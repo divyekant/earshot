@@ -1,0 +1,13 @@
+.DS_Store
+.build/
+.swiftpm/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+.venv/
+models/
+*.mlmodelc/
+*.onnx
+*.wav
+logs/
+.env
