@@ -12,6 +12,7 @@ public enum IntentText {
         switch intent {
         case .none: return "Nothing to do"
         case .openApp(let id): return "→ \(app(id))"
+        case .openURL(let address): return "Open \(URL(string: address)?.host ?? address)"
         case .openChat(let id, let target, let text):
             let base = "→ \(app(id)) · \(target)"
             guard let text, !text.isEmpty else { return base }
