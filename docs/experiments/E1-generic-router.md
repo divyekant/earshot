@@ -1,6 +1,6 @@
 # E1: generic router (rules + Jev, text only)
 
-Status: plan, 2026-11-02. The owner chose "E1 with Jev, text only" and "no local small model now".
+Status: run on 2026-11-02. Result: Go for the router and the catalogue. Change the design for the name source (section 6). The owner chose "E1 with Jev, text only" and "no local small model now".
 
 E1 follows [E0](E0-viability.md). E0 showed that one sentence can put the cursor in the correct message box in under 1 s. But E0 used data written by hand: the app rows in `probe/apps.json`, the names in `probe/people.json` and a fixed grammar. E1 tests a version with no hand-written data.
 
@@ -150,8 +150,66 @@ The index now holds 6 Messages chats and 3 Slack rows, with no noise. A group ch
 
 ### 5.4 The app's own search, first run (2026-11-02)
 
-24 searches: 12 names in Messages, 12 in Slack. No Return, no chat opened, no text left in a field. Each search closed.
+24 searches: 12 names in Messages, 12 in Slack. No Return, no chat opened, no text left in a field. The probe reported each search as closed, but that check was too weak (see 5.5).
 
 - Messages (Command-N, "To:" suggestions) found the contacts: Prakash (no chat in the sidebar), Udita, Mrunal, Felix and the owner. It does not find a business sender ("Partiful"): the "To:" field searches contacts, not chats. Results came 232 to 631 ms after the app was in front.
 - Slack (Command-K) found Prakash Iyer, PostHog, alerts and the owner, and found "Prakash Iyer" from the misheard "prakush". Results came 158 to 373 ms after the app was in front.
 - The first reader counted screen labels and the echo of the typed name as results ("Show results for: | manel"), and in Messages it fell back to the sidebar when "To:" found nothing. The reader now joins the texts of one screen line, drops prompt lines, file names and section titles, and reads nothing to the left of the field.
+
+### 5.5 The app's own search, second run: a failure (2026-11-02)
+
+This run left state behind. Nothing was sent, no Return was pressed, and no text went into a chat.
+
+- In Messages, one Escape closed the "To:" suggestions, but the new message stayed open. The next Command-N found the focus already in a "To:" field, so the focus check failed. Later searches read the suggestions of the earlier search.
+- In Slack, every search failed: the focus was on a "Delete" button of a search that was still open.
+- The cause: after a failed search, the probe did not press Escape. Its "closed" check accepted an open search with an empty field. It did not bring back the app that was in front.
+
+Cleanup: one Escape in Messages and one in Slack. After it, the Messages window showed only 22 accessibility nodes, with no chat list and no search field. The cause is not known. The owner must click a chat in Messages, or quit and open it again.
+
+Fixes: Escape after a failure; Escape again while a search field has the focus or the typed-into field is still on screen (3 times at most); close a search that is open before the next one; stop the run if a search does not close, or after 2 failures in a row; bring back the front app.
+
+### 5.6 The app's own search, Slack, third run (2026-11-02)
+
+12 searches. All closed, 0 failures, the front app came back.
+
+| Result | Names |
+| --- | --- |
+| Correct chat at place 1 | prakash → Prakash Iyer, posthog → PostHog, alerts → alerts, prakush (misheard) → Prakash Iyer, the owner's name → the owner |
+| Correct "no match" | 5 Messages contacts that are not in Slack, and 1 unknown name |
+| Wrong | "connect" → a Slack help item. The test name came from a sidebar link, not a chat |
+
+Results came 164 to 473 ms after the app was in front, median 323 ms. The remaining noise in the lists (file names, "Select Give feedback", help items) did not cause a wrong match. Commit 1e41ae3 drops it. An offline check of this log with the new filter (`e1-recheck`, no key presses) gives 12 of 12 correct outcomes ("connect" is now "no match"), and drops no true chat.
+
+## 6. Decision
+
+| Check | Result | Mark |
+| --- | --- | --- |
+| Catalogue | The generated Slack (Command-K) and Messages (Command-N) rows are the same as the E0 rows. One menu read: 50 to 350 ms for each app | Go |
+| Index (sidebar) | Slack shows 3 chats to Accessibility. Messages shows only chats with history. One read: about 70 ms | Change the design |
+| Router, correct | Rules, Jev if unsure: 42 of 42 | Go |
+| Router, time | Median 20 ms, slowest 1 in 10: 175 ms | Go |
+| Rules safety | Sure for 30 of 42, correct for 30 of 30 | Go |
+| Wrong chat | 0 for "Rules, Jev if unsure" | Go |
+| Search source | Slack: 11 of 12 correct, median 323 ms. Messages: 6 of 6 contacts found (second run, before the failure), 225 to 631 ms | Go, with the fixes in 5.5 |
+| Generated rows open the chat | Not run. The generated rows have the same keys as the E0 rows, which opened the owner's chat 10 of 10 | - |
+
+**Result: Go for a generic router.** The router needs no hand-written app row and no hand-written name list:
+
+1. **App catalogue** from the menu bars, built in the background.
+2. **Names** from two sources. The sidebar index is a fast hint for the chats on screen. The app's own search at command time is the main source, because it knows every chat. Messages "To:" finds contacts but not business senders, so the two sources work together.
+3. **Rules first.** They answer about 70 % of the commands in about 20 ms, and they were correct each time they were sure.
+4. **Jev only when the rules are unsure** (about 30 % of the commands), with the words and a short list of names as text. A warm call took about 90 ms median, 256 ms for the slowest 1 in 10, and 568 ms at most.
+5. **Generic executor** from E0: the app's search, the Return guard, the focus step and the chat check.
+
+Jev alone was less correct than the rules with Jev (39 of 42). It missed commands that hold message text or "me". So Jev is a fallback, not the main router.
+
+**Not decided: R-MD-1.** Jev runs in the cloud. E1 used it as a test only. The owner plans to train an own small model for the "unsure" step later, because the command vocabulary is small. Until then, R-MD-1 does not change. The logs in `probe/logs/e1-route-*.jsonl` are the first labelled data for that model.
+
+## 7. Changes before Phase 1
+
+- Route on the union of the sidebar index and the search results: rules pick from the search rows, and Jev picks only when the rules are unsure. Then press Return on the picked row, not on the top row, through the E0 guard.
+- Make the search reader robust in each app: read only the result popover, close it with checks, and keep the 5.5 fixes in the main pipeline.
+- Drop a result line that is exactly the typed text, unless it is a row of its own. Today only the line join removes the echo ("Show results for: ravi"). Drop or rank down message hits, such as lines below "Recent messages in" and "name • time" lines.
+- Find out why the Messages accessibility tree lost its chat list after Escape (5.5).
+- Do not index an app that has no list in its sidebar (ChatGPT took 2.3 s for 0 names before the fix).
+- Get real spoken commands from the owner's use, to replace the generated test set. They are also the training data for the own model.

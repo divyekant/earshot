@@ -70,6 +70,8 @@ Output: one action with arguments, for example `{action: "message", app: "slack"
 
 free-mac-voice (MIT) already uses the same tiers. Read its code before you write the router.
 
+Measured in E1 (2026-11-02, [E1-generic-router.md](experiments/E1-generic-router.md)): rules with fuzzy match (tiers 0 and 1) were sure for 30 of 42 test commands and correct for all 30, in about 20 ms. For the other 12, one text-only call to Jev (a cloud model, test only, see R-MD-1) picked from a short list in about 90 ms median (568 ms at most). Together: 42 of 42, with no wrong chat. The tier-2 model is still open: the owner plans an own small model, trained on the logs.
+
 ### 3.5 Actions (R-NV-*, R-CL-*, R-MT-*)
 
 **App table.** Keep one data file, for example `apps.yaml`, with one row for each app:
@@ -88,6 +90,8 @@ free-mac-voice (MIT) already uses the same tiers. Read its code before you write
 ```
 
 Verify the deep-link formats for WhatsApp, Messages and Discord. The research did not confirm them.
+
+E1 built the app rows from each app's menu bar, with no row written by hand: the menu item whose title says "switch to", "jump to" or "new message" gives the search keys. For Slack and Messages, the generated rows were the same as the E0 rows. The names come from two sources: the chat list in each app's sidebar (fast, but Slack shows only a few chats to Accessibility), and the app's own search at command time (it knows every chat; 160 to 630 ms).
 
 E0 used each app's own search in place of links, so the owner gives names only. Slack: Command-K. Messages: File > New Message (Command-N) and the "To:" field. WhatsApp (left out of E0): Command-F; the search also lists message hits, so a later design must check the type of the top result before Return.
 
