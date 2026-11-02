@@ -1,89 +1,78 @@
-import AppKit
-import ApplicationServices
 import EarshotCore
 import SwiftUI
 
-// T6 owns this module: the management window and the feedback note. T0 gives a first version of the tabs.
+// T6 owns this module: the management window and the feedback note (R-FB-1).
+// The module uses EarshotCore types only. EarshotApp (T7) gives the links to the other modules as hooks.
 
+/// The links from the management window to the other modules. EarshotApp (T7) sets them.
+/// If a hook is nil, the window shows that the function is not connected.
+public struct ManageHooks {
+    /// Runs one typed command through the router, and optionally the actions. Used by the Test tab.
+    public var test: ((String, _ runActions: Bool) async -> TestReport)?
+    /// Builds catalogue rows from the running and installed apps (CatalogueBuilder).
+    public var discoverApps: (() async -> [AppEntry])?
+    /// Reads the names of one app again (NameFinder).
+    public var refreshNames: ((_ appID: String) async -> [NameEntry])?
+    /// Shows the feedback note, for the "Show a test note" button.
+    public var feedback: FeedbackSink?
+    /// Tells EarshotApp that the settings changed, for example to restart the input trigger.
+    public var settingsChanged: ((EarshotSettings) -> Void)?
+
+    public init(test: ((String, Bool) async -> TestReport)? = nil,
+                discoverApps: (() async -> [AppEntry])? = nil,
+                refreshNames: ((String) async -> [NameEntry])? = nil,
+                feedback: FeedbackSink? = nil,
+                settingsChanged: ((EarshotSettings) -> Void)? = nil) {
+        self.test = test; self.discoverApps = discoverApps; self.refreshNames = refreshNames
+        self.feedback = feedback; self.settingsChanged = settingsChanged
+    }
+}
+
+/// The result of one command in the Test tab.
+public struct TestReport: Sendable {
+    public var heard: String
+    public var route: RouteResult
+    /// Nil if the actions did not run (dry run, or confidence too low).
+    public var outcome: ActionOutcome?
+
+    public init(heard: String, route: RouteResult, outcome: ActionOutcome? = nil) {
+        self.heard = heard; self.route = route; self.outcome = outcome
+    }
+}
+
+/// The management window. Tabs: General, Apps, Names, Activity, Permissions, Test.
 public struct ManageView: View {
     @Binding var settings: EarshotSettings
+    let store: Store
+    let hooks: ManageHooks
 
-    public init(settings: Binding<EarshotSettings>) { _settings = settings }
+    public init(settings: Binding<EarshotSettings>, store: Store = Store(), hooks: ManageHooks = ManageHooks()) {
+        _settings = settings
+        self.store = store
+        self.hooks = hooks
+    }
 
     public var body: some View {
         TabView {
-            GeneralTab(settings: $settings).tabItem { Text("General") }
-            Placeholder(title: "Apps", text: "The app catalogue. Discovered rows to approve, edit or turn off.").tabItem { Text("Apps") }
-            Placeholder(title: "Names", text: "Chats and people that earshot knows, by app.").tabItem { Text("Names") }
-            ActivityTab().tabItem { Text("Activity") }
+            GeneralTab(settings: $settings, hooks: hooks).tabItem { Text("General") }
+            AppsTab(store: store, hooks: hooks).tabItem { Text("Apps") }
+            NamesTab(store: store, hooks: hooks).tabItem { Text("Names") }
+            ActivityTab(store: store).tabItem { Text("Activity") }
             PermissionsTab().tabItem { Text("Permissions") }
+            TestTab(store: store, hooks: hooks).tabItem { Text("Test") }
         }
         .padding()
-    }
-}
-
-struct GeneralTab: View {
-    @Binding var settings: EarshotSettings
-
-    var body: some View {
-        Form {
-            Picker("Mode", selection: $settings.mode) {
-                Text("Hold key").tag(InputMode.hold)
-                Text("Always on").tag(InputMode.alwaysOn)
-            }
-            Picker("Speech engine", selection: $settings.engine) {
-                Text("Automatic").tag(EngineChoice.auto)
-                Text("Apple").tag(EngineChoice.apple)
-                Text("Parakeet").tag(EngineChoice.parakeet)
-            }
-            Picker("When the rules are unsure", selection: $settings.tier2) {
-                Text("Do nothing (all on this Mac)").tag(Tier2.off)
-                Text("Ask Jev").tag(Tier2.jev)
-            }
-            Toggle("Show the note on screen", isOn: $settings.showFeedback)
-        }
-        .onChange(of: settings) { _, new in try? Store().save(new, "settings.json") }
-    }
-}
-
-struct ActivityTab: View {
-    @State private var records: [ActivityRecord] = []
-
-    var body: some View {
-        List(records.reversed()) { r in
-            HStack {
-                Text(r.ok ? "✓" : "✗")
-                Text(r.heard).lineLimit(1)
-                Spacer()
-                Text(r.intent).foregroundStyle(.secondary).lineLimit(1)
-            }
-        }
-        .onAppear { records = ActivityLog().last(200) }
-    }
-}
-
-struct PermissionsTab: View {
-    var body: some View {
-        Form {
-            LabeledContent("Accessibility", value: AXIsProcessTrusted() ? "On" : "Off")
-            Button("Open Privacy & Security settings") {
-                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security") {
-                    NSWorkspace.shared.open(url)
-                }
-            }
+        .onChange(of: settings) { _, new in
+            try? store.save(new, "settings.json")
+            hooks.settingsChanged?(new)
         }
     }
 }
 
-struct Placeholder: View {
-    let title: String
-    let text: String
+/// A short line that tells the owner that a function is not connected yet.
+struct NotConnected: View {
+    let what: String
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title).font(.title2)
-            Text(text).foregroundStyle(.secondary)
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        Text("\(what) is not connected in this build.").font(.caption).foregroundStyle(.secondary)
     }
 }
