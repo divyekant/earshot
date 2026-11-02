@@ -281,9 +281,10 @@ enum ScreenRouter {
         for e in elements where !e.label.isEmpty {
             var s = score(p.target, e.label)
             if isMenu(e) {
-                // A menu title can hold the verb: "select all" is the item "Select All". A match on all the words wins a tie.
+                // A menu title can hold the verb: "select all" is the item "Select All". A match on all the words
+                // wins by the margin over a full match on the words after the verb (the link "All").
                 let whole = score(p.words, e.label)
-                if whole >= 1 { s = max(s, 1.02) } else { s = max(s, whole) }
+                if whole >= 1 { s = max(s, 1 + margin) } else { s = max(s, whole) }
             }
             if let hint = p.roleHint, hint == kind(e) { s += 0.05 }
             if s >= 0.3 { scored.append((e, s)) }
