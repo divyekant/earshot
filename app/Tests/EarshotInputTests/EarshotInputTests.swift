@@ -186,6 +186,28 @@ final class ForMeGateTests: XCTestCase {
         XCTAssertTrue(gate.check("iMessage mom", apps: apps, secondsSinceLastCommand: nil).isForMe)
     }
 
+    func testHesitationBeforePrefix() {
+        XCTAssertTrue(gate.check("uh Slack me hi", apps: apps, secondsSinceLastCommand: nil).isForMe)
+        XCTAssertTrue(gate.check("um, Slack me running late", apps: apps, secondsSinceLastCommand: nil).isForMe)
+        XCTAssertTrue(gate.check("um open hn.com", apps: apps, secondsSinceLastCommand: nil).isForMe)
+        XCTAssertFalse(gate.check("uh I think so", apps: apps, secondsSinceLastCommand: nil).isForMe)
+        XCTAssertFalse(gate.check("uh um", apps: apps, secondsSinceLastCommand: 1).isForMe, "only hesitation words")
+        guard case .forMe(_, let maySend, _) = gate.check("uh send", apps: apps, secondsSinceLastCommand: 2)
+        else { return XCTFail("\"uh send\" in the window is a send command") }
+        XCTAssertTrue(maySend)
+    }
+
+    /// The gate runs on every always-on utterance, so it must be fast.
+    func testGateLatency() {
+        let texts = ["uh Slack me hi", "um open hn.com", "uh I think so", "Slack Ravi, running late", "send"]
+        let n = 10_000
+        let t0 = Date()
+        for i in 0..<n { _ = gate.check(texts[i % texts.count], apps: apps, secondsSinceLastCommand: 2) }
+        let us = Date().timeIntervalSince(t0) / Double(n) * 1_000_000
+        print("ForMeGate latency: \(String(format: "%.1f", us)) us per check")
+        XCTAssertLessThan(us, 1000, "the gate must take less than 1 ms")
+    }
+
     func testTalkToPeopleIsRejected() {
         XCTAssertFalse(gate.check("I think we should get lunch", apps: apps, secondsSinceLastCommand: nil).isForMe)
         XCTAssertFalse(gate.check("", apps: apps, secondsSinceLastCommand: nil).isForMe)
