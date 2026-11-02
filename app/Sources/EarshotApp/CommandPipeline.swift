@@ -82,7 +82,10 @@ final class CommandPipeline {
         }
 
         let rows = apps().filter { $0.approved && $0.enabled }
-        var context = RouteContext(apps: rows, names: await allNames(), frontBundleID: frontBundleID())
+        let namesClock = Stopwatch()
+        let known = await allNames()
+        stages["names"] = namesClock.ms
+        var context = RouteContext(apps: rows, names: known, frontBundleID: frontBundleID())
         let screenClock = Stopwatch()
         context.screen = await actions.screen()
         stages["screen"] = screenClock.ms
@@ -92,7 +95,10 @@ final class CommandPipeline {
         stages["route"] = routeClock.ms
 
         // A name that no known chat explains: ask the app's own search once, then route again (E1).
-        if let heard = heardName(text, context), let appID = heard.appID ?? Self.appID(of: result.intent) {
+        // Only when the route is not sure or is not a chat, and never for the owner's own chat: the search types
+        // into the app, and in the first live test it searched Slack for the message words ("running late").
+        if Self.needsAppSearch(text, result),
+           let heard = heardName(text, context), let appID = heard.appID ?? Self.appID(of: result.intent) {
             let searchClock = Stopwatch()
             let found = await names.search(appID: appID, term: heard.name)
             stages["search"] = searchClock.ms
@@ -106,13 +112,13 @@ final class CommandPipeline {
         if result.confidence < SafetyPolicy.minimumConfidence {
             let options = result.alternatives.prefix(2).map { IntentText.describe($0, apps: rows, screen: context.screen) }
             let note = (["not sure: \(result.why)"] + options.map { "maybe \($0)" }).joined(separator: " · ")
-            return done(heard: text, intent: describe, tier: result.tier, ok: false, note: note, stages: stages, clock)
+            return done(heard: text, intent: describe, tier: result.tier, ok: false, note: note, stages: stages, clock, why: result.why)
         }
 
         var intent = result.intent
         if mode == .alwaysOn, intent == .send, !maySend { intent = .none }
         if intent == .none {
-            return done(heard: text, intent: "none", tier: result.tier, ok: false, note: "not a command", stages: stages, clock)
+            return done(heard: text, intent: "none", tier: result.tier, ok: false, note: "not a command", stages: stages, clock, why: result.why)
         }
 
         let types = Self.types(intent)
@@ -122,7 +128,7 @@ final class CommandPipeline {
         if types { pauseAlwaysOn(false) }
         for (k, v) in outcome.stages { stages["action." + k] = v }
         lastCommandAt = Date()
-        return done(heard: text, intent: describe, tier: result.tier, ok: outcome.ok, note: outcome.note, stages: stages, clock)
+        return done(heard: text, intent: describe, tier: result.tier, ok: outcome.ok, note: outcome.note, stages: stages, clock, why: result.why)
     }
 
     /// The Test tab: route typed text, and run the actions only if `runActions` is true. A typed command counts as a
@@ -140,15 +146,36 @@ final class CommandPipeline {
     }
 
     private func done(heard: String, intent: String, tier: RouterTier, ok: Bool, note: String,
-                      stages: [String: Double], _ clock: Stopwatch, quiet: Bool = false) -> ActivityRecord {
+                      stages: [String: Double], _ clock: Stopwatch, quiet: Bool = false, why: String = "") -> ActivityRecord {
         var stages = stages
         stages["total"] = clock.ms
-        let record = ActivityRecord(heard: heard, intent: intent, tier: tier, ok: ok, note: note, stages: stages)
+        // The log keeps the router's reason too, so that a wrong intent can be explained later
+        // (for example "open Slack" when Slack had no chat keys). The note on screen stays short.
+        let logNote = why.isEmpty || note.contains(why) ? note : "\(note) · route: \(why)"
+        let record = ActivityRecord(heard: heard, intent: intent, tier: tier, ok: ok, note: logNote, stages: stages)
         try? log?.append(record)
         if showFeedback, !quiet {
             feedback?.show(ok ? "→ \(intent)" : "✗ \(note)", ok: ok)
         }
         return record
+    }
+
+    /// The app search rule (E1, first live test).
+    static func needsAppSearch(_ text: String, _ result: RouteResult) -> Bool {
+        guard !namesSelf(text) else { return false }
+        if case .openChat = result.intent { return result.confidence < CommandRouter.sureConfidence }
+        return true
+    }
+
+    /// True if the name part names the owner's own chat ("me", "myself", "my own chat").
+    /// The name part: the words before the first comma, or, with no comma, the first three words.
+    /// So "Slack Ravi, call me later" and "Slack Ravi call me later" do not count: "me" is in the message.
+    static func namesSelf(_ text: String) -> Bool {
+        let head = text.split(separator: ",", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init) ?? text
+        var words = SafetyPolicy.normalize(head).split(separator: " ").map(String.init)
+        if !text.contains(",") { words = Array(words.prefix(3)) }
+        let set = Set(words)
+        return !set.isDisjoint(with: ["me", "myself"]) || (set.contains("my") && set.contains("own"))
     }
 
     static func appID(of intent: Intent) -> String? {
