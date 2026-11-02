@@ -7,12 +7,21 @@ public struct MenuItem: Hashable, Sendable {
     /// The titles from the menu bar down, for example ["Edit", "Select All"].
     public var path: [String]
     public var title: String { path.last ?? "" }
-    /// False if the app greys out the item now.
+    /// False if the app greyed out the item at the time of the read. An app in the background greys out
+    /// many items, so read the state again when the command runs.
     public var enabled: Bool
     /// The key shortcut as text, for example "cmd+a", or nil.
     public var keys: String?
+    /// True if the command can change data, send something or end work: SafetyPolicy.isRisky, or a word
+    /// in `MenuIndex.riskyWords` ("Empty Trash", "Quit Slack"). Press it only on the owner's exact command (R-NV-5).
+    public var risky: Bool
 
-    public init(path: [String], enabled: Bool, keys: String? = nil) { self.path = path; self.enabled = enabled; self.keys = keys }
+    public init(path: [String], enabled: Bool, keys: String? = nil) {
+        self.path = path; self.enabled = enabled; self.keys = keys
+        let title = path.last ?? ""
+        let words = Set(Words.normalize(title).split(separator: " ").map(String.init))
+        risky = SafetyPolicy.isRisky(title) || !words.isDisjoint(with: MenuIndex.riskyWords)
+    }
 }
 
 /// One node of a menu tree. The reader builds it from Accessibility. Tests build it by hand.
@@ -72,6 +81,10 @@ public actor MenuIndex {
     public func forget(bundleID: String) { cache[bundleID] = nil }
 
     // MARK: - Rules (pure)
+
+    /// Menu words that SafetyPolicy does not list, but that end work or remove data.
+    public static let riskyWords: Set<String> = ["quit", "empty", "trash", "erase", "restart", "shutdown", "shut",
+                                                 "logout", "terminate", "kill", "revert", "overwrite", "wipe", "format"]
 
     /// Menu titles that hold no commands: the Apple menu, the Services menu, and lists of recent files.
     public static let skippedMenus: Set<String> = ["apple", "services", "open recent", "recent items", "recent files",

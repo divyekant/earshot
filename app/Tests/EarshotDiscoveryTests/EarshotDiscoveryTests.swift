@@ -199,6 +199,11 @@ final class MenuIndexTests: XCTestCase {
         XCTAssertEqual(items[2].enabled, false)
         XCTAssertEqual(items[3].keys, "cmd+a")
         XCTAssertEqual(items[3].title, "Select All")
+        XCTAssertFalse(items[3].risky)
+        XCTAssertTrue(items[0].risky)  // Quit Notes
+        XCTAssertTrue(MenuItem(path: ["Finder", "Empty Trash…"], enabled: true).risky)
+        XCTAssertTrue(MenuItem(path: ["File", "Delete"], enabled: true).risky)
+        XCTAssertFalse(MenuItem(path: ["File", "New Note"], enabled: true).risky)
     }
 }
 
@@ -410,7 +415,7 @@ final class LiveDiscoveryTests: XCTestCase {
         for id in ids {
             let items = await index.refresh(bundleID: id)
             let read = await index.lastRead[id]
-            let sample = items.filter { $0.keys != nil }.prefix(6).map { $0.path.joined(separator: " > ") + " " + ($0.keys ?? "") }
+            let sample = items.filter { $0.keys != nil }.prefix(6).map { $0.path.joined(separator: " > ") + " " + ($0.keys ?? "") + ($0.risky ? " (risky)" : "") }
             print("LIVE menus \(id): \(items.count) items, \(items.filter(\.enabled).count) enabled, "
                   + "\(Int(read?.ms ?? 0)) ms, stopped at the limit: \(read?.timedOut ?? false): \(sample.joined(separator: " | "))")
         }
