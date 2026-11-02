@@ -34,6 +34,7 @@ public final class ParakeetEngine: SpeechEngine, SpeechTimingReporting, @uncheck
     private var turn = SpeechTiming(engine: ParakeetEngine.engineID, why: "")
     private var timing: SpeechTiming?
     private let mic: MicrophoneFeed
+    let activity = TurnActivity()
     private let useMicrophone: Bool
 
     /// The time of the last load, in ms. For the log and the management window.
@@ -91,6 +92,9 @@ public final class ParakeetEngine: SpeechEngine, SpeechTimingReporting, @uncheck
     /// Starts a turn with no microphone. The caller gives the audio with `feed`. For measurements.
     func beginWithoutMicrophone() { startTurn() }
 
+    /// The samples of the turn so far. For tests.
+    var bufferedFrames: Int { lock.withLock { samples.count } }
+
     /// Adds audio (16 kHz mono float) to the turn.
     func feed(_ floats: [Float]) {
         lock.withLock { if listening { samples.append(contentsOf: floats) } }
@@ -114,6 +118,7 @@ public final class ParakeetEngine: SpeechEngine, SpeechTimingReporting, @uncheck
         t.why = reason
         t.audioMs = Double(pcm.count) / 16.0
         t.tailMs = SpeechClock.ms(since: t0)
+        defer { activity.end() }
         let r = try await run(pcm)
         t.waitMs = r.waitMs
         t.decodeMs = r.decodeMs
@@ -141,6 +146,7 @@ public final class ParakeetEngine: SpeechEngine, SpeechTimingReporting, @uncheck
     // MARK: - Private
 
     private func startTurn() {
+        activity.begin("earshot speech command")
         let now = SpeechClock.nowNs()
         let warm: Bool = lock.withLock {
             samples.removeAll(keepingCapacity: true)

@@ -23,6 +23,7 @@ public final class AppleSpeechEngine: SpeechEngine, SpeechTimingReporting, @unch
     private var format: AVAudioFormat?
     private var frames: Int64 = 0
     private var timing: SpeechTiming?
+    let activity = TurnActivity()
 
     public init(locale: Locale = Locale(identifier: "en_US")) { self.locale = locale }
 
@@ -82,6 +83,7 @@ public final class AppleSpeechEngine: SpeechEngine, SpeechTimingReporting, @unch
         guard let loc = lock.withLock({ resolvedLocale }) else {
             throw SpeechError("Apple speech is not ready: call prepare() first")
         }
+        activity.begin("earshot speech command")
         let (stream, continuation) = AsyncStream.makeStream(of: AnalyzerInput.self)
         let task = Self.startAnalyzer(locale: loc, input: stream, onPartial: onPartial)
         let feed: (AVAudioPCMBuffer) -> Void = { [weak self] buffer in
@@ -111,6 +113,7 @@ public final class AppleSpeechEngine: SpeechEngine, SpeechTimingReporting, @unch
             feed(pad)
         }
         close?()
+        defer { activity.end() }
         guard let task else { return Utterance(text: "", engine: id, ms: 0) }
         var t = SpeechTiming(engine: id, why: reason)
         t.tailMs = SpeechClock.ms(since: t0)
