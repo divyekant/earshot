@@ -88,6 +88,41 @@ final class MenuRulesTests: XCTestCase {
     }
 }
 
+final class CatalogueSafetyTests: XCTestCase {
+    func testApprovedRowGainsChatKeysAndKeepsApproval() {
+        // Seen live: the owner approved Slack while Accessibility was off, so the row had no chat keys.
+        let old = AppEntry(id: "slack", name: "Slack", bundleID: "x.slack", aliases: ["slack", "work chat"], approved: true,
+                           enabled: true)
+        let new = AppEntry(id: "slack", name: "Slack", bundleID: "x.slack", aliases: ["slack"], isChat: true,
+                           openChat: .switcher(keys: "cmd+k"))
+        let row = MenuRules.merge(existing: [old], found: [new]).first
+        XCTAssertEqual(row?.isChat, true)
+        XCTAssertEqual(row?.openChat, .switcher(keys: "cmd+k"))
+        XCTAssertEqual(row?.approved, true)
+        XCTAssertEqual(row?.aliases, ["slack", "work chat"])
+        // A row that the owner did not approve still needs approval.
+        let fresh = MenuRules.merge(existing: [AppEntry(id: "slack", name: "Slack", bundleID: "x.slack")], found: [new]).first
+        XCTAssertEqual(fresh?.approved, false)
+    }
+
+    func testNoScanAndNoSaveWithoutAccessibility() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("earshot-t4-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let store = Store(folder: folder)
+        let catalogue = MenuCatalogue(skip: [], includeInstalled: true, trusted: { false })
+        let rows = await catalogue.discover()
+        XCTAssertEqual(rows, [])
+        do {
+            try await catalogue.refresh(store: store)
+            XCTFail("refresh must throw")
+        } catch {
+            XCTAssertEqual(error as? DiscoveryError, .accessibilityOff)
+            XCTAssertEqual(error.localizedDescription, "Turn on Accessibility for earshot first")
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: folder.appendingPathComponent("apps.json").path))
+    }
+}
+
 final class NameRulesTests: XCTestCase {
     func testClean() {
         XCTAssertEqual(NameRules.clean("Ravi Kumar (you)")?.name, "Ravi Kumar")

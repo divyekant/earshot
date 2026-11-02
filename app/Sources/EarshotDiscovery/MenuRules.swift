@@ -141,7 +141,8 @@ public enum MenuRules {
     }
 
     /// Joins a new scan with the rows that the owner already has.
-    /// - An approved row stays as the owner left it.
+    /// - An approved row stays as the owner left it. If it gains chat keys from a new menu read,
+    ///   it takes the keys and keeps the approval, the name, the aliases and "enabled".
     /// - A row that is not approved takes the new scan, but keeps the owner's "enabled" choice.
     /// - A scan with less data (an installed app that does not run now) does not replace a row with menu data.
     /// - A row that the scan did not find stays.
@@ -158,6 +159,13 @@ public enum MenuRules {
                 var row = new
                 row.id = old.id
                 row.enabled = old.enabled
+                if old.approved {
+                    // The owner approved this row before earshot could read its menus, for example
+                    // while Accessibility was off. Keep the approval and the owner's names.
+                    row.approved = true
+                    row.name = old.name
+                    row.aliases = old.aliases + new.aliases.filter { !old.aliases.contains($0) }
+                }
                 out[i] = row
             } else {
                 var row = new
