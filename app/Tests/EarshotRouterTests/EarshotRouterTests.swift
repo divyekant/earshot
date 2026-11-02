@@ -739,6 +739,7 @@ final class EarshotRouterTests: XCTestCase {
         XCTAssertEqual(r.intent, .click(elementID: "b2"), r.why)
         XCTAssertEqual(r.tier, .fuzzy, "a word pair is never an exact match")
         await expect("click on refresh.", .click(elementID: "m:View>Reload This Page"), liveContext(menus))
+        await expect("click on reload", .click(elementID: "m:View>Reload This Page"), liveContext(menus))
         await expect("open settings", .click(elementID: "p1"), liveContext([Fixtures.el("p1", "AXButton", "Preferences", y: 5)]))
         // No pair holds a risky word.
         for (w, others) in UIWords.other {
