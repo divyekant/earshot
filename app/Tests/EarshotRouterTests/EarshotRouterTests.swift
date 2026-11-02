@@ -595,6 +595,58 @@ final class EarshotRouterTests: XCTestCase {
         XCTAssertEqual(far.why, "no label matches")
     }
 
+    // MARK: - Live cases: letter group + number, whole numbers, app names by sound
+
+    func liveContext(_ elements: [ScreenElement], apps: [AppEntry] = Fixtures.apps) -> RouteContext {
+        RouteContext(apps: apps, names: Fixtures.names, frontBundleID: "com.google.Chrome",
+                     screen: ScreenSnapshot(bundleID: "com.google.Chrome", windowTitle: "Fantasy", elements: elements))
+    }
+
+    func testLetterGroupAndNumber() async {
+        let ctx = liveContext([Fixtures.el("e1", "AXLink", "Review GW8", y: 10), Fixtures.el("e2", "AXLink", "Review GW9", y: 20),
+                               Fixtures.el("e3", "AXLink", "Plan GW10", y: 30)])
+        await expect("Click on review GW 8", .click(elementID: "e1"), ctx)
+        await expect("click review gw eight", .click(elementID: "e1"), ctx)
+        await expect("Click on plan GW 10", .click(elementID: "e3"), ctx)
+        XCTAssertEqual(ScreenRouter.joinLetterNumber(["review", "gw", "8"]), ["review", "gw8"])
+        XCTAssertEqual(ScreenRouter.joinLetterNumber(["page", "2"]), ["page", "2"], "a long word does not join")
+        XCTAssertEqual(ScreenRouter.numbers(["gw8"]), ["8"])
+    }
+
+    func testANumberMatchesOnlyAWholeNumber() async {
+        let ctx = liveContext([Fixtures.el("e1", "AXLink", "Player Who Returned 10,000 Years Later", y: 10),
+                               Fixtures.el("e2", "AXLink", "Plan 100", y: 20)])
+        let r = await route("Click on plan GW 10", ctx)
+        XCTAssertEqual(r.intent, .none, r.why)
+        XCTAssertFalse(r.why.contains("Player"), r.why)
+        XCTAssertFalse(r.why.contains("Plan 100"), r.why)
+        await expect("click plan 100", .click(elementID: "e2"), ctx)
+        XCTAssertEqual(ScreenRouter.joinThousands("Returned 10,000 Years"), "Returned 10000 Years")
+        XCTAssertEqual(ScreenRouter.joinThousands("Chats, 44"), "Chats, 44")
+        XCTAssertEqual(ScreenRouter.info("Player Who Returned 10,000 Years Later").numbers, ["10000"])
+        XCTAssertEqual(ScreenRouter.score(["10"], "Plan 100"), 0)
+    }
+
+    func testAppNameBySound() async {
+        let claude = AppEntry(id: "claude", name: "Claude", bundleID: "com.example.claude", aliases: ["claude"], approved: true)
+        let menus = MenuElements.elements([MenuEntry(path: ["File", "Reopen Closed Tab"]), MenuEntry(path: ["View", "Reload"]),
+                                           MenuEntry(path: ["History", "Show Full History"])])
+        let ctx = liveContext(menus, apps: Fixtures.apps + [claude])
+        await expect("Open Cloud.", .openApp(appID: "claude"), ctx)
+        await expect("go to cloud", .openApp(appID: "claude"), ctx)
+        // An exact label on the screen wins: the screen rules press it.
+        let label = liveContext([Fixtures.el("e1", "AXButton", "Cloud", y: 10)], apps: Fixtures.apps + [claude])
+        await expect("open cloud", .click(elementID: "e1"), label)
+        // No app sounds like it: no app.
+        let r = await route("open crowd", ctx)
+        XCTAssertNotEqual(r.intent, .openApp(appID: "claude"), r.why)
+        // The app must be approved.
+        var unapproved = claude
+        unapproved.approved = false
+        let off = await route("Open Cloud.", liveContext(menus, apps: Fixtures.apps + [unapproved]))
+        XCTAssertNotEqual(off.intent, .openApp(appID: "claude"), off.why)
+    }
+
     func testE2NoCommand() async {
         let r = await route("what a lovely day", news)
         XCTAssertEqual(r.intent, .none)

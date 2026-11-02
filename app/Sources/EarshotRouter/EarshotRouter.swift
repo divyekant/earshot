@@ -131,6 +131,11 @@ public struct CommandRouter: Router {
 
         let chat = ChatRouter.decide(text, apps: context.apps, names: context.names, frontBundleID: context.frontBundleID)
         if chat.sure && chat.intent != .none { return chat }
+        // "Open Cloud" for "Open Claude": an app name by sound, before a fuzzy label or menu item (R-MT-1).
+        if let app = appBySound(words, apps: context.apps, screen: context.screen) {
+            return RulesDecision(intent: .openApp(appID: app.id), sure: true, exact: false, why: "app name by sound",
+                                 options: chat.options)
+        }
         if let screen = context.screen {
             var web = ScreenRouter.decide(text, screen: screen)
             if web.intent != .none || (!chat.sure && chat.intent == .none && web.options.contains { $0.score > 0 }) {
@@ -201,6 +206,29 @@ public struct CommandRouter: Router {
             if let app = exactApp(w[0..<span].joined(), apps) { return (app, tokens.raw(span..<w.count)) }
         }
         return nil
+    }
+
+    static let openVerbs: [[String]] = [["open"], ["go", "to"], ["switch", "to"], ["launch"], ["start"]]
+
+    /// "open <one or two words>" whose sound code is the sound code of one approved app name, and of no other.
+    /// The names come from the app table. A label on the screen with the same words wins: the screen rules press it.
+    static func appBySound(_ words: [String], apps: [AppEntry], screen: ScreenSnapshot?) -> AppEntry? {
+        guard let verb = openVerbs.first(where: { words.starts(with: $0) }) else { return nil }
+        var rest = Array(words.dropFirst(verb.count))
+        while let f = rest.first, ["the", "my"].contains(f), rest.count > 1 { rest.removeFirst() }
+        if let l = rest.last, ["app", "application"].contains(l), rest.count > 1 { rest.removeLast() }
+        guard (1...2).contains(rest.count) else { return nil }
+        let key = rest.joined()
+        guard key.count >= 3, !key.unicodeScalars.contains(where: { $0.value >= 48 && $0.value <= 57 }) else { return nil }
+        if let screen, screen.elements.contains(where: { ScreenRouter.keys($0.label).contains(key) }) { return nil }
+        let code = SoundCode.code(key)
+        let hits = apps.filter { app in
+            app.approved && app.enabled && (app.aliases + [app.name]).contains { name in
+                let k = TextKit.key(name)
+                return k.count >= 3 && k != key && SoundCode.code(k) == code
+            }
+        }
+        return hits.count == 1 ? hits[0] : nil
     }
 
     static func exactApp(_ key: String, _ apps: [AppEntry]) -> AppEntry? {
