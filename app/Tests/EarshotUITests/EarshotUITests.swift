@@ -210,25 +210,20 @@ final class AppsFilterTests: XCTestCase {
 }
 
 final class BrandTests: XCTestCase {
-    func testArcsBulgeLeftAndMatchTheSVG() {
-        // "M 330 432 A 120 120 0 0 0 330 592": ends at x 330, leftmost point at x 330 - (120 - sqrt(120^2 - 80^2)).
-        let inner = MarkPaths.innerArc.boundingRect
-        XCTAssertEqual(inner.minX, 419.443 - 120, accuracy: 0.5)
-        XCTAssertEqual(inner.maxX, 330, accuracy: 0.5)
-        XCTAssertEqual(inner.minY, 432, accuracy: 0.5)
-        XCTAssertEqual(inner.maxY, 592, accuracy: 0.5)
-        let outer = MarkPaths.outerArc.boundingRect
-        XCTAssertEqual(outer.minX, 411.749 - 205, accuracy: 0.5)
-        XCTAssertEqual(outer.maxY, 652, accuracy: 0.5)
+    func testMarkMatchesTheSVG() {
+        // glyph.svg: viewBox "276 286 472 452".
+        let all = (MarkShapes.bars + [MarkShapes.cursor]).map(\.rect).reduce(CGRect.null) { $0.union($1) }
+        XCTAssertEqual(all, CGRect(x: 276, y: 286, width: 472, height: 452))
+        XCTAssertEqual(MarkShapes.bars.count, 4)
+        // The bars rise to the third bar, then fall. The cursor is the tallest shape.
+        let heights = MarkShapes.bars.map(\.rect.height)
+        XCTAssertEqual(heights.max(), heights[2])
+        XCTAssertGreaterThan(MarkShapes.cursor.rect.height, heights[2])
     }
 
-    func testMarkStaysInsideTheTile() {
-        for p in [MarkPaths.rim, MarkPaths.curl, MarkPaths.cursor, MarkPaths.outerArc] {
-            let r = p.boundingRect.offsetBy(dx: -14, dy: 0)
-            XCTAssertGreaterThan(r.minX, 100)
-            XCTAssertLessThan(r.maxX, 924)
-            XCTAssertGreaterThan(r.minY, 100)
-            XCTAssertLessThan(r.maxY, 924)
-        }
+    func testMarkIsCentredInTheTile() {
+        let all = (MarkShapes.bars + [MarkShapes.cursor]).map(\.rect).reduce(CGRect.null) { $0.union($1) }
+        XCTAssertEqual(all.midX, 512, accuracy: 1)
+        XCTAssertEqual(all.midY, 512, accuracy: 1)
     }
 }
