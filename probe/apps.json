@@ -1,0 +1,36 @@
+{
+  "apps": [
+    {
+      "id": "slack",
+      "name": "Slack",
+      "say": "Slack",
+      "bundle_id": "com.tinyspeck.slackmacgap",
+      "aliases": ["slack"],
+      "electron": true,
+      "open_chat": { "kind": "switcher", "keys": "cmd+k", "pick": ["return"], "settle_ms": 250 },
+      "bench_runs": 10,
+      "script_lines": 10
+    },
+    {
+      "id": "whatsapp",
+      "name": "WhatsApp",
+      "say": "WhatsApp",
+      "bundle_id": "net.whatsapp.WhatsApp",
+      "aliases": ["whatsapp", "whats app"],
+      "open_chat": { "kind": "switcher", "keys": "cmd+f", "pick": ["return"], "settle_ms": 300 },
+      "bench_runs": 10,
+      "script_lines": 4,
+      "enabled": false
+    },
+    {
+      "id": "messages",
+      "name": "Messages",
+      "say": "iMessage",
+      "bundle_id": "com.apple.MobileSMS",
+      "aliases": ["imessage", "messages", "message", "text", "sms"],
+      "open_chat": { "kind": "switcher", "keys": "cmd+n", "pick": ["return"], "settle_ms": 300 },
+      "bench_runs": 10,
+      "script_lines": 4
+    }
+  ]
+}
