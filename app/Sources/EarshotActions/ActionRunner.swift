@@ -188,20 +188,30 @@ public final class EarshotActionRunner: ActionRunner {
         // The search keys must move the focus. If the focus stays where it was, for example in a reply box,
         // earshot stops, so that it never types the name into a message box.
         let before = AX.focused(app)
+        // The switcher-shaped fields that exist before the keys. A field that shows after the keys is the switcher.
+        let oldFields = AX.window(app).map { AX.switcherFields(in: $0) } ?? []
         if keys.isEmpty {
             guard focusSearchField(app) else { return "no search field found" }
         } else {
             guard let combo = Keys.parse(keys) else { return "bad switcher keys: \(keys)" }
             Keys.press(combo)
         }
-        var found: AXUIElement?
-        let opened = await waitUntil(timeoutMs: SwitcherTiming.fieldMs, intervalMs: SwitcherTiming.pollMs) {
-            guard let el = AX.focused(app), let win = AX.window(app), AX.isSwitcherField(el, in: win) else { return false }
-            if !keys.isEmpty, AX.same(el, before) { return false }
-            found = el
-            return true
-        }
-        guard opened, let field = found else { return "the search field did not get focus in \(SwitcherTiming.fieldMs) ms (\(AX.describeFocus(app)))" }
+        // Wait until the switcher field has focus. If it shows without focus (Messages "To:"), set the focus through AX.
+        let (found, failure) = await waitForSwitcherField(
+            focused: { () -> (AXUIElement?, Bool, Bool) in
+                guard let el = AX.focused(app), let win = AX.window(app) else { return (nil, false, false) }
+                let isNew = keys.isEmpty || !AX.same(el, before)
+                return (el, isNew && AX.isSwitcherField(el, in: win), AX.isComposer(el, in: win) || AX.looksLikeComposer(el))
+            },
+            newField: { () -> AXUIElement? in
+                guard let win = AX.window(app) else { return nil }
+                return AX.switcherFields(in: win).first { f in !oldFields.contains { CFEqual($0, f) } }
+            },
+            setFocus: { AX.set($0, "AXFocused", kCFBooleanTrue) })
+        guard let field = found else { return "\(failure ?? "no search field") (\(AX.describeFocus(app)))" }
+        // Never type the name while the focus is in a message box.
+        guard let now = AX.focused(app), AX.same(now, field), let win = AX.window(app),
+              !AX.isComposer(now, in: win), !AX.looksLikeComposer(now) else { return "the focus left the search field: nothing typed" }
         watch.mark("switcher")
         // The texts that match the name before typing, for example the chat in the sidebar. They do not count as results.
         let fieldFrame = AX.frame(field)
@@ -244,6 +254,36 @@ public final class EarshotActionRunner: ActionRunner {
         }
         Keys.press(Keys.returnKey)
         return nil
+    }
+
+    /// Waits until the focus is in a new switcher field. `focused` gives the focused element, whether it is a new
+    /// switcher field, and whether it is a message box. If a new switcher field shows without focus, `setFocus` focuses it.
+    /// It returns the field, or the reason for the time-out. The caller types nothing on a time-out.
+    func waitForSwitcherField<T>(timeoutMs: Int = SwitcherTiming.fieldMs, focused: () -> (T?, Bool, Bool),
+                                 newField: () -> T?, setFocus: (T) -> Void) async -> (T?, String?) {
+        let t0 = Clock.nowNs()
+        var lastScan = -Double(SwitcherTiming.scanMs)
+        var inBox = false
+        var sawField = false
+        while true {
+            let (el, isSwitcher, isComposer) = focused()
+            if isSwitcher, let el { return (el, nil) }
+            inBox = isComposer
+            let now = Clock.ms(since: t0)
+            if now - lastScan >= Double(SwitcherTiming.scanMs) {
+                lastScan = now
+                if let f = newField() {
+                    sawField = true
+                    setFocus(f)
+                    continue
+                }
+            }
+            if now >= Double(timeoutMs) { break }
+            await sleepMs(SwitcherTiming.pollMs)
+        }
+        if sawField { return (nil, "the search field showed, but did not take the focus in \(timeoutMs) ms: nothing typed") }
+        if inBox { return (nil, "the focus stayed in the message box for \(timeoutMs) ms: nothing typed") }
+        return (nil, "the search field did not show in \(timeoutMs) ms: nothing typed")
     }
 
     /// Polls `read` until a text that matches the name and is not in `baseline` shows on screen.

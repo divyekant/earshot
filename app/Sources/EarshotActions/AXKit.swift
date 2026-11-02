@@ -268,6 +268,28 @@ enum AX {
         return out
     }
 
+    /// The fields of the window that have the switcher shape, highest first. It skips lists and the lower part of the window.
+    static func switcherFields(in window: AXUIElement, budgetMs: Int = 60, maxNodes: Int = 3000) -> [AXUIElement] {
+        guard let w = frame(window) else { return [] }
+        let t0 = Clock.nowNs()
+        var queue: [AXUIElement] = [window]
+        var index = 0
+        var out: [(AXUIElement, Double)] = []
+        while index < queue.count, index < maxNodes, Clock.ms(since: t0) < Double(budgetMs) {
+            let element = queue[index]
+            index += 1
+            let r = role(element)
+            if textRoles.contains(r) || subrole(element) == "AXSearchField" {
+                if isSwitcherField(element, in: window), let f = frame(element) { out.append((element, f.y)) }
+                continue
+            }
+            if skipRoles.contains(r) { continue }
+            if let f = frame(element), f.w > 0, f.y > w.y + 0.6 * w.h { continue }
+            queue.append(contentsOf: elements(element, "AXChildren"))
+        }
+        return out.sorted { $0.1 < $1.1 }.map(\.0)
+    }
+
     /// The short texts below a field and in its column, in all windows of the app: the result list of a switcher.
     /// A native app can show its results in a separate window. Editable fields are left out: they show typed text.
     static func textsBelow(_ field: Frame, app: AXUIElement, skip: AXUIElement?, budgetMs: Int = 40, maxNodes: Int = 2500) -> [(String, Frame)] {
