@@ -39,8 +39,12 @@ public enum NameRules {
         "select", "givefeedback", "selectgivefeedback", "agent", "sirifoundinapps", "suggestions", "topresults",
         "recentsearches", "unreadmessages", "recap", "recaps", "catchup", "allunreads", "mentionsreactions",
         "media", "links", "docs", "starredmessages", "archived", "locked", "lockedchats", "broadcasts",
-        "history", "back", "forward",
+        "history", "back", "forward", "previous", "next", "recurring", "tomorrow",
     ]
+
+    /// First words of button labels: "Connect apps", "Create event", "Open recordings".
+    public static let actionVerbs: Set<String> = ["connect", "create", "open", "start", "add", "join", "schedule",
+                                                  "invite", "browse", "new", "show", "view", "manage", "edit"]
 
     public static let weekdays: Set<String> = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
                                                "mon", "tue", "wed", "thu", "fri", "sat", "sun"]
@@ -105,7 +109,16 @@ public enum NameRules {
     /// - The app's own name ("Slack" in Slack) is not a chat.
     /// - Search prompts and sentences of 5 words or more are not chats.
     public static func sidebarName(_ raw: String, appName: String = "") -> (name: String, isSelf: Bool)? {
-        guard let c = clean(raw) else { return nil }
+        var text = Words.squash(raw)
+        // A static text can hold "Name, 1 unread message". Keep the name.
+        if let comma = text.range(of: ", ") {
+            let rest = text[comma.upperBound...].lowercased()
+            if rest.contains(where: \.isNumber) || ["unread", "message", "typing", "muted", "draft"].contains(where: { rest.contains($0) }) {
+                text = String(text[..<comma.lowerBound])
+            }
+        }
+        guard var c = clean(text) else { return nil }
+        if raw.lowercased().contains("(you)") { c.isSelf = true }
         let lower = c.name.lowercased()
         // Search prompts of an open search: "Search for: happening".
         if promptStarts.contains(where: { lower.hasPrefix($0) }) { return nil }
@@ -117,6 +130,17 @@ public enum NameRules {
         // A date heading: "Sunday, November 1".
         // Only a full day name counts: "Sun Li" is a name.
         if let first = words.first, Words.key(first).count > 3, weekdays.contains(Words.key(first)) { return nil }
+        let lowerName = c.name.lowercased()
+        // A field label ("Organizer: x", "Host: y"), an address, or the encryption notice.
+        if c.name.contains(":") || c.name.contains("@") || lowerName.contains("encrypted") { return nil }
+        // A date heading with a short day: "Today, Nov 1", "Mon, Nov 2".
+        if let first = words.first, first.hasSuffix(","),
+           ["today", "yesterday", "tomorrow"].contains(Words.key(first)) || weekdays.contains(Words.key(first)) { return nil }
+        // A button: "Connect apps", "Create event".
+        if words.count >= 2, actionVerbs.contains(Words.key(words[0])), words[1].first?.isLowercase == true { return nil }
+        // A label with the app's own name: "Start Zoom Meeting", "Zoom Meeting".
+        if !c.isSelf, !appName.isEmpty, words.count >= 2,
+           words.contains(where: { Words.key($0) == Words.key(appName) }) { return nil }
         // Back and forward buttons: "Back in Chat".
         if words.count >= 2, ["back", "forward"].contains(Words.key(words[0])), words[1].lowercased() == "in" { return nil }
         if words.count >= 2, isEmojiName(words[0]), words[1].first?.isUppercase == true { return nil }
