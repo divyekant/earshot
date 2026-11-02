@@ -15,7 +15,7 @@ The owner wants to type less. Dictation tools, for example Wispr Flow, VoiceInk 
 
 The owner described this flow:
 
-1. Press one button. In the final version, no button is needed (see R-ON-1).
+1. Press one button, or say the wake phrase (see R-ON-1).
 2. Say something.
 3. earshot changes focus to the correct screen.
 4. earshot focuses the correct text box.
@@ -28,9 +28,9 @@ The owner described this flow:
 
 | ID | Requirement | Priority |
 |---|---|---|
-| R-ON-1 | earshot listens all the time. It does not need a key press or a wake word to start. | Must (final) |
-| R-ON-2 | earshot decides by itself whether the owner speaks to the computer or to someone else: a person in the room, a call, or nobody. | Must (final) |
-| R-ON-3 | earshot ignores voices that are not the owner's voice, for example TV, calls and other people. | Should |
+| R-ON-1 | earshot listens all the time. A command starts when the owner says the wake phrase (default "hey jarvis"). No key press is needed. Speech without the wake phrase does not start a command. Changed on 2026-11-02 from "no wake word" (D-11). | Must (final) |
+| R-ON-2 | earshot acts only on speech that is for it: speech after the wake phrase, or a follow-up command in the owner's voice up to 5 s after a command. Talk to a person in the room or in a call does not start a command (D-11). | Must (final) |
+| R-ON-3 | earshot ignores voices that are not the owner's voice, for example TV, calls and other people. The owner teaches earshot the voice with 5 wake phrases. Until the owner does this, any voice can wake earshot, and the management window says so (D-11). | Must |
 | R-ON-4 | A push-to-talk key is available. Use it in the first version, and keep it as a fallback. | Must (MVP) |
 | R-ON-5 | A false trigger must not cause an action that cannot be undone, for example a sent message. | Must |
 
@@ -101,7 +101,7 @@ The owner sees the screen and tells earshot what to do. earshot does not need to
 
 | ID | Question | How to answer it |
 |---|---|---|
-| Q-1 | How many false triggers does the "is this for me?" gate cause without a wake word? | Log one week of real use (DESIGN.md, Phase 3). |
+| Q-1 | How often does the wake phrase fire by mistake, and how often does it miss the owner? Which voice score separates the owner from other voices? | Log the wakes, the rejected wakes and the voice scores of one week of real use (DESIGN.md, Phase 3). |
 | Q-2 | Which speech-to-text model handles Hinglish well enough? | Test Nemotron-3.5 streaming and the community Hinglish fine-tunes on the owner's own audio. |
 | Q-3 | How long does an accessibility search take in Slack and other Electron apps? | Measure in Phase 0. |
 | Q-4 | Can one command include the message text, or must the owner pause after the target? | Test both in Phase 1. |

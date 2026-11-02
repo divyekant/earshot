@@ -53,7 +53,7 @@ public enum SpeechEngines {
 
 /// Uses `primary`. If `primary` fails in `prepare`, it uses the fallback engine.
 /// So a broken model file never stops voice commands.
-public final class FallbackSpeechEngine: TurnSpeechEngine, @unchecked Sendable {
+public final class FallbackSpeechEngine: TurnSpeechEngine, PrerollControl, @unchecked Sendable {
     private let lock = NSLock()
     private var current: SpeechEngine
     private var makeFallback: (() -> SpeechEngine)?
@@ -105,6 +105,7 @@ public final class FallbackSpeechEngine: TurnSpeechEngine, @unchecked Sendable {
     }
 
     public func begin() throws { try active.begin() }
+    public func setNextPreroll(seconds: Double) { (active as? PrerollControl)?.setNextPreroll(seconds: seconds) }
     public func end() async throws -> Utterance { try await active.end() }
     public func cancelTurn() { (active as? TurnSpeechEngine)?.cancelTurn() }
     public func shutdown() { (active as? TurnSpeechEngine)?.shutdown() }
