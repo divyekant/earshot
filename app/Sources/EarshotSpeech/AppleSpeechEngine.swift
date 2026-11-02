@@ -22,7 +22,7 @@ public final class AppleSpeechEngine: TurnSpeechEngine, PrerollControl, PhraseHi
     private let lock = NSLock()
     private var mic: MicrophoneFeed?
     private var resolvedLocale: Locale?
-    private var setup: Task<(SpeechAnalyzer, Task<String, Error>), Error>?
+    private var setup: Task<(SpeechAnalyzer, Task<TimedTranscript, Error>), Error>?
     private var finish: (() -> Void)?
     private var sink: ((AVAudioPCMBuffer) -> Void)?
     private var format: AVAudioFormat?
