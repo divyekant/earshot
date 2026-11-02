@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="472" height="452" viewBox="276 286 472 452">
+<!-- earshot mark on the 1024 icon canvas: four voice bars, then the text cursor.
+     Voice comes in, earshot puts the cursor in the message box. It never sends. -->
+<g id="mark">
+  <rect x="276" y="437" width="70" height="150" rx="35" fill="currentColor"/>
+  <rect x="384" y="367" width="70" height="290" rx="35" fill="currentColor"/>
+  <rect x="492" y="307" width="70" height="410" rx="35" fill="currentColor"/>
+  <rect x="600" y="387" width="70" height="250" rx="35" fill="currentColor"/>
+  <rect x="708" y="286" width="40" height="452" rx="20" fill="currentColor"/>
+</g>
+</svg>
