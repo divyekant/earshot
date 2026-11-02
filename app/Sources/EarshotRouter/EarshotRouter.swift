@@ -45,7 +45,7 @@ public struct CommandRouter: Router {
             }
         }
         return RouteResult(intent: d.intent, confidence: Self.confidence(d), tier: Self.tier(d), ms: ms(),
-                           why: d.why, alternatives: alternatives(d.intent))
+                           why: d.why, alternatives: alternatives(d.intent), awaitsText: d.awaitsText)
     }
 
     /// The words that no known name explains, and the chat app that the owner named, if any.
@@ -142,8 +142,23 @@ public struct CommandRouter: Router {
     }
 
     /// The rules answer, with no tier 2. Synchronous and on the Mac.
+    /// Words at the start that are not part of the command: "Yeah, let's open the Slack" gives "open the Slack".
+    static let leadFillers: Set<String> = fillers.union(["yeah", "yep", "yes", "lets", "let", "us", "alright", "well",
+                                                         "hey", "can", "could", "you", "would"])
+
+    /// The raw words with the lead fillers removed. Case and punctuation stay.
+    static func dropLeadFillers(_ text: String) -> String {
+        let tokens = Tokens(text)
+        var lead = 0
+        while lead < tokens.count - 1, leadFillers.contains(tokens.words[lead]) { lead += 1 }
+        return lead == 0 ? text : tokens.raw(lead..<tokens.count)
+    }
+
+    /// Words that can follow a bare command word: "click on", "go to". A second command word is a target: "click chat".
+    static let bareWords: Set<String> = ["to", "on", "the", "in", "into", "a"]
+
     static func rules(_ spoken: String, context: RouteContext) -> RulesDecision {
-        let text = fromCommandSentence(spoken, apps: context.apps)
+        let text = dropLeadFillers(fromCommandSentence(spoken, apps: context.apps))
         var words = TextKit.words(text)
         while let f = words.first, fillers.contains(f), words.count > 1 { words.removeFirst() }
         while let l = words.last, ["please", "now"].contains(l), words.count > 1, words != ["send", "now"] { words.removeLast() }
@@ -161,6 +176,18 @@ public struct CommandRouter: Router {
         }
         if hideNumbers.contains(phrase) {
             return RulesDecision(intent: .hideNumbers, sure: true, exact: true, why: "hide numbers", options: [])
+        }
+
+        // A bare command word never matches a target by sound or a fuzzy match: "type." once pressed the menu item "Top".
+        // A bare "type" tells the app that the next turn is the text (awaitsText).
+        if words.count <= 2, commandStarts.contains(words[0]), words.dropFirst().allSatisfy({ bareWords.contains($0) }),
+           ![.scroll, .back].contains(ScreenRouter.parse(text).kind) {
+            if words == ["type"] {
+                var d = RulesDecision(intent: .none, sure: true, exact: true, why: "type with no text", options: [])
+                d.awaitsText = true
+                return d
+            }
+            return RulesDecision(intent: .none, sure: true, exact: true, why: "\(phrase) with no target", options: [])
         }
 
         // A screen command for one app: "On Chrome, click Chat", "open notifications on Chrome", "Chrome, open settings".
