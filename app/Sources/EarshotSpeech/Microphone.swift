@@ -57,6 +57,12 @@ final class MicrophoneFeed: @unchecked Sendable {
         deliver = sink
     }
 
+    /// Waits `captureSeconds` so that the last audio block arrives, then calls `end()`.
+    func end(captureSeconds: Double) async {
+        if captureSeconds > 0 { try? await Task.sleep(nanoseconds: UInt64(captureSeconds * 1e9)) }
+        end()
+    }
+
     /// Stops to pass audio. Gives `TailPad.seconds` of silence to the sink as the last buffer.
     func end() {
         let sink = lock.withLock {
