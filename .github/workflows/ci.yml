@@ -61,3 +61,17 @@ jobs:
         env:
           EARSHOT_WAKE_MODELS: ${{ runner.temp }}/earshot-wake-models
         run: swift test -c release -Xswiftc -enable-testing
+
+      # The app bundle must not depend on the Xcode of the build Mac (rpaths, Swift libraries).
+      # build-app.sh fails if an rpath outside the bundle and /usr/lib/swift stays.
+      - name: Build the app bundle
+        env:
+          EARSHOT_APP_OUT: ${{ runner.temp }}/Earshot.app
+        run: |
+          set -euo pipefail
+          scripts/build-app.sh
+          exe="$EARSHOT_APP_OUT/Contents/MacOS/earshot"
+          echo "rpaths:"; otool -l "$exe" | awk '$2 == "LC_RPATH" { getline; getline; print "  " $2 }'
+          echo "Swift libraries:"; otool -L "$exe" | grep -i swift || true
+          ls -la "$EARSHOT_APP_OUT/Contents/Frameworks"
+          codesign --verify --deep --strict "$EARSHOT_APP_OUT"

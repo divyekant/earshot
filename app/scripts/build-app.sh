@@ -21,6 +21,28 @@ cp -R "$bin/CTranscribe.framework" "$app/Contents/Frameworks/"
 # Resource bundles of the SwiftPM modules, if any.
 for b in "$bin"/*.bundle; do [ -e "$b" ] && cp -R "$b" "$app/Contents/Resources/"; done
 
+# Swift back-deployment (the target is macOS 14): SwiftPM adds an rpath to the Swift toolchain of this Mac,
+# for example /Applications/Xcode.app/.../swift-6.2/macosx. Other Macs do not have that folder.
+# Copy each Swift library that the binary loads from @rpath and that exists only in the toolchain into
+# Contents/Frameworks, then remove the toolchain rpath. /usr/lib/swift and @executable_path rpaths stay.
+exe="$app/Contents/MacOS/earshot"
+rpaths() { otool -l "$1" | awk '$2 == "LC_RPATH" { getline; getline; print $2 }'; }
+for rp in $(rpaths "$exe"); do
+    case "$rp" in @*|/usr/lib/swift) continue ;; esac
+    for lib in $(otool -L "$exe" | awk '$1 ~ /^@rpath\/libswift/ { sub("@rpath/", "", $1); print $1 }'); do
+        if [ -f "$rp/$lib" ] && [ ! -e "$app/Contents/Frameworks/$lib" ]; then
+            echo "Bundling $lib from the toolchain"
+            cp "$rp/$lib" "$app/Contents/Frameworks/"
+        fi
+    done
+    echo "Removing the toolchain rpath $rp"
+    install_name_tool -delete_rpath "$rp" "$exe"
+done
+if rpaths "$exe" | grep -Ev '^(@|/usr/lib/swift$)'; then
+    echo "ERROR: the app still has an rpath outside the bundle and /usr/lib/swift." >&2
+    exit 1
+fi
+
 # macOS keeps the Accessibility and Microphone permissions only while the signature stays the same.
 # A stable identity keeps them over rebuilds. An ad-hoc signature does not.
 identity="$(security find-identity -v -p codesigning | awk -F'"' '/"/ {print $2; exit}')"
@@ -32,6 +54,7 @@ else
     echo "WARNING: macOS asks for the Accessibility and Microphone permissions again after each rebuild."
 fi
 codesign --force --sign "$identity" --timestamp=none "$app/Contents/Frameworks/CTranscribe.framework"
+for d in "$app"/Contents/Frameworks/*.dylib; do [ -e "$d" ] && codesign --force --sign "$identity" --timestamp=none "$d"; done
 codesign --force --sign "$identity" --timestamp=none "$app"
 
 echo "Built $(cd "$(dirname "$app")" && pwd)/$(basename "$app")"
