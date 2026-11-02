@@ -32,7 +32,7 @@ public final class AppleSpeechEngine: SpeechEngine, @unchecked Sendable {
         let format = try await prepareModel()
         let feed = MicrophoneFeed(format: format)
         try feed.start()
-        lock.lock(); mic = feed; lock.unlock()
+        lock.withLock { mic = feed }
     }
 
     /// Everything except the microphone. Returns the audio format of the model.
@@ -54,34 +54,35 @@ public final class AppleSpeechEngine: SpeechEngine, @unchecked Sendable {
         let warm = SpeechAnalyzer(modules: [module], options: Self.options)
         try await warm.prepareToAnalyze(in: format)
         await warm.cancelAndFinishNow()
-        lock.lock(); resolvedLocale = loc; lock.unlock()
+        lock.withLock { resolvedLocale = loc }
         return format
     }
 
     /// Key down: audio goes to the analyzer at once. The analyzer starts in parallel.
     public func begin() throws {
-        lock.lock()
-        guard let mic, let loc = resolvedLocale else {
-            lock.unlock()
+        guard let (mic, loc) = lock.withLock({ () -> (MicrophoneFeed, Locale)? in
+            guard let mic, let loc = resolvedLocale else { return nil }
+            return (mic, loc)
+        }) else {
             throw SpeechError("Apple speech is not ready: call prepare() first")
         }
-        lock.unlock()
         let (stream, continuation) = AsyncStream.makeStream(of: AnalyzerInput.self)
         mic.begin { buffer in continuation.yield(AnalyzerInput(buffer: buffer)) }
         let task = Self.startAnalyzer(locale: loc, input: stream, onPartial: onPartial)
-        lock.lock()
-        setup = task
-        finish = { continuation.finish() }   // `end` closes the stream.
-        lock.unlock()
+        lock.withLock {
+            setup = task
+            finish = { continuation.finish() }   // `end` closes the stream.
+        }
     }
 
     /// Key up: closes the audio (with the tail silence), finalizes, and returns the text.
     public func end() async throws -> Utterance {
         let t0 = SpeechClock.nowNs()
-        lock.lock()
-        let mic = self.mic, task = setup, close = finish
-        setup = nil; finish = nil
-        lock.unlock()
+        let (mic, task, close) = lock.withLock {
+            let out = (self.mic, setup, finish)
+            setup = nil; finish = nil
+            return out
+        }
         mic?.end()
         close?()
         guard let task else { return Utterance(text: "", engine: id, ms: 0) }
@@ -93,7 +94,7 @@ public final class AppleSpeechEngine: SpeechEngine, @unchecked Sendable {
 
     /// Transcribes an audio file. For the Test tab and for measurements. `ms` is the full run time.
     public func transcribe(file: URL) async throws -> Utterance {
-        lock.lock(); let known = resolvedLocale; lock.unlock()
+        let known = lock.withLock { resolvedLocale }
         let loc: Locale
         if let known { loc = known } else {
             guard let l = await SpeechTranscriber.supportedLocale(equivalentTo: locale) else {
@@ -115,7 +116,7 @@ public final class AppleSpeechEngine: SpeechEngine, @unchecked Sendable {
         return Utterance(text: text, engine: id, ms: SpeechClock.ms(since: t0))
     }
 
-    public func shutdown() { lock.lock(); let m = mic; lock.unlock(); m?.stop() }
+    public func shutdown() { lock.withLock { mic }?.stop() }
 
     private static func startAnalyzer(locale: Locale, input: AsyncStream<AnalyzerInput>,
                                       onPartial: (@Sendable (String) -> Void)?) -> Task<(SpeechAnalyzer, Task<String, Error>), Error> {
