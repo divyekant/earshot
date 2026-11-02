@@ -56,7 +56,7 @@ public enum ResolvedEngine: Equatable, Sendable {
 
     public var id: String {
         switch self {
-        case .apple: return AppleSpeechEngine.engineID
+        case .apple: return AppleSpeech.engineID
         case .parakeet: return ParakeetEngine.engineID
         }
     }

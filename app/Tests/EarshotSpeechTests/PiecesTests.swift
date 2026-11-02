@@ -116,13 +116,33 @@ final class ResolverTests: XCTestCase {
     func testFactoryTypes() {
         var s = EarshotSettings()
         s.engine = .apple
-        XCTAssertTrue(SpeechEngines.make(s, locator: locator(["parakeet-a.gguf"])).engine is AppleSpeechEngine)
+        XCTAssertEqual(SpeechEngines.make(s, locator: locator(["parakeet-a.gguf"])).engine.id.hasPrefix("apple"), true)
         s.engine = .auto
-        XCTAssertTrue(SpeechEngines.make(s, locator: locator(["parakeet-a.gguf"])).engine is AppleSpeechEngine)
+        XCTAssertEqual(SpeechEngines.make(s, locator: locator(["parakeet-a.gguf"])).engine.id.hasPrefix("apple"), true)
         s.engine = .parakeet
         let (e, _) = SpeechEngines.make(s, locator: locator(["parakeet-a.gguf"]))
         XCTAssertEqual(e.id, "apple", "the guarded Parakeet engine reports Apple until Parakeet is loaded")
         XCTAssertTrue(e is AutoSpeechEngine)
+    }
+
+    func testAppleEngineForThisMac() {
+        let e = AppleSpeech.make(locale: Locale(identifier: "en_US"))
+        if #available(macOS 26, *) {
+            #if compiler(>=6.2)
+            XCTAssertTrue(e is FallbackSpeechEngine, "macOS 26: SpeechTranscriber with dictation as the fallback")
+            #else
+            XCTAssertTrue(e is DictationEngine)
+            #endif
+        } else {
+            XCTAssertTrue(e is DictationEngine, "before macOS 26: on-device dictation")
+        }
+    }
+
+    func testDictationOutcome() {
+        XCTAssertEqual(try DictationTurn.outcome("hi", NSError(domain: "x", code: 1)).get(), "hi")
+        XCTAssertEqual(try DictationTurn.outcome("", NSError(domain: "kAFAssistantErrorDomain", code: 1110)).get(), "")
+        XCTAssertThrowsError(try DictationTurn.outcome("", NSError(domain: "x", code: 1)).get())
+        XCTAssertEqual(try DictationTurn.outcome("", nil).get(), "")
     }
 }
 

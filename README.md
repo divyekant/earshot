@@ -38,9 +38,9 @@ App support is data, not code. earshot reads the menus, sidebars and search resu
 
 ## Requirements
 
-- A Mac with Apple silicon.
-- macOS 26 (Tahoe) or later.
-- Xcode 26 or later, or a Swift 6 toolchain with the macOS 26 SDK.
+- A Mac with Apple silicon or an Intel processor.
+- macOS 14 (Sonoma) or later. macOS 26 (Tahoe) or later gives the best speech engine (see [Speech engines](#speech-engines)).
+- Xcode 16 or later, or the Command Line Tools with a Swift 6 toolchain. Build with the macOS 26 SDK (Xcode 26) to include Apple SpeechTranscriber.
 - A network connection for the first build. Swift Package Manager downloads transcribe.cpp (see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)).
 
 ## Build
@@ -110,7 +110,7 @@ Always-on mode is off by default. In this mode, earshot listens all the time and
 | Engine | Notes |
 |---|---|
 | Automatic (default) | Uses the Apple speech engine. |
-| Apple | Apple speech on this Mac. |
+| Apple | Apple speech on this Mac. On macOS 26, earshot uses SpeechTranscriber. On older macOS, on Intel Macs, and if SpeechTranscriber does not load, earshot uses Apple on-device dictation (SFSpeechRecognizer). Both keep the audio on this Mac. |
 | Parakeet | NVIDIA Parakeet through transcribe.cpp. earshot does not include the model file. Set the path to a Parakeet GGUF file in **Manage… > General**. If the path is empty, earshot uses the model file of the Hex app, if it is installed. |
 
 ### Jev (optional)
