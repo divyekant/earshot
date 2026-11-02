@@ -51,6 +51,11 @@ final class CommandPipeline {
     var namesNotReady: () -> Int = { 0 }
     /// The cached menu items of an app as screen elements (MenuCache.cached). It must not read: a menu read takes up to 1 s.
     var menus: (String) -> [ScreenElement] = { _ in [] }
+    /// If earshot's own window is in front, brings back the app that was in front before it, and returns the time
+    /// in ms. Nil if earshot was not in front (FrontTracker.restore).
+    var restoreFront: () async -> Double? = { nil }
+    /// earshot's own bundle id. earshot's own window is never a target of a voice command.
+    var ownBundleID: String?
     /// The screenshot picker (D-10). Nil is off, the default (ScreenPickerFactory.make).
     var picker: ScreenPicker?
     /// The longest wait for the screenshot fallback (settings.jevScreenBudgetMs).
@@ -111,16 +116,19 @@ final class CommandPipeline {
         let rows = apps().filter { $0.approved && $0.enabled }
         // The names and the screen read do not depend on each other, so they run side by side.
         // Each keeps its own timer. "context" is the wall time of both together.
+        // Live test: the Manage window was in front, so "type …" found no text field. Act on the app before it.
+        if let ms = await restoreFront() { stages["front.restore"] = ms }
         let contextClock = Stopwatch()
         async let namesTimed: ([NameEntry], Double) = { let c = Stopwatch(); let n = await allNames(); return (n, c.ms) }()
         async let screenTimed: (ScreenSnapshot?, Double) = { let c = Stopwatch(); let s = await actions.screen(); return (s, c.ms) }()
         let (known, namesMs) = await namesTimed
-        let (screen, screenMs) = await screenTimed
+        let (seen, screenMs) = await screenTimed
+        let screen = seen?.bundleID == ownBundleID ? nil : seen
         stages["names"] = namesMs
         let notReady = namesNotReady()
         stages["screen"] = screenMs
         stages["context"] = contextClock.ms
-        let front = frontBundleID()
+        let front = frontBundleID().flatMap { $0 == ownBundleID ? nil : $0 }
         var context = RouteContext(apps: rows, names: known, frontBundleID: front, screen: withMenus(screen, front: front))
 
         let routeClock = Stopwatch()
