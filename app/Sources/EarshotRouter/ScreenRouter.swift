@@ -80,7 +80,7 @@ enum ScreenRouter {
 
     static func parse(_ spoken: String) -> ScreenParse {
         var p = ScreenParse()
-        var tokens = Tokens(spoken)
+        var tokens = Tokens(joinThousands(spoken))
         var lead = 0
         while lead < tokens.count - 1, fillers.contains(tokens.words[lead]) { lead += 1 }
         tokens.dropFirst(lead)
@@ -175,7 +175,43 @@ enum ScreenRouter {
     // MARK: - Score
 
     /// The numbers in a list of words, as digits.
-    static func numbers(_ words: [String]) -> Set<String> { Set(TextKit.digitize(words).filter(TextKit.isNumber)) }
+    /// A number counts only as a whole number: "10" is not in "100", and "10,000" is one number.
+    /// A word of letters and digits gives its digit runs: "gw8" gives "8".
+    static func numbers(_ words: [String]) -> Set<String> { digitRuns(TextKit.digitize(words)) }
+
+    /// The digit runs of words that are already digitized.
+    static func digitRuns(_ words: [String]) -> Set<String> {
+        var out = Set<String>()
+        for w in words where w.unicodeScalars.contains(where: { $0.value >= 48 && $0.value <= 57 }) {
+            if TextKit.isNumber(w) { out.insert(w); continue }
+            var run = ""
+            for c in w.unicodeScalars {
+                if c.value >= 48 && c.value <= 57 { run.unicodeScalars.append(c) } else if !run.isEmpty { out.insert(run); run = "" }
+            }
+            if !run.isEmpty { out.insert(run) }
+        }
+        return out
+    }
+
+    /// Removes the comma in a number with thousands: "10,000" gives "10000", so it stays one number.
+    static func joinThousands(_ text: String) -> String {
+        guard text.contains(",") else { return text }
+        return text.replacingOccurrences(of: #"(?<=\d),(?=\d{3}(?!\d))"#, with: "", options: .regularExpression)
+    }
+
+    /// Joins a short letter group and the number after it: "gw 8" gives "gw8", as in the label "Review GW8".
+    static func joinLetterNumber(_ words: [String]) -> [String] {
+        var out: [String] = []
+        for w in words {
+            if TextKit.isNumber(w), let last = out.last, (1...3).contains(last.count), !smallWords.contains(last),
+               last.unicodeScalars.allSatisfy({ $0.value >= 97 && $0.value <= 122 }) {
+                out[out.count - 1] = last + w
+            } else {
+                out.append(w)
+            }
+        }
+        return out
+    }
 
     /// True if the label is mostly a number: "2", "(+2)", "Page 12".
     static func mostlyNumber(_ label: String) -> Bool {
@@ -219,14 +255,15 @@ enum ScreenRouter {
         let mostlyNumber: Bool
         let bareMostlyNumber: Bool
 
-        init(_ label: String) {
+        init(_ raw: String) {
+            let label = ScreenRouter.joinThousands(raw)
             words = TextKit.digitize(TextKit.words(label))
             let free = ScreenRouter.statusFree(label)
             bare = free.map { TextKit.digitize(TextKit.words($0)) }
             keys = [words.joined()] + (bare.map { [$0.joined()] } ?? [])
             codes = keys.filter { $0.count >= 3 }.map(SoundCode.code)
             wordCodes = (bare ?? words).map { $0.count >= 3 ? SoundCode.code($0) : "" }
-            numbers = Set(words.filter(TextKit.isNumber))
+            numbers = ScreenRouter.digitRuns(words)
             mostlyNumber = ScreenRouter.mostlyNumber(label)
             bareMostlyNumber = free.map(ScreenRouter.mostlyNumber) ?? false
         }
@@ -238,9 +275,13 @@ enum ScreenRouter {
         let key: String
         let code: String
         let numbers: Set<String>
+        /// The words with a short letter group and its number joined ("gw 8" gives "gw8"), or nil if nothing joins.
+        let joined: [String]?
 
         init(_ words: [String]) {
             self.words = words
+            let j = ScreenRouter.joinLetterNumber(words)
+            joined = j == words ? nil : j
             key = TextKit.key(words.joined())
             code = key.count >= 3 ? SoundCode.code(key) : ""
             numbers = ScreenRouter.numbers(words)
@@ -287,6 +328,10 @@ enum ScreenRouter {
         if label.keys.contains(said.key), !(label.mostlyNumber && !label.numbers.isSubset(of: said.numbers)) { return 1 }
         var s = wordScore(said.words, label.words, mostlyNumber: label.mostlyNumber)
         if s < 1, let bare = label.bare { s = max(s, wordScore(said.words, bare, mostlyNumber: label.bareMostlyNumber)) }
+        if s < 1, let j = said.joined {
+            s = max(s, wordScore(j, label.words, mostlyNumber: label.mostlyNumber))
+            if let bare = label.bare { s = max(s, wordScore(j, bare, mostlyNumber: label.bareMostlyNumber)) }
+        }
         // A sound match: speech to text writes "clawed" for "Claude". It is never an exact match (R-NV-5).
         if s < soundMatch, let first = said.code.first {
             for c in label.codes where c.first == first && c == said.code { s = soundMatch; break }
@@ -303,6 +348,8 @@ enum ScreenRouter {
         let said = target.filter { $0.count >= 3 && !smallWords.contains($0) && !TextKit.isNumber($0) }
         guard !said.isEmpty else { return false }
         let l = info(label)
+        // A label with other numbers is not near: "plan gw 10" is not "Player Who Returned 10,000 Years Later".
+        guard numbers(target).isSubset(of: l.numbers) else { return false }
         let words = l.bare ?? l.words
         return said.contains { t in
             let tc = SoundCode.code(t)
@@ -318,8 +365,8 @@ enum ScreenRouter {
 
     /// The word score of a label, as before the match keys: whole phrase, word cover and a run of words.
     static func wordScore(_ target: [String], _ labelWords: [String], mostlyNumber: Bool) -> Double {
-        let want = numbers(target)
-        let have = Set(labelWords.filter(TextKit.isNumber))
+        let want = digitRuns(target)
+        let have = digitRuns(labelWords)
         if !want.isSubset(of: have) { return 0 }
         if mostlyNumber, !have.isSubset(of: want) { return 0 }
         let full = TextKit.similarity(target.joined(), labelWords.joined())
