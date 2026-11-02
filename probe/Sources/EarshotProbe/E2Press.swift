@@ -61,11 +61,7 @@ enum E2Press {
         return Target(element: read.handles[i], item: read.elements[i])
     }
 
-    static func actions(_ el: AXUIElement) -> [String] {
-        var names: CFArray?
-        guard AXUIElementCopyActionNames(el, &names) == .success, let list = names as? [String] else { return [] }
-        return list
-    }
+    static func actions(_ el: AXUIElement) -> [String] { WebPage.actions(el) }
 
     static func settable(_ el: AXUIElement, _ attribute: String) -> Bool {
         var ok: DarwinBoolean = false

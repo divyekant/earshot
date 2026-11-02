@@ -175,6 +175,63 @@ enum WebPage {
         return nil
     }
 
+    // MARK: - Press
+
+    /// The actions that the element offers.
+    static func actions(_ el: AXUIElement) -> [String] {
+        var names: CFArray?
+        guard AXUIElementCopyActionNames(el, &names) == .success, let list = names as? [String] else { return [] }
+        return list
+    }
+
+    /// True if `node` is `target`, or the same link: same role, same address and same frame.
+    static func same(_ node: AXUIElement, _ target: AXUIElement) -> Bool {
+        if CFEqual(node, target) { return true }
+        let r = AX.role(node)
+        guard r == AX.role(target), r == "AXLink", let a = address(node), a == address(target),
+              let f = AX.frame(node), let g = AX.frame(target) else { return false }
+        return abs(f.x - g.x) < 1 && abs(f.y - g.y) < 1 && abs(f.w - g.w) < 1 && abs(f.h - g.h) < 1
+    }
+
+    /// A point where the top element on screen, over all apps, is the target or a part of it.
+    /// The hit test gives the deepest element (for a link, often its text or a group), so it goes up the parents.
+    static func safePoint(_ target: AXUIElement, _ f: Frame) -> CGPoint? {
+        let system = AXUIElementCreateSystemWide()
+        let candidates = [
+            CGPoint(x: f.x + min(f.w, 40) / 2, y: f.y + min(f.h, 24) / 2),
+            CGPoint(x: f.midX, y: f.midY),
+            CGPoint(x: f.x + f.w - min(f.w, 40) / 2, y: f.y + f.h - min(f.h, 24) / 2),
+        ]
+        for p in candidates {
+            var hit: AXUIElement?
+            guard AXUIElementCopyElementAtPosition(system, Float(p.x), Float(p.y), &hit) == .success, var node = hit else { continue }
+            for _ in 0..<8 {
+                if same(node, target) { return p }
+                guard let parent = AX.element(node, "AXParent") else { break }
+                node = parent
+            }
+        }
+        return nil
+    }
+
+    /// Presses a web element. Chrome links do not offer AXPress: the call returns success and does nothing
+    /// (E2 press test). So: AXPress if the element offers it. Else a mouse click at a safe point, with the
+    /// browser in front, and then the pointer goes back. The caller checks the label for risky words first.
+    static func press(_ el: AXUIElement, frame f: Frame, browserPid: pid_t) -> (way: String, done: Bool) {
+        if actions(el).contains(kAXPressAction as String) {
+            return ("AXPress", AXUIElementPerformAction(el, kAXPressAction as CFString) == .success)
+        }
+        guard NSWorkspace.shared.frontmostApplication?.processIdentifier == browserPid else { return ("browser not in front", false) }
+        guard let p = safePoint(el, f) else { return ("no point on screen is this element", false) }
+        let back = CGEvent(source: nil)?.location
+        Mouse.click(p)
+        if let back {
+            CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: back, mouseButton: .left)?
+                .post(tap: .cghidEventTap)
+        }
+        return ("click", true)
+    }
+
     // MARK: - Elements
 
     static let buttonRoles: Set<String> = ["AXButton", "AXMenuButton", "AXPopUpButton", "AXDisclosureTriangle"]

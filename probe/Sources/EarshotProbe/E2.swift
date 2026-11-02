@@ -395,8 +395,8 @@ enum E2 {
 
     /// Presses the Back button of the browser, and waits for the start page.
     static func goBack(_ app: AXUIElement, to start: String, bundle: String) async -> String {
-        if let w = AX.window(app), let b = WebPage.backButton(in: w) {
-            AXUIElementPerformAction(b, kAXPressAction as CFString)
+        if let w = AX.window(app), let b = WebPage.backButton(in: w), let f = AX.frame(b) {
+            _ = WebPage.press(b, frame: f, browserPid: AX.pid(app))
             if await waitUntil(timeoutMs: 4000, intervalMs: 100, { bare(WebPage.currentURL(app) ?? "") == bare(start) }) {
                 await sleepMs(700)
                 return "back"
@@ -442,6 +442,8 @@ enum E2 {
         }
         var rows: [Row] = []
         var stop = false
+        var pressedCount = 0
+        var changeMs: [Double] = []
         for site in file.sites where only.isEmpty || only.contains(site.id) {
             if stop { break }
             guard let url = URL(string: site.url), let host = url.host else { continue }
@@ -524,14 +526,18 @@ enum E2 {
                     if WebRouter.isRisky(e.label) { acted = "blocked"; break }
                     if e.kind != "link" { acted = "not pressed (\(e.kind))"; break }
                     let tp = Clock.nowNs()
-                    let err = AXUIElementPerformAction(read.handles[i], kAXPressAction as CFString)
+                    let press = WebPage.press(read.handles[i], frame: Frame(x: e.x, y: e.y, w: e.w, h: e.h), browserPid: AX.pid(app))
                     actMs = Clock.ms(since: tp)
-                    guard err == .success else { acted = "press failed (\(err.rawValue))"; break }
-                    acted = "pressed"
-                    let changed = await waitUntil(timeoutMs: 4000, intervalMs: 50) { (WebPage.currentURL(app) ?? start) != start }
+                    guard press.done else { acted = "not pressed (\(press.way))"; break }
+                    acted = "pressed (\(press.way))"
+                    pressedCount += 1
+                    let tc = Clock.nowNs()
+                    let changed = await waitUntil(timeoutMs: 4000, intervalMs: 20) { (WebPage.currentURL(app) ?? start) != start }
                     let now = WebPage.currentURL(app) ?? ""
                     after = changed ? "page: \(URL(string: now)?.host ?? now)\(bare(now) == bare(start) ? " (same page)" : "")" : "no page change in 4 s"
                     if changed {
+                        // From the press to the new address in the visible tab.
+                        changeMs.append((actMs ?? 0) + Clock.ms(since: tc))
                         let back = await goBack(app, to: start, bundle: bundle)
                         after += ", \(back)"
                         if back == "failed" {
@@ -622,6 +628,8 @@ enum E2 {
         print("Read the page: median \(Stats.ms(Stats.median(rows.map(\.readMs)))), slowest 1 in 10 \(Stats.ms(Stats.percentile(rows.map(\.readMs), 0.9))).")
         let toAction = acted.map { $0.decideMs + ($0.actMs ?? 0) }
         print("Text to action (read, route, Jev if unsure, act): median \(Stats.ms(Stats.median(toAction))), slowest 1 in 10 \(Stats.ms(Stats.percentile(toAction, 0.9))), \(acted.count) actions.")
+        print("Links pressed: \(pressedCount). Page changed: \(changeMs.count)"
+              + (changeMs.isEmpty ? "." : ", median \(Stats.ms(Stats.median(changeMs))) from the press to the new address."))
         print("Pages stay open in new tabs. Nothing was submitted.")
         return 0
     }

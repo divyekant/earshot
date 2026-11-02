@@ -1,6 +1,6 @@
 # E2: voice clicks on web pages, and Parakeet against Apple speech
 
-Status: running, 2026-11-02. The owner chose "Both (E2)". Live run 2 is done. The press test (section 5.6) waits for the owner.
+Status: running, 2026-11-02. The owner chose "Both (E2)". The press test (section 5.6) found the cause of the failed presses. Live run 3 waits for the owner.
 
 E2 follows [E1](E1-generic-router.md). E0 and E1 put the cursor in a chat. The owner asked two more questions:
 
@@ -35,7 +35,7 @@ The probe obeys these rules:
 3. It never presses Return. It types only into a search field, through the field value, and then empties the field. It submits no form.
 4. After each press, it goes back to the start page with the Back button of Chrome. If the start page does not come back in 4 s, the run stops.
 5. It brings back the app that was in front when the run ends.
-6. A real mouse click occurs only in `e2-press --mouse`, on one plain link, and only if a hit test shows that the point is on that link. The pointer goes back after the click.
+6. A real mouse click occurs only on a link that does not offer `AXPress`, only while Chrome is in front, and only at a point where the top element on screen (over all apps) is that link or a part of it. The pointer goes back after the click. `e2-press` clicks only with `--mouse`.
 
 ## 3. Method
 
@@ -197,7 +197,33 @@ The probe ran on the owner's Mac from the remote session on 2026-11-02. Chrome w
 | open the address | Open the address of the link (`AXURL`) in Chrome. This makes a new tab. |
 | mouse click (`--mouse` only) | A real click at the link, after a hit test shows that the point is on the link. The pointer goes back after. |
 
-Not run yet.
+Result (commit 743fc8f), on the link "Talk" of the Wikipedia page:
+
+| Way | Page changed | Call | Press to new page |
+| --- | --- | --- | --- |
+| press | No | 0.1 ms | |
+| focus, then press | No | 24 ms | |
+| press the text inside | No | 0.2 ms | |
+| enhanced UI, then press | No | 0.2 ms | |
+| open the address | Yes, in a new tab | 0.3 ms | 79 ms |
+| mouse click | Yes, in the same tab | 17 ms | 85 ms |
+
+- Cause: a Chrome link does not offer `AXPress`. Its actions are `AXShowMenu` and `AXScrollToVisible` only. Chrome still returns success for `AXPress`, and does nothing. This explains all 43 silent presses of live runs 1 and 2.
+- Focus, the text inside the link, and `AXEnhancedUserInterface` do not change this.
+- The hit test at a link gives the deepest element, for example the text or a group inside the link. A check that the point is on the link must go up the parents.
+- Nothing was submitted, and no Return was pressed.
+
+Rule for earshot (commit after 743fc8f, `WebPage.press`):
+
+1. If the element offers `AXPress`, use it.
+2. Else, if the browser is in front, find a point where the top element on screen is the element or a part of it. Click there, and move the pointer back.
+3. Else, do not press. Say why.
+
+"Open the address" stays an option for a command such as "open X in a new tab".
+
+### 5.7 Live run 3
+
+`e2-act` with the rule of section 5.6, on the 4 live pages. Not run yet.
 
 ## 6. Decision
 
