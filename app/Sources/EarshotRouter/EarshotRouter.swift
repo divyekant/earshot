@@ -97,14 +97,9 @@ public struct CommandRouter: Router {
             return RulesDecision(intent: .hideNumbers, sure: true, exact: true, why: "hide numbers", options: [])
         }
 
-        // "On Chrome, click Chat": the screen command is for that app's window, not a chat command.
-        if let hit = appPrefix(text, apps: context.apps), isScreenCommand(hit.1) {
-            let (app, rest) = hit
-            let front = context.screen?.bundleID ?? context.frontBundleID
-            if front == app.bundleID { return rules(rest, context: context) }
-            // The app is not in front, so the screen is not its screen. Open the app (it can be undone) and do not click.
-            return RulesDecision(intent: .openApp(appID: app.id), sure: true, exact: true,
-                                 why: "\(app.name) was not in front: say the command again", options: [])
+        // A screen command for one app: "On Chrome, click Chat", "open notifications on Chrome", "Chrome, open settings".
+        for hit in [appPrefix(text, apps: context.apps), appSuffix(text, apps: context.apps), appComma(text, apps: context.apps)] {
+            if let hit, let d = screenFor(hit.0, hit.1, context: context) { return d }
         }
 
         // "open hn.com", "go to news dot ycombinator dot com", "Openhn.com" (R-NV-7).
@@ -158,6 +153,64 @@ public struct CommandRouter: Router {
                 if names.contains(phrase) { return (app, tokens.raw((span + 1)..<w.count)) }
             }
         }
+        return nil
+    }
+
+    /// A trailing "on <app>" or "in <app>": the app, and the raw words before it. "open notifications on Chrome".
+    static func appSuffix(_ text: String, apps: [AppEntry]) -> (AppEntry, String)? {
+        var tokens = Tokens(text)
+        var lead = 0
+        while lead < tokens.count, fillers.contains(tokens.words[lead]) { lead += 1 }
+        tokens.dropFirst(lead)
+        let w = tokens.words, n = w.count
+        guard n >= 3 else { return nil }
+        for span in stride(from: min(3, n - 2), through: 1, by: -1) where ["on", "in"].contains(w[n - span - 1]) {
+            if let app = exactApp(w[(n - span)...].joined(), apps) { return (app, tokens.raw(0..<(n - span - 1))) }
+        }
+        return nil
+    }
+
+    /// A leading "<app>," with a comma: the app, and the raw words after it. "Chrome, open settings".
+    static func appComma(_ text: String, apps: [AppEntry]) -> (AppEntry, String)? {
+        var tokens = Tokens(text)
+        var lead = 0
+        while lead < tokens.count, fillers.contains(tokens.words[lead]) { lead += 1 }
+        tokens.dropFirst(lead)
+        let w = tokens.words
+        for span in stride(from: min(3, w.count - 1), through: 1, by: -1) where tokens.stops.contains(span) {
+            if let app = exactApp(w[0..<span].joined(), apps) { return (app, tokens.raw(span..<w.count)) }
+        }
+        return nil
+    }
+
+    static func exactApp(_ key: String, _ apps: [AppEntry]) -> AppEntry? {
+        apps.first { $0.approved && $0.enabled && ($0.aliases + [$0.name]).map(TextKit.key).contains(key) }
+    }
+
+    /// The decision for a command that names one app, or nil to use the other rules.
+    /// - A screen command (click, scroll, ...): route it on the screen if the app is in front, else open the app.
+    /// - "open <words>": a click only if the app is in front and a label matches sure. A risky label never gets a click
+    ///   from "open": only "click <exact label>" can press a risky label (R-NV-5).
+    static func screenFor(_ app: AppEntry, _ rest: String, context: RouteContext) -> RulesDecision? {
+        guard !rest.isEmpty else { return nil }
+        let front = context.screen?.bundleID ?? context.frontBundleID
+        if isScreenCommand(rest) {
+            if front == app.bundleID { return rules(rest, context: context) }
+            // The app is not in front, so the screen is not its screen. Open the app (it can be undone) and do not click.
+            return RulesDecision(intent: .openApp(appID: app.id), sure: true, exact: true,
+                                 why: "\(app.name) was not in front: say the command again", options: [])
+        }
+        var words = TextKit.words(rest)
+        while let f = words.first, fillers.contains(f), words.count > 1 { words.removeFirst() }
+        guard words.first == "open", words.count >= 2, front == app.bundleID, let screen = context.screen else { return nil }
+        let d = ScreenRouter.decide(rest, screen: screen)
+        if case .click(let id) = d.intent, d.sure {
+            if let e = screen.elements.first(where: { $0.id == id }), e.risky || SafetyPolicy.isRisky(e) {
+                return RulesDecision(intent: .none, sure: true, exact: true, why: "blocked: risky label \"\(e.label)\"", options: [])
+            }
+            return d
+        }
+        if d.intent == .none, d.why.hasPrefix("blocked") { return d }
         return nil
     }
 
