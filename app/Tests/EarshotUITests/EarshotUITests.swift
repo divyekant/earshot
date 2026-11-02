@@ -177,3 +177,58 @@ final class SettingsSaveTests: XCTestCase {
         XCTAssertEqual(store.settings, s)
     }
 }
+
+final class AppsFilterTests: XCTestCase {
+    private let apps = [
+        AppEntry(id: "a", name: "Alpha Chat", bundleID: "com.example.alphachat", aliases: ["al"], isChat: true, approved: true),
+        AppEntry(id: "b", name: "Beta", bundleID: "org.beta.app", approved: false, enabled: false),
+        AppEntry(id: "c", name: "Gamma Notes", bundleID: "io.gamma.notes", approved: false),
+    ]
+
+    func testSearchLooksAtNameBundleAndAliases() {
+        XCTAssertEqual(CatalogueEdit.filter(apps, query: "gamma", scope: .all).map(\.id), ["c"])
+        XCTAssertEqual(CatalogueEdit.filter(apps, query: "ORG.BETA", scope: .all).map(\.id), ["b"])
+        XCTAssertEqual(CatalogueEdit.filter(apps, query: "al", scope: .all).map(\.id), ["a"])
+        XCTAssertEqual(CatalogueEdit.filter(apps, query: "  ", scope: .all).count, 3)
+    }
+
+    func testScopes() {
+        XCTAssertEqual(CatalogueEdit.filter(apps, query: "", scope: .needsApproval).map(\.id), ["b", "c"])
+        XCTAssertEqual(CatalogueEdit.filter(apps, query: "", scope: .approved).map(\.id), ["a"])
+        XCTAssertEqual(CatalogueEdit.filter(apps, query: "", scope: .chat).map(\.id), ["a"])
+        XCTAssertEqual(CatalogueEdit.filter(apps, query: "", scope: .off).map(\.id), ["b"])
+        XCTAssertEqual(CatalogueEdit.filter(apps, query: "notes", scope: .needsApproval).map(\.id), ["c"])
+    }
+
+    func testBulkSet() {
+        let out = CatalogueEdit.set(\.approved, true, ids: ["b", "c"], in: apps)
+        XCTAssertEqual(out.map(\.approved), [true, true, true])
+        let off = CatalogueEdit.set(\.enabled, false, ids: ["a"], in: out)
+        XCTAssertEqual(off.map(\.enabled), [false, false, true])
+        XCTAssertEqual(off.map(\.id), ["a", "b", "c"])
+    }
+}
+
+final class BrandTests: XCTestCase {
+    func testArcsBulgeLeftAndMatchTheSVG() {
+        // "M 330 432 A 120 120 0 0 0 330 592": ends at x 330, leftmost point at x 330 - (120 - sqrt(120^2 - 80^2)).
+        let inner = MarkPaths.innerArc.boundingRect
+        XCTAssertEqual(inner.minX, 419.443 - 120, accuracy: 0.5)
+        XCTAssertEqual(inner.maxX, 330, accuracy: 0.5)
+        XCTAssertEqual(inner.minY, 432, accuracy: 0.5)
+        XCTAssertEqual(inner.maxY, 592, accuracy: 0.5)
+        let outer = MarkPaths.outerArc.boundingRect
+        XCTAssertEqual(outer.minX, 411.749 - 205, accuracy: 0.5)
+        XCTAssertEqual(outer.maxY, 652, accuracy: 0.5)
+    }
+
+    func testMarkStaysInsideTheTile() {
+        for p in [MarkPaths.rim, MarkPaths.curl, MarkPaths.cursor, MarkPaths.outerArc] {
+            let r = p.boundingRect.offsetBy(dx: -14, dy: 0)
+            XCTAssertGreaterThan(r.minX, 100)
+            XCTAssertLessThan(r.maxX, 924)
+            XCTAssertGreaterThan(r.minY, 100)
+            XCTAssertLessThan(r.maxY, 924)
+        }
+    }
+}
