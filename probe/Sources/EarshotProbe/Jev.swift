@@ -5,7 +5,8 @@ import Foundation
 /// E1 sends text only: the command words and the option labels. It sends no audio,
 /// no screenshot and no message text from the apps. The owner approved this for E1 only.
 /// R-MD-1 does not change unless the owner decides so after E1.
-final class JevClient {
+/// All stored properties are constants, so one client can serve calls from several tasks.
+final class JevClient: @unchecked Sendable {
     static let endpoint = URL(string: "https://api.typesafe.ai/v1/systemone")!
     static let keyName = "TYPESAFE_API_KEY"
     /// The file that jev-qa reads the key from.

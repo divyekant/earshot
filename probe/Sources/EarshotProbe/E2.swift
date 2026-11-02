@@ -24,13 +24,13 @@ enum E2 {
     static var testsURL: URL { Paths.logs.appendingPathComponent("e2-tests.json") }
     static func pad(_ s: String, _ n: Int) -> String { E1.pad(s, n) }
 
-    /// The words in the arguments that are not options. "--browser" and "--seed" take a value.
+    /// The words in the arguments that are not options. "--browser", "--seed" and "--label" take a value.
     static func names(_ args: [String]) -> [String] {
         var out: [String] = []
         var skip = false
         for a in args {
             if skip { skip = false; continue }
-            if ["--browser", "--seed"].contains(a) { skip = true; continue }
+            if ["--browser", "--seed", "--label"].contains(a) { skip = true; continue }
             if a.hasPrefix("--") { continue }
             out.append(a)
         }
@@ -413,6 +413,8 @@ enum E2 {
         return "failed"
     }
 
+    /// The longest wait for Jev in the live run. Jev took 106 ms (median) and 168 ms (slowest 1 in 10) in e2-run.
+    static let jevBudgetMs = 1000
     static let liveKinds: Set<String> = ["exact", "free", "partial", "misheard", "ordinal", "search", "risky", "unknown", "scroll", "none"]
     static let pageDown = Keys.Combo(key: CGKeyCode(0x79), flags: [])
     static let home = Keys.Combo(key: CGKeyCode(0x73), flags: [])
@@ -483,17 +485,33 @@ enum E2 {
                 let r = WebRouter.route(t.words, elements: read.elements)
                 var choice = r.rules
                 var jevMs: Double?
-                if !r.sure, jevApplies(r), let jev,
-                   let answer = try? await WebRouter.askJev(t.words, r, elements: read.elements, jev: jev) {
-                    choice = answer.0
-                    jevMs = answer.1.ms
+                var jevNote = ""
+                if !r.sure, jevApplies(r), let jev {
+                    // Jev gets a time budget. After that time, the rules answer stays (live run 2: one call took 5 s).
+                    do {
+                        let answer = try await WebRouter.askJev(t.words, r, elements: read.elements, jev: jev, budgetMs: jevBudgetMs)
+                        choice = answer.0
+                        jevMs = answer.1.ms
+                    } catch {
+                        jevNote = "Jev: \(error), rules answer used"
+                    }
                 }
                 let decideMs = Clock.ms(since: t0)
                 let index = choice.element.flatMap { id in read.elements.firstIndex(where: { $0.id == id }) }
                 let picked = index.map { read.elements[$0] }
-                let ok = wanted.contains { w in
-                    w.0 == choice.action && (w.1.isEmpty || w.1 == Text.key(picked?.label ?? ""))
-                        && (choice.action != "scroll" || t.expected.contains { $0.text == choice.text })
+                // Google results and Hacker News stories change between e2-make and e2-act (live run 2).
+                // If the expected label is gone from the live page, the correct answer is "none".
+                // For an ordinal command, the position counts, so any press is correct. The label is printed for a check by eye.
+                let pressKeys = wanted.filter { $0.0 == "press" && !$0.1.isEmpty }.map { $0.1 }
+                let labelGone = !pressKeys.isEmpty && pressKeys.allSatisfy { k in !read.elements.contains { Text.key($0.label) == k } }
+                let ok: Bool
+                if labelGone {
+                    ok = t.kind == "ordinal" ? choice.action == "press" : choice.action == "none"
+                } else {
+                    ok = wanted.contains { w in
+                        w.0 == choice.action && (w.1.isEmpty || w.1 == Text.key(picked?.label ?? ""))
+                            && (choice.action != "scroll" || t.expected.contains { $0.text == choice.text })
+                    }
                 }
 
                 var acted = choice.action
@@ -583,12 +601,15 @@ enum E2 {
                     "route_ms": r.ms, "decide_ms": decideMs,
                 ]
                 if let jevMs { entry["jev_ms"] = jevMs }
+                if !jevNote.isEmpty { entry["jev_note"] = jevNote }
+                if labelGone { entry["label_gone"] = true }
                 if let actMs { entry["act_ms"] = actMs }
                 log.write(entry)
                 let total = decideMs + (actMs ?? 0)
                 print("  \(pad("\(t.id).", 4))\(ok ? "✓" : "✗") [\(t.kind)] \(t.words)  →  \(choice.describe(read.elements)) · \(acted)"
                       + " · read \(Int(readMs.rounded())) + route \(String(format: "%.1f", r.ms))\(jevMs.map { " + jev \(Int($0.rounded()))" } ?? "")"
-                      + " + act \(Int((actMs ?? 0).rounded())) = \(Int(total.rounded())) ms\(after.isEmpty ? "" : " · \(after)")")
+                      + " + act \(Int((actMs ?? 0).rounded())) = \(Int(total.rounded())) ms\(after.isEmpty ? "" : " · \(after)")"
+                      + (labelGone ? " · the expected label is gone from the page" : "") + (jevNote.isEmpty ? "" : " · \(jevNote)"))
                 if stop { break }
                 await sleepMs(400)
             }
