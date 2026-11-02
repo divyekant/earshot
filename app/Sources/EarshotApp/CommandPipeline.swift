@@ -2,6 +2,7 @@ import EarshotActions
 import EarshotCore
 import EarshotInput
 import EarshotRouter
+import EarshotSpeech
 import EarshotUI
 import Foundation
 
@@ -39,6 +40,8 @@ final class CommandPipeline {
     var heardName: (String, RouteContext) -> (name: String, appID: String?)? = CommandRouter.heardName
     var gate = ForMeGate()
     private var lastCommandAt: Date?
+    /// The speech engine's line for the log of the current command (engine, why, audio length).
+    private var speechSummary = ""
 
     init(engine: SpeechEngine, router: Router, actions: CommandActions, names: NameFinder,
          apps: @escaping () -> [AppEntry], allNames: @escaping () async -> [NameEntry],
@@ -67,6 +70,13 @@ final class CommandPipeline {
             return done(heard: "", intent: "none", tier: .none, ok: false, note: "speech error: \(error)", stages: stages, clock)
         }
         stages["speech"] = clock.ms
+        // The parts of the speech stage (T1): tail, wait for the model, decode, and the audio length.
+        speechSummary = ""
+        if let timing = (engine as? SpeechTimingReporting)?.lastTiming {
+            stages.merge(timing.stages) { _, new in new }
+            stages["speech.audio"] = (timing.audioMs * 10).rounded() / 10
+            speechSummary = timing.summary
+        }
         guard !text.isEmpty else { return done(heard: "", intent: "none", tier: .none, ok: false, note: "no words", stages: stages, clock, quiet: true) }
 
         // Always-on: is it for earshot? (R-ON-2, R-ON-5)
@@ -162,7 +172,8 @@ final class CommandPipeline {
         stages["total"] = clock.ms
         // The log keeps the router's reason too, so that a wrong intent can be explained later
         // (for example "open Slack" when Slack had no chat keys). The note on screen stays short.
-        let logNote = why.isEmpty || note.contains(why) ? note : "\(note) · route: \(why)"
+        var logNote = why.isEmpty || note.contains(why) ? note : "\(note) · route: \(why)"
+        if !speechSummary.isEmpty { logNote += " · speech: \(speechSummary)" }
         let record = ActivityRecord(heard: heard, intent: intent, tier: tier, ok: ok, note: logNote, stages: stages)
         try? log?.append(record)
         if showFeedback, !quiet {
