@@ -99,8 +99,33 @@ enum WebPage {
         NSWorkspace.shared.open([url], withApplicationAt: appURL, configuration: config, completionHandler: nil)
     }
 
-    /// The largest web area of the window: the page of the visible tab. The search does not go into a web area.
+    /// The page of the visible tab. Chrome keeps the pages of other tabs in the tree too, with the same size,
+    /// and it ignores a press on them (E2 live run 1). A hit test in the window finds the page that is on screen.
+    /// The hit test is limited to the windows of the browser, so it works when another app is in front.
+    static func visibleWebArea(_ window: AXUIElement) -> AXUIElement? {
+        guard let app = AX.element(window, "AXParent"), let w = AX.frame(window) else { return nil }
+        for (fx, fy) in [(0.5, 0.6), (0.3, 0.75), (0.7, 0.4)] {
+            var hit: AXUIElement?
+            guard AXUIElementCopyElementAtPosition(app, Float(w.x + fx * w.w), Float(w.y + fy * w.h), &hit) == .success,
+                  var node = hit else { continue }
+            // Go up to the outermost web area. A frame inside the page is a web area too.
+            var area: AXUIElement?
+            for _ in 0..<80 {
+                let r = AX.role(node)
+                if r == "AXWebArea" { area = node }
+                if r == "AXWindow" { break }
+                guard let parent = AX.element(node, "AXParent") else { break }
+                node = parent
+            }
+            if let area, let f = AX.frame(area), f.w > 50, f.h > 50 { return area }
+        }
+        return nil
+    }
+
+    /// The page of the visible tab: the hit test first, else the largest web area of the window.
+    /// The search does not go into a web area.
     static func webArea(in window: AXUIElement, maxNodes: Int = 3000) -> AXUIElement? {
+        if let visible = visibleWebArea(window) { return visible }
         var queue: [AXUIElement] = [window]
         var index = 0
         var best: (AXUIElement, Double)?
