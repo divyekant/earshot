@@ -75,6 +75,8 @@ enum SwitcherTiming {
     static let pollMs = 15
     /// From the switcher keys to a focused search field.
     static let fieldMs = 1200
+    /// The time between two searches for a switcher field that has no focus.
+    static let scanMs = 90
     /// From the typed name to the name in the field.
     static let typedMs = 1000
     /// From the name in the field to a result that shows the name. It replaces the fixed 250 ms sleep of E0.

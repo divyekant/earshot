@@ -206,6 +206,56 @@ final class ActionRunnerTests: XCTestCase {
         XCTAssertLessThan(ms, 150)
     }
 
+    /// A fake app for the switcher field wait. The element type is a string.
+    private final class FakeSwitcher {
+        let t0 = Clock.nowNs()
+        var fieldShowsAtMs: Double
+        var takesFocusOnItsOwn: Bool
+        var acceptsAXFocus: Bool
+        var focusedField = false
+        var focusSets = 0
+        init(showsAt: Double, ownFocus: Bool, acceptsAX: Bool) { fieldShowsAtMs = showsAt; takesFocusOnItsOwn = ownFocus; acceptsAXFocus = acceptsAX }
+        var shown: Bool { Clock.ms(since: t0) >= fieldShowsAtMs }
+        func focused() -> (String?, Bool, Bool) {
+            if shown && (takesFocusOnItsOwn || focusedField) { return ("to-field", true, false) }
+            return ("message-box", false, true)  // the focus stays in the message box of the open chat
+        }
+        func newField() -> String? { shown ? "to-field" : nil }
+        func setFocus(_ f: String) { focusSets += 1; if acceptsAXFocus { focusedField = true } }
+    }
+
+    func testSwitcherFieldShowsLate() async {
+        let runner = EarshotActionRunner(store: nil)
+        let fake = FakeSwitcher(showsAt: 600, ownFocus: true, acceptsAX: false)  // E0: "To:" after about 600 ms
+        let (field, why) = await runner.waitForSwitcherField(focused: fake.focused, newField: fake.newField, setFocus: fake.setFocus)
+        XCTAssertEqual(field, "to-field")
+        XCTAssertNil(why)
+        XCTAssertLessThan(Clock.ms(since: fake.t0), 750)
+    }
+
+    func testSwitcherFieldWithoutFocusGetsAXFocus() async {
+        let runner = EarshotActionRunner(store: nil)
+        let fake = FakeSwitcher(showsAt: 200, ownFocus: false, acceptsAX: true)
+        let (field, _) = await runner.waitForSwitcherField(focused: fake.focused, newField: fake.newField, setFocus: fake.setFocus)
+        XCTAssertEqual(field, "to-field")
+        XCTAssertGreaterThanOrEqual(fake.focusSets, 1)
+        XCTAssertLessThan(Clock.ms(since: fake.t0), 400)
+    }
+
+    func testFocusStaysInMessageBoxTypesNothing() async {
+        let runner = EarshotActionRunner(store: nil)
+        // No switcher field ever shows: the focus stays in the message box.
+        let fake = FakeSwitcher(showsAt: .infinity, ownFocus: false, acceptsAX: false)
+        let (field, why) = await runner.waitForSwitcherField(timeoutMs: 200, focused: fake.focused, newField: fake.newField, setFocus: fake.setFocus)
+        XCTAssertNil(field)
+        XCTAssertEqual(why?.contains("message box"), true)
+        // The field shows but refuses the focus: still nothing.
+        let stuck = FakeSwitcher(showsAt: 0, ownFocus: false, acceptsAX: false)
+        let (f2, why2) = await runner.waitForSwitcherField(timeoutMs: 200, focused: stuck.focused, newField: stuck.newField, setFocus: stuck.setFocus)
+        XCTAssertNil(f2)
+        XCTAssertEqual(why2?.contains("did not take the focus"), true)
+    }
+
     /// No row: the wait stops at its time limit and reports false, so earshot presses no Return.
     func testResultWaitTimesOut() async {
         let runner = EarshotActionRunner(store: nil)
