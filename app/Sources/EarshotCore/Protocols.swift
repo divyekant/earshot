@@ -38,8 +38,8 @@ public protocol Tier2Chooser {
 /// Runs one intent in the user interface (R-MD-6). It obeys SafetyPolicy.
 public protocol ActionRunner {
     func run(_ intent: Intent, context: RouteContext) async -> ActionOutcome
-    /// The elements of the front window, for voice clicks.
-    func screenElements() async -> [ScreenElement]
+    /// The front window and its elements, for voice clicks. Nil if earshot cannot read it.
+    func screen() async -> ScreenSnapshot?
 }
 
 /// Builds catalogue rows from the running and installed apps (R-MT-1, R-MT-2).

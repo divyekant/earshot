@@ -55,12 +55,37 @@ public struct NameEntry: Codable, Hashable, Sendable {
 /// A clickable or typable element on screen, for voice clicks.
 public struct ScreenElement: Codable, Hashable, Sendable {
     public var id: String
+    /// The accessibility role, for example "AXLink", "AXButton" or "AXTextField".
     public var role: String
+    public var subrole: String
     public var label: String
+    /// The address of a link, if it has one.
+    public var url: String?
+    /// True for a link inside a heading: a search "result" (E2).
+    public var inHeading: Bool
     public var risky: Bool
+    /// The frame in screen points. Ordinals ("the second result") sort by position.
+    public var x: Double
+    public var y: Double
+    public var w: Double
+    public var h: Double
 
-    public init(id: String, role: String, label: String, risky: Bool) {
-        self.id = id; self.role = role; self.label = label; self.risky = risky
+    public init(id: String, role: String, subrole: String = "", label: String, url: String? = nil, inHeading: Bool = false,
+                risky: Bool, x: Double = 0, y: Double = 0, w: Double = 0, h: Double = 0) {
+        self.id = id; self.role = role; self.subrole = subrole; self.label = label; self.url = url
+        self.inHeading = inHeading; self.risky = risky; self.x = x; self.y = y; self.w = w; self.h = h
+    }
+}
+
+/// What the front window shows: the app, the page address for a browser, and the elements.
+public struct ScreenSnapshot: Codable, Hashable, Sendable {
+    public var bundleID: String
+    public var windowTitle: String
+    public var url: String?
+    public var elements: [ScreenElement]
+
+    public init(bundleID: String, windowTitle: String, url: String? = nil, elements: [ScreenElement]) {
+        self.bundleID = bundleID; self.windowTitle = windowTitle; self.url = url; self.elements = elements
     }
 }
 
@@ -72,9 +97,14 @@ public enum Intent: Codable, Hashable, Sendable {
     case openApp(appID: String)
     case openChat(appID: String, target: String, text: String?)
     case click(elementID: String)
+    /// Type into a field of the screen, for example "search for X" (E2).
+    case typeInto(elementID: String, text: String)
     case typeText(String)
     case scroll(ScrollDirection)
     case back
+    /// Show and hide numbers on the clickable elements (R-CL-3).
+    case showNumbers
+    case hideNumbers
     /// Only an explicit spoken "send" makes this intent (R-NV-5).
     case send
 }
@@ -88,9 +118,14 @@ public struct RouteResult: Sendable {
     public var confidence: Double
     public var tier: RouterTier
     public var ms: Double
+    /// A short reason for the log, for example "label match" or "jev: unsure rules".
+    public var why: String
+    /// Other intents that the router also considered, best first. The feedback note can offer them.
+    public var alternatives: [Intent]
 
-    public init(intent: Intent, confidence: Double, tier: RouterTier, ms: Double) {
+    public init(intent: Intent, confidence: Double, tier: RouterTier, ms: Double, why: String = "", alternatives: [Intent] = []) {
         self.intent = intent; self.confidence = confidence; self.tier = tier; self.ms = ms
+        self.why = why; self.alternatives = alternatives
     }
 }
 
@@ -99,10 +134,10 @@ public struct RouteContext: Sendable {
     public var apps: [AppEntry]
     public var names: [NameEntry]
     public var frontBundleID: String?
-    /// Elements of the front window, for voice clicks. Empty when not needed.
-    public var screen: [ScreenElement]
+    /// The front window, for voice clicks. Nil when not needed.
+    public var screen: ScreenSnapshot?
 
-    public init(apps: [AppEntry], names: [NameEntry], frontBundleID: String? = nil, screen: [ScreenElement] = []) {
+    public init(apps: [AppEntry], names: [NameEntry], frontBundleID: String? = nil, screen: ScreenSnapshot? = nil) {
         self.apps = apps; self.names = names; self.frontBundleID = frontBundleID; self.screen = screen
     }
 }

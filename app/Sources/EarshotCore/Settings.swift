@@ -6,24 +6,29 @@ public enum InputMode: String, Codable, Sendable, CaseIterable { case hold, alwa
 /// The router's tier 2.
 public enum Tier2: String, Codable, Sendable, CaseIterable { case off, jev }
 
+/// The speech engine. "auto" uses Parakeet if its model file exists, else Apple (E2, decision 6.2).
+public enum EngineChoice: String, Codable, Sendable, CaseIterable { case auto, apple, parakeet }
+
 /// The owner's settings. The management window edits them. Secrets (the Jev key) go to the Keychain, not here.
 public struct EarshotSettings: Codable, Equatable, Sendable {
     public var mode: InputMode = .hold
-    /// The hold key as a virtual key code. Default: F18 (no modifiers, so no wait for held modifiers).
-    public var holdKeyCode: UInt32 = 79
+    /// The hold key as a virtual key code. Default: right Option alone (61). Every Mac keyboard has it,
+    /// and with no other modifier there is no wait for held modifiers (E0).
+    public var holdKeyCode: UInt32 = 61
+    /// True if the hold key is a modifier key alone. The input module then reads it from flagsChanged events.
+    public var holdKeyIsModifierOnly: Bool = true
     public var holdKeyModifiers: UInt32 = 0
-    /// "apple" or "parakeet".
-    public var engine: String = "apple"
+    public var engine: EngineChoice = .auto
     /// Parakeet model file. Empty means: use Hex's model file if it exists.
     public var parakeetModelPath: String = ""
     public var locale: String = "en_US"
-    /// The router's tier 2, used only when the rules are unsure. "off" keeps all decisions on the Mac (R-MD-1).
-    /// "jev" waits for the owner's decision on R-MD-1.
+    /// The router's tier 2, used only when the rules are unsure. "off" keeps all decisions on the Mac.
+    /// "jev" sends the command words and the short list of labels to Jev, as text (R-MD-1, D-9).
     public var tier2: Tier2 = .off
     /// The longest wait for tier 2. After it, the rules result wins.
     public var tier2BudgetMs: Int = 1000
-    /// Type the dictated text into the owner's own chats only (the E0 rule), or into any chat.
-    public var typeIntoOthers: Bool = false
+    /// Type the dictated text into any chat (R-NV-4). Typing is not Send. The own-chats-only rule is for live tests.
+    public var typeIntoOthers: Bool = true
     public var showFeedback: Bool = true
 
     public init() {}
