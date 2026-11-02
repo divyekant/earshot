@@ -217,7 +217,9 @@ enum WebRouter {
     }
 
     /// The result list for an ordinal: links in headings, else links with 4 or more words.
-    static func ordinalList(_ noun: String, _ elements: [WebElement]) -> [WebElement] {
+    /// A risky element is never a result: on Wikipedia, the fundraising banner is a long link.
+    static func ordinalList(_ noun: String, _ all: [WebElement]) -> [WebElement] {
+        let elements = all.filter { !isRisky($0.label) }
         switch noun {
         case "button": return elements.filter { $0.kind == "button" }
         case "tab": return elements.filter { $0.kind == "tab" }
@@ -290,7 +292,7 @@ enum WebRouter {
         options.append(WebOption(id: "back", choice: WebChoice(action: "back", element: nil, text: nil),
                                  label: "Go back to the previous page", score: 0))
         options.append(WebOption(id: "none", choice: WebChoice.noAction,
-                                 label: "None: no element on this page matches the command", score: 0))
+                                 label: "None: no element on this page has a label with the meaning of the command", score: 0))
 
         guard let top = scored.first, top.1 >= noMatch else {
             return done(WebChoice.noAction, true, p.isCommand ? "no label matches" : "no command word")
@@ -314,7 +316,8 @@ enum WebRouter {
     The command comes from speech to text, so words can be heard wrong. \
     Pick the element whose label matches the command best. A command can name only part of a label. \
     If the command asks to scroll or to go back, pick that option. \
-    If no element matches, or the words are not a command for this page, pick none.
+    Do not pick an element only because it is the closest option. \
+    If no label has the meaning of the command, or the words are not a command for this page, pick none.
     """
 
     static func askJev(_ words: String, _ r: WebRoute, elements: [WebElement], jev: JevClient) async throws

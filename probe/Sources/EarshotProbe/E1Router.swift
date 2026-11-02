@@ -129,15 +129,19 @@ enum E1Router {
         for app in world.apps {
             for alias in app.aliases {
                 let parts = alias.split(separator: " ").map(String.init)
-                guard !parts.isEmpty, parts.count <= tokens.count else { continue }
-                for start in 0...(tokens.count - parts.count) {
-                    let phrase = tokens[start..<(start + parts.count)].joined()
-                    let score = Text.similarity(phrase, parts.joined())
-                    guard score >= 0.9 else { continue }
-                    mentioned[app.id] = max(mentioned[app.id] ?? 0, score)
-                    for i in start..<(start + parts.count) { appTokens.insert(i) }
-                    if start == 0 { appAtStart = true }
-                    if start > 0, ["on", "in"].contains(tokens[start - 1]) { onApp = true }
+                guard !parts.isEmpty else { continue }
+                // Speech to text can split a one-word name: "TigerVNC" comes back as "Tiger VNC" (E2).
+                let spans = parts.count == 1 && parts[0].count >= 5 ? [1, 2] : [parts.count]
+                for span in spans where span <= tokens.count {
+                    for start in 0...(tokens.count - span) {
+                        let phrase = tokens[start..<(start + span)].joined()
+                        let score = Text.similarity(phrase, parts.joined())
+                        guard score >= 0.9 else { continue }
+                        mentioned[app.id] = max(mentioned[app.id] ?? 0, score)
+                        for i in start..<(start + span) { appTokens.insert(i) }
+                        if start == 0 { appAtStart = true }
+                        if start > 0, ["on", "in"].contains(tokens[start - 1]) { onApp = true }
+                    }
                 }
             }
         }

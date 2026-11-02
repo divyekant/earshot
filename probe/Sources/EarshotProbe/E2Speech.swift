@@ -123,7 +123,9 @@ enum E2Speech {
         guard let first = manifest.items.first else { return 0 }
         // Warm-up, not logged: the first run loads the model.
         _ = try await SpeechSetup.transcribe(file: audioDir.appendingPathComponent(first.file).path, kind: kind, locale: locale, hints: [])
-        for (engine, h) in [("apple", [String]()), ("apple+hints", hints)] {
+        // The engine name in the log tells the two Apple models apart.
+        let base = kind == .transcriber ? "apple" : "apple-dictation"
+        for (engine, h) in [(base, [String]()), ("\(base)+hints", hints)] {
             var times: [Double] = []
             for item in manifest.items {
                 let url = audioDir.appendingPathComponent(item.file)
