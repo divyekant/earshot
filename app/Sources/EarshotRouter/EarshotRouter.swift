@@ -1,4 +1,152 @@
 // T2 owns this module. See docs/BUILD-PLAN.md.
 import EarshotCore
+import Foundation
 
-enum EarshotRouterModule {}
+/// The command router (R-SP-2). Rules and fuzzy match first, on the Mac, in a few ms.
+/// Tier 2 runs only when the rules are unsure, only if the owner turned it on, and only within its budget.
+/// There is no agent loop: one tier-2 call for each command at most.
+public struct CommandRouter: Router {
+    /// Nil means tier 2 is off: all decisions stay on the Mac (R-MD-1, D-9). This is the default.
+    public var tier2: Tier2Chooser?
+    /// The longest wait for tier 2. After it, the rules answer stays.
+    public var tier2BudgetMs: Int
+
+    /// Confidence of a sure rules answer.
+    public static let sureConfidence = 0.9
+    /// Confidence of a tier-2 answer.
+    public static let tier2Confidence = 0.8
+    /// Confidence of an unsure rules answer. It is below SafetyPolicy.minimumConfidence, so the app shows it and does nothing.
+    public static let unsureConfidence = 0.5
+    /// Confidence of an unsure "open the app" answer. Opening an app can be undone, so the app does it.
+    public static let unsureOpenAppConfidence = 0.65
+
+    public init(tier2: Tier2Chooser? = nil, tier2BudgetMs: Int = 1000) {
+        self.tier2 = tier2
+        self.tier2BudgetMs = tier2BudgetMs
+    }
+
+    /// The router for the owner's settings. Tier 2 is on only if `settings.tier2` is not "off" and a key exists.
+    public init(settings: EarshotSettings, jevKey: String?) {
+        self.init(tier2: Tier2Factory.make(settings, jevKey: jevKey), tier2BudgetMs: settings.tier2BudgetMs)
+    }
+
+    public func route(_ text: String, context: RouteContext) async -> RouteResult {
+        let t0 = DispatchTime.now().uptimeNanoseconds
+        func ms() -> Double { Double(DispatchTime.now().uptimeNanoseconds &- t0) / 1_000_000 }
+        let d = Self.rules(text, context: context)
+        let alternatives = { (chosen: Intent) in Array(d.options.map(\.intent).filter { $0 != chosen }.prefix(3)) }
+
+        if !d.sure, let tier2, !d.options.isEmpty {
+            let labels = d.options.map(\.label)
+            if let i = await Self.ask(tier2, text, labels, budgetMs: tier2BudgetMs), i >= 0, i < d.options.count {
+                let intent = d.options[i].intent
+                return RouteResult(intent: intent, confidence: Self.tier2Confidence, tier: .jev, ms: ms(),
+                                   why: "tier 2: \(d.why)", alternatives: alternatives(intent))
+            }
+        }
+        return RouteResult(intent: d.intent, confidence: Self.confidence(d), tier: Self.tier(d), ms: ms(),
+                           why: d.why, alternatives: alternatives(d.intent))
+    }
+
+    /// The words that no known name explains, and the chat app that the owner named, if any.
+    /// The app can give them to the app's own search (NameFinder.search) and then route again with the new names (E1, section 6).
+    public static func heardName(_ text: String, context: RouteContext) -> (name: String, appID: String?)? {
+        let d = ChatRouter.decide(text, apps: context.apps, names: context.names)
+        guard let n = d.heardName else { return nil }
+        return (n, d.heardApp)
+    }
+
+    /// The label words that the owner said for a click, for example "send" in "click the send button".
+    /// The app gives them to SafetyPolicy.mayPress with the tier and the input mode (R-NV-5).
+    public static func spokenTarget(_ text: String) -> String {
+        ScreenRouter.parse(text).target.joined(separator: " ")
+    }
+
+    // MARK: - Rules
+
+    static let sendPhrases: Set<String> = ["send", "send it", "send that", "send this", "send now", "send it now",
+                                           "send the message", "send message", "send the text", "now send", "and send"]
+    static let showNumbers: Set<String> = ["show numbers", "show the numbers", "numbers", "show me numbers", "show me the numbers",
+                                           "number the elements", "show labels"]
+    static let hideNumbers: Set<String> = ["hide numbers", "hide the numbers", "clear numbers", "remove numbers",
+                                           "remove the numbers", "no numbers", "stop numbers", "hide labels"]
+    /// Verbs that ask for a press on the screen, not for a chat.
+    static let pressOnly: Set<String> = ["click", "press", "tap", "select", "choose", "hit", "follow", "visit", "toggle",
+                                         "expand", "check", "pick"]
+    static let typeFirst: Set<String> = ["search", "look", "type", "enter"]
+    static let fillers: Set<String> = ["hey", "ok", "okay", "earshot", "please", "now", "then", "and"]
+
+    /// The rules answer, with no tier 2. Synchronous and on the Mac.
+    static func rules(_ text: String, context: RouteContext) -> RulesDecision {
+        var words = TextKit.words(text)
+        while let f = words.first, fillers.contains(f), words.count > 1 { words.removeFirst() }
+        while let l = words.last, ["please", "now"].contains(l), words.count > 1, words != ["send", "now"] { words.removeLast() }
+        let phrase = words.joined(separator: " ")
+        guard !words.isEmpty, !(words.count == 1 && fillers.contains(words[0])) else {
+            return RulesDecision(intent: .none, sure: true, exact: true, why: "no words", options: [])
+        }
+
+        // Only an explicit spoken "send" makes a send intent (R-NV-5). "Send Ravi a message" opens a chat.
+        if sendPhrases.contains(phrase) {
+            return RulesDecision(intent: .send, sure: true, exact: true, why: "send words", options: [])
+        }
+        if showNumbers.contains(phrase) {
+            return RulesDecision(intent: .showNumbers, sure: true, exact: true, why: "show numbers", options: [])
+        }
+        if hideNumbers.contains(phrase) {
+            return RulesDecision(intent: .hideNumbers, sure: true, exact: true, why: "hide numbers", options: [])
+        }
+
+        let parse = ScreenRouter.parse(text)
+        if parse.kind == .scroll { return RulesDecision(intent: .scroll(parse.scroll ?? .down), sure: true, exact: true, why: "scroll words", options: []) }
+        if parse.kind == .back { return RulesDecision(intent: .back, sure: true, exact: true, why: "back words", options: []) }
+
+        let first = words.first ?? ""
+        let wantsScreen = pressOnly.contains(first) || typeFirst.contains(first) || parse.kind == .ordinal
+        if wantsScreen {
+            if let screen = context.screen { return ScreenRouter.decide(text, screen: screen) }
+            if first == "type", parse.kind == .type, let t = parse.text, !t.isEmpty, parse.target.isEmpty {
+                return RulesDecision(intent: .typeText(t), sure: true, exact: true, why: "type words, no screen", options: [])
+            }
+        }
+
+        let chat = ChatRouter.decide(text, apps: context.apps, names: context.names)
+        if chat.sure && chat.intent != .none { return chat }
+        if let screen = context.screen {
+            var web = ScreenRouter.decide(text, screen: screen)
+            if web.intent != .none || (!chat.sure && chat.intent == .none && web.options.contains { $0.score > 0 }) {
+                if chat.intent != .none { web.options += chat.options }
+                return web
+            }
+            if chat.intent != .none {
+                var c = chat
+                c.options += web.options.filter { $0.score > 0 }
+                return c
+            }
+        }
+        return chat
+    }
+
+    static func confidence(_ d: RulesDecision) -> Double {
+        if d.sure { return sureConfidence }
+        if case .openApp = d.intent { return unsureOpenAppConfidence }
+        return unsureConfidence
+    }
+
+    static func tier(_ d: RulesDecision) -> RouterTier {
+        if d.intent == .none && !d.sure { return .none }
+        return d.exact ? .rules : .fuzzy
+    }
+
+    /// Runs tier 2, and stops waiting after `budgetMs`. The router does not trust the chooser to keep its budget.
+    static func ask(_ chooser: Tier2Chooser, _ text: String, _ options: [String], budgetMs: Int) async -> Int? {
+        let box = ChooserBox(chooser)
+        return await withBudget(budgetMs) { await box.chooser.choose(text, options: options, budgetMs: budgetMs) }
+    }
+}
+
+/// Lets a chooser go into a child task. The router calls it from one task at a time.
+final class ChooserBox: @unchecked Sendable {
+    let chooser: Tier2Chooser
+    init(_ chooser: Tier2Chooser) { self.chooser = chooser }
+}
