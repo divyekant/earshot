@@ -69,6 +69,18 @@ enum ActionText {
     }
 }
 
+/// The time limits of the chat switcher. Each wait ends as soon as the screen shows the next state.
+enum SwitcherTiming {
+    /// The time between two AX reads in a wait.
+    static let pollMs = 15
+    /// From the switcher keys to a focused search field.
+    static let fieldMs = 1200
+    /// From the typed name to the name in the field.
+    static let typedMs = 1000
+    /// From the name in the field to a result that shows the name. It replaces the fixed 250 ms sleep of E0.
+    static let resultMs = 800
+}
+
 /// The result of the chat check.
 enum ChatCheck: String, Equatable {
     /// A text on screen is the chat name and nothing more. Typing needs this.
@@ -175,6 +187,21 @@ enum ActionRules {
         if texts.contains(where: exact) { return .exact }
         if texts.contains(where: { t in let k = ActionText.key(t); return keys.contains { k.contains($0) } }) { return .partial }
         return .none
+    }
+
+    /// The key of a text at its place on screen: the same text in the sidebar and in the result list has two keys.
+    static func placeKey(_ text: String, _ f: Frame) -> String {
+        "\(ActionText.normalize(text))@\(Int(f.x.rounded())),\(Int(f.y.rounded()))"
+    }
+
+    /// The place keys of the texts that match the name.
+    static func matchKeys(_ texts: [(String, Frame)], name: String) -> Set<String> {
+        Set(texts.filter { chatCheck(texts: [$0.0], names: [name]) != .none }.map { placeKey($0.0, $0.1) })
+    }
+
+    /// True if a text that matches the name shows at a place where it was not before typing.
+    static func resultShows(_ texts: [(String, Frame)], name: String, baseline: Set<String>) -> Bool {
+        !matchKeys(texts, name: name).subtracting(baseline).isEmpty
     }
 
     /// The reason not to type the dictated text into the chat, or nil (R-NV-4).
