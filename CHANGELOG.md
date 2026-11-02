@@ -8,6 +8,10 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Added
 
+- earshot runs on Intel Macs and on macOS 14 and 15. On these Macs, it uses Apple on-device dictation for speech. No audio leaves the Mac (R-MD-1).
+
+### Added
+
 - "Jev sees the screen" now works in the app: an unsure hold-key click that was not blocked can ask Jev with one picture of the front window. It is off by default (R-MD-1, R-NV-5, D-10).
 
 ### Fixed
