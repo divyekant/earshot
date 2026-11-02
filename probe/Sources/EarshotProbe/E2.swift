@@ -89,6 +89,11 @@ enum E2 {
                 print("\(site.id): no page found in the front window")
                 continue
             }
+            // Save only the page of the site, and never a sign-in, code or payment page (E2 live run 3).
+            if let why = WebPage.refuse(last, host: args.contains("--current") ? nil : URL(string: site.url)?.host) {
+                print("\(site.id): \(why). Not saved.")
+                continue
+            }
             // The tree walk, for comparison with the one-call search.
             var walkMs: Double?
             var walkCount: Int?
@@ -148,6 +153,11 @@ enum E2 {
         for site in file.sites {
             guard let snap = try? WebPage.load(site.id) else {
                 print("\(site.id): no saved read. Run e2-page first.")
+                continue
+            }
+            if let host = URL(string: site.url)?.host, !WebPage.onHost(snap.url, host)
+                || WebPage.sensitive(url: snap.url, elements: snap.elements) != nil {
+                print("\(site.id): the saved read is not a page of \(host), or it is a sign-in page. Run e2-page again.")
                 continue
             }
             loaded.append(snap)
@@ -480,6 +490,12 @@ enum E2 {
                 }
                 guard read.areaPath == "hit test" else {
                     print("  the page is not on screen (found by \(read.areaPath) only). The run stops, so that no hidden tab gets a press.")
+                    stop = true
+                    break
+                }
+                // Act only on the page of the site, and never on a sign-in, code or payment page (E2 live run 3).
+                if let why = WebPage.refuse(read, host: host) {
+                    print("  \(why). The run stops. Nothing was done on this page.")
                     stop = true
                     break
                 }

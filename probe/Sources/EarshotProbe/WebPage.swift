@@ -112,13 +112,18 @@ enum WebPage {
                   var node = hit else { continue }
             // Go up to the outermost web area. A frame inside the page is a web area too.
             var area: AXUIElement?
+            var otherWindow = false
             for _ in 0..<80 {
                 let r = AX.role(node)
                 if r == "AXWebArea" { area = node }
-                if r == "AXWindow" { break }
+                if r == "AXWindow" { otherWindow = !CFEqual(node, window); break }
                 guard let parent = AX.element(node, "AXParent") else { break }
                 node = parent
             }
+            // The hit test on the app element gives the top Chrome element at the point. That can be in another
+            // Chrome window on top, for example a sign-in window (E2 live run 3). Such a page is not this window's page.
+            if let area, let w = AX.element(area, "AXWindow"), !CFEqual(w, window) { otherWindow = true }
+            if otherWindow { continue }
             if let area, let f = AX.frame(area), f.w > 50, f.h > 50 { return area }
         }
         return nil
@@ -171,6 +176,47 @@ enum WebPage {
                 if name == "back" { return el }
             }
             queue.append(contentsOf: AX.elements(el, "AXChildren"))
+        }
+        return nil
+    }
+
+    // MARK: - Pages that earshot must not act on
+
+    /// True if the address is on the host or on a part of it ("en.wikipedia.org" for "wikipedia.org").
+    static func onHost(_ url: String, _ host: String) -> Bool {
+        let want = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+        guard var h = URL(string: url)?.host else { return false }
+        if h.hasPrefix("www.") { h = String(h.dropFirst(4)) }
+        return h == want || h.hasSuffix("." + want)
+    }
+
+    /// Words in the path of an address that mark a sign-in, code check or payment page.
+    static let sensitivePathWords = ["signin", "sign-in", "sign_in", "login", "log-in", "logon", "password", "twofactor",
+                                     "two-factor", "2fa", "mfa", "otp", "verify", "checkout", "payment", "billing"]
+    /// Words in the label of a field or a button that mark such a page. Links are not checked:
+    /// a story title on Hacker News can have the word "password".
+    static let sensitiveLabelWords = ["password", "verification code", "two-step", "two-factor", "one-time code",
+                                      "security code", "card number", "cvv", "cvc"]
+
+    /// The reason, if the page looks like a sign-in, code check or payment page. Earshot does not act on such a page.
+    static func sensitive(url: String, elements: [WebElement]) -> String? {
+        let path = (URL(string: url)?.path ?? url).lowercased()
+        if let w = sensitivePathWords.first(where: { path.contains($0) }) { return "the address has \"\(w)\"" }
+        if elements.contains(where: { $0.subrole == "AXSecureTextField" }) { return "a password field" }
+        for e in elements where e.kind != "link" {
+            let l = e.label.lowercased()
+            if sensitiveLabelWords.contains(where: { l.contains($0) }) { return "the label \"\(e.label)\"" }
+        }
+        return nil
+    }
+
+    /// Why earshot must not act on this page, or nil. The page must be on the expected host, if one is given.
+    static func refuse(_ read: LiveRead, host: String?) -> String? {
+        if let host, !onHost(read.url, host) {
+            return "the page on screen is \(URL(string: read.url)?.host ?? "unknown"), not \(host)"
+        }
+        if let why = sensitive(url: read.url, elements: read.elements) {
+            return "this looks like a sign-in, code or payment page (\(why))"
         }
         return nil
     }

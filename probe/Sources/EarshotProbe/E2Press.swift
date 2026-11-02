@@ -118,6 +118,7 @@ enum E2Press {
         guard let w = AX.window(app), let found = WebPage.findWebArea(in: w), found.1 == "hit test",
               let area = AX.frame(found.0), let read = WebPage.read(app, headings: false), read.areaPath == "hit test"
         else { throw ProbeError("the page is not on screen. Nothing was pressed.") }
+        if let why = WebPage.refuse(read, host: startHost) { throw ProbeError("\(why). Nothing was pressed.") }
         guard let index = pick(read, area: area, start: start, label: label) else {
             throw ProbeError("no plain link to test on this page. Nothing was pressed.")
         }
