@@ -140,7 +140,7 @@ final class CommandPipeline {
         if let until = armedUntil {
             armedUntil = nil
             if now() <= until, !CommandRouter.hasCommandWord(text, context: context) {
-                return await typeArmed(text, context: context, rows: rows, stages: stages, clock)
+                return await typeArmed(text, mode: mode, context: context, rows: rows, stages: stages, clock)
             }
         }
 
@@ -249,7 +249,7 @@ final class CommandPipeline {
     }
 
     /// Types the words of an armed turn into the focused field. The log keeps the word count, not the words.
-    private func typeArmed(_ text: String, context: RouteContext, rows: [AppEntry], stages: [String: Double],
+    private func typeArmed(_ text: String, mode: InputMode, context: RouteContext, rows: [AppEntry], stages: [String: Double],
                            _ clock: Stopwatch) async -> ActivityRecord {
         var stages = stages
         let words = text.split(whereSeparator: \.isWhitespace).count
@@ -260,7 +260,8 @@ final class CommandPipeline {
             return done(heard: heard, intent: "none", tier: .rules, ok: false, note: "type: \(why)", stages: stages, clock)
         }
         pauseAlwaysOn(true)
-        let outcome = await actions.run(.typeText(text), context: context, command: CommandInfo(mode: .hold, tier: .rules))
+        // The real mode of the turn, so that a mode rule of the action module also holds here.
+        let outcome = await actions.run(.typeText(text), context: context, command: CommandInfo(mode: mode, tier: .rules))
         pauseAlwaysOn(false)
         for (k, ms) in outcome.stages { stages["action." + k] = ms }
         return done(heard: heard, intent: "Type \(words) word\(words == 1 ? "" : "s")", tier: .rules, ok: outcome.ok,

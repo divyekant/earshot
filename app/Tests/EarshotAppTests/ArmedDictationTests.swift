@@ -34,6 +34,7 @@ final class ArmedDictationTests: XCTestCase {
         clock += 3
         let typed = await say(p, e, "the blue fox jumps", .alwaysOn)
         XCTAssertEqual(runner.runs.map(\.0), [.typeText("the blue fox jumps")])
+        XCTAssertEqual(runner.runs.first?.1.mode, .alwaysOn, "the action gets the real mode of the turn")
         XCTAssertEqual(typed.heard, "(4 words)", "the log keeps the word count, not the words")
         XCTAssertFalse(typed.note.contains("blue fox"), typed.note)
         XCTAssertNil(p.armedUntil)
