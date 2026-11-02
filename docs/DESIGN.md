@@ -233,3 +233,4 @@ Fine-tune the tier-2 router on the Phase 3 logs. Add Hinglish support if Phase 0
 | FluidAudio, speech-swift | Apache-2.0 (check model terms) | VAD, ASR, turn detection, speaker embeddings in Swift |
 | Talon + Rango | Closed core + MIT | Command grammar and click-hint ideas |
 | macOS Voice Control | Apple | Reference behavior for "click <name>" and "show numbers" |
+| Hex (anomalyco/hex) | MIT | Parakeet speech in about 155 ms on this Mac. A Hex transformation can give the transcript to another program (E4). |
