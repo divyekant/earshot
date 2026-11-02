@@ -13,17 +13,19 @@ The experiments E0, E1 and E2 showed that earshot is viable. This plan builds th
 
 | Task | Scope | Folder that the task owns | Depends on |
 |---|---|---|---|
-| T0 Foundation | Package, EarshotCore protocols and types, settings store, activity log, safety policy, app shell | `app/Package.swift`, `app/Sources/EarshotCore`, `app/Sources/EarshotApp` (shell only), `app/Tests/EarshotCoreTests`, this file | — |
-| T1 Speech | Apple SpeechTranscriber engine (default) and Parakeet engine (transcribe.cpp, model kept loaded). Partial text. Audio after key release. | `app/Sources/EarshotSpeech`, `app/Tests/EarshotSpeechTests` | T0 |
+| T0 Foundation | Package with every module target, EarshotCore protocols and types, settings store, activity log, safety policy, app shell | `app/Package.swift`, `app/Sources/EarshotCore`, `app/Tests/EarshotCoreTests`, this file | — |
+| T1 Speech | Apple SpeechTranscriber engine and Parakeet engine (transcribe.cpp, model kept loaded). Engine "auto": Parakeet if its model file exists, else Apple. Partial text. Audio after key release. | `app/Sources/EarshotSpeech`, `app/Tests/EarshotSpeechTests`; also the TranscribeCpp binary target in `app/Package.swift` | T0 |
 | T2 Router | Rules and fuzzy match from E1 and E2. Name match by sound ("Manal" → Mrunal). Exact match for labels that are mostly numbers. Tier-2 Jev client (opt-in, 1 s budget, rules answer as the fallback). | `app/Sources/EarshotRouter`, `app/Tests/EarshotRouterTests` | T0 |
-| T3 Actions | Open app, open chat (switcher or link from the catalogue), focus the message box, type, web click (AXPress if the element offers it, else a click after a hit test), scroll, back. All rules of SafetyPolicy. | `app/Sources/EarshotActions`, `app/Tests/EarshotActionsTests` | T0 |
+| T3 Actions | Open app, open chat (switcher or link from the catalogue), focus the message box, type, web click (AXPress if the element offers it, else a click after a hit test), scroll, back. "Show numbers" on clickable elements (R-CL-3). OCR fallback with Apple Vision for apps with poor labels (R-CL-4). All rules of SafetyPolicy. | `app/Sources/EarshotActions`, `app/Tests/EarshotActionsTests` | T0 |
 | T4 Discovery | Catalogue from the menus (whole words, owner approval). Name index from sidebars, app search (with the echo and label filters) and optional Contacts. Refresh. | `app/Sources/EarshotDiscovery`, `app/Tests/EarshotDiscoveryTests` | T0 |
-| T5 Input | Hold key (configurable, default F18 with no modifiers). Always-on: speech detection, end of turn, "for me?" gate. A false trigger never does an action that cannot be undone (R-ON-5). | `app/Sources/EarshotInput`, `app/Tests/EarshotInputTests` | T0, T1 |
-| T6 Management window | Tabs: General, Apps, Names, Activity, Permissions, Test. Jev key in the Keychain. Uses EarshotCore types only. | `app/Sources/EarshotUI` | T0 |
+| T5 Input | Hold key (configurable; default right Option alone, key code 61, read with a flagsChanged monitor). Always-on: speech detection, end of turn, "for me?" gate. A false trigger never does an action that cannot be undone (R-ON-5). | `app/Sources/EarshotInput`, `app/Tests/EarshotInputTests` | T0, T1 |
+| T6 Management window and note | Tabs: General, Apps, Names, Activity, Permissions, Test. Jev key in the Keychain. The feedback note on screen (FeedbackSink, R-FB-1). Uses EarshotCore types only. | `app/Sources/EarshotUI`, `app/Tests/EarshotUITests` | T0 |
 | T7 Integration | Connect the modules in EarshotApp. App bundle, Info.plist usage text, signing, start at login. Live tests on the Mac. | `app/Sources/EarshotApp`, `app/scripts` | T1 to T6 |
 | T8 Docs | README, user guide, design and decisions updates. | `README.md`, `docs/` | T7 |
 
-T0 freezes the protocols in `app/Sources/EarshotCore/Protocols.swift`. If a task needs a change to a protocol, ask the coordinator first.
+T0 freezes the protocols in `app/Sources/EarshotCore/Protocols.swift` and the types in `app/Sources/EarshotCore/Types.swift`. If a task needs a change to them, ask the coordinator first.
+
+T0 declares every module target in `app/Package.swift`. Threads do not edit `app/Package.swift`. The one exception: T1 adds the TranscribeCpp binary target and its linker settings.
 
 ## 3. Rules for every thread
 
@@ -36,6 +38,7 @@ T0 freezes the protocols in `app/Sources/EarshotCore/Protocols.swift`. If a task
 7. App support is data, not code. Do not add an `if app == "slack"` branch (R-MT-1, R-MT-2).
 8. Work in your own git worktree on the Mac, for example `~/projects/earshot-t1`. Never build in `~/projects/earshot`, so that builds do not collide.
 9. Live tests that press keys or click run one at a time, and only after the owner says "go".
+10. Live tests type only into the owner's own chats. For other people, a test only puts the cursor in the message box.
 
 ## 4. Toolchain
 
