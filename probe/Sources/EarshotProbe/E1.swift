@@ -79,15 +79,18 @@ enum E1 {
     static func index(_ args: [String]) async throws -> Int32 {
         guard AX.trusted(prompt: false) else { throw ProbeError("Accessibility is off for this terminal") }
         let cat = try Catalogue.load()
-        let file = await NameIndex.build(catalogue: cat, front: args.contains("--front"), debug: args.contains("--debug"))
+        let file = await NameIndex.build(catalogue: cat, front: args.contains("--front"), debug: args.contains("--debug"),
+                                         dumpTree: args.contains("--dump"))
         try NameIndex.save(file)
         print("\nName index. Owner: \(file.owner)")
         for app in cat.apps where app.chat {
             let names = file.entries.filter { $0.app == app.id }
             guard !names.isEmpty else { print("  \(app.name): not read (not running)"); continue }
             let ms = Int((file.readMs[app.id] ?? 0).rounded())
-            let shown = names.prefix(15).map { $0.isSelf ? "\($0.name) (self)" : $0.name }
-            print("  \(app.name): \(names.count) names in \(ms) ms: \(shown.joined(separator: " | "))\(names.count > 15 ? " | ..." : "")")
+            let settled = Int((file.settleMs?[app.id] ?? 0).rounded())
+            let shown = names.prefix(20).map { $0.isSelf ? "\($0.name) (self)" : $0.name }
+            print("  \(app.name): \(names.count) names, one read \(ms) ms, settled in \(settled) ms: \(shown.joined(separator: " | "))\(names.count > 20 ? " | ..." : "")")
+            if let extra = file.aliases?[app.id] { print("    extra app names from the screen: \(extra.joined(separator: ", "))") }
         }
         print("Saved \(NameIndex.url.path)")
         return 0
@@ -119,6 +122,23 @@ enum E1 {
         "can you summarise this page",
     ]
 
+    /// Phrasings that the rules grammar was not written for. The Bool says if the phrasing names the app.
+    static let freePhrasings: [(String, Bool)] = [
+        ("can you pull up {first} on {app}", true),
+        ("{first} on {app}", true),
+        ("get me {first}'s chat", false),
+        ("I need to talk to {first} on {app}", true),
+        ("reply to {first}", false),
+        ("DM {first} on {app}", true),
+        ("open {app} and go to {first}", true),
+        ("let's write to {first}", false),
+        ("{app}, {first}", true),
+        ("switch over to my chat with {first}", false),
+    ]
+
+    /// Names that are very likely not in the owner's chats.
+    static let unknownNames = ["Zorawar", "Ingrid Vasquez", "Thembeka", "Okonkwo"]
+
     static func make(_ args: [String]) throws -> Int32 {
         let cat = try Catalogue.load()
         let idx = try NameIndex.load()
@@ -145,7 +165,12 @@ enum E1 {
             let picks = idx.entries.filter { $0.app == app.id && !$0.isSelf }.shuffled(using: &rng).prefix(perApp)
             for e in picks {
                 let first = firstName(e.name)
-                for kind in [kinds[n % 5], kinds[(n + 2) % 5]] {
+                // One phrasing that the rules were not written for.
+                let (template, needsApp) = freePhrasings[n % freePhrasings.count]
+                let words = template.replacingOccurrences(of: "{first}", with: first)
+                    .replacingOccurrences(of: "{app}", with: app.name)
+                add("free", words, byFirst(first, app: needsApp ? app.id : nil))
+                for kind in [kinds[n % 5]] {
                     switch kind {
                     case "full":
                         let t = ["message \(e.name) on \(app.name)", "open my chat with \(e.name) in \(app.name)",
@@ -171,7 +196,7 @@ enum E1 {
             add("self", "open my own chat in \(app.name)", mine)
             add("open-app", "switch to \(app.name)", [Choice(action: "open_app", app: app.id, target: nil)])
         }
-        // A common spoken name of Messages that no menu shows. Rules cannot know it.
+        // A common spoken name of Messages that no menu shows. Only the message box placeholder shows it.
         if let messages = chatApps.first(where: { $0.id == "messages" }) {
             let names = idx.entries.filter { $0.app == messages.id && !$0.isSelf }.prefix(2)
             for e in names { add("spoken-app", "text \(firstName(e.name)) on iMessage", byFirst(firstName(e.name), app: messages.id)) }
@@ -183,6 +208,14 @@ enum E1 {
             add("open-app", "open \(a.name)", [Choice(action: "open_app", app: a.id, target: nil)])
         }
         for s in nonCommands { add("none", s, [Choice.noAction]) }
+        // Names that are not in the index. Doing nothing is correct. Opening only the app is also safe.
+        for (i, name) in unknownNames.enumerated() where byFirst(firstName(name), app: nil).isEmpty {
+            if let app = chatApps.isEmpty ? nil : chatApps[i % chatApps.count], i % 2 == 0 {
+                add("unknown", "message \(name) on \(app.name)", [Choice.noAction, Choice(action: "open_app", app: app.id, target: nil)])
+            } else {
+                add("unknown", "ping \(name)", [Choice.noAction])
+            }
+        }
 
         let set = TestSet(builtAt: ISO8601DateFormatter().string(from: Date()), commands: out)
         let encoder = JSONEncoder()
@@ -247,6 +280,8 @@ enum E1 {
             let jevOK: Bool?, jevMs: Double?
             let hybridOK: Bool, hybridMs: Double
             let tokens: Int?
+            /// A wrong chat is the unsafe error: the owner could type into it.
+            let rulesWrongChat: Bool, jevWrongChat: Bool, hybridWrongChat: Bool
         }
         var rows: [Row] = []
         for cmd in set.commands.prefix(limit) {
@@ -273,9 +308,12 @@ enum E1 {
             let hybrid = rr.confident || jevChoice == nil ? rr.choice : jevChoice!
             let hybridOK = cmd.expected.contains { hybrid.matches($0) }
             let hybridMs = rulesMs + (rr.confident ? 0 : (answer?.ms ?? 0))
+            func wrongChat(_ c: Choice?, _ ok: Bool?) -> Bool { c?.action == "open_chat" && ok == false }
             rows.append(Row(kind: cmd.kind, recall: recall, rulesOK: rulesOK, rulesSure: rr.confident, rulesMs: rulesMs,
                             jevOK: jevOK, jevMs: answer?.ms, hybridOK: hybridOK, hybridMs: hybridMs,
-                            tokens: answer?.inputTokens))
+                            tokens: answer?.inputTokens,
+                            rulesWrongChat: wrongChat(rr.choice, rulesOK), jevWrongChat: wrongChat(jevChoice, jevOK),
+                            hybridWrongChat: wrongChat(hybrid, hybridOK)))
 
             var entry: [String: Any] = [
                 "event": "route", "id": cmd.id, "kind": cmd.kind, "words": cmd.words,
@@ -309,14 +347,17 @@ enum E1 {
         let total = rows.count
         func pct(_ k: Int) -> String { total == 0 ? "-" : "\(k)/\(total) (\(Int((Double(k) / Double(total) * 100).rounded())) %)" }
         print("\nSummary")
-        print(pad("Router", 24) + pad("Correct", 16) + pad("Median", 10) + "Slowest 1 in 10")
+        print(pad("Router", 24) + pad("Correct", 16) + pad("Wrong chat", 12) + pad("Median", 10) + "Slowest 1 in 10")
         print(pad("Rules + fuzzy (Mac)", 24) + pad(pct(rows.filter(\.rulesOK).count), 16)
+              + pad("\(rows.filter(\.rulesWrongChat).count)", 12)
               + pad(Stats.ms(Stats.median(rows.map(\.rulesMs))), 10) + Stats.ms(Stats.percentile(rows.map(\.rulesMs), 0.9)))
         if jev != nil {
             let jevMs = rows.compactMap(\.jevMs)
             print(pad("Jev alone (cloud)", 24) + pad(pct(rows.filter { $0.jevOK == true }.count), 16)
+                  + pad("\(rows.filter(\.jevWrongChat).count)", 12)
                   + pad(Stats.ms(Stats.median(jevMs)), 10) + Stats.ms(Stats.percentile(jevMs, 0.9)))
             print(pad("Rules, Jev if unsure", 24) + pad(pct(rows.filter(\.hybridOK).count), 16)
+                  + pad("\(rows.filter(\.hybridWrongChat).count)", 12)
                   + pad(Stats.ms(Stats.median(rows.map(\.hybridMs))), 10) + Stats.ms(Stats.percentile(rows.map(\.hybridMs), 0.9)))
         }
         let sure = rows.filter(\.rulesSure)
