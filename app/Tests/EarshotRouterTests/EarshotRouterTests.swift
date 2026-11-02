@@ -425,6 +425,33 @@ final class EarshotRouterTests: XCTestCase {
         await expect("on Slack message Ravi", chat("slack", "Ravi Kumar"), slack)
     }
 
+    func testOpenLabelOnAnApp() async {
+        let x = ScreenSnapshot(bundleID: "com.google.Chrome", windowTitle: "Home / X", url: "https://x.com/home", elements: [
+            Fixtures.el("e1", "AXLink", "Home", y: 10), Fixtures.el("e2", "AXLink", "Explore", y: 40),
+            Fixtures.el("e3", "AXLink", "Notifications", y: 70), Fixtures.el("e4", "AXLink", "Messages", y: 100),
+            Fixtures.el("e5", "AXButton", "Delete", y: 130), Fixtures.el("e6", "AXLink", "Bookmarks", y: 160),
+        ])
+        let chrome = RouteContext(apps: Fixtures.apps, names: Fixtures.names, frontBundleID: "com.google.Chrome", screen: x)
+        await expect("Open notifications on Chrome.", .click(elementID: "e3"), chrome)
+        await expect("open bookmarks in Google Chrome", .click(elementID: "e6"), chrome)
+        await expect("Chrome, open explore", .click(elementID: "e2"), chrome)
+        // An app name still wins over a label.
+        await expect("open notes", .openApp(appID: "notes"), chrome)
+        // "open" never presses a risky label.
+        let del = await route("open delete on Chrome", chrome)
+        XCTAssertEqual(del.intent, .none)
+        XCTAssertTrue(del.why.hasPrefix("blocked"), del.why)
+        // A weak match keeps today's answer: open the app.
+        let weak = await route("open the quarterly figures on Chrome", chrome)
+        XCTAssertEqual(weak.intent, .openApp(appID: "chrome"), weak.why)
+        // Chrome not in front: open it, no click.
+        let slackFront = RouteContext(apps: Fixtures.apps, names: Fixtures.names, frontBundleID: "com.tinyspeck.slackmacgap")
+        let away = await route("open notifications on Chrome", slackFront)
+        XCTAssertEqual(away.intent, .openApp(appID: "chrome"), away.why)
+        // A chat form with a comma stays a chat: "Slack, Ravi".
+        await expect("Slack, Ravi", chat("slack", "Ravi Kumar"))
+    }
+
     func testE2NoCommand() async {
         let r = await route("what a lovely day", news)
         XCTAssertEqual(r.intent, .none)
