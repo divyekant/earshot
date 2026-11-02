@@ -217,8 +217,10 @@ enum E2 {
                     fields.map { WebChoice(action: "type", element: $0.id, text: "local voice control") })
             }
             // Ordinal: the router's own result list. The live run prints the label to check by eye.
+            // Only a page with a list of results gets this test: links in headings, or many long links.
             let results = WebRouter.ordinalList("result", els)
-            if results.count >= 3 {
+            let headed = results.filter(\.inHeading).count
+            if results.count >= 3, headed >= 2 || results.count >= 15 {
                 add(site.id, "ordinal", "open the second result", [press(results[1])])
             }
             // A label that the page does not have.

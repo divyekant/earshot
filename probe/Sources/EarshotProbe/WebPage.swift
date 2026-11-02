@@ -238,6 +238,9 @@ enum WebPage {
         return parts.joined(separator: " ")
     }
 
+    /// Links that the browser adds to the page for screen readers. They are not part of the page.
+    static let browserHints = ["To get missing image descriptions"]
+
     static let emailPattern = #"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"#
 
     /// Removes invisible characters and e-mail addresses, and cuts long labels.
@@ -331,6 +334,7 @@ enum WebPage {
                 unlabelled += 1
                 continue
             }
+            if browserHints.contains(where: { d.label.hasPrefix($0) }) { continue }
             items.append((d, el))
         }
         // Reading order: rows of 8 points from the top, then left to right.
