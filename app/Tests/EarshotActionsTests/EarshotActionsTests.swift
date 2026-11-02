@@ -1,3 +1,4 @@
+import AppKit
 import CoreGraphics
 import EarshotCore
 import Foundation
@@ -354,6 +355,29 @@ final class ActionRunnerTests: XCTestCase {
         }
         times.sort()
         print("EARSHOT_BENCH screen read: front \(bundle), \(count) elements, median \(times[5]) ms, max \(times[9]) ms")
+        // Read one app that is not in front, by bundle id, for example a browser: EARSHOT_READ_BUNDLE=com.google.Chrome.
+        // It reads only. The window controls walk is timed on its own, so the cost of the new targets shows.
+        if let id = ProcessInfo.processInfo.environment["EARSHOT_READ_BUNDLE"],
+           let pid = NSRunningApplication.runningApplications(withBundleIdentifier: id).first?.processIdentifier {
+            var total: [Double] = [], walk: [Double] = []
+            var n = 0, tabs = 0, inPage = 0
+            for _ in 0..<10 {
+                guard let r = ScreenReader.read(pid: pid, maxElements: 400) else { continue }
+                total.append(r.ms)
+                n = r.snapshot.elements.count
+                inPage = r.items.values.filter(\.inPage).count
+                tabs = r.items.values.filter { !$0.inPage && $0.kind == "tab" }.count
+                if let w = AX.window(AX.appElement(pid)) {
+                    let t0 = Clock.nowNs()
+                    _ = ScreenReader.windowControls(w)
+                    walk.append(Clock.ms(since: t0))
+                }
+            }
+            total.sort(); walk.sort()
+            if !total.isEmpty, !walk.isEmpty {
+                print("EARSHOT_BENCH \(id) read: \(n) elements (\(inPage) in the page, \(tabs) window tabs), median \(total[total.count / 2]) ms, max \(total.last!) ms; window controls walk median \(walk[walk.count / 2]) ms")
+            }
+        }
         if ProcessInfo.processInfo.environment["EARSHOT_OCR_BENCH"] == "1", OCR.allowed(), let pid = AX.frontPid(),
            let w = AX.window(AX.appElement(pid)).flatMap({ AX.frame($0) }) {
             var ocr: [Double] = []
