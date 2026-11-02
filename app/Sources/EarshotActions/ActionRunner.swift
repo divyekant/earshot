@@ -450,7 +450,7 @@ public final class EarshotActionRunner: ActionRunner {
         let (read, item) = pair
         let label = item.element.label
         let sensitive = SafetyPolicy.sensitive(url: read.snapshot.url, elements: read.snapshot.elements)
-        if let block = ActionRules.pressBlock(label: label, command: command, sensitive: sensitive) { return fail(block) }
+        if let block = ActionRules.pressBlock(label: label, role: item.element.role, command: command, sensitive: sensitive) { return fail(block) }
         // Chrome keeps hidden tabs in the tree and ignores a press on them (E2 live run 1).
         if read.web, read.areaPath != "hit test" { return fail("not clicked: the page can be a hidden tab") }
         await waitForKeysUp(watch)

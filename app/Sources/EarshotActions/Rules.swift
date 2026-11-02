@@ -235,9 +235,10 @@ enum ActionRules {
     // MARK: - Safety gates
 
     /// The reason not to press this element, or nil (R-NV-5, R-ON-5, E2 safety rules).
-    static func pressBlock(label: String, command: CommandInfo, sensitive: String?) -> String? {
+    static func pressBlock(label: String, role: String? = nil, command: CommandInfo, sensitive: String?) -> String? {
         if let sensitive { return "blocked: this looks like a sign-in, code or payment page (\(sensitive))" }
-        if !SafetyPolicy.mayPress(label: label, spokenTarget: command.spokenTarget, tier: command.tier, mode: command.mode) {
+        if !SafetyPolicy.mayPress(label: label, role: role, spokenTarget: command.spokenTarget, tier: command.tier,
+                                  mode: command.mode) {
             return "blocked: risky label \"\(label)\""
         }
         return nil

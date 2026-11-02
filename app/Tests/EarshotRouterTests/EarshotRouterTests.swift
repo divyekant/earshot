@@ -330,6 +330,53 @@ final class EarshotRouterTests: XCTestCase {
         }
     }
 
+    // MARK: - Risky labels by role (live: x.com chat row "... You: Sent a post" was blocked)
+
+    static let xRow = "user avatar Prakash Iyer Verified account 1h You: Sent a post"
+
+    func testRiskyWordsCountForControlsOnly() {
+        XCTAssertFalse(SafetyPolicy.isRisky(Self.xRow, role: "AXRow"))
+        XCTAssertFalse(SafetyPolicy.isRisky(Self.xRow, role: "AXLink"))
+        XCTAssertFalse(SafetyPolicy.isRisky(Self.xRow, role: "AXCell"))
+        XCTAssertTrue(SafetyPolicy.isRisky(Self.xRow, role: "AXButton"), "a control keeps the strict rule")
+        XCTAssertTrue(SafetyPolicy.isRisky(Self.xRow, role: nil), "an unknown role keeps the strict rule")
+        XCTAssertTrue(SafetyPolicy.isRisky(Self.xRow, role: "AXSomethingNew"), "an unknown role keeps the strict rule")
+        XCTAssertTrue(SafetyPolicy.isRisky("Post", role: "AXButton"))
+        XCTAssertTrue(SafetyPolicy.isRisky("Send message", role: "AXButton"))
+        XCTAssertTrue(SafetyPolicy.isRisky("Delete", role: "AXLink"))
+        XCTAssertTrue(SafetyPolicy.isRisky("Delete account", role: "AXLink"))
+        XCTAssertTrue(SafetyPolicy.isRisky("Delete this repository and all of its issues", role: "AXLink"))
+        XCTAssertTrue(SafetyPolicy.isRisky("Sign out of all your devices now", role: "AXLink"))
+        XCTAssertFalse(SafetyPolicy.isRisky("How we post a new release every week", role: "AXLink"))
+        // The press gate uses the same rule.
+        XCTAssertTrue(SafetyPolicy.mayPress(label: Self.xRow, role: "AXRow", spokenTarget: "prakash iyar", tier: .fuzzy,
+                                            mode: .hold))
+        XCTAssertFalse(SafetyPolicy.mayPress(label: Self.xRow, spokenTarget: "prakash iyar", tier: .fuzzy, mode: .hold))
+    }
+
+    func testClickAChatRowWithMessageText() async {
+        let page = ScreenSnapshot(bundleID: "com.google.Chrome", windowTitle: "Messages / X", url: "https://x.com/messages",
+                                  elements: [
+            Fixtures.el("e1", "AXRow", Self.xRow, y: 100),
+            Fixtures.el("e2", "AXButton", "Post", y: 10),
+            Fixtures.el("e3", "AXLink", "Home", y: 10, x: 50),
+        ])
+        let ctx = RouteContext(apps: Fixtures.apps, names: Fixtures.names, screen: page)
+        let r = await route("Click on Prakash Iyar", ctx)
+        XCTAssertEqual(r.intent, .click(elementID: "e1"), r.why)
+        XCTAssertGreaterThanOrEqual(r.confidence, SafetyPolicy.minimumConfidence, "a name in a long row is a sure match: \(r.why)")
+        // A text that the OCR fallback found is a click target too (R-CL-4). An OCR text keeps the strict risky rule.
+        let canvas = ScreenSnapshot(bundleID: "com.figma.Desktop", windowTitle: "Figma", elements: [
+            Fixtures.el("e1", "OCRText", "Quarterly report", y: 100),
+            Fixtures.el("e2", "OCRText", "You: Sent a post about the launch", y: 140),
+        ])
+        let ocr = await route("click quarterly report", RouteContext(apps: Fixtures.apps, names: Fixtures.names, screen: canvas))
+        XCTAssertEqual(ocr.intent, .click(elementID: "e1"), ocr.why)
+        XCTAssertTrue(SafetyPolicy.isRisky("You: Sent a post about the launch", role: "OCRText"))
+        let post = await route("click post", ctx)
+        XCTAssertEqual(post.intent, .click(elementID: "e2"), "the exact risky label still gives a click: \(post.why)")
+    }
+
     func testE2NoCommand() async {
         let r = await route("what a lovely day", news)
         XCTAssertEqual(r.intent, .none)
