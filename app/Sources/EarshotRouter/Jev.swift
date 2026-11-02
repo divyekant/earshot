@@ -96,10 +96,10 @@ public final class JevChooser: Tier2Chooser, @unchecked Sendable {
     /// Reads the choice and checks it with the rules of the probe: the choice is one of the ids,
     /// the probabilities cover exactly the ids, each is in 0...1, they add up to 1 (± 0.02),
     /// and the chosen option has the highest probability.
-    static func parse(_ data: Data, ids: [String]) throws -> String {
+    static func parse(_ data: Data, ids: [String], question: String = "route") throws -> String {
         guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let answers = root["answers"] as? [String: Any],
-              let a = answers["route"] as? [String: Any],
+              let a = answers[question] as? [String: Any],
               let choice = a["choice"] as? String else { throw BadAnswer(why: "no choice") }
         guard ids.contains(choice) else { throw BadAnswer(why: "unknown option") }
         let probs = (a["probabilities"] as? [String: Any] ?? [:]).compactMapValues { ($0 as? NSNumber)?.doubleValue }

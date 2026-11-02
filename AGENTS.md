@@ -8,12 +8,22 @@
 
 ## Hard rules
 
-- All audio stays on the Mac. Decisions stay on the Mac by default. Do not add a cloud speech service. The only cloud model is Jev, as the opt-in tier 2 of the router: off by default, text only, 1 s budget (R-MD-1, D-9).
+- All audio stays on the Mac. Decisions stay on the Mac by default. Do not add a cloud speech service. The only cloud model is Jev, as the opt-in tier 2 of the router: off by default, text only, 1 s budget (R-MD-1, D-9). The separate opt-in "Jev sees the screen" (D-10) may send one picture of the front window for a hold-key click: off by default, never on sign-in, code or payment pages, 1.5 s budget.
 - Do not add a large-model agent loop to the command path (R-SP-2). The router must finish in about 300 ms or less.
 - Do not write a script for each app. App support is data in the app table (R-MT-1, R-MT-2).
 - Do not add a verb or an intent for one app or for one feature. Add a target source instead (`docs/DESIGN.md`, section 3.0).
 - earshot must never press Send or do another action that cannot be undone, unless the owner gives an explicit command (R-NV-5, R-ON-5).
 - Measure latency for every change to the command path. Record the numbers in the pull request.
+
+## Branches and releases
+
+Follow `docs/RELEASING.md`. The short form:
+
+- Make each topic branch from `develop`. Open each feature or fix pull request with `develop` as the base. Never use `main` as the base for a feature.
+- If users can see the change, add one line under `## [Unreleased]` in `CHANGELOG.md`, with the requirement IDs.
+- Merge with a merge commit. A merge into `develop` makes a pre-release tag `vX.Y.Z-dev.N` and a GitHub pre-release.
+- A release is a pull request from `develop` to `main`, titled `Release vX.Y.Z`. Before it, set `VERSION` and move the `Unreleased` lines into a `## [X.Y.Z] - YYYY-MM-DD` section. The merge into `main` makes the tag `vX.Y.Z` and the GitHub release.
+- Do not make, move or delete a tag by hand.
 
 ## Environment
 
