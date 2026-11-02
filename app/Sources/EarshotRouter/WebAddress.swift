@@ -1,3 +1,4 @@
+import EarshotCore
 import Foundation
 
 /// "Open <web address>" (R-NV-7). The words after a command word must look like a domain name:
@@ -11,6 +12,11 @@ enum WebAddress {
     static func parse(_ text: String) -> String? {
         var s = text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
         while let last = s.last, ".!?,".contains(last) { s.removeLast() }
+        // Lead hesitation words and fillers: "um, open hn.com", "okay open hn.com".
+        while let space = s.firstIndex(of: " "),
+              TextKit.hesitations.union(["okay", "ok", "hey"]).contains(String(s[..<space]).trimmingCharacters(in: CharacterSet(charactersIn: ","))) {
+            s = String(s[s.index(after: space)...]).trimmingCharacters(in: .whitespaces)
+        }
         for filler in ["please ", "can you ", "could you "] where s.hasPrefix(filler) { s.removeFirst(filler.count) }
         if s.hasSuffix(" please") { s.removeLast(" please".count) }
 

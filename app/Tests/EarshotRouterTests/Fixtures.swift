@@ -43,7 +43,7 @@ enum Fixtures {
     static func el(_ id: String, _ role: String, _ label: String, y: Double, x: Double = 0, subrole: String = "",
                    url: String? = nil, inHeading: Bool = false) -> ScreenElement {
         ScreenElement(id: id, role: role, subrole: subrole, label: label, url: url, inHeading: inHeading,
-                      risky: SafetyPolicy.isRisky(label), x: x, y: y, w: 50, h: 12)
+                      risky: SafetyPolicy.isRisky(label, role: role), x: x, y: y, w: 50, h: 12)
     }
 
     /// A page in the shape of the Hacker News front page in E2.
