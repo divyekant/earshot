@@ -27,7 +27,7 @@
       "say": "iMessage",
       "bundle_id": "com.apple.MobileSMS",
       "aliases": ["imessage", "messages", "message", "text", "sms"],
-      "open_chat": { "kind": "switcher", "pick": ["down", "return"], "settle_ms": 300 },
+      "open_chat": { "kind": "switcher", "keys": "cmd+n", "pick": ["return"], "settle_ms": 400 },
       "bench_runs": 10,
       "script_lines": 4
     }

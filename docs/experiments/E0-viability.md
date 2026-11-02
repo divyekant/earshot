@@ -76,7 +76,38 @@ The router read all three transcripts correctly. The model download took about 2
 
 DictationTranscriber with the `.shortDictation` preset sent no final result, so the first build returned empty text. `.progressiveShortDictation` and `.longDictation` send a final result. The dictation engine can drop the last word when the audio stops right after the speech; the transcriber did not. The probe now adds 300 ms of silence at key release and keeps the last volatile text if no final result arrives.
 
-### 5.2 Part A and Part B
+### 5.2 Part A, first run (2026-11-02)
+
+The probe ran on the owner's Mac through a remote session, with the owner's approval. Nothing was sent.
+
+Focus-only check, one command for each app:
+
+| App | Result | Cause |
+| --- | --- | --- |
+| Slack | Pass, 656 ms | Your DM opened through Command-K. The header showed the name before the window title changed. |
+| WhatsApp | Fail at the search step | After Command-F, the focus is an AXStaticText with the AXSearchField subrole. The probe accepted only editable text roles. |
+| Messages | Wrong chat | Search, Down and Return did not open the owner's chat. The probe still reported a pass, because it counted an unknown chat as a pass. |
+
+Part A, Slack, 10 commands into the owner's own DM (log `e0-bench-20261101-165936.jsonl`):
+
+| Reach | Verified | Median to focused box | Slowest 1 in 10 |
+| --- | --- | --- | --- |
+| 10 of 10 | 10 | 466 ms | 497 ms |
+
+Stages of a typical Slack command: front 3 to 59 ms, Return in the switcher at about 380 ms, focused box at about 470 ms. The switcher stage includes a fixed 250 ms wait (`settle_ms`). That wait is the first target for the 100 ms goal.
+
+Other findings:
+- The test text was typed into the owner's own DM, but the probe did not delete it. The delete step looked for the focused element, not the box that it typed into.
+- One command waited 1.5 s for modifier keys. A failed command left the Command flag set, because the probe sent no event that releases it.
+
+Fixes in the next build:
+- WhatsApp: accept an element with the AXSearchField subrole as the search field.
+- Messages: open the chat through File > New Message (Command-N) and the "To:" field.
+- Reach counts a command only when the chat name is on screen. The chat check leaves out the field that holds the typed name.
+- The delete step uses the box that the probe typed into, and it accepts only test text in the box.
+- After each key combination, the probe releases the modifier flags.
+
+### 5.3 Part B
 
 Not run yet.
 

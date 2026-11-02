@@ -57,6 +57,13 @@ enum Keys {
         up?.flags = combo.flags
         down?.post(tap: .cghidEventTap)
         up?.post(tap: .cghidEventTap)
+        // Release the modifier flags. Without this event, macOS can report Command as held
+        // after the probe stops, and the next command waits 1.5 s for the key (seen in Part A).
+        if !combo.flags.isEmpty, let release = CGEvent(source: src) {
+            release.type = .flagsChanged
+            release.flags = []
+            release.post(tap: .cghidEventTap)
+        }
     }
 
     /// Types text as Unicode key events. Control characters are removed first,

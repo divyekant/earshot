@@ -18,6 +18,8 @@ final class Outcome {
     var header: [String] = []
     var typed = false
     var typedText: String?
+    /// The message box that the probe typed into. The bench uses it to delete the test text.
+    var typedBox: AXUIElement?
     var notes: [String] = []
 
     var dictionary: [String: Any] {
@@ -38,6 +40,8 @@ enum TypingMode { case off, selfOnly }
 @MainActor
 final class Pipeline {
     let apps: [AppRow]
+    /// The search field that the probe typed the name into, for the current command.
+    private var searchField: AXUIElement?
 
     init(apps: [AppRow]) { self.apps = apps }
 
@@ -81,6 +85,7 @@ final class Pipeline {
     func execute(_ cmd: Command, watch: Stopwatch, typing: TypingMode) async -> Outcome {
         let out = Outcome()
         let row = cmd.app
+        searchField = nil
         guard let url = appURL(row) else {
             out.reason = "\(row.name) is not installed"
             return out
@@ -152,7 +157,9 @@ final class Pipeline {
         // 4. Check that the chat on screen belongs to this person.
         checkChat(app: app, row: row, person: person, out: out)
         watch.mark("checked")
-        out.ok = out.chatCheck != "mismatch"
+        // Reach needs the chat name on screen. A box in an unknown chat is not a pass.
+        out.ok = out.chatCheck == "title" || out.chatCheck == "header"
+        if !out.ok { out.reason = "the chat name is not on screen" }
 
         // 5. Type the text. Only into your own chat, only into an empty box.
         if let text = cmd.text {
@@ -194,19 +201,27 @@ final class Pipeline {
 
         Keys.type(name)
         let wanted = name.lowercased()
+        // Some apps move the focus into an inner text field when typing starts. Accept the
+        // focused element if it is the same field, or another search field that holds exactly the name.
+        var typedInto: AXUIElement?
         let typed = await waitUntil(timeoutMs: 1000) {
-            AX.same(AX.focused(app), field) && self.focusedValue(app)?.lowercased() == wanted
+            guard let el = AX.focused(app), let win = AX.window(app),
+                  self.focusedValue(app)?.lowercased() == wanted,
+                  AX.same(el, field) || AX.isSwitcherField(el, in: win) else { return false }
+            typedInto = el
+            return true
         }
-        guard typed else {
+        guard typed, let target = typedInto else {
             Keys.press(Keys.escape)
-            return "the search field did not show the name"
+            return "the search field did not show the name (\(describeFocus(app)))"
         }
+        searchField = target
         await sleepMs(row.openChat.settleMs ?? 250)
 
         for key in pick {
             if key == "return" {
                 // SAFETY (R-NV-5): a Return in a message box sends the message.
-                guard returnIsSafe(app, wanted: wanted, field: field) else {
+                guard returnIsSafe(app, wanted: wanted, field: target) else {
                     let focus = describeFocus(app)
                     Keys.press(Keys.escape)
                     return "safety guard stopped the Return key (\(focus))"
@@ -235,11 +250,13 @@ final class Pipeline {
     /// It never presses Return in a message box or on a button.
     private func returnIsSafe(_ app: AXUIElement, wanted: String, field: AXUIElement) -> Bool {
         guard let el = AX.focused(app), let win = AX.window(app) else { return false }
-        if AX.isComposer(el, in: win) { return false }
-        if AX.textRoles.contains(AX.role(el)) {
-            return AX.same(el, field) && AX.isSwitcherField(el, in: win)
+        if AX.isComposer(el, in: win) || AX.looksLikeComposer(el) { return false }
+        if AX.same(el, field) {
+            return AX.isSwitcherField(el, in: win)
                 && AX.value(el)?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == wanted
         }
+        // Any other text field: no Return.
+        if AX.textRoles.contains(AX.role(el)) { return false }
         return AX.listRoles.contains(AX.role(el))
     }
 
@@ -320,8 +337,9 @@ final class Pipeline {
             return
         }
         // The chat name sits above the message box, so read only that column.
+        // Leave out the field that holds the typed name: it shows the name in any chat.
         let column = AX.focused(app).flatMap { AX.frame($0) }
-        out.header = AX.headerTexts(in: win, column: column)
+        out.header = AX.headerTexts(in: win, column: column, skip: searchField)
         out.chatExact = out.header.contains(where: exact)
         if matches(out.windowTitle) {
             out.chatCheck = "title"
@@ -354,19 +372,34 @@ final class Pipeline {
         let probe = String(Text.printable(text).prefix(12))
         Keys.type(current.isEmpty ? full : " " + full)
         out.typed = await waitUntil(timeoutMs: 1000) { (AX.value(box) ?? "").contains(probe) }
-        if out.typed { out.typedText = full }
+        if out.typed {
+            out.typedText = full
+            out.typedBox = box
+        }
     }
 
-    /// Deletes the text that the probe typed, but only when the box holds
-    /// exactly that text and nothing else.
-    func clearTyped(app pid: pid_t, expected: String) async -> Bool {
+    /// Deletes the probe's test text. It acts only when the box holds test text and nothing else:
+    /// one or more copies of `expected`, apart from white space and invisible characters.
+    /// It returns true on success, and a note for the log. The note holds no text from the box.
+    func clearTyped(app pid: pid_t, box given: AXUIElement?, expected: String) async -> (Bool, String) {
         let app = AX.appElement(pid)
-        guard let box = AX.focused(app), let win = AX.window(app), AX.isComposer(box, in: win),
-              AX.value(box)?.trimmingCharacters(in: .whitespacesAndNewlines) == expected else { return false }
+        guard let box = given ?? AX.focused(app) else { return (false, "no box") }
+        guard let win = AX.window(app), AX.isComposer(box, in: win) else { return (false, "not the message box now") }
+        let value = Text.squash(AX.value(box) ?? "")
+        let test = Text.squash(expected)
+        let rest = value.replacingOccurrences(of: test, with: "").trimmingCharacters(in: .whitespaces)
+        guard value.contains(test), rest.isEmpty else {
+            return (false, "box holds other text: \(value.count) characters, test text \(test.count)")
+        }
+        if !AX.same(AX.focused(app), box) {
+            AX.set(box, "AXFocused", kCFBooleanTrue)
+            guard await waitUntil(timeoutMs: 300, { AX.same(AX.focused(app), box) }) else {
+                return (false, "could not focus the box")
+            }
+        }
         Keys.press(Keys.selectAll)
         Keys.press(Keys.deleteKey)
-        return await waitUntil(timeoutMs: 500) {
-            (AX.value(box) ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        }
+        let empty = await waitUntil(timeoutMs: 800) { Text.squash(AX.value(box) ?? "").isEmpty }
+        return (empty, empty ? "cleared" : "text still there after delete")
     }
 }

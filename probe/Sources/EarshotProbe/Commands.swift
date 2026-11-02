@@ -284,14 +284,16 @@ enum Commands {
                 let watch = Stopwatch()
                 let out = await pipeline.execute(cmd, watch: watch, typing: .selfOnly)
                 var cleared = false
+                var clearNote = ""
                 if last, out.typed, let typed = out.typedText, row.typeIntoPrefilled != true,
                    let pid = pipeline.running(row)?.processIdentifier {
-                    cleared = await pipeline.clearTyped(app: pid, expected: typed)
+                    (cleared, clearNote) = await pipeline.clearTyped(app: pid, box: out.typedBox, expected: typed)
+                    if !cleared { print("   test text NOT deleted: \(clearNote). Delete it by hand.") }
                 }
                 id += 1
                 log.write(["event": "command", "id": id, "mode": "typed", "heard": cmd.describe, "route": cmd.describe,
                            "app": row.id, "person": me.name, "hearing": "unscored", "from_other_app": i % 2 == 1,
-                           "stages": watch.dictionary, "outcome": out.dictionary, "cleared": cleared])
+                           "stages": watch.dictionary, "outcome": out.dictionary, "cleared": cleared, "clear_note": clearNote])
                 let mark = out.ok ? "✓" : "✗"
                 print("\(row.name) \(i + 1)/\(runs) \(mark) \(watch.summary) · open=\(out.openMethod) focus=\(out.focusMethod) chat=\(out.chatCheck)\(out.typed ? " typed" : "")\(out.reason.map { " · \($0)" } ?? "")")
                 if i == 0 {
