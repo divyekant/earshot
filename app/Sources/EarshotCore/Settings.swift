@@ -6,7 +6,8 @@ public enum InputMode: String, Codable, Sendable, CaseIterable { case hold, alwa
 /// The router's tier 2.
 public enum Tier2: String, Codable, Sendable, CaseIterable { case off, jev }
 
-/// The speech engine. "auto" uses Parakeet if its model file exists, else Apple (E2, decision 6.2).
+/// The speech engine. "auto" is Apple (PR #32: under memory pressure, Parakeet decodes took seconds).
+/// "parakeet" runs Apple always, and Parakeet only when the memory pressure is normal and its warm-up ended in time.
 public enum EngineChoice: String, Codable, Sendable, CaseIterable { case auto, apple, parakeet }
 
 /// The owner's settings. The management window edits them. Secrets (the Jev key) go to the Keychain, not here.
