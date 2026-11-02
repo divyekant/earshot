@@ -144,9 +144,18 @@ enum ActionRules {
     }
 
     /// Visible: at least 2 points wide and high, and inside the viewport.
+    /// An element with an empty or 1x1 frame, or a frame fully outside the viewport, has no point on screen
+    /// (for example a web "skip link"). The click step cannot reach it, so the read drops it.
     static func visible(_ f: Frame, in vp: Frame) -> Bool {
         f.w >= 2 && f.h >= 2 && f.overlaps(vp)
     }
+
+    /// Roles that the walk for window controls does not go into: the web page, the menu bar, images and scroll bars.
+    static let skipForControls: Set<String> = ["AXWebArea", "AXMenuBar", "AXImage", "AXScrollBar"]
+
+    /// The page rules (a hidden tab, a sign-in page) apply to elements of the page. A window tab is not part of the
+    /// page: a press on it only shows another tab. Other window controls, for example Reload, keep the page rules.
+    static func pageRulesApply(kind: String, inPage: Bool) -> Bool { inPage || kind != "tab" }
 
     /// Links that the browser adds for screen readers. They are not part of the page.
     static let browserHints = ["To get missing image descriptions"]

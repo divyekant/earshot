@@ -1,3 +1,4 @@
+import AppKit
 import CoreGraphics
 import EarshotCore
 import Foundation
@@ -91,6 +92,50 @@ final class ActionRulesTests: XCTestCase {
         // A row for another person: no.
         XCTAssertFalse(ActionRules.resultShows([("Ravi Kumar", Frame(x: 400, y: 140, w: 500, h: 30))], name: "Divyekant", baseline: []))
         XCTAssertEqual(SwitcherTiming.resultMs, 800)
+    }
+
+    /// A fake browser window: a tab strip, a toolbar, and a web page with many links.
+    private final class Node {
+        let role: String, subrole: String, title: String
+        var children: [Node]
+        init(_ role: String, _ subrole: String = "", _ title: String = "", _ children: [Node] = []) {
+            self.role = role; self.subrole = subrole; self.title = title; self.children = children
+        }
+    }
+
+    func testWindowControlsSkipTheWebPage() {
+        let page = Node("AXWebArea", "", "", (0..<500).map { Node("AXLink", "", "link \($0)") })
+        let window = Node("AXWindow", "", "", [
+            Node("AXGroup", "", "", [
+                Node("AXTabGroup", "", "", [Node("AXRadioButton", "AXTabButton", "shadcn/ui"),
+                                            Node("AXRadioButton", "AXTabButton", "FPL Guru"),
+                                            Node("AXButton", "", "New Tab")]),
+                Node("AXToolbar", "", "", [Node("AXButton", "", "Back"), Node("AXButton", "", "Reload"),
+                                           Node("AXTextField", "", "Address and search bar")]),
+            ]),
+            Node("AXGroup", "", "", [page]),
+            Node("AXMenuBar", "", "", [Node("AXMenuItem", "", "File")]),
+        ])
+        let t0 = Clock.nowNs()
+        let found = ScreenReader.controlWalk(window, role: { $0.role }, subrole: { $0.subrole }, children: { $0.children })
+        let ms = Clock.ms(since: t0)
+        XCTAssertEqual(found.map(\.title), ["shadcn/ui", "FPL Guru", "New Tab", "Back", "Reload", "Address and search bar"])
+        XCTAssertEqual(found.compactMap { ActionRules.kind(role: $0.role, subrole: $0.subrole) }, ["tab", "tab", "button", "button", "button", "field"])
+        XCTAssertLessThan(ms, 25)
+    }
+
+    func testPageRulesForWindowControls() {
+        XCTAssertFalse(ActionRules.pageRulesApply(kind: "tab", inPage: false))   // a browser tab: no page rules
+        XCTAssertTrue(ActionRules.pageRulesApply(kind: "button", inPage: false)) // Reload on a payment page: blocked
+        XCTAssertTrue(ActionRules.pageRulesApply(kind: "tab", inPage: true))     // a tab inside the page
+    }
+
+    func testSkipLinksHaveNoVisiblePoint() {
+        let vp = Frame(x: 0, y: 80, w: 1200, h: 800)
+        XCTAssertFalse(ActionRules.visible(Frame(x: 0, y: 80, w: 1, h: 1), in: vp))           // a 1x1 skip link
+        XCTAssertFalse(ActionRules.visible(Frame(x: 0, y: 0, w: 0, h: 0), in: vp))            // an empty frame
+        XCTAssertFalse(ActionRules.visible(Frame(x: -10000, y: -10000, w: 150, h: 20), in: vp)) // off screen
+        XCTAssertTrue(ActionRules.visible(Frame(x: 10, y: 870, w: 150, h: 20), in: vp))       // partly visible: kept
     }
 
     func testComposerShape() {
@@ -310,6 +355,29 @@ final class ActionRunnerTests: XCTestCase {
         }
         times.sort()
         print("EARSHOT_BENCH screen read: front \(bundle), \(count) elements, median \(times[5]) ms, max \(times[9]) ms")
+        // Read one app that is not in front, by bundle id, for example a browser: EARSHOT_READ_BUNDLE=com.google.Chrome.
+        // It reads only. The window controls walk is timed on its own, so the cost of the new targets shows.
+        if let id = ProcessInfo.processInfo.environment["EARSHOT_READ_BUNDLE"],
+           let pid = NSRunningApplication.runningApplications(withBundleIdentifier: id).first?.processIdentifier {
+            var total: [Double] = [], walk: [Double] = []
+            var n = 0, tabs = 0, inPage = 0
+            for _ in 0..<10 {
+                guard let r = ScreenReader.read(pid: pid, maxElements: 400) else { continue }
+                total.append(r.ms)
+                n = r.snapshot.elements.count
+                inPage = r.items.values.filter(\.inPage).count
+                tabs = r.items.values.filter { !$0.inPage && $0.kind == "tab" }.count
+                if let w = AX.window(AX.appElement(pid)) {
+                    let t0 = Clock.nowNs()
+                    _ = ScreenReader.windowControls(w)
+                    walk.append(Clock.ms(since: t0))
+                }
+            }
+            total.sort(); walk.sort()
+            if !total.isEmpty, !walk.isEmpty {
+                print("EARSHOT_BENCH \(id) read: \(n) elements (\(inPage) in the page, \(tabs) window tabs), median \(total[total.count / 2]) ms, max \(total.last!) ms; window controls walk median \(walk[walk.count / 2]) ms")
+            }
+        }
         if ProcessInfo.processInfo.environment["EARSHOT_OCR_BENCH"] == "1", OCR.allowed(), let pid = AX.frontPid(),
            let w = AX.window(AX.appElement(pid)).flatMap({ AX.frame($0) }) {
             var ocr: [Double] = []
