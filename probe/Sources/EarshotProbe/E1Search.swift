@@ -45,7 +45,7 @@ extension Pipeline {
         let t1 = Clock.nowNs()
         while Clock.ms(since: t1) < 1500 {
             await sleepMs(60)
-            let now = Pipeline.resultTexts(app: app, field: field)
+            let now = Pipeline.resultTexts(app: app, field: field, appName: row.name)
             if now == last {
                 if !now.isEmpty { stable += 1 }
                 if stable >= 2 { break }
@@ -97,7 +97,8 @@ extension Pipeline {
     /// result row can hold several texts. It drops prompt lines such as "Search for: ravi",
     /// file names and section titles. It skips the field itself, message boxes, live regions,
     /// and everything to the left of the field (the sidebar).
-    static func resultTexts(app: AXUIElement, field: AXUIElement, budgetMs: Int = 200, maxNodes: Int = 5000) -> [String] {
+    static func resultTexts(app: AXUIElement, field: AXUIElement, appName: String,
+                            budgetMs: Int = 200, maxNodes: Int = 5000) -> [String] {
         guard let ff = AX.frame(field), let win = AX.window(app), let w = AX.frame(win) else { return [] }
         let right = ff.x + ff.w + 0.05 * w.w
         let bottom = ff.maxY + 0.6 * w.h
@@ -131,7 +132,10 @@ extension Pipeline {
                     } else if r == "AXButton" || r == "AXLink" || r == "AXMenuItem" {
                         text = AX.string(el, "AXTitle") ?? AX.string(el, "AXDescription")
                     }
-                    if let t = text.map(Text.squash), !t.isEmpty { pieces.append((t, f)) }
+                    // A piece that is a screen label ("Select", "Give feedback") is not part of a result.
+                    if let t = text.map(Text.squash), !t.isEmpty, !NameIndex.uiWords.contains(Text.key(t)) {
+                        pieces.append((t, f))
+                    }
                 }
                 queue.append(contentsOf: AX.elements(el, "AXChildren"))
             }
@@ -152,20 +156,41 @@ extension Pipeline {
         for line in lines {
             var words: [String] = []
             for p in line.sorted(by: { $0.f.x < $1.f.x }) where words.last != p.text { words.append(p.text) }
-            let joined = words.joined(separator: " ")
-            let lower = joined.lowercased()
-            // Prompt lines repeat the typed text: "Show results for: ravi", "Search for: ravi".
-            if promptStarts.contains(where: { lower.hasPrefix($0) }) { continue }
-            // File names, links and section titles in capital letters ("SIRI FOUND IN APPS").
-            if lower.range(of: #"\.[a-z0-9]{2,5}$"#, options: .regularExpression) != nil || lower.contains("://") { continue }
-            let parts = joined.split(separator: " ")
-            if parts.count >= 3, !joined.contains(where: \.isLowercase) { continue }
-            let first = joined.split(separator: ",").first.map(String.init) ?? joined
-            guard let c = NameIndex.clean(first), seen.insert(Text.key(c.name)).inserted else { continue }
-            out.append(c.name)
+            guard let name = cleanResultLine(words.joined(separator: " "), appName: appName),
+                  seen.insert(Text.key(name)).inserted else { continue }
+            out.append(name)
             if out.count >= 12 { break }
         }
         return out
+    }
+
+    /// Turns one screen line of a result list into a chat name, or nil if the line is not a chat.
+    static func cleanResultLine(_ raw: String, appName: String) -> String? {
+        // Remove invisible format characters, and HTML entities that some apps leave in the text.
+        var view = String.UnicodeScalarView()
+        for u in raw.unicodeScalars where u.properties.generalCategory != .format { view.append(u) }
+        var line = String(view)
+        for (entity, char) in [("&#39;", "'"), ("&quot;", "\""), ("&lt;", "<"), ("&gt;", ">"), ("&amp;", "&")] {
+            line = line.replacingOccurrences(of: entity, with: char)
+        }
+        line = Text.squash(line)
+        // "Ravi Kumar • Today" is a message hit in Ravi's chat. Keep the name part.
+        if let dot = line.range(of: " • ") { line = String(line[..<dot.lowerBound]) }
+        let lower = line.lowercased()
+        // Prompt lines repeat the typed text: "Show results for: ravi", "Search for: ravi".
+        if promptStarts.contains(where: { lower.hasPrefix($0) }) { return nil }
+        // File names and links: "setup.md", "NOTES_2026.pdf", "https://...".
+        if lower.range(of: #"\.[a-z0-9]{1,5}$"#, options: .regularExpression) != nil || lower.contains("://") { return nil }
+        let words = line.split(separator: " ")
+        // A sentence is a help item, not a chat name ("Connect your tools to Slack").
+        if words.count >= 5 { return nil }
+        // A line with the app's own name is a help or app item ("Slack Connect").
+        let app = Text.normalize(appName)
+        if !app.isEmpty, Text.normalize(line).split(separator: " ").contains(where: { $0 == app }) { return nil }
+        // Section titles in capital letters ("SIRI FOUND IN APPS").
+        if words.count >= 3, !line.contains(where: \.isLowercase) { return nil }
+        let first = line.split(separator: ",").first.map(String.init) ?? line
+        return NameIndex.clean(first)?.name
     }
 
     static let promptStarts = ["show results for", "search for", "results for", "recent messages", "no results",
@@ -173,6 +198,30 @@ extension Pipeline {
 }
 
 extension E1 {
+    /// e1-recheck: reads the newest e1-search log and applies the current line filter to its results.
+    /// It presses no key. It shows which result lines the filter now drops.
+    static func recheck(_ args: [String]) throws -> Int32 {
+        let cat = try Catalogue.load()
+        let files = (try FileManager.default.contentsOfDirectory(atPath: Paths.logs.path))
+            .filter { $0.hasPrefix("e1-search-") && $0.hasSuffix(".jsonl") }.sorted()
+        guard let name = Commands.positional(args).first ?? files.last else { throw ProbeError("no e1-search log") }
+        let url = name.contains("/") ? URL(fileURLWithPath: name) : Paths.logs.appendingPathComponent(name)
+        print("Recheck of \(url.lastPathComponent)\n")
+        for line in try String(contentsOf: url, encoding: .utf8).split(whereSeparator: \.isNewline) {
+            guard let obj = try JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any],
+                  let appID = obj["app"] as? String, let term = obj["term"] as? String,
+                  let results = obj["results"] as? [String] else { continue }
+            let appName = cat.apps.first(where: { $0.id == appID })?.name ?? appID
+            let kept = results.compactMap { Pipeline.cleanResultLine($0, appName: appName) }
+            let dropped = results.filter { Pipeline.cleanResultLine($0, appName: appName) == nil }
+            let best = kept.map { ($0, nameScore(term, $0)) }.max { $0.1 < $1.1 }
+            let match = best.map { $0.1 >= 0.8 } ?? false
+            print("\(appName) \"\(term)\": \(match ? "match \"\(best!.0)\"" : "no match") · kept: \(kept.joined(separator: " | "))"
+                  + (dropped.isEmpty ? "" : " · dropped: \(dropped.joined(separator: " | "))"))
+        }
+        return 0
+    }
+
     /// How well a result names the searched person: the full name, or the first name.
     static func nameScore(_ term: String, _ result: String) -> Double {
         let t = Text.key(term)

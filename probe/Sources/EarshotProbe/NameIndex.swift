@@ -73,7 +73,8 @@ enum NameIndex {
         "workflows", "automations", "starredchannels", "recent", "favorites", "favourites", "conversations",
         "channel", "directmessage", "dm", "group", "private", "public", "huddle", "mute", "muted", "notifications",
         "moreactions", "options", "close", "avatar", "image", "photo", "profile", "presence", "inactive", "pin",
-        "select", "givefeedback", "agent", "sirifoundinapps", "suggestions", "topresults", "recentsearches",
+        "select", "givefeedback", "selectgivefeedback", "agent", "sirifoundinapps", "suggestions", "topresults",
+        "recentsearches",
     ]
 
     static let weekdays: Set<String> = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
