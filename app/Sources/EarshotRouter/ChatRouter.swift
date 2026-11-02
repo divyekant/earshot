@@ -62,9 +62,11 @@ enum ChatRouter {
         let gram: Gram?
     }
 
-    static func decide(_ spoken: String, apps allApps: [AppEntry], names allNames: [NameEntry]) -> RulesDecision {
+    static func decide(_ spoken: String, apps allApps: [AppEntry], names allNames: [NameEntry],
+                       frontBundleID: String? = nil) -> RulesDecision {
         let apps = allApps.filter { $0.approved && $0.enabled }
         let chatApps = Set(apps.filter(\.isChat).map(\.id))
+        let frontApp = apps.first { $0.bundleID == frontBundleID && $0.isChat }?.id
         let names = allNames.filter { chatApps.contains($0.appID) }
         func appName(_ id: String) -> String { apps.first(where: { $0.id == id })?.name ?? id }
 
@@ -111,6 +113,19 @@ enum ChatRouter {
         var nameEnd = commas.first(where: { hasNameWord(0..<$0) }) ?? words.count
         if let lead = words.indices.dropFirst().first(where: { textLeads.contains(words[$0]) }) {
             nameEnd = min(nameEnd, lead)
+        }
+
+        let nameEndMarked = nameEnd < words.count
+        // A self word right after the command word or the app name ends the name part, as in E0.
+        // Speech to text often drops the comma: "Slack me running late" is the own chat, with the text "running late".
+        // "get me Francis's chat" does not count: "get" is not a command word.
+        if let i = words.indices.first(where: { $0 < nameEnd && (selfWords.contains(words[$0])
+                                                                  || (words[$0] == "own" && $0 > 0 && words[$0 - 1] == "my")) }),
+           (0..<i).allSatisfy({ appTokens.contains($0) || stopWords.contains(words[$0]) }),
+           (0..<i).contains(where: { appTokens.contains($0) || commandVerbs.contains(words[$0]) }) {
+            var end = i + 1
+            if words[i] == "own", end < nameEnd, ["chat", "conversation", "channel"].contains(words[end]) { end += 1 }
+            nameEnd = end
         }
 
         // A command word in the first three words: "let's write to Ravi", "can you pull up Ravi".
@@ -162,6 +177,9 @@ enum ChatRouter {
             if entry.isSelf && wantsSelf { best = 1.0; bestText = 1.0 }
             if !chatMentioned.isEmpty {
                 best += chatMentioned.contains(entry.appID) ? 0.1 : -0.15
+            } else if let front = frontApp, entry.appID == front {
+                // No app named: the front chat app wins a tie ("message myself" while Messages is in front).
+                best += 0.1
             }
             if best >= 0.45 {
                 scored.append(Scored(entry: entry, score: best, text: bestText, sound: bestSound, gram: bestGram))
@@ -172,8 +190,17 @@ enum ChatRouter {
         // Name words that nothing explains. A word counts as known if it is in a gram that matched a name well.
         var known = Set<Int>()
         for s in scored where s.score >= weakMatch { if let g = s.gram { for i in g.first...g.last { known.insert(i) } } }
-        let unknownIdx = nameIdx.filter { !known.contains($0) }
-        let heardName: String? = unknownIdx.isEmpty ? nil : tokens.raw(unknownIdx.first!..<(unknownIdx.last! + 1))
+        // A known name at the start of the name words, with no comma after it: the words after it are the message text,
+        // not an unknown name ("Slack Darshan running late").
+        var textFrom = Int.max
+        if let first = nameIdx.first, let top = scored.first, top.score >= strongMatch, let g = top.gram, g.first == first {
+            textFrom = g.last + 1
+        }
+        let unknownIdx = nameIdx.filter { !known.contains($0) && $0 < textFrom }
+        // With no comma, the end of an unknown name is not known. Give the first word to the app's search:
+        // the next route then knows the name, and the words after it become the text.
+        let heardIdx = nameEndMarked ? unknownIdx : Array(unknownIdx.prefix(1))
+        let heardName: String? = heardIdx.isEmpty ? nil : tokens.raw(heardIdx.first!..<(heardIdx.last! + 1))
         let heardApp = mentioned.filter { chatApps.contains($0.key) }.max(by: { $0.value < $1.value })?.key
 
         // The message text: after the name part, or after the name words that matched the name.
