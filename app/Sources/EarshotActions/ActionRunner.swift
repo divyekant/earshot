@@ -522,6 +522,7 @@ public final class EarshotActionRunner: ActionRunner {
     }
 
     private func click(_ id: String, command: CommandInfo, watch: Stopwatch) async -> ActionOutcome {
+        if let path = MenuElements.path(id) { return await pressMenu(path, command: command, watch: watch) }
         let (found, why) = await target(id)
         guard let pair = found else { return fail(why ?? "no element") }
         let (read, item) = pair
@@ -724,6 +725,25 @@ public final class EarshotActionRunner: ActionRunner {
         }
         if url == nil, let win = AX.window(app), let area = ScreenReader.visibleWebArea(win) { url = ScreenReader.address(area) }
         return SafetyPolicy.sensitive(url: url, elements: elements)
+    }
+
+    /// Presses a menu item of the front app by its path, read at run time (R-MT-1). It checks that the item is
+    /// enabled and obeys the same safety gate as a click. It sends no key shortcut.
+    private func pressMenu(_ path: [String], command: CommandInfo, watch: Stopwatch) async -> ActionOutcome {
+        guard let pid = AX.frontPid() else { return fail("no front app") }
+        guard let item = AX.menuItem(AX.appElement(pid), path: path) else {
+            return fail("no menu item \(path.joined(separator: " › "))")
+        }
+        watch.mark("find")
+        let title = AX.string(item, "AXTitle") ?? path.last ?? ""
+        guard AX.bool(item, "AXEnabled") != false else { return fail("the menu item \"\(title)\" is off") }
+        if let block = ActionRules.pressBlock(label: title, role: MenuElements.role, command: command, sensitive: nil) {
+            return fail(block)
+        }
+        await waitForKeysUp(watch)
+        guard AX.perform(item, "AXPress") else { return fail("the menu item \"\(title)\" did not respond") }
+        watch.mark("press")
+        return ok("menu \(path.joined(separator: " › "))")
     }
 
     private func ok(_ note: String) -> ActionOutcome { ActionOutcome(ok: true, note: note) }

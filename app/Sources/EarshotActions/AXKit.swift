@@ -353,6 +353,25 @@ enum AX {
 
     // MARK: - Menus
 
+    /// Finds the menu item at this path, for example ["Edit", "Select All"]. It reads only: it opens no menu.
+    /// Titles match after normalize, so "Export…" and "Export" are the same.
+    static func menuItem(_ app: AXUIElement, path: [String]) -> AXUIElement? {
+        guard let bar = element(app, "AXMenuBar"), !path.isEmpty else { return nil }
+        func title(_ el: AXUIElement) -> String { SafetyPolicy.normalize(string(el, "AXTitle") ?? "") }
+        var level = elements(bar, "AXChildren")
+        var found: AXUIElement?
+        for (i, wanted) in path.enumerated() {
+            let key = SafetyPolicy.normalize(wanted)
+            guard let match = level.first(where: { title($0) == key }) else { return nil }
+            found = match
+            if i < path.count - 1 {
+                // A bar item or a submenu item holds one AXMenu, which holds the items.
+                level = elements(match, "AXChildren").flatMap { role($0) == "AXMenu" ? elements($0, "AXChildren") : [$0] }
+            }
+        }
+        return found
+    }
+
     /// Finds an enabled menu item with this title in the menu bar, for example "Back".
     /// It reads only: it opens no menu. Depth: bar, bar item, menu, item, submenu, item.
     static func menuItem(_ app: AXUIElement, titled wanted: String, budgetMs: Int = 150) -> AXUIElement? {
