@@ -258,7 +258,7 @@ enum ScreenRouter {
         let found = content.filter { l in target.contains { TextKit.similarity($0, l) >= 0.75 } }.count
         let precision = Double(found) / Double(content.count)
         // Two or more words that match a run of words in the label, in order: a name in a long chat row
-        // ("Prakash Iyar" in "user avatar Prakash Iyer Verified account 1h ..."). The long label does not count against it.
+        // ("Prakash Iyyer" in "user avatar Prakash Iyer Verified account 1h ..."). The long label does not count against it.
         var run = 0.0
         if target.count >= 2, labelWords.count >= target.count {
             for start in 0...(labelWords.count - target.count) {
