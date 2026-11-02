@@ -84,8 +84,11 @@ final class EarshotRouterTests: XCTestCase {
         // No app named: the front chat app decides between the two own chats.
         let front = RouteContext(apps: Fixtures.apps, names: Fixtures.names, frontBundleID: "com.apple.MobileSMS")
         await expect("message myself buy milk", chat("messages", "Owner", "buy milk"), front)
-        let noFront = await route("message myself buy milk")
-        XCTAssertLessThan(noFront.confidence, SafetyPolicy.minimumConfidence, "two own chats, no front app: \(noFront.why)")
+        // No front app: the verb "message" leans to the app "Messages".
+        await expect("message myself buy milk", chat("messages", "Owner", "buy milk"))
+        // A verb that names no app leaves two own chats: unsure.
+        let noFront = await route("ping myself buy milk")
+        XCTAssertLessThan(noFront.confidence, SafetyPolicy.minimumConfidence, "two own chats, no hint: \(noFront.why)")
         await expect("text me on Slack", chat("slack", "Owner (you)"))
         await expect("ping myself on Slack call the bank", chat("slack", "Owner (you)", "call the bank"))
         await expect("open my own chat in Slack", chat("slack", "Owner (you)"))
@@ -122,6 +125,32 @@ final class EarshotRouterTests: XCTestCase {
         let ctx = RouteContext(apps: Fixtures.apps,
                                names: Fixtures.names + [NameEntry(appID: "slack", name: "Zorawar Singh", source: .search)])
         await expect("Slack Zorawar running late", chat("slack", "Zorawar Singh", "running late"), ctx)
+    }
+
+    // MARK: - App names split by speech to text (live: "iMessage me, sounds good" gave "I message me sounds good")
+
+    func testSplitAppNamesJoin() async {
+        await expect("I message me sounds good", chat("messages", "Owner", "sounds good"))
+        await expect("i message me, sounds good", chat("messages", "Owner", "sounds good"))
+        await expect("whats app me call mum", chat("whatsapp", "Owner (You)", "call mum"))
+        await expect("text Aditi on i message", chat("messages", "Aditi"))
+        await expect("open chat GPT", .openApp(appID: "chatgpt"))
+    }
+
+    func testNoJoinWhenWordsDoNotMakeAnApp() async {
+        // A word that alone is an app name is never part of a join.
+        await expect("open notes app", .openApp(appID: "notes"))
+        // "chat" alone is a stop word, not an app: "chat with Mrinal" opens Mrinal.
+        await expect("chat with Mrinal", chat("messages", "Mrinal"))
+    }
+
+    func testChatVerbLeansToTheAppWithThatName() async {
+        await expect("message me sounds good", chat("messages", "Owner", "sounds good"))
+        // An app that the owner names always wins.
+        await expect("message me on Slack hi", chat("slack", "Owner (you)", "hi"))
+        await expect("Slack me sounds good", chat("slack", "Owner (you)", "sounds good"))
+        // A known name that only one app has wins.
+        await expect("message Darshan", chat("slack", "Darshan Pania"))
     }
 
     func testE1OpenApp() async {
