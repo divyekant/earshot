@@ -216,13 +216,17 @@ enum AX {
 
     /// Reads the menu bar of an app: each menu item that has a key shortcut.
     /// It reads only. It opens no menu and presses nothing.
-    static func menuShortcuts(_ app: AXUIElement) -> [MenuShortcut] {
-        guard let bar = element(app, "AXMenuBar") else { return [] }
+    /// It stops at `budgetMs` and then returns the items that it read, with `timedOut` true.
+    static func menuShortcuts(_ app: AXUIElement, budgetMs: Int = 1000) -> (items: [MenuShortcut], timedOut: Bool) {
+        guard let bar = element(app, "AXMenuBar") else { return ([], false) }
+        let t0 = Clock.nowNs()
+        var timedOut = false
         var out: [MenuShortcut] = []
         func walk(_ element: AXUIElement, _ path: [String], depth: Int) {
             // Bar item, menu, item, submenu, item: "Edit > Find > Find..." is 5 levels down.
-            guard depth < 8 else { return }
+            guard depth < 8, !timedOut else { return }
             for child in elements(element, "AXChildren") {
+                if Clock.ms(since: t0) > Double(budgetMs) { timedOut = true; return }
                 let title = (string(child, "AXTitle") ?? "").replacingOccurrences(of: "\u{200E}", with: "")
                 let next = title.isEmpty ? path : path + [title]
                 if role(child) == "AXMenuItem", let char = string(child, "AXMenuItemCmdChar"), !char.isEmpty {
@@ -234,6 +238,6 @@ enum AX {
             }
         }
         walk(bar, [], depth: 0)
-        return out
+        return (out, timedOut)
     }
 }
