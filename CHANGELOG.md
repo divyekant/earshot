@@ -6,6 +6,10 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+### Fixed
+
+- A tab or window title with a word such as "transfer" no longer blocks a switch to that tab. Bookmarks and History menu items are no longer click targets (R-NV-5, R-MT-1).
+
 ## [0.1.0] - 2026-11-02
 
 The first public release. earshot is early software. Expect bugs and changes to the settings format.
