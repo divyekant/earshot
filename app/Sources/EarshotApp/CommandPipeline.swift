@@ -62,6 +62,7 @@ final class CommandPipeline {
     @discardableResult
     func finish(mode: InputMode) async -> ActivityRecord {
         let clock = Stopwatch()
+        speechSummary = ""  // a speech error must not show the line of the last command
         var stages: [String: Double] = [:]
         let text: String
         do {
@@ -155,6 +156,7 @@ final class CommandPipeline {
     /// The Test tab: route typed text, and run the actions only if `runActions` is true. A typed command counts as a
     /// hold-key command, because the owner typed it on purpose.
     func test(_ text: String, runActions: Bool) async -> TestReport {
+        speechSummary = ""  // a typed command has no speech
         let rows = apps().filter { $0.approved && $0.enabled }
         var context = RouteContext(apps: rows, names: await allNames(), frontBundleID: frontBundleID())
         context.screen = await actions.screen()
