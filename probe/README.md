@@ -92,3 +92,27 @@ E1 tests a router with no hand-written app rows and no hand-written names. See [
 | `swift run earshot-probe e1-open [app] [runs]` | Opens your own chat with the generated rows and focuses the box. It types nothing. Do not touch the keyboard or the mouse while it runs. |
 
 The Jev key comes from `TYPESAFE_API_KEY`, else from `~/.config/jev-qa/env`. The probe never prints or saves the key.
+
+## E2: web pages and Parakeet
+
+E2 tests voice clicks on web pages in Chrome, and compares Apple speech with Parakeet. See [docs/experiments/E2-web-and-speech.md](../docs/experiments/E2-web-and-speech.md).
+
+> **CAUTION:** `e2-try`, `e2-run` and `e2-act` send the command words and up to 8 element labels of the test page to Jev, a cloud service. They send no audio and no screenshot.
+
+> **WARNING:** `e2-act` presses links on live pages. It never presses Return, and never presses a label with a risky word such as Send, Pay, Delete, Submit, Star or upvote. Do not touch the keyboard or the mouse while it runs.
+
+The test pages are data in [e2-sites.json](e2-sites.json).
+
+| Command | What it does |
+| --- | --- |
+| `swift run earshot-probe e2-page` | Opens each test page in Chrome as a new tab and reads its visible links, buttons and fields into `logs/e2-page-<site>.json`. It clicks nothing. Add `--front` to bring Chrome to the front, `--list` to print each element, or `--current` to read only the tab that Chrome shows now. |
+| `swift run earshot-probe e2-make` | Makes `logs/e2-tests.json`: about 40 web test commands with their correct answers. |
+| `swift run earshot-probe e2-try wikipedia "click talk"` | Shows the short list, the rules answer and the Jev answer for one command on a saved page. |
+| `swift run earshot-probe e2-run` | Routes all web test commands with the rules, with Jev, and with the rules first and Jev only when the rules are unsure. Add `--no-jev` to use the rules only. |
+| `swift run earshot-probe e2-act [site...]` | Live run. For each command: read the page, route, and act. It presses links only, types into search fields only and then empties them, and scrolls. After each press, it goes back. |
+| `swift run earshot-probe e2-say` | Makes WAV files of the E1 test commands with `say`, with up to 3 English voices, in `logs/e2-audio/`. |
+| `swift run earshot-probe e2-asr` | Transcribes the WAV files with Apple SpeechTranscriber, without and with the chat names as hints. |
+| `cd parakeet && swift run -c release parakeet-ab` | Transcribes the same files with Parakeet. It reads the model file of Hex in `~/Library/Application Support/hex/models/` and does not change it. Give another file with `--model <file.gguf>`. |
+| `swift run earshot-probe e2-asr-score` | Compares the engines: word errors, and if the E1 rules route the text to the correct chat. Add `--misses` to list the commands that routed wrong. |
+
+`probe/parakeet` is a separate package. It downloads the prebuilt transcribe.cpp 0.3.1 library (MIT) one time. The Parakeet weights are from NVIDIA, under CC BY 4.0.

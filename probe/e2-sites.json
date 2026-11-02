@@ -1,0 +1,9 @@
+{
+  "browser": "com.google.Chrome",
+  "sites": [
+    { "id": "wikipedia", "url": "https://en.wikipedia.org/wiki/Computer_accessibility" },
+    { "id": "github", "url": "https://github.com/divyekant/earshot" },
+    { "id": "google", "url": "https://www.google.com/search?q=parakeet+speech+recognition" },
+    { "id": "hackernews", "url": "https://news.ycombinator.com/" }
+  ]
+}
