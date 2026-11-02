@@ -16,6 +16,8 @@ public struct SearchScan: Sendable {
     public var resultsMs = 0.0
     /// True if the search closed after the read.
     public var closed = false
+    /// The raw screen lines of the last read, for the log: 15 lines at most, 40 characters each.
+    public var rawLines: [String] = []
 }
 
 /// Key events for the search. There is no Return key here: the search can never open a chat
@@ -140,7 +142,9 @@ enum SearchReader {
         let t1 = Clock.nowNs()
         while Clock.ms(since: t1) < 1500 {
             await sleepMs(60)
-            let now = NameRules.results(resultLines(app: el, field: field), term: name, appName: app.name)
+            let lines = resultLines(app: el, field: field)
+            out.rawLines = lines.prefix(15).map { ($0.inRow ? "[row] " : "") + String($0.text.prefix(40)) }
+            let now = NameRules.results(lines, term: name, appName: app.name)
             if now == last {
                 if !now.isEmpty { stable += 1 }
                 if stable >= 2 { break }

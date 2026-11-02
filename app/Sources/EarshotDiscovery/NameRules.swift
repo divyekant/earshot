@@ -114,7 +114,8 @@ public enum NameRules {
         let lower = line.lowercased()
         if promptStarts.contains(where: { lower.hasPrefix($0) }) { return nil }
         // File names and links: "setup.md", "NOTES_2026.pdf", "https://...".
-        if lower.range(of: #"\.[a-z0-9]{1,5}$"#, options: .regularExpression) != nil || lower.contains("://") { return nil }
+        if lower.contains("://") || hasFileName(lower) { return nil }
+        line = dropHandles(line)
         let words = line.split(separator: " ")
         // A sentence is a help item, not a chat name ("Connect your tools to Slack").
         if words.count >= 5 { return nil }
@@ -125,6 +126,34 @@ public enum NameRules {
         if words.count >= 3, !line.contains(where: \.isLowercase) { return nil }
         let first = line.split(separator: ",").first.map(String.init) ?? line
         return clean(first)?.name
+    }
+
+    /// Common document, image, media, archive and code file types. A user handle such as
+    /// "darshan.pania" has a dot too, so the check needs a known file type.
+    public static let fileTypes: Set<String> = [
+        "md", "txt", "rtf", "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "csv", "tsv", "json", "xml", "yml",
+        "yaml", "log", "png", "jpg", "jpeg", "gif", "heic", "webp", "svg", "mov", "mp4", "m4a", "mp3", "wav", "zip",
+        "gz", "tar", "dmg", "pkg", "key", "pages", "numbers", "swift", "js", "ts", "py", "rb", "go", "rs", "java",
+        "html", "css", "sh", "sql", "fig", "sketch", "ipynb",
+    ]
+
+    /// True if a word of the line is a file name, for example "notes_2026.pdf" in "notes_2026.pdf, 2 KB".
+    public static func hasFileName(_ lower: String) -> Bool {
+        lower.split(whereSeparator: { $0 == " " || $0 == "," }).contains { word in
+            guard let dot = word.lastIndex(of: "."), word.distance(from: word.startIndex, to: dot) >= 2 else { return false }
+            return fileTypes.contains(String(word[word.index(after: dot)...]))
+        }
+    }
+
+    /// Removes user handles ("darshan.pania", "@ravi", "ravi_k") from a line that also has a name:
+    /// "Darshan Pania darshan.pania" gives "Darshan Pania".
+    public static func dropHandles(_ line: String) -> String {
+        let words = line.split(separator: " ").map(String.init)
+        let kept = words.filter { w in
+            let handle = w.hasPrefix("@") || (w == w.lowercased() && (w.contains(".") || w.contains("_")) && w.count > 2)
+            return !handle
+        }
+        return kept.isEmpty ? line : kept.joined(separator: " ")
     }
 
     /// True if the line is a section title of message hits.

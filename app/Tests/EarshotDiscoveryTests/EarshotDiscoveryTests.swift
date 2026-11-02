@@ -108,6 +108,13 @@ final class NameRulesTests: XCTestCase {
     func testResultLineFilters() {
         XCTAssertNil(NameRules.cleanResultLine("Show results for: ravi", appName: "Chat"))
         XCTAssertNil(NameRules.cleanResultLine("notes_2026.pdf", appName: "Chat"))
+        // Seen in Slack: a file result with more text after the file name.
+        XCTAssertNil(NameRules.cleanResultLine("darshangithubsetup.md, 2 KB", appName: "Chat"))
+        XCTAssertNil(NameRules.cleanResultLine("DARSHAN_BUZZ_DESKTOP_SETUP.md Shared", appName: "Chat"))
+        XCTAssertEqual(NameRules.cleanResultLine("Dr. Ravi", appName: "Chat"), "Dr. Ravi")
+        // A user handle is not a file name. It is removed from the name.
+        XCTAssertEqual(NameRules.cleanResultLine("Darshan Pania darshan.pania", appName: "Chat"), "Darshan Pania")
+        XCTAssertEqual(NameRules.cleanResultLine("Ravi @ravi", appName: "Chat"), "Ravi")
         XCTAssertNil(NameRules.cleanResultLine("https://example.com", appName: "Chat"))
         XCTAssertNil(NameRules.cleanResultLine("Connect your tools to this place", appName: "Chat"))
         XCTAssertNil(NameRules.cleanResultLine("Chat Connect", appName: "Chat"))
@@ -251,6 +258,7 @@ final class LiveDiscoveryTests: XCTestCase {
             print("LIVE search \(app.name) \"\(term)\": \(found.count) names in \(Int(scan?.resultsMs ?? 0)) ms, typed \(Int(scan?.typedMs ?? 0)) ms, "
                   + "closed \(scan?.closed ?? false)\(scan?.failure.map { ", FAILED: \($0)" } ?? ""): "
                   + found.prefix(5).map(\.name).joined(separator: " | "))
+            for line in scan?.rawLines ?? [] { print("LIVE     raw: \(line)") }
             XCTAssertEqual(scan?.closed, true)
             try await Task.sleep(nanoseconds: 400_000_000)
         }
