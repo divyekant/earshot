@@ -318,7 +318,9 @@ final class CommandPipeline {
         guard !namesSelf(text), result.confidence >= minimumSearchConfidence else { return false }
         switch result.intent {
         case .openChat(let id, _, _): return id == appID && result.confidence < CommandRouter.sureConfidence
-        case .openApp(let id): return id == appID
+        // Live test: "Yeah, let's open the Slack" was a sure openApp, but the extra words ran a 2.1 s search
+        // that typed into Slack. Search only when the route is not sure, the same as for a chat.
+        case .openApp(let id): return id == appID && result.confidence < CommandRouter.sureConfidence
         default: return false
         }
     }
