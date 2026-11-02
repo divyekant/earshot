@@ -268,6 +268,36 @@ enum AX {
         return out
     }
 
+    /// The short texts below a field and in its column, in all windows of the app: the result list of a switcher.
+    /// A native app can show its results in a separate window. Editable fields are left out: they show typed text.
+    static func textsBelow(_ field: Frame, app: AXUIElement, skip: AXUIElement?, budgetMs: Int = 40, maxNodes: Int = 2500) -> [(String, Frame)] {
+        let t0 = Clock.nowNs()
+        var queue: [AXUIElement] = elements(app, "AXWindows")
+        var index = 0
+        var out: [(String, Frame)] = []
+        let left = field.x - 0.5 * field.w, right = field.maxX + 0.5 * field.w
+        while index < queue.count, index < maxNodes, Clock.ms(since: t0) < Double(budgetMs) {
+            let element = queue[index]
+            index += 1
+            if let skip, CFEqual(element, skip) { continue }
+            let r = role(element)
+            if r == "AXMenuBar" || r == "AXImage" || r == "AXScrollBar" { continue }
+            let f = frame(element)
+            if let f, f.w > 0, f.h > 0 {
+                // Leave out parts above the field, and parts that do not touch its column.
+                if f.maxY <= field.maxY - 2 || f.maxX < left || f.x > right { continue }
+            }
+            if textRoles.contains(r) && isEditableText(element, allowSearch: true) { continue }
+            if let f, f.y >= field.maxY - 2 {
+                for attribute in r == "AXStaticText" ? ["AXValue"] : ["AXTitle", "AXDescription"] {
+                    if let s = string(element, attribute), !s.isEmpty, s.count < 120 { out.append((s, f)) }
+                }
+            }
+            queue.append(contentsOf: elements(element, "AXChildren"))
+        }
+        return out
+    }
+
     /// The app's own search field: an editable field in the upper part of the window that is a search field
     /// or has "search" in its label. It returns the highest one.
     static func findSearchField(in window: AXUIElement, budgetMs: Int = 300, maxNodes: Int = 4000) -> AXUIElement? {

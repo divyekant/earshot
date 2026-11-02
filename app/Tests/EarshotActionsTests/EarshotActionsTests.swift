@@ -79,6 +79,20 @@ final class ActionRulesTests: XCTestCase {
                                                      focusedValue: nil, wanted: "ravi", focusedRole: "AXRow"))
     }
 
+    func testSwitcherResultNeedsANewMatch() {
+        let sidebar = ("Divyekant (you)", Frame(x: 20, y: 300, w: 200, h: 20))
+        let baseline = ActionRules.matchKeys([sidebar, ("general", Frame(x: 20, y: 320, w: 200, h: 20))], name: "Divyekant")
+        XCTAssertEqual(baseline.count, 1)
+        // Only the sidebar: no result yet.
+        XCTAssertFalse(ActionRules.resultShows([sidebar], name: "Divyekant", baseline: baseline))
+        // The same text at a new place: a result row.
+        XCTAssertTrue(ActionRules.resultShows([sidebar, ("Divyekant (you)", Frame(x: 400, y: 140, w: 500, h: 30))],
+                                              name: "Divyekant", baseline: baseline))
+        // A row for another person: no.
+        XCTAssertFalse(ActionRules.resultShows([("Ravi Kumar", Frame(x: 400, y: 140, w: 500, h: 30))], name: "Divyekant", baseline: []))
+        XCTAssertEqual(SwitcherTiming.resultMs, 800)
+    }
+
     func testComposerShape() {
         let w = Frame(x: 0, y: 0, w: 1000, h: 800)
         XCTAssertTrue(ActionRules.composerShape(field: Frame(x: 300, y: 720, w: 650, h: 40), window: w))
@@ -175,6 +189,30 @@ final class ActionRunnerTests: XCTestCase {
         let app = AppEntry(id: "x", name: "X", bundleID: "com.example.none", isChat: true, openChat: .switcher(keys: "cmd+k"))
         let out = await runner.run(.openChat(appID: "x", target: "Ravi", text: "hi"), context: RouteContext(apps: [app], names: []))
         XCTAssertFalse(out.ok)
+    }
+
+    /// A fake result list that shows the row after 45 ms. The wait must end soon after, not after a fixed sleep.
+    func testResultWaitEndsWhenTheRowShows() async {
+        let runner = EarshotActionRunner(store: nil)
+        let t0 = Clock.nowNs()
+        let row = ("Divyekant (you)", Frame(x: 400, y: 140, w: 500, h: 30))
+        let shown = await runner.waitForResult(name: "Divyekant", baseline: []) {
+            Clock.ms(since: t0) >= 45 ? [row] : []
+        }
+        let ms = Clock.ms(since: t0)
+        print("EARSHOT_BENCH fake result wait: \(ms) ms (row at 45 ms)")
+        XCTAssertTrue(shown)
+        XCTAssertGreaterThanOrEqual(ms, 45)
+        XCTAssertLessThan(ms, 150)
+    }
+
+    /// No row: the wait stops at its time limit and reports false, so earshot presses no Return.
+    func testResultWaitTimesOut() async {
+        let runner = EarshotActionRunner(store: nil)
+        let t0 = Clock.nowNs()
+        let shown = await runner.waitForResult(name: "Divyekant", baseline: [], timeoutMs: 100) { [] }
+        XCTAssertFalse(shown)
+        XCTAssertGreaterThanOrEqual(Clock.ms(since: t0), 100)
     }
 
     /// Read-only latency check: reads the front window 10 times and prints the times. It presses nothing.

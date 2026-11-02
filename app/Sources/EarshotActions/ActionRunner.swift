@@ -156,7 +156,7 @@ public final class EarshotActionRunner: ActionRunner {
 
         // 1. Open the chat through the app's own search.
         if case .switcher(let keys) = e.openChat {
-            if let failure = await openWithSwitcher(app: f.app, keys: keys, name: shown) { return fail(failure) }
+            if let failure = await openWithSwitcher(app: f.app, keys: keys, name: shown, watch: watch) { return fail(failure) }
             watch.mark("chat")
         }
         // 2. Focus the message box.
@@ -184,7 +184,7 @@ public final class EarshotActionRunner: ActionRunner {
     }
 
     /// Opens the chat through the app's own search. Returns nil on success, else the reason for the failure.
-    private func openWithSwitcher(app: AXUIElement, keys: String, name: String) async -> String? {
+    private func openWithSwitcher(app: AXUIElement, keys: String, name: String, watch: Stopwatch) async -> String? {
         // The search keys must move the focus. If the focus stays where it was, for example in a reply box,
         // earshot stops, so that it never types the name into a message box.
         let before = AX.focused(app)
@@ -195,13 +195,17 @@ public final class EarshotActionRunner: ActionRunner {
             Keys.press(combo)
         }
         var found: AXUIElement?
-        let opened = await waitUntil(timeoutMs: 1200) {
+        let opened = await waitUntil(timeoutMs: SwitcherTiming.fieldMs, intervalMs: SwitcherTiming.pollMs) {
             guard let el = AX.focused(app), let win = AX.window(app), AX.isSwitcherField(el, in: win) else { return false }
             if !keys.isEmpty, AX.same(el, before) { return false }
             found = el
             return true
         }
-        guard opened, let field = found else { return "the search field did not get focus (\(AX.describeFocus(app)))" }
+        guard opened, let field = found else { return "the search field did not get focus in \(SwitcherTiming.fieldMs) ms (\(AX.describeFocus(app)))" }
+        watch.mark("switcher")
+        // The texts that match the name before typing, for example the chat in the sidebar. They do not count as results.
+        let fieldFrame = AX.frame(field)
+        let baseline = fieldFrame.map { ActionRules.matchKeys(AX.textsBelow($0, app: app, skip: field), name: name) } ?? []
         // A search field can keep the last search. Select it, so that the name replaces it.
         if !(AX.value(field) ?? "").isEmpty { Keys.press(Keys.selectAll) }
         Keys.type(name)
@@ -209,7 +213,7 @@ public final class EarshotActionRunner: ActionRunner {
         // Some apps move the focus into an inner field when typing starts. Accept the same field,
         // or another search field that holds exactly the name.
         var typedInto: AXUIElement?
-        let typed = await waitUntil(timeoutMs: 1000) {
+        let typed = await waitUntil(timeoutMs: SwitcherTiming.typedMs, intervalMs: SwitcherTiming.pollMs) {
             guard let el = AX.focused(app), let win = AX.window(app),
                   AX.value(el)?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == wanted,
                   AX.same(el, field) || AX.isSwitcherField(el, in: win) else { return false }
@@ -221,7 +225,17 @@ public final class EarshotActionRunner: ActionRunner {
             return "the search field did not show the name (\(AX.describeFocus(app)))"
         }
         searchField = target
-        await sleepMs(250)
+        watch.mark("name")
+        // Wait until the result list shows a new text that matches the name, in place of a fixed sleep.
+        let shown = await waitForResult(name: name, baseline: baseline) {
+            guard let f = AX.frame(target) ?? fieldFrame else { return [] }
+            return AX.textsBelow(f, app: app, skip: target)
+        }
+        guard shown else {
+            Keys.press(Keys.escape)
+            return "the search results did not show \"\(name)\" in \(SwitcherTiming.resultMs) ms"
+        }
+        watch.mark("result")
         // SAFETY (R-NV-5): Return in a message box sends the message.
         guard returnIsSafe(app, wanted: wanted, field: target) else {
             let focus = AX.describeFocus(app)
@@ -230,6 +244,14 @@ public final class EarshotActionRunner: ActionRunner {
         }
         Keys.press(Keys.returnKey)
         return nil
+    }
+
+    /// Polls `read` until a text that matches the name and is not in `baseline` shows on screen.
+    func waitForResult(name: String, baseline: Set<String>, timeoutMs: Int = SwitcherTiming.resultMs,
+                       read: () -> [(String, Frame)]) async -> Bool {
+        await waitUntil(timeoutMs: timeoutMs, intervalMs: SwitcherTiming.pollMs) {
+            ActionRules.resultShows(read(), name: name, baseline: baseline)
+        }
     }
 
     /// For an app with no search keys: focus the search field through accessibility, else click it.
