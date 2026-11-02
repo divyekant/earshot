@@ -1,6 +1,6 @@
 # E2: voice clicks on web pages, and Parakeet against Apple speech
 
-Status: plan, 2026-11-02. The owner chose "Both (E2)".
+Status: running, 2026-11-02. The owner chose "Both (E2)". Live run 2 is open.
 
 E2 follows [E1](E1-generic-router.md). E0 and E1 put the cursor in a chat. The owner asked two more questions:
 
@@ -98,6 +98,70 @@ The router is generic. It knows no site.
 | Speech | Parakeet becomes the default only if it routes more commands correctly than Apple, and is at most 100 ms slower |
 
 ## 5. Results
+
+The probe ran on the owner's Mac from the remote session on 2026-11-02. Chrome was signed in. The probe replaced the owner's e-mail address in a Google label with "[email]" before it logged or sent the label.
+
+### 5.1 Read
+
+`e2-page`, pages in background tabs, median of 3 reads:
+
+| Site | Elements | Links | Buttons | Fields | No label | Read | Tree walk |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Wikipedia | 99 | 80 | 10 | 1 | 0 | 36 ms | 119 ms |
+| GitHub | 76 | 57 | 17 | 1 | 0 | 31 ms | 33 ms |
+| Google | 32 | 17 | 14 | 1 | 0 | 26 ms | 31 ms |
+| Hacker News | 191 | 191 | 0 | 0 | 30 | 47 ms | 95 ms |
+
+- The one-call search (`AXUIElementsForSearchPredicate`) worked on all pages. It was 1 to 3 times faster than the tree walk. The time to find the page in the window was 20 to 22 ms of each read.
+- The check for links in headings adds 15 to 40 ms. Only an ordinal command needs it.
+- The 30 elements with no label on Hacker News are the vote arrows. The reader does not keep elements with no label, so the router cannot press them.
+
+### 5.2 Route (saved pages)
+
+`e2-run`, 45 commands, after the fixes in commits 75892a2 and 810095f:
+
+| Router | Correct | Wrong press | Median | Slowest 1 in 10 |
+| --- | --- | --- | --- | --- |
+| Rules + fuzzy (Mac) | 42/45 (93 %) | 0 | 23 ms | 56 ms |
+| Jev for press commands | 44/45 (98 %) | 1 | 106 ms | 168 ms |
+| Rules, Jev if unsure | 45/45 (100 %) | 0 | 24 ms | 64 ms |
+
+- The rules were sure for 42 of 45 commands, and right for all 42.
+- The rules were unsure only for free phrasings with no command word ("tools please", "I want to see accessibility"). Jev got all 3 right.
+- All 4 risky commands ("click Donate", "click Star", "click Share", "click submit") gave "blocked".
+- Jev alone pressed "Packages" for "click pricing plans", also with a stronger "none" option. The hybrid did not, because the rules were sure that nothing matched. So Jev must not get a command that the rules can answer with "none".
+- The first run found one bad test: Wikipedia's fundraising banner was a "result". Ordinal lists now leave out risky links, and only pages with a result list get an ordinal test.
+
+### 5.3 Live run 1
+
+`e2-act`, 42 commands on the 4 live pages (commit 75892a2):
+
+- The router picked the correct element for 40 of 42 commands. The 2 misses were test drift: a Hacker News story that was gone, and a label that changed from "(+2)" to "(+1)".
+- From the text to the action: 47 ms median, 77 ms for the slowest 1 in 10, with Jev for 2 commands. Page read: 29 ms median.
+- But Chrome ignored the presses. 21 of 22 link presses changed nothing, and both value sets in search fields failed. The press call returned at once with no error.
+- Cause: the probe took the first web area in the window. Chrome keeps the pages of other tabs in the tree, with the same size. Each command step had opened a new tab, so the probe read and pressed a hidden tab. One press on a Hacker News link was followed by a Google address, which showed this.
+- Fix (commits 810095f and c43dfa8): a hit test in the Chrome window finds the page that is on screen. The live run acts only on a page found this way. Else it brings Chrome to the front, and if the page is still not on screen, it stops.
+- Safety held: nothing was submitted, no Return was pressed, and all 4 risky commands were blocked.
+
+### 5.4 Speech
+
+126 files: the 42 E1 commands, spoken by `say` with the voices Rishi (Indian English), Samantha (US) and Daniel (UK). The route is the E1 rules on the text, on the Mac, with no Jev. With the written words, the rules route 120 of 126 correctly.
+
+| Engine | Word errors | Route correct | Wrong chat | Median | Slowest 1 in 10 |
+| --- | --- | --- | --- | --- | --- |
+| Apple SpeechTranscriber | 18.8 % | 113/126 | 4 | 56 ms | 65 ms |
+| Apple SpeechTranscriber, name hints | 18.8 % | 113/126 | 4 | 55 ms | 65 ms |
+| Apple DictationTranscriber | 16.5 % | 102/126 | 5 | 88 ms | 157 ms |
+| Apple DictationTranscriber, name hints | 14.8 % | 101/126 | 5 | 131 ms | 183 ms |
+| Parakeet (Hex's file, transcribe.cpp, Metal) | 14.9 % | 114/126 | 4 | 34 ms | 40 ms |
+
+- SpeechTranscriber ignores the name hints: the text is the same, line for line. DictationTranscriber uses them, but it changes the command words more ("Slag me", "Open claw"), so it routes worse.
+- Parakeet loads in 14.4 s the first time and uses about 890 MB after the load. It must stay loaded.
+- Both engines miss the same names: "Aditi" gives "a ditty", "Mrinal" gives "Marinel" or "Manal", "Claude" gives "clawed" or "cloud". The word "ping" at the start is sometimes lost.
+- `say` voices are not real speech. The names are the hard part, and these results show the same weak names for both engines.
+- The macOS sandbox of the remote session blocked SwiftPM downloads and the run of a downloaded library. The owner ran `parakeet-ab` once in the terminal.
+
+### 5.5 Live run 2
 
 Not run yet.
 
