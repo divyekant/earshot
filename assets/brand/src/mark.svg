@@ -1,0 +1,10 @@
+<g id="mark" fill="none" stroke-linecap="round" stroke-linejoin="round" transform="translate(-14 0)">
+  <!-- Sound arcs: the range of earshot. -->
+  <path d="M 330 432 A 120 120 0 0 0 330 592" stroke="#FFFFFF" stroke-opacity="0.55" stroke-width="40"/>
+  <path d="M 262 372 A 205 205 0 0 0 262 652" stroke="#FFFFFF" stroke-opacity="0.28" stroke-width="40"/>
+  <!-- Ear: outer rim and inner curl. -->
+  <path d="M 420 470 C 420 340 500 262 600 262 C 712 262 790 344 790 452 C 790 540 738 580 700 620 C 662 660 664 714 626 752 C 590 788 524 790 494 748" stroke="#FFFFFF" stroke-width="64"/>
+  <path d="M 524 448 C 530 400 562 372 604 372 C 652 372 684 412 680 458 C 676 502 636 516 620 556" stroke="#FFFFFF" stroke-width="54"/>
+  <!-- Text cursor in the ear canal: earshot puts the cursor in the message box. -->
+  <path d="M 532 540 L 532 640" stroke="#FFC24B" stroke-width="46"/>
+</g>
