@@ -124,7 +124,7 @@ public final class ParakeetEngine: SpeechEngine, SpeechTimingReporting, @uncheck
     public func end() async throws -> Utterance {
         let t0 = SpeechClock.nowNs()
         if useMicrophone {
-            mic.end()   // adds the tail silence through `feed`
+            await mic.end(captureSeconds: TailPad.captureSeconds)   // then adds the tail silence through `feed`
         } else {
             feed([Float](repeating: 0, count: TailPad.frames(sampleRate: 16000)))
         }

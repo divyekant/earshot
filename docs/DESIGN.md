@@ -43,14 +43,27 @@ Swift SDKs: FluidAudio and speech-swift bundle these parts.
 
 | Option | Use when |
 |---|---|
-| Parakeet 0.6B, the model file of Hex (`parakeet-unified-en-0.6b-Q8_0.gguf`, transcribe.cpp on Metal) | Default for English when the file is on the Mac. earshot reads the file in place, so there is no download. E2: 114 of 126 commands routed correctly, 14.9 % word errors, 34 ms median on short commands. It loads in 14.4 s and uses about 890 MB, so it must stay loaded. English only. Weights CC BY 4.0. |
-| Apple SpeechTranscriber (Speech framework, macOS 26 and later) | Default when the Parakeet file is not on the Mac. It is built into macOS and runs on the device. macOS manages the model, so earshot ships no speech model. E0: 14 of 14 commands heard correctly, final text 23 to 101 ms after key release. E2: 113 of 126 routed correctly, 18.8 % word errors, 56 ms median. It takes name hints (`AnalysisContext.contextualStrings`), but in E2 the hints did not change the text. |
+| Parakeet 0.6B, the model file of Hex (`parakeet-unified-en-0.6b-Q8_0.gguf`, transcribe.cpp on Metal) | Optional, when the owner chooses "Parakeet" in Settings. It is not the default (live test 2026-11-02, below). earshot reads the file in place, so there is no download. E2: 114 of 126 commands routed correctly, 14.9 % word errors, 34 ms median on short commands. It loads in 14.4 s and uses about 890 MB, so it must stay loaded. English only. Weights CC BY 4.0. |
+| Apple SpeechTranscriber (Speech framework, macOS 26 and later) | Default ("auto"). It is built into macOS and runs on the device. macOS manages the model, so earshot ships no speech model. E0: 14 of 14 commands heard correctly, final text 23 to 101 ms after key release. E2: 113 of 126 routed correctly, 18.8 % word errors, 56 ms median. It takes name hints (`AnalysisContext.contextualStrings`), but in E2 the hints did not change the text. |
 | Nemotron-3.5-ASR-Streaming-0.6B (speech-swift) | English and Hindi. Hindi word error rate is 8.0 at 160 ms chunks (model card). Test the Hinglish fine-tunes. |
 | Moonshine v2 small (MIT, 123M) | Fastest English-only option. The vendor reports 73 ms. |
 
 No source measured end-of-speech latency on an M4 Pro. Measure it in Phase 0.
 
-E2 (section 6.2) chose Parakeet by a small margin: 1 command in 126, on `say` voices. Keep both engines behind one interface, log the engine with each command, and check the choice on the owner's real commands. Both engines miss the same names, so the router must also match names by sound.
+E2 (section 6.2) chose Parakeet by a small margin: 1 command in 126, on `say` voices. The live test of the app on 2026-11-02 changed the default to Apple:
+
+| Measure (owner's Mac, memory full: swap 4.5 to 6.7 GB of 5 to 7 GB) | Parakeet | Apple |
+|---|---|---|
+| Live speech stage, 8 commands in one session | 441, 900, 821, 565, 646, 2567, 2232, 6937 ms | — |
+| Replay of `say` commands through the turn path, after key release | 110 to 2000 ms; 20 in a row: median 250 to 570 ms | about 30 ms (first call about 110 ms) |
+| 12-file bench, median / p90 | 231 to 281 ms / 552 to 800 ms (E2 with free memory: 33 ms) | 54 to 67 ms / 67 to 123 ms |
+
+- All the Parakeet time was decode. The tail after key release was 1.2 ms or less, and the queue wait 0.4 ms or less. There was no growth over 20 commands.
+- macOS moved the 890 MB of Parakeet weights out of memory between commands (the app's resident memory fell from 746 MB to about 100 MB). Each decode then read them back from swap.
+- So "auto" uses Apple and does not load Parakeet. The setting "Parakeet" uses Parakeet for a command only when a warm-up run at the key press shows that the weights are in memory and the memory pressure is normal. Else Apple makes the text, so Parakeet never makes the owner wait.
+- Each command logs the engine and the reason (`SpeechTiming.why`) and the stages `speech.tail`, `speech.wait` and `speech.decode`.
+
+Both engines miss the same names, so the router must also match names by sound.
 
 ### 3.3 "Is this for me?" gate (R-ON-2, R-ON-5)
 

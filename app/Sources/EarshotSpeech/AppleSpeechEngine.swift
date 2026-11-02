@@ -108,7 +108,7 @@ public final class AppleSpeechEngine: SpeechEngine, SpeechTimingReporting, @unch
             return out
         }
         if let mic {
-            mic.end()   // adds the tail silence through the sink
+            await mic.end(captureSeconds: TailPad.captureSeconds)   // then adds the tail silence through the sink
         } else if let feed, let format, let pad = AudioUtil.silence(format: format, frames: TailPad.frames(sampleRate: format.sampleRate)) {
             feed(pad)
         }
