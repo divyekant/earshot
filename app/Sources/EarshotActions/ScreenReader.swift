@@ -298,7 +298,7 @@ enum ScreenReader {
             let page = i < drafts.count
             let e = ScreenElement(id: id, role: d.role, subrole: d.subrole, label: d.label, url: d.url,
                                   inHeading: page && d.kind == "link" && areaPath != "window" ? inHeading(el) : false,
-                                  risky: SafetyPolicy.isRisky(d.label, role: d.role),
+                                  risky: SafetyPolicy.isRisky(d.label, role: d.role, subrole: d.subrole),
                                   x: d.frame.x, y: d.frame.y, w: d.frame.w, h: d.frame.h)
             elements.append(e)
             items[id] = ReadElement(element: e, kind: d.kind, handle: el, inPage: page || areaPath == "window")

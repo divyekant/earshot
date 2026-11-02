@@ -152,7 +152,7 @@ E0 used each app's own search in place of links, so the owner gives names only. 
 
 **Click.**
 1. Collect buttons, links, menu items and rows from the front window. In a browser, find the page on screen with a hit test in the front window, and read its visible elements with one `AXUIElementsForSearchPredicate` call (12 ms in E2). Chrome keeps the pages of hidden tabs in the tree, so a page found by a tree search can be a hidden tab.
-2. Fuzzy-match the spoken label to `AXTitle`, `AXDescription` and `AXValue`. Numbers must match exactly. Block every label with a risky word (send, pay, delete, submit, vote, star and similar).
+2. Fuzzy-match the spoken label to `AXTitle`, `AXDescription` and `AXValue`. Numbers must match exactly. Block every label with a risky word (send, pay, delete, submit, vote, star and similar). A title is not a command: a tab button, and a menu item that names an open tab or window of the app (found by data, not by menu names), use the rule of a link. A title is risky only if it has 3 words or fewer and a risky word, or if it starts with a risky word. Bookmarks and History menus are not targets.
 3. Act only on a page of the expected app or site. Never act on a sign-in, code or payment page.
 4. Press the match with `AXPress` if the element offers it. A Chrome link does not offer it: `AXPress` returns success and does nothing (E2, section 5.6). Else click a point where the top element on screen is the match, and move the pointer back. If no such point exists, scroll the element into view (`AXScrollToVisible`) and try again.
 5. For ordinal commands ("second email", "second result"), sort the rows by position on screen. On a web page, a result is a link in a heading.

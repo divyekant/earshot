@@ -529,7 +529,8 @@ public final class EarshotActionRunner: ActionRunner {
         let label = item.element.label
         let pageRules = ActionRules.pageRulesApply(kind: item.kind, inPage: item.inPage)
         let sensitive = pageRules ? SafetyPolicy.sensitive(url: read.snapshot.url, elements: pageElements(read)) : nil
-        if let block = ActionRules.pressBlock(label: label, role: item.element.role, command: command, sensitive: sensitive) { return fail(block) }
+        if let block = ActionRules.pressBlock(label: label, role: item.element.role, subrole: item.element.subrole, command: command,
+                                              sensitive: sensitive) { return fail(block) }
         // Chrome keeps hidden tabs in the tree and ignores a press on them (E2 live run 1).
         if item.inPage, read.web, read.areaPath != "hit test" { return fail("not clicked: the page can be a hidden tab") }
         await waitForKeysUp(watch)
@@ -588,8 +589,8 @@ public final class EarshotActionRunner: ActionRunner {
                 let url = AX.window(app).flatMap { ScreenReader.visibleWebArea($0) }.flatMap { ScreenReader.address($0) }
                 if let block = ActionRules.afterScrollBlock(before: read.snapshot.url, after: url) { return fail(block) }
                 let sensitiveNow = SafetyPolicy.sensitive(url: url, elements: pageElements(read))
-                if let block = ActionRules.pressBlock(label: again.label, role: item.element.role, command: command,
-                                                      sensitive: sensitiveNow) { return fail(block) }
+                if let block = ActionRules.pressBlock(label: again.label, role: item.element.role, subrole: item.element.subrole,
+                                                      command: command, sensitive: sensitiveNow) { return fail(block) }
             }
             point = safePoint(h, f)
             // In view, but the top element at each point is another one, for example a fixed header.
@@ -769,7 +770,11 @@ public final class EarshotActionRunner: ActionRunner {
         watch.mark("find")
         let title = AX.string(item, "AXTitle") ?? path.last ?? ""
         guard AX.bool(item, "AXEnabled") != false else { return fail("the menu item \"\(title)\" is off") }
-        if let block = ActionRules.pressBlock(label: title, role: MenuElements.role, command: command, sensitive: nil) {
+        // A title that the strict rule blocks: read the tabs and windows again, to see if it names one of them.
+        let app = AX.appElement(pid)
+        let isTitle = SafetyPolicy.isRisky(title) && WindowTitles.names(title, in: AX.titles(app))
+        if let block = ActionRules.pressBlock(label: title, role: MenuElements.role, subrole: isTitle ? MenuElements.titleSubrole : nil,
+                                              command: command, sensitive: nil) {
             return fail(block)
         }
         await waitForKeysUp(watch)
