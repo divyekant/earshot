@@ -18,6 +18,14 @@ enum Commands {
     swift run earshot-probe transcribe <file>     Transcribe an audio file and time it
     swift run earshot-probe report [log]          Summary of the newest log, or of [log]
 
+    E1 (docs/experiments/E1-generic-router.md):
+    swift run earshot-probe catalogue             Build the app catalogue from the menu bars (read only)
+    swift run earshot-probe index [--front]       Read the chat names in each chat app's sidebar (read only)
+    swift run earshot-probe e1-make               Make the test commands from the index
+    swift run earshot-probe e1-try "<words>"      Show the short list, the rules answer and the Jev answer
+    swift run earshot-probe e1-run [--no-jev]     Route all test commands with rules, Jev, and rules then Jev
+    swift run earshot-probe e1-open [app] [runs]  Open your own chat with the generated rows (types nothing)
+
     Options: --engine transcriber|dictation   --locale en-IN
     """
 
@@ -63,6 +71,12 @@ enum Commands {
             case "listen": return try await listen(args)
             case "transcribe": return try await transcribe(args)
             case "report": return try Report.run(positional(args).first)
+            case "catalogue": return try await E1.catalogue(args)
+            case "index": return try await E1.index(args)
+            case "e1-make": return try E1.make(args)
+            case "e1-try": return try await E1.tryOne(args)
+            case "e1-run": return try await E1.runAll(args)
+            case "e1-open": return try await E1.open(args)
             default:
                 print(usage)
                 return 2

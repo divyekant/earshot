@@ -64,10 +64,10 @@ final class RunLog {
     let url: URL
     private let handle: FileHandle
 
-    init(kind: String) throws {
+    init(kind: String, experiment: String = "e0") throws {
         try FileManager.default.createDirectory(at: Paths.logs, withIntermediateDirectories: true)
         let stamp = RunLog.stamp()
-        url = Paths.logs.appendingPathComponent("e0-\(kind)-\(stamp).jsonl")
+        url = Paths.logs.appendingPathComponent("\(experiment)-\(kind)-\(stamp).jsonl")
         FileManager.default.createFile(atPath: url.path, contents: nil)
         handle = try FileHandle(forWritingTo: url)
     }
