@@ -111,11 +111,30 @@ enum AX {
         return true
     }
 
-    static func looksLikeSearch(_ element: AXUIElement) -> Bool {
-        let words = ["AXPlaceholderValue", "AXDescription", "AXTitle", "AXHelp", "AXRoleDescription"]
+    /// The words that label a field: placeholder, description, title, help and role description.
+    static func label(_ element: AXUIElement) -> String {
+        ["AXPlaceholderValue", "AXDescription", "AXTitle", "AXHelp", "AXRoleDescription"]
             .compactMap { string(element, $0)?.lowercased() }
             .joined(separator: " ")
-        return words.contains("search") || words.contains("jump to") || words.contains("find")
+            .replacingOccurrences(of: "\u{200E}", with: "")
+    }
+
+    static func looksLikeSearch(_ element: AXUIElement) -> Bool {
+        let words = label(element)
+        return words.contains("search") || words.contains("jump to") || words.contains("find") || words.contains("go to")
+    }
+
+    /// A field whose label says that it writes a message, for example
+    /// "Message to all-fplbros", "Reply to thread" or "Compose message".
+    static func looksLikeComposer(_ element: AXUIElement) -> Bool {
+        let words = label(element)
+        return ["message", "reply", "compose", "write", "send"].contains { words.contains($0) }
+    }
+
+    /// True if the app lets other apps set the field's text. Read-only text, such as a chat bubble, is not settable.
+    static func valueSettable(_ element: AXUIElement) -> Bool {
+        var settable = DarwinBoolean(false)
+        return AXUIElementIsAttributeSettable(element, "AXValue" as CFString, &settable) == .success && settable.boolValue
     }
 
     /// The generic message-box rule: an editable text field that is wide
@@ -126,11 +145,14 @@ enum AX {
         return !looksLikeSearch(element)
     }
 
-    /// The switcher rule: an editable field in the upper part of the window.
-    /// A message box never matches, because it sits at the bottom.
+    /// The switcher rule: a settable text field in the upper part of the window.
+    /// If its label says search, it matches. Else its label must not say message, reply or compose,
+    /// because a thread reply box can sit high in the window (seen in Slack).
     static func isSwitcherField(_ element: AXUIElement, in window: AXUIElement) -> Bool {
-        guard isEditableText(element, allowSearch: true), let f = frame(element), let w = frame(window) else { return false }
-        return f.midY < w.y + 0.6 * w.h
+        guard isEditableText(element, allowSearch: true), valueSettable(element),
+              let f = frame(element), let w = frame(window), f.midY < w.y + 0.6 * w.h else { return false }
+        if subrole(element) == "AXSearchField" || looksLikeSearch(element) { return true }
+        return !looksLikeComposer(element)
     }
 
     /// Roles of a result list. The probe can press Return on these, never on a text field or a button.
@@ -233,7 +255,10 @@ enum AX {
         if mods & 8 == 0 { parts.append("cmd") }
         let names: [UInt32: String] = [0x0D: "return", 0x03: "enter", 0x09: "tab", 0x1B: "escape", 0x20: "space",
                                        0x08: "delete", 0x7F: "delete"]
+        let codeNames: [Int: String] = [123: "left", 124: "right", 125: "down", 126: "up", 36: "return", 76: "enter"]
         if let scalar = char.unicodeScalars.first, let name = names[scalar.value] {
+            parts.append(name)
+        } else if let code, let name = codeNames[code] {
             parts.append(name)
         } else if let scalar = char.unicodeScalars.first, scalar.properties.generalCategory == .control
                     || scalar.properties.generalCategory == .privateUse {

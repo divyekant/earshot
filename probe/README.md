@@ -21,7 +21,8 @@ The probe obeys these rules (R-NV-5, R-ON-5):
 
 1. It never presses Return or Send in a message box.
 2. It presses Return only to open a search result, one time for each command. Before the press, it checks the focus:
-   - If the focus is in a text field, the field must be in the upper part of the window and hold exactly the name.
+   - The search keys must move the focus to a new field. If the focus does not move, the probe stops and types nothing.
+   - If the focus is in a text field, it must be the field that the probe typed the name into. The field must be in the upper part of the window, hold exactly the name, and accept typed text. Its label must not say "message", "reply", "compose", "write" or "send", unless it also says "search".
    - If the focus is not in a text field, it must be on a row of a result list.
    - If the focus is in a message box or on a button, the probe presses Escape and stops.
 3. It types text only into your own chats, and only when the chat name on screen is exactly your name. For other people, it only focuses the box.
