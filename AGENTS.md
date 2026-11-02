@@ -15,6 +15,16 @@
 - earshot must never press Send or do another action that cannot be undone, unless the owner gives an explicit command (R-NV-5, R-ON-5).
 - Measure latency for every change to the command path. Record the numbers in the pull request.
 
+## Branches and releases
+
+Follow `docs/RELEASING.md`. The short form:
+
+- Make each topic branch from `develop`. Open each feature or fix pull request with `develop` as the base. Never use `main` as the base for a feature.
+- If users can see the change, add one line under `## [Unreleased]` in `CHANGELOG.md`, with the requirement IDs.
+- Merge with a merge commit. A merge into `develop` makes a pre-release tag `vX.Y.Z-dev.N` and a GitHub pre-release.
+- A release is a pull request from `develop` to `main`, titled `Release vX.Y.Z`. Before it, set `VERSION` and move the `Unreleased` lines into a `## [X.Y.Z] - YYYY-MM-DD` section. The merge into `main` makes the tag `vX.Y.Z` and the GitHub release.
+- Do not make, move or delete a tag by hand.
+
 ## Environment
 
 - Mac Mini, Apple M4 Pro, 24 GB of memory, macOS 26.6.2.

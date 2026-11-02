@@ -39,17 +39,20 @@ These rules come from [AGENTS.md](AGENTS.md). A pull request that breaks one of 
 
 ## Send a change
 
-1. Fork the repository and make a branch from `main`.
+1. Fork the repository and make a branch from `develop`.
 2. Make your change. Keep each pull request to one topic.
-3. Run the tests:
+3. If users can see the change, add one line under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md).
+4. Run the tests:
 
    ```sh
    cd app
    swift test
    ```
 
-4. If your change touches the command path (speech, router, actions, discovery or input), measure the latency before and after the change. Use the **Activity** tab or the benchmark tests in `app/Tests`.
-5. Open a pull request. Fill in the template. Include the latency numbers and the requirement IDs.
+5. If your change touches the command path (speech, router, actions, discovery or input), measure the latency before and after the change. Use the **Activity** tab or the benchmark tests in `app/Tests`.
+6. Open a pull request with `develop` as the base. Fill in the template. Include the latency numbers and the requirement IDs.
+
+Do not open a feature pull request to `main`. `main` gets only release pull requests from `develop`. [docs/RELEASING.md](docs/RELEASING.md) gives the branches, the version numbers, the tags and the release procedure.
 
 ### Tests that use the screen, keys or the microphone
 
