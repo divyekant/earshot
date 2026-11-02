@@ -4,19 +4,6 @@ import EarshotCore
 import EarshotRouter
 import XCTest
 
-/// The real router, except that a bare "type" gives awaitsText (the router contract of T2).
-struct TypeAwareRouter: Router {
-    let real = CommandRouter()
-    func route(_ text: String, context: RouteContext) async -> RouteResult {
-        if SafetyPolicy.normalize(text) == "type" {
-            var r = RouteResult(intent: .none, confidence: 0.9, tier: .rules, ms: 0, why: "type: no text")
-            r.awaitsText = true
-            return r
-        }
-        return await real.route(text, context: context)
-    }
-}
-
 /// A bare "type", then the text in the next turn (the owner's choice, R-NV-4). Made-up text only.
 final class ArmedDictationTests: XCTestCase {
     private var clock = Date(timeIntervalSince1970: 1_000_000)
@@ -25,7 +12,7 @@ final class ArmedDictationTests: XCTestCase {
         let engine = TextEngine()
         let runner = FieldRunner()
         setup(runner)
-        let p = CommandPipeline(engine: engine, router: TypeAwareRouter(), actions: runner, names: FakeNames(),
+        let p = CommandPipeline(engine: engine, router: CommandRouter(), actions: runner, names: FakeNames(),
                                 apps: { Fixture.apps }, allNames: { Fixture.names }, frontBundleID: { "com.anthropic.claudefordesktop" })
         p.now = { [unowned self] in self.clock }
         return (p, engine, runner)
