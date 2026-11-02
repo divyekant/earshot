@@ -62,6 +62,7 @@ final class AppController: ObservableObject {
     /// The menu items of the front app. Read when an app comes to the front and after each command, never in a command.
     let menus: MenuCache
     private var menuObserver: NSObjectProtocol?
+    private var keyObserver: NSObjectProtocol?
 
     init() {
         let store = self.store
@@ -88,6 +89,10 @@ final class AppController: ObservableObject {
             }
         }
         if let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier { menus.refresh(front) }
+        applyJev()
+        keyObserver = NotificationCenter.default.addObserver(forName: KeychainSecret.changed, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.applyJev() }
+        }
         pipeline.feedback = feedback
         pipeline.log = ActivityLog(store: store)
         pipeline.showFeedback = settings.showFeedback
@@ -162,6 +167,13 @@ final class AppController: ObservableObject {
         return await box.names
     }
 
+    /// Makes the Jev router and the screenshot picker again: at start, after a settings change, and after a new key.
+    private func applyJev() {
+        pipeline.router = Self.router(settings)
+        pipeline.picker = ScreenPickerFactory.make(settings, jevKey: settings.jevSeesScreen ? KeychainSecret.jev.read() : nil)
+        pipeline.jevScreenBudgetMs = settings.jevScreenBudgetMs
+    }
+
     static func router(_ settings: EarshotSettings) -> CommandRouter {
         CommandRouter(settings: settings, jevKey: settings.tier2 == .jev ? KeychainSecret.jev.read() : nil)
     }
@@ -213,7 +225,8 @@ final class AppController: ObservableObject {
         settings = new
         pipeline.showFeedback = new.showFeedback
         runner.options = ActionOptions(settings: new)
-        if new.tier2 != old.tier2 || new.tier2BudgetMs != old.tier2BudgetMs { pipeline.router = Self.router(new) }
+        if new.tier2 != old.tier2 || new.tier2BudgetMs != old.tier2BudgetMs || new.jevSeesScreen != old.jevSeesScreen
+            || new.jevScreenBudgetMs != old.jevScreenBudgetMs { applyJev() }
         if new.engine != old.engine || new.parakeetModelPath != old.parakeetModelPath || new.locale != old.locale {
             // Close the microphone of the old engine first. The old engine then has no owner, so its deinit frees
             // the Parakeet model, and two models do not stay loaded.

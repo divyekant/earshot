@@ -56,6 +56,13 @@ public struct CommandRouter: Router {
         return (n, d.heardApp)
     }
 
+    /// True if the words ask for a press on the screen ("click X", "open the X tab"), by the router's own verb parse.
+    /// Not for typing, scrolling, back or an ordinal. The screenshot fallback runs only for a press (D-10).
+    public static func isPress(_ text: String) -> Bool {
+        let p = ScreenRouter.parse(text)
+        return p.isCommand && p.kind == .press && !p.target.isEmpty
+    }
+
     /// The label words that the owner said for a click, for example "send" in "click the send button".
     /// The app gives them to SafetyPolicy.mayPress with the tier and the input mode (R-NV-5).
     public static func spokenTarget(_ text: String) -> String {
