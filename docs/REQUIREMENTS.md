@@ -52,6 +52,7 @@ The owner described this flow:
 | R-NV-4 | earshot enters dictated text in the focused text box. A command can include the text: "Slack Ravi, running late". | Must |
 | R-NV-5 | earshot does not press Send unless the owner says so, for example "send" or "click Send". | Must |
 | R-NV-6 | First apps to support: Slack, WhatsApp, Messages, Mail. | Must |
+| R-NV-7 | "Open <web address>" opens the address in the default browser, for example "open hn.com" or "go to news dot ycombinator dot com". earshot opens only http and https addresses, and presses no key. | Should |
 
 ### 3.4 Voice clicks
 
