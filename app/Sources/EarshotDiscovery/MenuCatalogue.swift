@@ -20,6 +20,8 @@ public struct CatalogueRead: Sendable {
     public var shortcuts: Int
     public var guess: MenuGuess?
     public var ms: Double
+    /// True if the menu read stopped at its time limit. The app answered Accessibility too slowly.
+    public var timedOut: Bool
 }
 
 /// Builds catalogue rows from the menu bars of the running apps, and from the installed apps
@@ -87,20 +89,28 @@ public final class MenuCatalogue: CatalogueBuilder, @unchecked Sendable {
         return MenuRules.merge(existing: [], found: rows)
     }
 
+    /// The time limit of one menu read. One slow app must not hold up the catalogue (seen live: 24 s).
+    static let menuBudgetMs = 1000
+
     static func read(pid: pid_t, bundleID: String, name: String, url: URL?, menus: Bool) -> (AppEntry, CatalogueRead)? {
         guard !bundleID.isEmpty else { return nil }
         let t0 = Clock.nowNs()
         let electron = isElectron(url)
         var shortcuts: [MenuShortcut]?
+        var timedOut = false
         if menus {
             let el = AX.appElement(pid)
             if electron { AX.askForTree(el) }
-            shortcuts = AX.menuShortcuts(el)
+            AXUIElementSetMessagingTimeout(el, 0.25)
+            let menus = AX.menuShortcuts(el, budgetMs: menuBudgetMs)
+            shortcuts = menus.items
+            timedOut = menus.timedOut
         }
-        let entry = MenuRules.entry(name: name, bundleID: bundleID, extraNames: bundleNames(url),
+        let entry = MenuRules.entry(name: name, bundleID: bundleID, extraNames: bundleNames(url, appName: name),
                                     shortcuts: shortcuts, electron: electron)
         let read = CatalogueRead(bundleID: bundleID, name: name, shortcuts: shortcuts?.count ?? 0,
-                                 guess: shortcuts.flatMap(MenuRules.guess), ms: Clock.round1(Clock.ms(since: t0)))
+                                 guess: shortcuts.flatMap(MenuRules.guess), ms: Clock.round1(Clock.ms(since: t0)),
+                                 timedOut: timedOut)
         return (entry, read)
     }
 
@@ -110,9 +120,9 @@ public final class MenuCatalogue: CatalogueBuilder, @unchecked Sendable {
     }
 
     /// The spoken names that the app declares in its Info.plist: bundle names and URL schemes.
-    static func bundleNames(_ url: URL?) -> [String] {
+    static func bundleNames(_ url: URL?, appName: String) -> [String] {
         guard let info = url.flatMap({ Bundle(url: $0)?.infoDictionary }) else { return [] }
-        return MenuRules.declaredNames(info)
+        return MenuRules.declaredNames(info, appName: appName)
     }
 
     /// The apps in the standard app folders. It reads the Info.plist of each app, and leaves out
@@ -131,7 +141,7 @@ public final class MenuCatalogue: CatalogueBuilder, @unchecked Sendable {
                       seen.insert(bundleID).inserted else { continue }
                 if (info["LSBackgroundOnly"] as? Bool) == true { continue }
                 let name = String(item.dropLast(4))
-                out.append(MenuRules.entry(name: name, bundleID: bundleID, extraNames: bundleNames(url), shortcuts: nil,
+                out.append(MenuRules.entry(name: name, bundleID: bundleID, extraNames: bundleNames(url, appName: name), shortcuts: nil,
                                            electron: isElectron(url)))
             }
         }
