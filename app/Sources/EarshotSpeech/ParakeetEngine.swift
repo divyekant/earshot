@@ -21,6 +21,11 @@ public final class ParakeetEngine: SpeechEngine, SpeechTimingReporting, @uncheck
     public var warmAfterIdleSeconds: Double? = 2.0
     /// The length of the warm-up audio (silence).
     var warmSeconds = 0.5
+    /// True: start the warm-up run at every key press. AutoSpeechEngine uses its time to see if the
+    /// model weights are in memory.
+    public var warmEveryTurn = false
+    /// The time of a warm-up run right after the load, when the weights are surely in memory.
+    public private(set) var baselineWarmMs: Double = 0
 
     /// All model runs go through this queue, because one transcribe.cpp session is not thread safe.
     private let queue = DispatchQueue(label: "earshot.speech.parakeet", qos: .userInitiated)
@@ -33,6 +38,8 @@ public final class ParakeetEngine: SpeechEngine, SpeechTimingReporting, @uncheck
     private var lastRunEndNs: UInt64 = 0
     private var turn = SpeechTiming(engine: ParakeetEngine.engineID, why: "")
     private var timing: SpeechTiming?
+    private var turnID = 0
+    private var turnWarm: Double?
     private let mic: MicrophoneFeed
     let activity = TurnActivity()
     private let useMicrophone: Bool
@@ -80,6 +87,9 @@ public final class ParakeetEngine: SpeechEngine, SpeechTimingReporting, @uncheck
         // The first run prepares the GPU code. Do it now, not on the first command.
         warmNow(seconds: 1.0)
         loadMs = SpeechClock.ms(since: t0)
+        let tb = SpeechClock.nowNs()
+        warmNow(seconds: warmSeconds)
+        baselineWarmMs = SpeechClock.ms(since: tb)
     }
 
     public func begin() throws {
@@ -91,6 +101,17 @@ public final class ParakeetEngine: SpeechEngine, SpeechTimingReporting, @uncheck
 
     /// Starts a turn with no microphone. The caller gives the audio with `feed`. For measurements.
     func beginWithoutMicrophone() { startTurn() }
+
+    /// The time of the warm-up run of this turn, or nil if it did not run or is not done.
+    public var turnWarmMs: Double? { lock.withLock { turnWarm } }
+
+    /// Drops the turn with no decode. The microphone stops to pass audio.
+    public func cancelTurn() {
+        if useMicrophone { mic.end() }
+        stopTimer()
+        lock.withLock { samples.removeAll(); listening = false }
+        activity.end()
+    }
 
     /// The samples of the turn so far. For tests.
     var bufferedFrames: Int { lock.withLock { samples.count } }
@@ -148,18 +169,27 @@ public final class ParakeetEngine: SpeechEngine, SpeechTimingReporting, @uncheck
     private func startTurn() {
         activity.begin("earshot speech command")
         let now = SpeechClock.nowNs()
-        let warm: Bool = lock.withLock {
+        let (warm, id): (Bool, Int) = lock.withLock {
+            turnID += 1
+            turnWarm = nil
             samples.removeAll(keepingCapacity: true)
             lastPartialFrames = 0
             listening = true
             turn = SpeechTiming(engine: id, why: reason)
             turn.idleMs = lastRunEndNs == 0 ? 0 : Double(now &- lastRunEndNs) / 1_000_000
+            if warmEveryTurn { turn.warmed = true }
             if let limit = warmAfterIdleSeconds, turn.idleMs >= limit * 1000 { turn.warmed = true }
-            return turn.warmed
+            return (turn.warmed, turnID)
         }
         if warm {
             let seconds = warmSeconds
-            queue.async { [weak self] in self?.warmNow(seconds: seconds) }
+            queue.async { [weak self] in
+                guard let self else { return }
+                let t0 = SpeechClock.nowNs()
+                self.warmNow(seconds: seconds)
+                let ms = SpeechClock.ms(since: t0)
+                self.lock.withLock { if self.turnID == id { self.turnWarm = ms } }
+            }
         }
         if onPartial != nil { startTimer() }
     }

@@ -132,6 +132,24 @@ public final class AppleSpeechEngine: SpeechEngine, SpeechTimingReporting, @unch
         return Utterance(text: text, engine: id, ms: t.totalMs)
     }
 
+    /// Drops the turn with no final text.
+    public func cancelTurn() {
+        let (mic, task, close) = lock.withLock {
+            let out = (self.mic, setup, finish)
+            setup = nil; finish = nil; sink = nil
+            return out
+        }
+        mic?.end()
+        close?()
+        activity.end()
+        guard let task else { return }
+        Task {
+            guard let (analyzer, collector) = try? await task.value else { return }
+            await analyzer.cancelAndFinishNow()
+            collector.cancel()
+        }
+    }
+
     /// Transcribes an audio file. For the Test tab and for measurements. `ms` is the full run time.
     public func transcribe(file: URL) async throws -> Utterance {
         let known = lock.withLock { resolvedLocale }

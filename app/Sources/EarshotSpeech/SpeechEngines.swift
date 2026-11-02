@@ -4,7 +4,8 @@ import Foundation
 /// Makes the speech engine from the owner's settings. EarshotApp calls this one time at start.
 public enum SpeechEngines {
     /// Returns the engine for the settings, and the reason for the log.
-    /// For "auto" and "parakeet", if Parakeet fails to load, the engine falls back to Apple.
+    /// "auto" with a Parakeet model file: AutoSpeechEngine picks Parakeet or Apple for each command.
+    /// "parakeet": Parakeet only; if it fails to load, the engine falls back to Apple.
     public static func make(_ settings: EarshotSettings,
                             locator: ParakeetModelLocator = ParakeetModelLocator()) -> (engine: SpeechEngine, why: String) {
         let locale = Locale(identifier: settings.locale)
@@ -14,6 +15,10 @@ public enum SpeechEngines {
             let apple = AppleSpeechEngine(locale: locale)
             apple.reason = why
             return (apple, why)
+        case .parakeet(let path) where settings.engine == .auto:
+            let engine = AutoSpeechEngine(parakeet: ParakeetEngine(modelPath: path), apple: AppleSpeechEngine(locale: locale))
+            engine.reason = why
+            return (engine, why)
         case .parakeet(let path):
             let parakeet = ParakeetEngine(modelPath: path)
             parakeet.reason = why
