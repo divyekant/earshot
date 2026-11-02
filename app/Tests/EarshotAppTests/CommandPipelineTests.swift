@@ -1,4 +1,5 @@
 import EarshotActions
+import EarshotDiscovery
 @testable import EarshotApp
 import EarshotCore
 import EarshotRouter
@@ -130,6 +131,33 @@ final class CommandPipelineTests: XCTestCase {
         XCTAssertEqual(target, "Ravi Kumar")
     }
 
+    func testNoAppSearchForTheOwnChat() async {
+        // First live test: "Slack me running late" (no comma) searched Slack for "running late".
+        let finder = FakeNames()
+        let (p, _, _) = make("Slack me running late", finder: finder)
+        _ = await p.finish(mode: .hold)
+        XCTAssertTrue(finder.searches.isEmpty, "\(finder.searches)")
+    }
+
+    func testNoAppSearchWhenTheRouteIsSure() async {
+        let finder = FakeNames()
+        let sure = RouteResult(intent: .openChat(appID: "slack", target: "Prakash Iyer", text: nil), confidence: 0.95,
+                               tier: .rules, ms: 0, why: "name match")
+        let (p, _, runner) = make("Slack Prakash extra words", router: FixedRouter(result: sure), finder: finder)
+        _ = await p.finish(mode: .hold)
+        XCTAssertTrue(finder.searches.isEmpty)
+        XCTAssertEqual(runner.runs.count, 1)
+    }
+
+    func testLogKeepsTheRouteReason() async {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let (p, _, _) = make("open notes")
+        p.log = ActivityLog(store: Store(folder: folder))
+        let r = await p.finish(mode: .hold)
+        XCTAssertTrue(r.note.contains("route:"), r.note)
+    }
+
     func testTypingPausesAlwaysOn() async {
         let (p, _, _) = make("Slack me, buy milk")
         var pauses: [Bool] = []
@@ -154,5 +182,98 @@ final class CommandPipelineTests: XCTestCase {
         XCTAssertTrue(runner.runs.isEmpty)
         let ran = await p.test("open notes", runActions: true)
         XCTAssertEqual(ran.outcome?.note, "dry run")
+    }
+}
+
+final class NoteRecorder: FeedbackSink {
+    var shown: [(String, Bool)] = []
+    func show(_ text: String, ok: Bool) { shown.append((text, ok)) }
+    func hide() {}
+}
+
+final class DiscoverHookTests: XCTestCase {
+    func testAccessibilityOffShowsTheErrorAndKeepsTheRows() async {
+        let note = NoteRecorder()
+        let current = [Fixture.apps[0]]
+        let rows = await AppController.discover(refresh: { throw DiscoveryError.accessibilityOff }, current: current, feedback: note)
+        XCTAssertEqual(rows, current)
+        XCTAssertEqual(note.shown.first?.0, "Discover apps: Turn on Accessibility for earshot first")
+        XCTAssertEqual(note.shown.first?.1, false)
+    }
+
+    func testSearchRule() {
+        let sureChat = RouteResult(intent: .openChat(appID: "slack", target: "Prakash", text: nil), confidence: 0.95, tier: .rules, ms: 0)
+        let unsureChat = RouteResult(intent: .openChat(appID: "slack", target: "Prakash", text: nil), confidence: 0.5, tier: .rules, ms: 0)
+        let app = RouteResult(intent: .openApp(appID: "slack"), confidence: 0.9, tier: .rules, ms: 0)
+        XCTAssertFalse(CommandPipeline.needsAppSearch("Slack Prakash", sureChat))
+        XCTAssertTrue(CommandPipeline.needsAppSearch("Slack Prakash", unsureChat))
+        XCTAssertTrue(CommandPipeline.needsAppSearch("Slack Ravi", app))
+        XCTAssertFalse(CommandPipeline.needsAppSearch("Slack me running late", app))
+        XCTAssertFalse(CommandPipeline.needsAppSearch("open my own chat in Slack", unsureChat))
+    }
+}
+
+final class ReviewFixTests: XCTestCase {
+    func testUnknownNameWithMeInTheMessageStillSearches() async {
+        let finder = FakeNames()
+        finder.found = [NameEntry(appID: "slack", name: "Ravi Kumar", source: .search)]
+        let unsure = RouteResult(intent: .openChat(appID: "slack", target: "Ravi", text: "call me later"), confidence: 0.5,
+                                 tier: .rules, ms: 0, why: "unknown name")
+        let engine = TextEngine()
+        engine.text = "Slack Ravi call me later"
+        let p = CommandPipeline(engine: engine, router: FixedRouter(result: unsure), actions: DryRunner(), names: finder,
+                                apps: { Fixture.apps }, allNames: { Fixture.names }, frontBundleID: { nil })
+        p.heardName = { _, _ in ("Ravi", "slack") }
+        let r = await p.finish(mode: .hold)
+        XCTAssertEqual(finder.searches.count, 1)
+        XCTAssertNotNil(r.stages["names"])
+    }
+
+    func testNamesSelfLooksOnlyAtTheNamePart() {
+        XCTAssertTrue(CommandPipeline.namesSelf("Slack me running late"))
+        XCTAssertTrue(CommandPipeline.namesSelf("Slack me, running late"))
+        XCTAssertTrue(CommandPipeline.namesSelf("open my own chat in Slack"))
+        XCTAssertFalse(CommandPipeline.namesSelf("Slack Ravi call me later"))
+        XCTAssertFalse(CommandPipeline.namesSelf("Slack Ravi, call me later"))
+    }
+
+    func testWarmerReadsOnlyWithAccessibility() async {
+        var reads = 0
+        var trusted = false
+        let w = NameWarmer(interval: 3600, trusted: { trusted }, refresh: { reads += 1 })
+        let first = await w.tick()
+        XCTAssertFalse(first)
+        XCTAssertEqual(reads, 0)
+        trusted = true
+        let second = await w.tick()
+        XCTAssertTrue(second)
+        XCTAssertEqual(reads, 1)
+    }
+
+    func testWarmerReadsAtStart() async throws {
+        let done = expectation(description: "first read")
+        let w = NameWarmer(interval: 3600, trusted: { true }, refresh: { done.fulfill() })
+        w.start()
+        await fulfillment(of: [done], timeout: 2)
+        w.stop()
+    }
+}
+
+final class EndToEndRouterTests: XCTestCase {
+    /// The first live test, with the T2 fix (PR #20): no comma, a self entry, the real CommandRouter.
+    func testSlackMeRunningLateOpensTheOwnChatWithTheText() async {
+        let finder = FakeNames()
+        let engine = TextEngine()
+        engine.text = "Slack me running late."
+        let runner = DryRunner()
+        let p = CommandPipeline(engine: engine, router: CommandRouter(), actions: runner, names: finder,
+                                apps: { Fixture.apps }, allNames: { Fixture.names }, frontBundleID: { nil })
+        let r = await p.finish(mode: .hold)
+        XCTAssertTrue(r.ok, r.note)
+        XCTAssertTrue(finder.searches.isEmpty, "\(finder.searches)")
+        guard case .openChat(let app, let target, let text)? = runner.runs.first?.0 else { return XCTFail("\(runner.runs)") }
+        XCTAssertEqual(app, "slack")
+        XCTAssertEqual(target, "Divyekant Gupta")
+        XCTAssertEqual(text?.lowercased().trimmingCharacters(in: .punctuationCharacters), "running late")
     }
 }
