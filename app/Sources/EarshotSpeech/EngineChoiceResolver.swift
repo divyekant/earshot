@@ -63,19 +63,23 @@ public enum ResolvedEngine: Equatable, Sendable {
 }
 
 public enum EngineResolver {
-    /// "auto": Parakeet if its model file exists, else Apple (E2, decision 6.2).
+    /// "auto": Apple. E2 (decision 6.2) chose Parakeet when its file exists, but the live test of 2026-11-02 changed it:
+    /// with the memory of the Mac full, a Parakeet decode of a 1.5 s command took 0.2 s to 2 s (live up to 6.9 s),
+    /// and Apple took about 30 ms. The Parakeet model also adds about 890 MB to a Mac that is short of memory.
     /// "parakeet" with no model file: Apple, with a reason, so that the owner can still give commands.
     public static func resolve(_ choice: EngineChoice, configuredModel: String,
                                locator: ParakeetModelLocator = ParakeetModelLocator()) -> (engine: ResolvedEngine, why: String) {
         switch choice {
         case .apple:
             return (.apple, "owner chose Apple")
-        case .auto, .parakeet:
+        case .auto:
+            return (.apple, "auto: Apple (Parakeet is slow when memory is short)")
+        case .parakeet:
             if let path = locator.find(configured: configuredModel) {
-                return (.parakeet(modelPath: path), choice == .auto ? "auto: Parakeet model file found" : "owner chose Parakeet")
+                return (.parakeet(modelPath: path), "owner chose Parakeet")
             }
             let missing = configuredModel.isEmpty ? "no Parakeet model file in the Hex folder" : "Parakeet model file not found"
-            return (.apple, choice == .auto ? "auto: \(missing)" : "owner chose Parakeet, but \(missing); using Apple")
+            return (.apple, "owner chose Parakeet, but \(missing); using Apple")
         }
     }
 }

@@ -90,16 +90,17 @@ final class ResolverTests: XCTestCase {
         XCTAssertNil(l.find(configured: "/gone.gguf"))
     }
 
-    func testAutoUsesParakeetIfFileExists() {
+    func testAutoUsesAppleEvenWithTheFile() {
+        // Live test 2026-11-02: Parakeet 0.2-2 s per command with the memory full; Apple about 30 ms.
         let r = EngineResolver.resolve(.auto, configuredModel: "", locator: locator(["parakeet-a.gguf"]))
-        XCTAssertEqual(r.engine, .parakeet(modelPath: "/m/parakeet-a.gguf"))
-        XCTAssertEqual(r.engine.id, "parakeet")
+        XCTAssertEqual(r.engine, .apple)
+        XCTAssertTrue(r.why.hasPrefix("auto: Apple"))
     }
 
-    func testAutoUsesAppleWithNoFile() {
-        let r = EngineResolver.resolve(.auto, configuredModel: "", locator: locator([]))
-        XCTAssertEqual(r.engine, .apple)
-        XCTAssertTrue(r.why.contains("no Parakeet model file"))
+    func testParakeetChoiceUsesTheFile() {
+        let r = EngineResolver.resolve(.parakeet, configuredModel: "", locator: locator(["parakeet-a.gguf"]))
+        XCTAssertEqual(r.engine, .parakeet(modelPath: "/m/parakeet-a.gguf"))
+        XCTAssertEqual(r.engine.id, "parakeet")
     }
 
     func testAppleChoiceIgnoresFile() {
@@ -117,11 +118,11 @@ final class ResolverTests: XCTestCase {
         s.engine = .apple
         XCTAssertTrue(SpeechEngines.make(s, locator: locator(["parakeet-a.gguf"])).engine is AppleSpeechEngine)
         s.engine = .auto
-        let (e, _) = SpeechEngines.make(s, locator: locator(["parakeet-a.gguf"]))
-        XCTAssertEqual(e.id, "apple", "auto reports Apple until Parakeet is loaded")
-        XCTAssertTrue(e is AutoSpeechEngine)
+        XCTAssertTrue(SpeechEngines.make(s, locator: locator(["parakeet-a.gguf"])).engine is AppleSpeechEngine)
         s.engine = .parakeet
-        XCTAssertTrue(SpeechEngines.make(s, locator: locator(["parakeet-a.gguf"])).engine is FallbackSpeechEngine)
+        let (e, _) = SpeechEngines.make(s, locator: locator(["parakeet-a.gguf"]))
+        XCTAssertEqual(e.id, "apple", "the guarded Parakeet engine reports Apple until Parakeet is loaded")
+        XCTAssertTrue(e is AutoSpeechEngine)
     }
 }
 
