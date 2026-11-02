@@ -103,6 +103,8 @@ E0 used each app's own search in place of links, so the owner gives names only. 
 
 **Type text.** Set the accessibility value, or paste through the clipboard and restore the clipboard afterwards.
 
+**Open a web address (R-NV-7).** The router takes "open", "go to", "visit", "browse to" or "load", followed by words that form a domain name ("hn.com", "news dot ycombinator dot com", "example.org slash docs"). Speech can glue the command word to the address ("Openhnm.com"): the router splits it only when the rest is a domain. The action opens the address in the default browser with `NSWorkspace.open`. It accepts only http and https, because other schemes can start apps. It presses no key.
+
 **Click.**
 1. Collect buttons, links, menu items and rows from the front window. In a browser, find the page on screen with a hit test in the front window, and read its visible elements with one `AXUIElementsForSearchPredicate` call (12 ms in E2). Chrome keeps the pages of hidden tabs in the tree, so a page found by a tree search can be a hidden tab.
 2. Fuzzy-match the spoken label to `AXTitle`, `AXDescription` and `AXValue`. Numbers must match exactly. Block every label with a risky word (send, pay, delete, submit, vote, star and similar).

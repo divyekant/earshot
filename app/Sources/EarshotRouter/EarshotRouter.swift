@@ -97,6 +97,11 @@ public struct CommandRouter: Router {
             return RulesDecision(intent: .hideNumbers, sure: true, exact: true, why: "hide numbers", options: [])
         }
 
+        // "open hn.com", "go to news dot ycombinator dot com", "Openhn.com" (R-NV-7).
+        if let address = WebAddress.parse(text) {
+            return RulesDecision(intent: .openURL(address), sure: true, exact: true, why: "web address", options: [])
+        }
+
         let parse = ScreenRouter.parse(text)
         if parse.kind == .scroll { return RulesDecision(intent: .scroll(parse.scroll ?? .down), sure: true, exact: true, why: "scroll words", options: []) }
         if parse.kind == .back { return RulesDecision(intent: .back, sure: true, exact: true, why: "back words", options: []) }
