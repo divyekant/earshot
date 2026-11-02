@@ -34,7 +34,7 @@ final class MenuCache: @unchecked Sendable {
     /// The enabled items as screen elements (MenuElements.elements). An item that T4 marks risky
     /// ("Empty Trash", "Wipe") stays risky, also when SafetyPolicy does not list its word (R-NV-5).
     static func elements(_ items: [MenuItem]) -> [ScreenElement] {
-        let entries = items.filter(\.enabled).map { MenuEntry(path: $0.path, enabled: true, shortcut: $0.keys) }
+        let entries = items.filter(\.enabled).map { MenuEntry(path: $0.path, enabled: true, shortcut: $0.keys, isTitle: $0.isTitle) }
         let risky = Set(items.filter(\.risky).map { MenuElements.id($0.path) })
         return MenuElements.elements(entries).map { e in
             var e = e
