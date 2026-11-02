@@ -72,3 +72,26 @@ Cua Driver is the only part of trycua/cua that operates the real Mac. These are 
 - If a model controls it, the model can press Return. Return sends the message in Slack, WhatsApp and Messages (R-NV-5).
 
 **Decision:** Keep the direct Accessibility approach (DESIGN.md, section 3.5). The E0 probe uses it, and it reached the Slack text box in a median of 466 ms (docs/experiments/E0-viability.md). Cua Driver reads the accessibility state again after each action to make sure that the change occurred. E0 already does a similar check: it types text only when the chat name on the screen is correct. Keep this check in the final design.
+
+## D-8. Do not use Clicky, HeyClicky or LocalClicky
+
+The owner asked about "Clicky" on 2026-11-02. Three products use this name. The facts below come from their READMEs and websites. Nobody ran them on this Mac.
+
+| Option | Result | Reason |
+|---|---|---|
+| Clicky (farzaa/clicky, MIT, Swift) | Rejected | It is an AI tutor. It sends a screenshot and the spoken question to Claude, speaks the answer, and points a cursor at a user-interface element. It does not click, type or open a chat. |
+| HeyClicky (heyclicky.com) | Rejected | Closed, hosted successor of Clicky. Its "agent" mode does tasks with a cloud model. The site does not list its actions or its latency. |
+| LocalClicky (dikshantrajput/LocalClicky, MIT) | Rejected | Local, but it is an agent loop. A model of 8B parameters calls tools for up to 5 rounds. A vision model finds a box on a screenshot and clicks it. |
+
+These are the reasons:
+
+- Clicky and HeyClicky send audio and screenshots to cloud services: AssemblyAI, Claude and ElevenLabs (R-MD-1).
+- All three use a large model for each request or each step. This is the loop of D-2 (R-SP-2).
+- Clicky does not do the earshot task. It does not open the chat or put the cursor in the text box (R-NV-3).
+- Setup is large. Clicky needs an Xcode build, a Cloudflare Worker and three API keys. LocalClicky needs Ollama, Whisper.cpp, a Python environment and model downloads. AGENTS.md says to use oMLX, not Ollama.
+- If a model can act, it can press Return. Return sends the message in Slack, WhatsApp and Messages (R-NV-5).
+- The open Clicky repository stopped on 2026-04-27. New work is private.
+
+**Decision:** Keep the direct Accessibility approach of E0 (DESIGN.md, section 3.5). Generic Accessibility logic plus one data row for each app is general and fast. A model that reads the screen for each command is general but slow.
+
+**Idea to keep:** Clicky moves a cursor to the element that it talks about. earshot can use a similar pointer as feedback before a voice click (R-FB-1, R-CL-1).
