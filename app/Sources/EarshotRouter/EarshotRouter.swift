@@ -74,7 +74,7 @@ public struct CommandRouter: Router {
     static let pressOnly: Set<String> = ["click", "press", "tap", "select", "choose", "hit", "follow", "visit", "toggle",
                                          "expand", "check", "pick"]
     static let typeFirst: Set<String> = ["search", "look", "type", "enter"]
-    static let fillers: Set<String> = ["hey", "ok", "okay", "earshot", "please", "now", "then", "and"]
+    static let fillers: Set<String> = Set(["hey", "ok", "okay", "earshot", "please", "now", "then", "and"]).union(TextKit.hesitations)
 
     /// The rules answer, with no tier 2. Synchronous and on the Mac.
     static func rules(_ text: String, context: RouteContext) -> RulesDecision {

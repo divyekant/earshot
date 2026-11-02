@@ -19,7 +19,7 @@ struct ScreenParse {
 /// It gets only the words and the elements of the screen. Numbers in a command must match exactly (E2, section 7).
 enum ScreenRouter {
     static let fillers: Set<String> = ["hey", "ok", "okay", "earshot", "please", "can", "could", "you", "would", "now", "then",
-                                       "just", "lets", "let", "us", "i", "want", "to", "need"]
+                                       "just", "lets", "let", "us", "i", "want", "to", "need"].union(TextKit.hesitations)
     static let pressVerbs: Set<String> = ["click", "press", "tap", "open", "select", "choose", "hit", "follow", "visit", "go",
                                           "show", "check", "toggle", "expand", "view", "take", "jump", "pick"]
     static let typeVerbs: Set<String> = ["search", "find", "look", "type", "enter"]
