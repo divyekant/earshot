@@ -11,6 +11,7 @@ The protocol and the pass marks are in [docs/experiments/E0-viability.md](../doc
 - The app table is data in [apps.json](apps.json) (R-MT-2).
 - Your test chats are in `people.json`. It holds names only. Git ignores this file.
 - Each app opens a chat through its own search: the probe types the name and picks the top result. No app needs a phone number or an email address.
+- If an app has no search shortcut (Messages), the probe finds the search field through accessibility and focuses it.
 
 ## Safety
 
@@ -65,7 +66,7 @@ Run `swift run earshot-probe report`. The report shows the result for each app.
 
 | Command | What it does |
 | --- | --- |
-| `swift run earshot-probe inspect --launch` | Reads the menu shortcuts and the text fields of each app. It presses no key and types nothing. |
+| `swift run earshot-probe inspect --front` | Reads the menu shortcuts and the text fields of each app. It brings each app to the front, then brings back your app. It presses no key and types nothing. |
 | `swift run earshot-probe route "Slack me, running late"` | Shows how the router reads a command. It does no action. |
 | `swift run earshot-probe run "Slack me, running late"` | Runs one typed command. |
 | `swift run earshot-probe transcribe file.aiff` | Transcribes an audio file and shows the time. |

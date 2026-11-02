@@ -206,13 +206,16 @@ enum AX {
         guard let bar = element(app, "AXMenuBar") else { return [] }
         var out: [MenuShortcut] = []
         func walk(_ element: AXUIElement, _ path: [String], depth: Int) {
-            guard depth < 4 else { return }
+            // Bar item, menu, item, submenu, item: "Edit > Find > Find..." is 5 levels down.
+            guard depth < 8 else { return }
             for child in elements(element, "AXChildren") {
-                let title = string(child, "AXTitle") ?? ""
+                // Some apps start titles with an invisible left-to-right mark (U+200E).
+                let title = (string(child, "AXTitle") ?? "").replacingOccurrences(of: "\u{200E}", with: "")
                 let next = title.isEmpty ? path : path + [title]
                 if role(child) == "AXMenuItem", let char = string(child, "AXMenuItemCmdChar"), !char.isEmpty {
                     let mods = (copy(child, "AXMenuItemCmdModifiers") as? NSNumber)?.intValue ?? 0
-                    out.append(MenuShortcut(path: next.joined(separator: " > "), keys: shortcutText(char, mods)))
+                    let code = (copy(child, "AXMenuItemCmdVirtualKey") as? NSNumber)?.intValue
+                    out.append(MenuShortcut(path: next.joined(separator: " > "), keys: shortcutText(char, mods, code)))
                 }
                 walk(child, next, depth: depth + 1)
             }
@@ -222,13 +225,22 @@ enum AX {
     }
 
     /// AXMenuItemCmdModifiers: 0 = Command only. Add 1 for Shift, 2 for Option, 4 for Control, 8 for no Command.
-    private static func shortcutText(_ char: String, _ mods: Int) -> String {
+    private static func shortcutText(_ char: String, _ mods: Int, _ code: Int?) -> String {
         var parts: [String] = []
         if mods & 4 != 0 { parts.append("ctrl") }
         if mods & 2 != 0 { parts.append("opt") }
         if mods & 1 != 0 { parts.append("shift") }
         if mods & 8 == 0 { parts.append("cmd") }
-        parts.append(char.lowercased())
+        let names: [UInt32: String] = [0x0D: "return", 0x03: "enter", 0x09: "tab", 0x1B: "escape", 0x20: "space",
+                                       0x08: "delete", 0x7F: "delete"]
+        if let scalar = char.unicodeScalars.first, let name = names[scalar.value] {
+            parts.append(name)
+        } else if let scalar = char.unicodeScalars.first, scalar.properties.generalCategory == .control
+                    || scalar.properties.generalCategory == .privateUse {
+            parts.append("key code \(code.map(String.init) ?? "?")")
+        } else {
+            parts.append(char.lowercased())
+        }
         return parts.joined(separator: "+")
     }
 
@@ -265,6 +277,32 @@ enum AX {
             queue.append(contentsOf: elements(element, "AXChildren"))
         }
         return out
+    }
+
+    /// Finds the app's own search field: an editable field in the upper part of the window
+    /// that is a search field or has "search" in its label. It returns the highest one.
+    static func findSearchField(in window: AXUIElement, budgetMs: Int = 300, maxNodes: Int = 4000) -> AXUIElement? {
+        guard let w = frame(window) else { return nil }
+        let t0 = Clock.nowNs()
+        var queue: [AXUIElement] = [window]
+        var index = 0
+        var best: (AXUIElement, Frame)?
+        while index < queue.count, index < maxNodes, Clock.ms(since: t0) < Double(budgetMs) {
+            let element = queue[index]
+            index += 1
+            let r = role(element)
+            if textRoles.contains(r) {
+                if isSwitcherField(element, in: window), subrole(element) == "AXSearchField" || looksLikeSearch(element),
+                   let f = frame(element), best == nil || f.y < best!.1.y {
+                    best = (element, f)
+                }
+                continue
+            }
+            if skipRoles.contains(r) { continue }
+            if let f = frame(element), f.w > 0, f.y > w.y + 0.6 * w.h { continue }
+            queue.append(contentsOf: elements(element, "AXChildren"))
+        }
+        return best?.0
     }
 
     /// Finds short texts that contain "(you)". Chat apps mark the owner's own chat this way.

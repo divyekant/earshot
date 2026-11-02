@@ -28,6 +28,7 @@ struct AppRow: Codable {
 
 struct OpenChat: Codable {
     /// "switcher": press `keys` to open the app's own search, type the name, then press the `pick` keys.
+    /// With no `keys`, the probe finds the search field through accessibility and focuses it.
     /// "link": open a URL from `template`. A link needs a handle in people.json.
     let kind: String
     let template: String?
