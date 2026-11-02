@@ -172,20 +172,31 @@ final class Pipeline {
               pick.firstIndex(of: "return").map({ $0 == pick.count - 1 }) ?? true
         else { return "bad pick keys in apps.json: only down, up and one return at the end" }
 
+        // The search keys must move the focus. If the focus stays where it was, for example
+        // in a reply box, the probe stops, so that it never types the name into a message box.
+        let before = AX.focused(app)
         if let keys = row.openChat.keys {
             guard let combo = Keys.parse(keys) else { return "bad switcher keys in apps.json" }
             Keys.press(combo)
         } else if !focusSearchField(app) {
             return "no search field found"
         }
-        let opened = await waitUntil(timeoutMs: 1200) { self.switcherFocused(app) }
-        guard opened else { return "the search field did not get focus" }
+        var found: AXUIElement?
+        let opened = await waitUntil(timeoutMs: 1200) {
+            guard let el = AX.focused(app), let win = AX.window(app), AX.isSwitcherField(el, in: win) else { return false }
+            if row.openChat.keys != nil, AX.same(el, before) { return false }
+            found = el
+            return true
+        }
+        guard opened, let field = found else { return "the search field did not get focus (\(describeFocus(app)))" }
         // A search field can keep the last search. Select it, so that the name replaces it.
-        if !(focusedValue(app) ?? "").isEmpty, switcherFocused(app) { Keys.press(Keys.selectAll) }
+        if !(AX.value(field) ?? "").isEmpty { Keys.press(Keys.selectAll) }
 
         Keys.type(name)
         let wanted = name.lowercased()
-        let typed = await waitUntil(timeoutMs: 1000) { self.focusedValue(app)?.lowercased() == wanted }
+        let typed = await waitUntil(timeoutMs: 1000) {
+            AX.same(AX.focused(app), field) && self.focusedValue(app)?.lowercased() == wanted
+        }
         guard typed else {
             Keys.press(Keys.escape)
             return "the search field did not show the name"
@@ -195,9 +206,10 @@ final class Pipeline {
         for key in pick {
             if key == "return" {
                 // SAFETY (R-NV-5): a Return in a message box sends the message.
-                guard returnIsSafe(app, wanted: wanted) else {
+                guard returnIsSafe(app, wanted: wanted, field: field) else {
+                    let focus = describeFocus(app)
                     Keys.press(Keys.escape)
-                    return "safety guard stopped the Return key"
+                    return "safety guard stopped the Return key (\(focus))"
                 }
                 Keys.press(Keys.returnKey)
             } else if let arrow = Keys.parse(key) {
@@ -218,17 +230,25 @@ final class Pipeline {
     }
 
     /// The probe presses Return only in one of these two places:
-    /// - the search field, in the upper part of the window, when it holds exactly the name
+    /// - the search field that the probe typed the name into, when it still holds exactly the name
     /// - a row of a result list, which is not a text field
     /// It never presses Return in a message box or on a button.
-    private func returnIsSafe(_ app: AXUIElement, wanted: String) -> Bool {
+    private func returnIsSafe(_ app: AXUIElement, wanted: String, field: AXUIElement) -> Bool {
         guard let el = AX.focused(app), let win = AX.window(app) else { return false }
         if AX.isComposer(el, in: win) { return false }
         if AX.textRoles.contains(AX.role(el)) {
-            return AX.isSwitcherField(el, in: win)
+            return AX.same(el, field) && AX.isSwitcherField(el, in: win)
                 && AX.value(el)?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == wanted
         }
         return AX.listRoles.contains(AX.role(el))
+    }
+
+    /// A short description of the focused element for the log. It holds no field text.
+    private func describeFocus(_ app: AXUIElement) -> String {
+        guard let el = AX.focused(app) else { return "no focus" }
+        let sub = AX.subrole(el)
+        let label = AX.label(el).prefix(40)
+        return "focus: \(AX.role(el))\(sub.isEmpty ? "" : "/" + sub) \"\(label)\""
     }
 
     private func switcherFocused(_ app: AXUIElement) -> Bool {
