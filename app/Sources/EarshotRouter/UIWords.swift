@@ -16,8 +16,6 @@ enum UIWords {
 
     /// The score of a full match through a pair: below an exact match, above the strong mark.
     static let score = 0.9
-    /// The score when all the words, through a pair, are whole words of a longer label.
-    static let wordsMatch = 0.85
 
     static let other: [String: [String]] = {
         var out: [String: [String]] = [:]

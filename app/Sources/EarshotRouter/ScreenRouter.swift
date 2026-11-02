@@ -399,8 +399,6 @@ enum ScreenRouter {
                 let alt = Said(w)
                 if label.keys.contains(alt.key) { s = UIWords.score; break }
                 s = max(s, min(UIWords.score, wordScore(w, label.words, mostlyNumber: label.mostlyNumber)))
-                // All the words, through the pair, are whole words of the label: "refresh" in "Reload This Page".
-                if Set(w).isSubset(of: Set(label.bare ?? label.words)) { s = max(s, UIWords.wordsMatch) }
             }
         }
         // A sound match: speech to text writes "clawed" for "Claude". It is never an exact match (R-NV-5).

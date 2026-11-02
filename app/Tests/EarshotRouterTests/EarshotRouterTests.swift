@@ -738,7 +738,11 @@ final class EarshotRouterTests: XCTestCase {
         let r = await route("click on refresh.", ctx)
         XCTAssertEqual(r.intent, .click(elementID: "b2"), r.why)
         XCTAssertEqual(r.tier, .fuzzy, "a word pair is never an exact match")
-        await expect("click on refresh.", .click(elementID: "m:View>Reload This Page"), liveContext(menus))
+        // One word of a three-word label is not a sure match, through a pair or not: the router asks, it does not guess.
+        for s in ["click on refresh.", "click on reload"] {
+            let r = await route(s, liveContext(menus))
+            XCTAssertLessThan(r.confidence, SafetyPolicy.minimumConfidence, "\(s): \(r.why)")
+        }
         await expect("open settings", .click(elementID: "p1"), liveContext([Fixtures.el("p1", "AXButton", "Preferences", y: 5)]))
         // No pair holds a risky word.
         for (w, others) in UIWords.other {
