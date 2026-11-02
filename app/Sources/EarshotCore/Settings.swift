@@ -28,11 +28,38 @@ public struct EarshotSettings: Codable, Equatable, Sendable {
     public var tier2: Tier2 = .off
     /// The longest wait for tier 2. After it, the rules result wins.
     public var tier2BudgetMs: Int = 1000
+    /// The screenshot fallback for clicks (D-10). Off by default. When it is on, and a hold-key click finds no target,
+    /// earshot sends one picture of the front window, with numbers drawn on it, to Jev. Never on a sign-in, code
+    /// or payment page, and never in always-on mode. It needs the Jev key and the Screen Recording permission.
+    public var jevSeesScreen: Bool = false
+    /// The longest wait for the screenshot fallback. After it, earshot does nothing.
+    public var jevScreenBudgetMs: Int = 1500
     /// Type the dictated text into any chat (R-NV-4). Typing is not Send. The own-chats-only rule is for live tests.
     public var typeIntoOthers: Bool = true
     public var showFeedback: Bool = true
 
     public init() {}
+
+    /// Reads each setting if it is in the file, else keeps the default. So a new setting does not reset the old ones.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        func read<T: Decodable>(_ key: CodingKeys, _ value: inout T) {
+            if let v = try? c.decodeIfPresent(T.self, forKey: key) { value = v }
+        }
+        read(.mode, &mode)
+        read(.holdKeyCode, &holdKeyCode)
+        read(.holdKeyIsModifierOnly, &holdKeyIsModifierOnly)
+        read(.holdKeyModifiers, &holdKeyModifiers)
+        read(.engine, &engine)
+        read(.parakeetModelPath, &parakeetModelPath)
+        read(.locale, &locale)
+        read(.tier2, &tier2)
+        read(.tier2BudgetMs, &tier2BudgetMs)
+        read(.jevSeesScreen, &jevSeesScreen)
+        read(.jevScreenBudgetMs, &jevScreenBudgetMs)
+        read(.typeIntoOthers, &typeIntoOthers)
+        read(.showFeedback, &showFeedback)
+    }
 }
 
 /// Reads and writes EarshotSettings, the catalogue and the names as JSON in Application Support.

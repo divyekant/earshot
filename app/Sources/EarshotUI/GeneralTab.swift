@@ -72,6 +72,19 @@ struct GeneralTab: View {
                     }
                 }
             }
+            Section("When a click finds no target") {
+                // D-10: a separate switch. "Ask Jev" (text only) never turns it on.
+                Toggle("Jev sees the screen (cloud, sends a screenshot)", isOn: $settings.jevSeesScreen)
+                if settings.jevSeesScreen {
+                    Text("Only for the hold key. earshot sends one picture of the front window, with numbers on the elements, and the command words to Jev. Never on a sign-in, code or payment page. earshot checks the element under the point before it clicks, and never clicks a risky label. Audio stays on this Mac. It needs the Jev key and the Screen Recording permission.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Stepper("Wait for Jev: \(settings.jevScreenBudgetMs) ms", value: $settings.jevScreenBudgetMs, in: 500...1500, step: 100)
+                    if !jevKeySaved {
+                        Text("Save the Jev key above first (choose \"Ask Jev\" to show the key field).")
+                            .font(.caption).foregroundStyle(.orange)
+                    }
+                }
+            }
             Section("Behavior") {
                 Toggle("Type dictated text into chats with other people", isOn: $settings.typeIntoOthers)
                 Toggle("Show the note on screen", isOn: $settings.showFeedback)
