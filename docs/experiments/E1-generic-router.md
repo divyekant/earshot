@@ -128,3 +128,30 @@ Numbers that do count:
 | Rules | median 9 ms, slowest 1 in 10: 25 ms |
 
 Changes after the first run: the sidebar ends at the message box, the probe reads again until the list is stable, rows win over loose labels, the menu rules match whole words and skip the Apple menu ("find" matched "Finder"), the last word of an app name is not a spoken name if it is a command word ("Sublime Text" gave "text"), and the test set has free phrasings and unknown names.
+
+### 5.2 Second run (2026-11-02)
+
+44 commands. Each router was correct for 37 (84 %), with 0 wrong chats. Rules, then Jev if unsure: median 18 ms, slowest 1 in 10: 123 ms. 4 of the 7 misses came from 2 noise entries in the index ("Text Message • SMS", "New Message to Prakash"). 3 came from rule bugs: a possessive ("felix's"), a comma after the app name ("Slack, posthog") and "let's write to". Messages gave names after a fix: each chat is a text with an empty value, and the name is in its description. Slack still showed only 3 sidebar rows to Accessibility.
+
+### 5.3 Third run (2026-11-02)
+
+The index now holds 6 Messages chats and 3 Slack rows, with no noise. A group chat with a phone number in its name stays out.
+
+| Router | Correct | Wrong chat | Median | Slowest 1 in 10 |
+| --- | --- | --- | --- | --- |
+| Rules + fuzzy (Mac) | 40 of 42 (95 %) | 1 | 16 ms | 29 ms |
+| Jev alone (cloud) | 39 of 42 (93 %) | 0 | 93 ms | 256 ms |
+| Rules, Jev if unsure | 42 of 42 (100 %) | 0 | 20 ms | 175 ms |
+
+- The rules were sure for 30 of 42 commands, and correct for all 30. So Jev got 12 of 42 commands.
+- The one wrong chat of the rules ("Manel & Mrunal" gave "Manel") was an unsure answer, so Jev decided it, correctly.
+- Jev alone missed commands with message text or "me" ("Messages me, buy milk"). The rules were sure of these, so the hybrid did not ask Jev.
+- The correct answer was on the short list for 42 of 42 commands.
+
+### 5.4 The app's own search, first run (2026-11-02)
+
+24 searches: 12 names in Messages, 12 in Slack. No Return, no chat opened, no text left in a field. Each search closed.
+
+- Messages (Command-N, "To:" suggestions) found the contacts: Prakash (no chat in the sidebar), Udita, Mrunal, Felix and the owner. It does not find a business sender ("Partiful"): the "To:" field searches contacts, not chats. Results came 232 to 631 ms after the app was in front.
+- Slack (Command-K) found Prakash Iyer, PostHog, alerts and the owner, and found "Prakash Iyer" from the misheard "prakush". Results came 158 to 373 ms after the app was in front.
+- The first reader counted screen labels and the echo of the typed name as results ("Show results for: | manel"), and in Messages it fell back to the sidebar when "To:" found nothing. The reader now joins the texts of one screen line, drops prompt lines, file names and section titles, and reads nothing to the left of the field.

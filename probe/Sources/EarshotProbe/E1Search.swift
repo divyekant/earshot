@@ -67,26 +67,19 @@ extension Pipeline {
     }
 
     /// Reads the result list: the names below the search field, in the same column.
-    /// It skips the field itself, message boxes and live regions.
+    /// It joins the texts of one screen line into one result ("Prakash" + "Iyer"), because one
+    /// result row can hold several texts. It drops prompt lines such as "Search for: ravi",
+    /// file names and section titles. It skips the field itself, message boxes, live regions,
+    /// and everything to the left of the field (the sidebar).
     static func resultTexts(app: AXUIElement, field: AXUIElement, budgetMs: Int = 200, maxNodes: Int = 5000) -> [String] {
         guard let ff = AX.frame(field), let win = AX.window(app), let w = AX.frame(win) else { return [] }
-        let left = ff.x - 0.05 * w.w
         let right = ff.x + ff.w + 0.05 * w.w
         let bottom = ff.maxY + 0.6 * w.h
         var roots = AX.elements(app, "AXWindows")
         if roots.isEmpty { roots = [win] }
         let t0 = Clock.nowNs()
-        var items: [(name: String, y: Double)] = []
-        var seen = Set<String>()
+        var pieces: [(text: String, f: Frame)] = []
         var count = 0
-        func add(_ raw: String?, _ y: Double) -> Bool {
-            guard let raw else { return false }
-            // "Ravi Kumar, Active" gives "Ravi Kumar".
-            let first = raw.split(separator: ",").first.map(String.init) ?? raw
-            guard let c = NameIndex.clean(first) else { return false }
-            if seen.insert(Text.key(c.name)).inserted { items.append((c.name, y)) }
-            return true
-        }
         for root in roots {
             var queue: [AXUIElement] = [root]
             var i = 0
@@ -100,29 +93,57 @@ extension Pipeline {
                 if NameIndex.liveRegions.contains(AX.subrole(el)) { continue }
                 let frame = AX.frame(el)
                 if let f = frame, f.w > 0, f.h > 0, !CFEqual(el, root) {
-                    // Leave out what is above the field, beside it, or far below it (the message box).
-                    if f.maxY <= ff.maxY || f.x > right || f.x + f.w < left || f.y > bottom { continue }
+                    // Leave out what is above the field, to its left (the sidebar), to its right,
+                    // or far below it (the message box).
+                    if f.maxY <= ff.maxY || f.x + f.w < ff.x - 4 || f.x > right || f.y > bottom { continue }
                 }
-                let visible = frame.map { $0.w > 0 && $0.h > 0 && $0.midY > ff.maxY } ?? false
-                if r == "AXRow" || r == "AXCell" || r == "AXMenuItem" {
-                    if visible, let f = frame {
-                        for text in NameIndex.rowTexts(el) where add(text, f.midY) { break }
-                    }
-                    continue
-                }
-                if visible, let f = frame {
+                if let f = frame, f.w > 0, f.h > 0, f.midY > ff.maxY, f.midX >= ff.x - 0.03 * w.w, f.midX <= right {
+                    var text: String?
                     if r == "AXStaticText" {
                         let v = AX.string(el, "AXValue") ?? ""
-                        _ = add(v.isEmpty ? AX.string(el, "AXDescription") : v, f.midY)
-                    } else if r == "AXButton" || r == "AXLink" {
-                        _ = add(AX.string(el, "AXTitle") ?? AX.string(el, "AXDescription"), f.midY)
+                        text = v.isEmpty ? AX.string(el, "AXDescription") : v
+                    } else if r == "AXButton" || r == "AXLink" || r == "AXMenuItem" {
+                        text = AX.string(el, "AXTitle") ?? AX.string(el, "AXDescription")
                     }
+                    if let t = text.map(Text.squash), !t.isEmpty { pieces.append((t, f)) }
                 }
                 queue.append(contentsOf: AX.elements(el, "AXChildren"))
             }
         }
-        return items.sorted { $0.y < $1.y }.prefix(12).map(\.name)
+
+        // Group the pieces into screen lines, then join each line from left to right.
+        let sorted = pieces.sorted { $0.f.midY < $1.f.midY }
+        var lines: [[(text: String, f: Frame)]] = []
+        for p in sorted {
+            if let last = lines.last?.last, abs(p.f.midY - last.f.midY) <= max(6, 0.5 * min(p.f.h, last.f.h)) {
+                lines[lines.count - 1].append(p)
+            } else {
+                lines.append([p])
+            }
+        }
+        var out: [String] = []
+        var seen = Set<String>()
+        for line in lines {
+            var words: [String] = []
+            for p in line.sorted(by: { $0.f.x < $1.f.x }) where words.last != p.text { words.append(p.text) }
+            let joined = words.joined(separator: " ")
+            let lower = joined.lowercased()
+            // Prompt lines repeat the typed text: "Show results for: ravi", "Search for: ravi".
+            if promptStarts.contains(where: { lower.hasPrefix($0) }) { continue }
+            // File names, links and section titles in capital letters ("SIRI FOUND IN APPS").
+            if lower.range(of: #"\.[a-z0-9]{2,5}$"#, options: .regularExpression) != nil || lower.contains("://") { continue }
+            let parts = joined.split(separator: " ")
+            if parts.count >= 3, !joined.contains(where: \.isLowercase) { continue }
+            let first = joined.split(separator: ",").first.map(String.init) ?? joined
+            guard let c = NameIndex.clean(first), seen.insert(Text.key(c.name)).inserted else { continue }
+            out.append(c.name)
+            if out.count >= 12 { break }
+        }
+        return out
     }
+
+    static let promptStarts = ["show results for", "search for", "results for", "recent messages", "no results",
+                               "try searching", "search all", "jump to"]
 }
 
 extension E1 {

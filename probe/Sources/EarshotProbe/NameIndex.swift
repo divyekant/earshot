@@ -73,6 +73,7 @@ enum NameIndex {
         "workflows", "automations", "starredchannels", "recent", "favorites", "favourites", "conversations",
         "channel", "directmessage", "dm", "group", "private", "public", "huddle", "mute", "muted", "notifications",
         "moreactions", "options", "close", "avatar", "image", "photo", "profile", "presence", "inactive", "pin",
+        "select", "givefeedback", "agent", "sirifoundinapps", "suggestions", "topresults", "recentsearches",
     ]
 
     static let weekdays: Set<String> = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
@@ -303,7 +304,8 @@ enum NameIndex {
                 let now = rows.isEmpty ? all : rows
                 if now.count >= kept.count { kept = now }
                 stillLoading = loading
-                if !loading, now.count == lastCount, now.count > 0 { break }
+                // Stop when the list is stable. An app with no list in its sidebar stops after 3 reads.
+                if !loading, now.count == lastCount, now.count > 0 || attempt >= 2 { break }
                 lastCount = now.count
                 if attempt < 7 { await sleepMs(300) }
             }
