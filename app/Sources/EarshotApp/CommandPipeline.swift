@@ -113,16 +113,24 @@ final class CommandPipeline {
         }
 
         let describe = IntentText.describe(result.intent, apps: rows, screen: context.screen)
+        // For the log only: what earshot saw, and, for a miss, what else it considered.
+        var why = result.why
+        why += " · " + Self.screenSummary(context.screen, front: context.frontBundleID)
+        let sensitive = context.screen.map { SafetyPolicy.sensitive(url: $0.url, elements: $0.elements) != nil } ?? false
+        if (result.intent == .none || result.confidence < SafetyPolicy.minimumConfidence), !sensitive {
+            let top = result.alternatives.prefix(3).map { IntentText.describe($0, apps: rows, screen: context.screen) }
+            why += String(format: " · confidence %.2f", result.confidence) + (top.isEmpty ? "" : " · considered: " + top.joined(separator: " | "))
+        }
         if result.confidence < SafetyPolicy.minimumConfidence {
             let options = result.alternatives.prefix(2).map { IntentText.describe($0, apps: rows, screen: context.screen) }
             let note = (["not sure: \(result.why)"] + options.map { "maybe \($0)" }).joined(separator: " · ")
-            return done(heard: text, intent: describe, tier: result.tier, ok: false, note: note, stages: stages, clock, why: result.why)
+            return done(heard: text, intent: describe, tier: result.tier, ok: false, note: note, stages: stages, clock, why: why)
         }
 
         var intent = result.intent
         if mode == .alwaysOn, intent == .send, !maySend { intent = .none }
         if intent == .none {
-            return done(heard: text, intent: "none", tier: result.tier, ok: false, note: "not a command", stages: stages, clock, why: result.why)
+            return done(heard: text, intent: "none", tier: result.tier, ok: false, note: "not a command", stages: stages, clock, why: why)
         }
 
         let types = Self.types(intent)
@@ -132,7 +140,7 @@ final class CommandPipeline {
         if types { pauseAlwaysOn(false) }
         for (k, v) in outcome.stages { stages["action." + k] = v }
         lastCommandAt = Date()
-        return done(heard: text, intent: describe, tier: result.tier, ok: outcome.ok, note: outcome.note, stages: stages, clock, why: result.why)
+        return done(heard: text, intent: describe, tier: result.tier, ok: outcome.ok, note: outcome.note, stages: stages, clock, why: why)
     }
 
     /// The Test tab: route typed text, and run the actions only if `runActions` is true. A typed command counts as a
@@ -162,6 +170,15 @@ final class CommandPipeline {
             feedback?.show(ok ? "→ \(intent)" : "✗ \(note)", ok: ok)
         }
         return record
+    }
+
+    /// One line about the screen for the log: the front app, the host (no path, no query) and the element count.
+    /// A sign-in, code or payment page shows only "sensitive".
+    static func screenSummary(_ screen: ScreenSnapshot?, front: String?) -> String {
+        guard let s = screen else { return "screen: none, front \(front ?? "unknown")" }
+        if SafetyPolicy.sensitive(url: s.url, elements: s.elements) != nil { return "screen: \(s.bundleID), sensitive" }
+        let host = s.url.flatMap { URL(string: $0)?.host }.map { " \($0)" } ?? ""
+        return "screen: \(s.bundleID)\(host), \(s.elements.count) elements"
     }
 
     /// The app search rule (E1, first live test).
