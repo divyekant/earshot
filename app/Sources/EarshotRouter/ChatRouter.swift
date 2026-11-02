@@ -85,17 +85,25 @@ enum ChatRouter {
         var appTokens = Set<Int>()
         var appAtStart = false
         var onApp = false
-        for app in apps {
-            let aliases = Set((app.aliases + [app.name]).map(TextKit.normalize)).filter { !$0.isEmpty }
+        let aliasesByApp = apps.map { app in
+            (app, Set((app.aliases + [app.name]).map(TextKit.normalize)).filter { !$0.isEmpty })
+        }
+        // Words that alone are an app name. A join never takes such a word: "notes app" stays the app Notes.
+        let oneWordApps = Set(aliasesByApp.flatMap { $0.1 }.filter { !$0.contains(" ") })
+        for (app, aliases) in aliasesByApp {
             for alias in aliases {
                 let parts = alias.split(separator: " ").map(String.init)
-                // Speech to text can split a one-word name: "TigerVNC" comes back as "Tiger VNC" (E2).
-                let spans = parts.count == 1 && parts[0].count >= 5 ? [1, 2] : [parts.count]
+                // Speech to text can split a one-word name into 2 or 3 words: "TigerVNC" gives "Tiger VNC" (E2),
+                // "iMessage" gives "I message", "ChatGPT" gives "chat GPT". A join must give the exact name.
+                let spans = parts.count == 1 && parts[0].count >= 4 ? [1, 2, 3] : [parts.count]
                 for span in spans where span <= words.count {
                     for start in 0...(words.count - span) {
-                        let phrase = words[start..<(start + span)].joined()
+                        let piece = words[start..<(start + span)]
+                        let phrase = piece.joined()
+                        let joined = parts.count == 1 && span > 1
+                        if joined, piece.contains(where: { oneWordApps.contains($0) }) { continue }
                         let score = TextKit.similarity(phrase, parts.joined())
-                        guard score >= 0.9 else { continue }
+                        guard joined ? score >= 1 : score >= 0.9 else { continue }
                         mentioned[app.id] = max(mentioned[app.id] ?? 0, score)
                         for i in start..<(start + span) { appTokens.insert(i) }
                         if start == 0 { appAtStart = true }
@@ -152,6 +160,15 @@ enum ChatRouter {
             }
         }
 
+        // Chat apps whose one-word name is the chat verb, or the verb with "s" or "es" ("message" and "Messages").
+        var verbApps = Set<String>()
+        if let verb = words.prefix(3).first(where: { commandVerbs.contains($0) }) {
+            for (app, aliases) in aliasesByApp where app.isChat
+                && aliases.contains(where: { $0 == verb || $0 == verb + "s" || $0 == verb + "es" }) {
+                verbApps.insert(app.id)
+            }
+        }
+
         // Only a chat app name changes the name scores. An app such as "Lock Screen" can match a common word.
         let chatMentioned = Set(mentioned.keys.filter { chatApps.contains($0) })
 
@@ -177,9 +194,12 @@ enum ChatRouter {
             if entry.isSelf && wantsSelf { best = 1.0; bestText = 1.0 }
             if !chatMentioned.isEmpty {
                 best += chatMentioned.contains(entry.appID) ? 0.1 : -0.15
-            } else if let front = frontApp, entry.appID == front {
+            } else {
                 // No app named: the front chat app wins a tie ("message myself" while Messages is in front).
-                best += 0.1
+                if let front = frontApp, entry.appID == front { best += 0.1 }
+                // The chat verb is the singular of a chat app's name: "message me" leans to "Messages". Weak evidence:
+                // enough to break a tie, less than a known name that only one app has.
+                if verbApps.contains(entry.appID) { best += 0.06 }
             }
             if best >= 0.45 {
                 scored.append(Scored(entry: entry, score: best, text: bestText, sound: bestSound, gram: bestGram))

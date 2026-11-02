@@ -13,6 +13,9 @@ enum Fixtures {
         AppEntry(id: "calendar", name: "Calendar", bundleID: "com.apple.iCal", aliases: ["calendar"], approved: true),
         AppEntry(id: "lockscreen", name: "Lock Screen", bundleID: "com.example.lock", aliases: ["lock screen"], approved: true),
         AppEntry(id: "tigervnc", name: "TigerVNC", bundleID: "com.tigervnc.viewer", aliases: ["tigervnc"], approved: true),
+        AppEntry(id: "whatsapp", name: "WhatsApp", bundleID: "net.whatsapp.WhatsApp", aliases: ["whatsapp"], isChat: true,
+                 approved: true),
+        AppEntry(id: "chatgpt", name: "ChatGPT", bundleID: "com.openai.chat", aliases: ["chatgpt"], approved: true),
         // Not approved: the router must not route to it.
         AppEntry(id: "discord", name: "Discord", bundleID: "com.hnc.Discord", aliases: ["discord"], isChat: true, approved: false),
     ]
@@ -29,6 +32,7 @@ enum Fixtures {
         NameEntry(appID: "slack", name: "alerts", source: .sidebar),
         NameEntry(appID: "slack", name: "Owner (you)", isSelf: true, source: .sidebar),
         NameEntry(appID: "discord", name: "Zed", source: .sidebar),
+        NameEntry(appID: "whatsapp", name: "Owner (You)", isSelf: true, source: .sidebar),
     ]
 
     /// The E1 group chat that made the one wrong chat of the rules.
