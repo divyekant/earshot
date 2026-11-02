@@ -49,7 +49,10 @@ public enum MenuRules {
 
     /// A title with one of these words is not a way to open a chat.
     public static let excluded = ["next", "previous", "selection", "replace", "spelling", "google", "page", "tab", "tabs",
-                                  "mailbox", "web", "workspace", "window", "quit", "force"]
+                                  "mailbox", "web", "workspace", "window", "quit", "force",
+                                  // "Jump to End" (WhatsApp) scrolls a chat. It does not switch chats.
+                                  "end", "top", "bottom", "beginning", "latest", "oldest", "unread", "line",
+                                  "date", "today", "definition"]
 
     /// Finds the best menu item that opens a chat. It skips the Apple menu, and keys that
     /// earshot cannot press. A shortcut with Return or Enter never counts: Command-Return sends a message in some apps.

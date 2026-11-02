@@ -25,6 +25,11 @@ public struct SidebarScan: Sendable {
     public var settleMs: Double
     public var reads: Int
     public var stillLoading: Bool
+    /// The windows that earshot could read. 0 means that the app showed no window to Accessibility,
+    /// for example because the window is on another desktop or minimized.
+    public var windows: Int
+    /// The accessibility nodes of the last read.
+    public var nodes: Int
 }
 
 /// Reads the chat names in the sidebar of a chat app through Accessibility (E1, section 3.2).
@@ -34,22 +39,34 @@ enum SidebarReader {
     static let sidebarWidth = 0.42
 
     /// Reads the sidebars of the first two windows of the app, again every 300 ms until the list is stable.
-    static func scan(_ app: AppEntry) async -> SidebarScan? {
+    /// If `front` is true, it brings the app to the front for the read, and then brings back the app
+    /// that was in front (as `index --front` in E1). It presses no key.
+    static func scan(_ app: AppEntry, front: Bool = false) async -> SidebarScan? {
         guard let running = NSRunningApplication.runningApplications(withBundleIdentifier: app.bundleID).first else { return nil }
+        let before = NSWorkspace.shared.frontmostApplication
+        if front, before?.processIdentifier != running.processIdentifier {
+            _ = await SearchReader.bringToFront(app.bundleID)
+            await sleepMs(400)
+        }
+        defer { if front, let before, before.processIdentifier != running.processIdentifier { before.activate() } }
         let t0 = Clock.nowNs()
         let el = AX.appElement(running.processIdentifier)
         if app.electron { AX.askForTree(el) }
-        let windows = Array(AX.elements(el, "AXWindows").prefix(2))
+        var windows = Array(AX.elements(el, "AXWindows").filter { AX.subrole($0) != "AXSystemDialog" }.prefix(2))
+        if windows.isEmpty, let main = AX.window(el) { windows = [main] }
         var check = SettleCheck()
         var oneRead = 0.0
         var placeholder: String?
+        var nodes = 0
         while true {
             var all: [SidebarName] = []
             var loading = false
             oneRead = 0
+            nodes = 0
             for win in windows {
                 let r = read(window: win)
                 oneRead += r.ms
+                nodes += r.nodes
                 loading = loading || r.loading
                 placeholder = placeholder ?? r.placeholder
                 for n in r.names where !all.contains(where: { Words.key($0.name) == Words.key(n.name) }) { all.append(n) }
@@ -59,7 +76,8 @@ enum SidebarReader {
         }
         let extra = NameRules.placeholderAliases(placeholder).filter { !app.aliases.contains($0) }
         return SidebarScan(appID: app.id, names: check.kept, appAliases: extra, readMs: Clock.round1(oneRead),
-                           settleMs: Clock.round1(Clock.ms(since: t0)), reads: check.reads, stillLoading: check.stillLoading)
+                           settleMs: Clock.round1(Clock.ms(since: t0)), reads: check.reads, stillLoading: check.stillLoading,
+                           windows: windows.count, nodes: nodes)
     }
 
     /// The texts of a list row, from the top left. Chat lists put the name there, and the last message after it.
