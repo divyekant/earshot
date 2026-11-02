@@ -95,6 +95,8 @@ public enum ScrollDirection: String, Codable, Sendable { case up, down, top, bot
 public enum Intent: Codable, Hashable, Sendable {
     case none
     case openApp(appID: String)
+    /// Open a web address (http or https only) in the default browser (R-NV-7).
+    case openURL(String)
     case openChat(appID: String, target: String, text: String?)
     case click(elementID: String)
     /// Type into a field of the screen, for example "search for X" (E2).

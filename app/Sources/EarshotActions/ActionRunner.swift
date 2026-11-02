@@ -48,6 +48,7 @@ public final class EarshotActionRunner: ActionRunner {
         switch intent {
         case .none: out = ok("nothing to do")
         case .openApp(let appID): out = await openApp(appID, context: context, watch: watch)
+        case .openURL(let address): out = openURL(address, watch: watch)
         case let .openChat(appID, target, text): out = await openChat(appID, target: target, text: text, context: context, watch: watch)
         case .click(let id): out = await click(id, command: command, watch: watch)
         case let .typeInto(id, text): out = await typeInto(id, text: text, watch: watch)
@@ -121,6 +122,21 @@ public final class EarshotActionRunner: ActionRunner {
         let app = AX.appElement(pid)
         if e.electron { AX.set(app, "AXManualAccessibility", kCFBooleanTrue) }
         return (Fronted(app: app, pid: pid), nil)
+    }
+
+    /// A web address that earshot may open: http or https, with a host. Other schemes can start apps, so they are refused.
+    public nonisolated static func webURL(_ address: String) -> URL? {
+        guard let url = URL(string: address), let scheme = url.scheme?.lowercased(), ["http", "https"].contains(scheme),
+              let host = url.host, !host.isEmpty else { return nil }
+        return url
+    }
+
+    /// Opens the address in the default browser. It presses no key (R-NV-7).
+    private func openURL(_ address: String, watch: Stopwatch) -> ActionOutcome {
+        guard let url = Self.webURL(address) else { return fail("not a web address") }
+        guard NSWorkspace.shared.open(url) else { return fail("the browser did not open \(url.host ?? address)") }
+        watch.mark("opened")
+        return ok("opened \(url.host ?? address)")
     }
 
     private func openApp(_ appID: String, context: RouteContext, watch: Stopwatch) async -> ActionOutcome {
