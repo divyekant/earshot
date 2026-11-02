@@ -39,7 +39,7 @@ public final class MenuCatalogue: CatalogueBuilder, @unchecked Sendable {
     /// The Accessibility check. Tests can replace it.
     let trusted: @Sendable () -> Bool
 
-    public init(skip: Set<String> = [], includeInstalled: Bool = true) {
+    public convenience init(skip: Set<String> = [], includeInstalled: Bool = true) {
         self.init(skip: skip, includeInstalled: includeInstalled, trusted: { AX.trusted() })
     }
 
