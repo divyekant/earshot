@@ -161,12 +161,22 @@ Tests on 10 synthetic voices (Piper text to speech, 800 phrases of other talk, t
 
 The spotter does not know the made-up word "earshot". It hears "your shot" or "here shut".
 
+Live trial on the owner's Mac (2026-11-02, phrase "hey atlas", Apple speech, 15 records):
+
+| Measure | Result |
+|---|---|
+| Model download and load | 7 s for the download. No errors. |
+| Owner wakes | 8. Voice scores 0.50 to 0.73 (median 0.63). Enrolment self score 0.75. |
+| Another voice (`say` through the speaker) | 1 wake, voice score 0.06, rejected. 4 other `say` voices did not wake the spotter. |
+| Commands that worked | 238 to 541 ms in total. |
+| Commands that failed | 7 began with a misheard form of the phrase ("Here, at least", "He at least"). The strict text match kept it, so the router found no command. The looser match at the start of the text removes it in 5 of the 7. |
+
 **Decision:**
 - The keyword spotter (icefall KWS Zipformer, 3.49M parameters) listens for the phrase. The phrase is a setting. The default is "hey jarvis", because real words work best.
 - If the spelled phrase does not fire on the owner's enrolment phrases (a made-up name), the spotter also listens for the word pieces that it heard in them.
-- At each wake, the voice model (WeSpeaker ResNet34-LM) compares the voice of the phrase with the mean of the 5 enrolment phrases. The start threshold is 0.45 (cosine). Tune it from the log.
-- Speech without the phrase never reaches the speech engine. So earshot keeps no text of talk that is not for it. A wake in another voice is logged with no text.
-- The speech engine starts at the phrase (a longer preroll), and the pipeline removes the phrase from the text.
+- At each wake, the voice model (WeSpeaker ResNet34-LM) compares the voice of the phrase with the mean of the 5 enrolment phrases. The threshold is 0.35 (cosine). The live trial gave 0.50 to 0.73 for the owner and 0.06 for another voice. Tune it from the log.
+- Speech without the phrase never reaches the speech engine. So earshot keeps no text of talk that is not for it. A wake in another voice, and a follow-up turn in another voice, are logged with the voice score and no text.
+- The speech engine starts at the phrase (a longer preroll), and the pipeline removes the phrase from the text. Speech to text can write a known phrase as other words, so the first words of the text may differ from the phrase in up to half of its letters.
 - For 5 s after a command, the owner's voice can give the next command with no phrase. The voice is checked at the end of that turn.
 - The safety rules do not change. Always-on never presses Send or a risky button (R-ON-5, `ActionRules.sendBlock`). The hold key stays (R-ON-4).
 - The models download one time from Hugging Face, at pinned revisions, with a SHA-256 check. No audio leaves the Mac (R-MD-1).

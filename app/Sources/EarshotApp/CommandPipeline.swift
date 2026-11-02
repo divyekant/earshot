@@ -54,6 +54,11 @@ final class CommandPipeline {
     var namesNotReady: () -> Int = { 0 }
     /// The cached menu items of an app as screen elements (MenuCache.cached). It must not read: a menu read takes up to 1 s.
     var menus: (String) -> [ScreenElement] = { _ in [] }
+    /// If earshot's own window is in front, brings back the app that was in front before it, and returns the time
+    /// in ms. Nil if earshot was not in front (FrontTracker.restore).
+    var restoreFront: () async -> Double? = { nil }
+    /// earshot's own bundle id. earshot's own window is never a target of a voice command.
+    var ownBundleID: String?
     /// The screenshot picker (D-10). Nil is off, the default (ScreenPickerFactory.make).
     var picker: ScreenPicker?
     /// The longest wait for the screenshot fallback (settings.jevScreenBudgetMs).
@@ -102,23 +107,26 @@ final class CommandPipeline {
             // The trigger opens an always-on turn only on the wake phrase, or in the follow-up window in the owner's
             // voice (D-11). So the text is for earshot. The speech engine starts before the phrase: remove it.
             if let wake { speechSummary = Self.wakeSummary(wake) + (speechSummary.isEmpty ? "" : " · " + speechSummary) }
-            text = WakePhrase.strip(text, phrase: wakePhrase)
+            text = WakePhrase.strip(text, phrase: wakePhrase, afterWake: wake != nil)
         }
         guard !text.isEmpty else { return done(heard: "", intent: "none", tier: .none, ok: false, note: "no words", stages: stages, clock, quiet: true) }
 
         let rows = apps().filter { $0.approved && $0.enabled }
         // The names and the screen read do not depend on each other, so they run side by side.
         // Each keeps its own timer. "context" is the wall time of both together.
+        // Live test: the Manage window was in front, so "type …" found no text field. Act on the app before it.
+        if let ms = await restoreFront() { stages["front.restore"] = ms }
         let contextClock = Stopwatch()
         async let namesTimed: ([NameEntry], Double) = { let c = Stopwatch(); let n = await allNames(); return (n, c.ms) }()
         async let screenTimed: (ScreenSnapshot?, Double) = { let c = Stopwatch(); let s = await actions.screen(); return (s, c.ms) }()
         let (known, namesMs) = await namesTimed
-        let (screen, screenMs) = await screenTimed
+        let (seen, screenMs) = await screenTimed
+        let screen = seen?.bundleID == ownBundleID ? nil : seen
         stages["names"] = namesMs
         let notReady = namesNotReady()
         stages["screen"] = screenMs
         stages["context"] = contextClock.ms
-        let front = frontBundleID()
+        let front = frontBundleID().flatMap { $0 == ownBundleID ? nil : $0 }
         var context = RouteContext(apps: rows, names: known, frontBundleID: front, screen: withMenus(screen, front: front))
 
         let routeClock = Stopwatch()
@@ -147,6 +155,18 @@ final class CommandPipeline {
         if (result.intent == .none || result.confidence < SafetyPolicy.minimumConfidence), !sensitive {
             let top = result.alternatives.prefix(3).map { IntentText.describe($0, apps: rows, screen: context.screen) }
             why += String(format: " · confidence %.2f", result.confidence) + (top.isEmpty ? "" : " · considered: " + top.joined(separator: " | "))
+        }
+        // Dictation (the owner's choice): plain words with no command word go into the focused text field.
+        // Only with the hold key. Never into a password field or on a sign-in, code or payment page. Never Return.
+        if mode == .hold, result.intent == .none, !sensitive, Self.dictationField(context.screen) != nil,
+           !CommandRouter.hasCommandWord(text, context: context) {
+            why += " · dictation into the focused field"
+            pauseAlwaysOn(true)
+            let outcome = await actions.run(.typeText(text), context: context, command: CommandInfo(mode: .hold, tier: .rules))
+            pauseAlwaysOn(false)
+            for (k, ms) in outcome.stages { stages["action." + k] = ms }
+            return done(heard: text, intent: IntentText.describe(.typeText(text), apps: rows, screen: context.screen),
+                        tier: .rules, ok: outcome.ok, note: outcome.note, stages: stages, clock, why: why)
         }
         // The screenshot fallback (D-10): one picture to Jev, only for a hold-key press with no sure target that the
         // rules did not block. The click path checks the label again at the tier .jev, so a risky label stays blocked.
@@ -201,6 +221,24 @@ final class CommandPipeline {
         let score = wake.voiceScore.map { String(format: "%.2f", $0) } ?? "none"
         let note = String(format: "wake phrase in another voice (score %@, needs %.2f)", score, threshold)
         let record = ActivityRecord(heard: "", intent: "none", tier: .none, ok: false, note: note, stages: [:])
+        try? log?.append(record)
+        return record
+    }
+
+    /// The focused text field for dictation: ScreenSnapshot.focusedID (set only for an editable field), and not a
+    /// password field.
+    static func dictationField(_ screen: ScreenSnapshot?) -> ScreenElement? {
+        guard let s = screen, let id = s.focusedID, let e = s.elements.first(where: { $0.id == id }),
+              e.subrole != "AXSecureTextField" else { return nil }
+        return e
+    }
+
+    /// Logs a follow-up turn that earshot dropped because the voice is not the owner's (R-ON-3). Nothing ran.
+    /// The record has no text: the words were not the owner's.
+    @discardableResult
+    func droppedFollowUp(_ why: String) -> ActivityRecord {
+        let record = ActivityRecord(heard: "", intent: "none", tier: .none, ok: false, note: "follow-up dropped: \(why)",
+                                    stages: [:])
         try? log?.append(record)
         return record
     }

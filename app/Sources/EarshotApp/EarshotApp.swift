@@ -47,6 +47,9 @@ private struct OpenManageButton: View {
 @MainActor
 final class AppController: ObservableObject {
     @Published var settings: EarshotSettings
+    /// The settings that the running parts use now. The Manage window binds to `settings`, so `settings` already
+    /// has the new values when apply(_:) runs. apply(_:) compares the new values with this copy.
+    private var applied: EarshotSettings
     @Published var status = "Starting…"
     @Published var startsAtLogin = SMAppService.mainApp.status == .enabled
 
@@ -76,6 +79,7 @@ final class AppController: ObservableObject {
         let store = self.store
         let settings = store.settings
         self.settings = settings
+        applied = settings
         names = NameIndex(apps: { store.apps }, store: store)
         runner = EarshotActionRunner(options: ActionOptions(settings: settings), store: store)
         let (engine, why) = SpeechEngines.make(settings)
@@ -86,15 +90,18 @@ final class AppController: ObservableObject {
                                    apps: { store.apps }, allNames: { await Self.chatNames(names, apps: store.apps, notReady: { lastNotReady.value = $0 }) },
                                    frontBundleID: { NSWorkspace.shared.frontmostApplication?.bundleIdentifier })
         pipeline.namesNotReady = { lastNotReady.value }
+        let frontTracker = FrontTracker(own: Bundle.main.bundleIdentifier)
+        pipeline.ownBundleID = Bundle.main.bundleIdentifier
+        pipeline.restoreFront = { await frontTracker.restore() }
         let menuIndex = MenuIndex()
         let menus = MenuCache(read: { await menuIndex.refresh(bundleID: $0) })
         self.menus = menus
         pipeline.menus = { menus.cached($0) }
         menuObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: nil) { note in
-            if let id = (note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?.bundleIdentifier {
-                menus.refresh(id)
-            }
+            guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
+            frontTracker.activated(app)
+            if let id = app.bundleIdentifier { menus.refresh(id) }
         }
         if let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier { menus.refresh(front) }
         applyJev()
@@ -142,13 +149,13 @@ final class AppController: ObservableObject {
             feedback: feedback,
             settingsChanged: { [weak self] new in self?.apply(new) },
             voice: VoiceHooks(
-                status: { [weak self] in await self?.voiceStatus() ?? "" },
+                status: { [weak self] in self?.voiceStatus() ?? "" },
                 record: { [weak self] in try await self?.recordPhrase() ?? [] },
                 teach: { [weak self] phrase, clips in
                     guard let self else { throw WakeError("earshot is closing.") }
                     return try await self.teachVoice(phrase: phrase, clips: clips)
                 },
-                forget: { [weak self] in await self?.forgetVoice() }))
+                forget: { [weak self] in self?.forgetVoice() }))
     }
 
     /// Runs the catalogue scan. On an error, for example DiscoveryError.accessibilityOff (first live test: the scan
@@ -218,8 +225,10 @@ final class AppController: ObservableObject {
         input.onStart = { [weak self] in
             if let problem = pipeline.begin() { self?.feedback.show(problem, ok: false) }
         }
-        input.onCancel = { _ in
+        input.onCancel = { why in
             pipeline.pendingWake = nil
+            // Log the voice score of a dropped follow-up turn, for the voice threshold (no text).
+            if why.hasPrefix(WakeTrigger.otherVoice) { pipeline.droppedFollowUp(why) }
             Task { await pipeline.cancel() }
         }
         input.onStop = { [weak input] in
@@ -341,14 +350,16 @@ final class AppController: ObservableObject {
 
     /// The management window changed the settings (it saved them already).
     private func apply(_ new: EarshotSettings) {
-        let old = settings
-        settings = new
+        // Compare with the settings that the running parts use, not with `settings`: the window changed `settings`
+        // already, so a comparison with it found no change, and a new wake phrase did not reach the listener.
+        let restart = SettingsRestart.needed(from: applied, to: new)
+        applied = new
+        if settings != new { settings = new }
         pipeline.showFeedback = new.showFeedback
         pipeline.wakePhrase = new.wakePhrase
         runner.options = ActionOptions(settings: new)
-        if new.tier2 != old.tier2 || new.tier2BudgetMs != old.tier2BudgetMs || new.jevSeesScreen != old.jevSeesScreen
-            || new.jevScreenBudgetMs != old.jevScreenBudgetMs { applyJev() }
-        if new.engine != old.engine || new.parakeetModelPath != old.parakeetModelPath || new.locale != old.locale {
+        if restart.contains(.jev) { applyJev() }
+        if restart.contains(.engine) {
             // Close the microphone of the old engine first. The old engine then has no owner, so its deinit frees
             // the Parakeet model, and two models do not stay loaded.
             Self.shutdown(pipeline.engine)
@@ -357,11 +368,7 @@ final class AppController: ObservableObject {
             pipeline.engine = engine
             prepareEngine()
         }
-        if new.mode != old.mode || new.holdKeyCode != old.holdKeyCode || new.holdKeyIsModifierOnly != old.holdKeyIsModifierOnly
-            || new.holdKeyModifiers != old.holdKeyModifiers || new.wakePhrase != old.wakePhrase
-            || new.voiceThreshold != old.voiceThreshold {
-            startInput()
-        }
+        if restart.contains(.input) { startInput() }
     }
 
     /// Stops an engine: the microphone closes and the timers stop (T1).
