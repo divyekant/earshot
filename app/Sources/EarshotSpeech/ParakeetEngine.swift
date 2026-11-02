@@ -72,11 +72,11 @@ public final class ParakeetEngine: SpeechEngine, @unchecked Sendable {
     public func begin() throws {
         guard useMicrophone else { throw SpeechError("this Parakeet engine has no microphone") }
         guard mic.isRunning else { throw SpeechError("Parakeet is not ready: call prepare() first") }
-        lock.lock()
-        samples.removeAll(keepingCapacity: true)
-        lastPartialFrames = 0
-        listening = true
-        lock.unlock()
+        lock.withLock {
+            samples.removeAll(keepingCapacity: true)
+            lastPartialFrames = 0
+            listening = true
+        }
         mic.begin { [weak self] buffer in self?.append(AudioUtil.floats(buffer)) }
         startTimer()
     }
@@ -85,11 +85,12 @@ public final class ParakeetEngine: SpeechEngine, @unchecked Sendable {
         let t0 = SpeechClock.nowNs()
         mic.end()                      // adds the tail silence
         stopTimer()
-        lock.lock()
-        let pcm = samples
-        samples.removeAll()
-        listening = false
-        lock.unlock()
+        let pcm = lock.withLock {
+            let out = samples
+            samples.removeAll()
+            listening = false
+            return out
+        }
         let text = try await run(pcm)
         return Utterance(text: text, engine: id, ms: SpeechClock.ms(since: t0))
     }
@@ -113,8 +114,7 @@ public final class ParakeetEngine: SpeechEngine, @unchecked Sendable {
     // MARK: - Private
 
     private func append(_ floats: [Float]) {
-        lock.lock(); defer { lock.unlock() }
-        if listening { samples.append(contentsOf: floats) }
+        lock.withLock { if listening { samples.append(contentsOf: floats) } }
     }
 
     private func run(_ pcm: [Float]) async throws -> String {
@@ -139,29 +139,26 @@ public final class ParakeetEngine: SpeechEngine, @unchecked Sendable {
         let t = DispatchSource.makeTimerSource(queue: queue)
         t.schedule(deadline: .now() + .milliseconds(200), repeating: .milliseconds(200))
         t.setEventHandler { [weak self] in self?.partialTick() }
-        lock.lock(); timer = t; lock.unlock()
+        lock.withLock { timer = t }
         t.resume()
     }
 
     private func stopTimer() {
-        lock.lock(); let t = timer; timer = nil; lock.unlock()
+        let t = lock.withLock { () -> DispatchSourceTimer? in defer { timer = nil }; return timer }
         t?.cancel()
     }
 
     /// Runs on `queue`. Makes a partial text when enough new audio came in.
     private func partialTick() {
-        lock.lock()
-        guard listening, onPartial != nil,
-              partials.due(totalFrames: samples.count, lastFrames: lastPartialFrames, sampleRate: 16000) else {
-            lock.unlock(); return
+        let due = lock.withLock { () -> ([Float], @Sendable (String) -> Void)? in
+            guard listening, let callback = onPartial,
+                  partials.due(totalFrames: samples.count, lastFrames: lastPartialFrames, sampleRate: 16000) else { return nil }
+            lastPartialFrames = samples.count
+            return (samples, callback)
         }
-        let pcm = samples
-        lastPartialFrames = pcm.count
-        let callback = onPartial
-        lock.unlock()
-        if let text = try? runNow(pcm), !text.isEmpty {
-            lock.lock(); let still = listening; lock.unlock()
-            if still { callback?(text) }
+        guard let (pcm, callback) = due else { return }
+        if let text = try? runNow(pcm), !text.isEmpty, lock.withLock({ listening }) {
+            callback(text)
         }
     }
 

@@ -48,7 +48,7 @@ final class MicrophoneFeed: @unchecked Sendable {
         _ = preroll.drain()
     }
 
-    var isRunning: Bool { lock.lock(); defer { lock.unlock() }; return running }
+    var isRunning: Bool { lock.withLock { running } }
 
     /// Starts to pass audio to `sink`, first the preroll.
     func begin(_ sink: @escaping (AVAudioPCMBuffer) -> Void) {
@@ -59,10 +59,11 @@ final class MicrophoneFeed: @unchecked Sendable {
 
     /// Stops to pass audio. Gives `TailPad.seconds` of silence to the sink as the last buffer.
     func end() {
-        lock.lock()
-        let sink = deliver
-        deliver = nil
-        lock.unlock()
+        let sink = lock.withLock {
+            let s = deliver
+            deliver = nil
+            return s
+        }
         if let sink, let pad = AudioUtil.silence(format: format, frames: TailPad.frames(sampleRate: format.sampleRate)) {
             sink(pad)
         }

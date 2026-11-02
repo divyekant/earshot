@@ -35,28 +35,30 @@ public final class FallbackSpeechEngine: SpeechEngine, @unchecked Sendable {
         makeFallback = fallback
     }
 
-    public var id: String { lock.lock(); defer { lock.unlock() }; return current.id }
+    public var id: String { lock.withLock { current.id } }
 
     /// The engine in use now.
-    public var active: SpeechEngine { lock.lock(); defer { lock.unlock() }; return current }
+    public var active: SpeechEngine { lock.withLock { current } }
 
     public var onPartial: (@Sendable (String) -> Void)? {
-        get { lock.lock(); defer { lock.unlock() }; return partial }
-        set { lock.lock(); partial = newValue; current.onPartial = newValue; lock.unlock() }
+        get { lock.withLock { partial } }
+        set { lock.withLock { partial = newValue; current.onPartial = newValue } }
     }
 
     public func prepare() async throws {
         do {
             try await active.prepare()
         } catch {
-            lock.lock()
-            guard let make = makeFallback else { lock.unlock(); throw error }
-            let next = make()
-            next.onPartial = partial
-            current = next
-            makeFallback = nil
-            fallbackReason = "\(error)"
-            lock.unlock()
+            let next = lock.withLock { () -> SpeechEngine? in
+                guard let make = makeFallback else { return nil }
+                let next = make()
+                next.onPartial = partial
+                current = next
+                makeFallback = nil
+                fallbackReason = "\(error)"
+                return next
+            }
+            guard let next else { throw error }
             try await next.prepare()
         }
     }
