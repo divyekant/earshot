@@ -6,6 +6,7 @@ import Foundation
 ///
 /// The layers:
 /// 1. Prefix rule. Text that starts with a command word or the name of an approved app passes.
+///    Hesitation words at the start (`Hesitation.words`, for example "uh") do not count.
 /// 2. Follow-up window. For a few seconds after a command, any text passes, for example the message text.
 /// 3. Call context. If the owner is in a call, only the prefix rule counts.
 /// 4. Safety. "send" passes only as a short command of its own, in the follow-up window, not in a call.
@@ -47,7 +48,9 @@ public struct ForMeGate: Sendable {
     ///   - secondsSinceLastCommand: nil if there was no command yet.
     ///   - inCall: true if the owner is in a call. Then only the prefix rule counts.
     public func check(_ text: String, apps: [AppEntry], secondsSinceLastCommand: Double?, inCall: Bool = false) -> Verdict {
-        let words = SafetyPolicy.normalize(text).split(separator: " ").map(String.init)
+        // Drop hesitation words at the start ("uh, Slack me ..."). The router uses the same list.
+        let words = Array(SafetyPolicy.normalize(text).split(separator: " ").map(String.init)
+            .drop(while: { Hesitation.words.contains($0) }))
         guard !words.isEmpty else { return .notForMe("no words") }
         let phrase = words.joined(separator: " ")
         let inWindow = !inCall && (secondsSinceLastCommand.map { $0 >= 0 && $0 <= config.followUpSeconds } ?? false)
