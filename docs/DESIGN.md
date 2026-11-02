@@ -153,12 +153,13 @@ E0 used each app's own search in place of links, so the owner gives names only. 
 
 **Click.**
 1. Collect buttons, links, menu items and rows from the front window. In a browser, find the page on screen with a hit test in the front window, and read its visible elements with one `AXUIElementsForSearchPredicate` call (12 ms in E2). Chrome keeps the pages of hidden tabs in the tree, so a page found by a tree search can be a hidden tab.
-2. Fuzzy-match the spoken label to `AXTitle`, `AXDescription` and `AXValue`. Numbers must match exactly. Block every label with a risky word (send, pay, delete, submit, vote, star and similar).
+2. Fuzzy-match the spoken label to `AXTitle`, `AXDescription` and `AXValue`. Numbers must match exactly. Block every label with a risky word (send, pay, delete, submit, vote, star and similar). A title is not a command: a tab button, and a menu item that names an open tab or window of the app (found by data, not by menu names), use the rule of a link. A title is risky only if it has 3 words or fewer and a risky word, or if it starts with a risky word. Bookmarks and History menus are not targets.
 3. Act only on a page of the expected app or site. Never act on a sign-in, code or payment page.
 4. Press the match with `AXPress` if the element offers it. A Chrome link does not offer it: `AXPress` returns success and does nothing (E2, section 5.6). Else click a point where the top element on screen is the match, and move the pointer back. If no such point exists, scroll the element into view (`AXScrollToVisible`) and try again.
 5. For ordinal commands ("second email", "second result"), sort the rows by position on screen. On a web page, a result is a link in a heading.
 6. If no label matches, run Apple Vision OCR (about 130–230 ms) and click the matched text.
 7. For "show numbers", draw numbered labels over the same element list.
+8. Optional, off by default (D-10, "Jev sees the screen"): if no label matches a hold-key click, take one picture of the front window, draw the numbers of step 7 on it, and ask Jev once. Jev picks a number, or else gives a box. For a box, earshot clicks its middle only if the element under the point is of the front app, has a label, and is not risky. The click then goes through steps 3 and 4. Never on a sign-in, code or payment page. The command path asks only after the route, only for a press by the router's verb parse, and only if the route has no sure target and was not blocked. A blocked route never goes to the screenshot. The click runs at the tier `jev`.
 
 E2 measured this in Chrome on 4 public pages: 42 of 43 commands correct, 25 of 25 link clicks changed the page, 0 risky elements pressed.
 

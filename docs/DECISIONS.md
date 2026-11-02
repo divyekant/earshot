@@ -114,4 +114,23 @@ Jev added about 100 ms when it was called (warm connection). Jev alone made wron
 - It sends text only: the command words and the short list of candidate labels. Audio never leaves the Mac.
 - It runs only when the rules are unsure.
 - It has a budget of 1 s. After the budget, the rules answer wins.
+- The screenshot fallback for clicks (D-10) is a separate setting. "Ask Jev" never turns it on.
+
+## D-10. Jev sees the screen: an opt-in click fallback
+
+Date: 2026-11-02.
+
+The owner asked for an option: take a screenshot, send it to Jev with the command, and get back the point to click. On 2026-11-02 the owner chose "Yes, front window, set-of-marks" on the question "Allow Jev to get a screenshot of the front window as a click fallback?". The choice was: "Off by default, hold key only, never sign-in/code/payment pages. Jev picks a drawn number; raw x,y only via a coarse grid."
+
+The TypeSafe API takes images (an `assets` map and the header `TypeSafe-Danger-Zone-Images: true`) and has a `box` question that gives a box on the image. So earshot uses the box in place of a coarse grid. E3 measured it (see [E3](experiments/E3-screenshot-fallback.md)).
+
+**Decision:** earshot can ask Jev with one picture when a click finds no target.
+- It is a separate setting, "Jev sees the screen". It is off by default. It needs the Jev key and the Screen Recording permission.
+- It runs only for a hold-key command, never in always-on mode (R-ON-5), and only after the rules found no sure target.
+- It sends the command words and one JPEG of the front window. It never sends a picture of a sign-in, code or payment page, or of a page that can be a hidden tab. It never sends audio. earshot never saves the picture.
+- The picture has the "show numbers" numbers drawn on it (set-of-marks). Risky elements get no number. Jev picks a number. Only if no number fits does earshot use Jev's box.
+- Before a click, earshot checks the element under the point: it must belong to the front app and have a label, and no risky label or risky text may be under the point. The click path then runs with the tier "jev", so `SafetyPolicy.mayPress` blocks every risky label. earshot never sends (R-NV-5).
+- It has a budget of 1.5 s. After the budget, earshot does nothing.
+
+**How it differs from D-2.** D-2 rejected agents that take a screenshot, ask a large model, act, and repeat, in 3 to 4 steps of 1 to 5 s each. This fallback asks once for each command, only after the rules fail, and never loops (R-SP-2). The rules still decide most commands in a few ms.
 

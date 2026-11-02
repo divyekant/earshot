@@ -97,6 +97,30 @@ enum AX {
     static func focused(_ app: AXUIElement) -> AXUIElement? { element(app, "AXFocusedUIElement") }
     static func window(_ app: AXUIElement) -> AXUIElement? { element(app, "AXFocusedWindow") ?? element(app, "AXMainWindow") }
 
+    /// The window titles and the tab labels of the app, for WindowTitles (the same read as MenuIndex.readTitles).
+    /// It reads only, does not go into web pages, and stops at `budgetMs`.
+    static func titles(_ app: AXUIElement, budgetMs: Double = 150) -> [String] {
+        let t0 = Date()
+        var out: [String] = []
+        func walk(_ e: AXUIElement, _ depth: Int) {
+            guard depth < 12 else { return }
+            for c in elements(e, "AXChildren") {
+                if Date().timeIntervalSince(t0) * 1000 > budgetMs { return }
+                let r = role(c)
+                if SafetyPolicy.isTitle(role: r, subrole: subrole(c)) {
+                    if let t = string(c, "AXTitle") ?? string(c, "AXDescription"), !t.isEmpty { out.append(t) }
+                    continue
+                }
+                if r != "AXWebArea" { walk(c, depth + 1) }
+            }
+        }
+        for w in elements(app, "AXWindows") {
+            if let t = string(w, "AXTitle"), !t.isEmpty { out.append(t) }
+            walk(w, 0)
+        }
+        return out
+    }
+
     /// The actions that the element offers, for example "AXPress".
     static func actions(_ el: AXUIElement) -> [String] {
         var names: CFArray?

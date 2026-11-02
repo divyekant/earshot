@@ -18,8 +18,8 @@ public final class EarshotActionRunner: ActionRunner {
     /// The focus method that worked last time for each app id: "app", "set" or "click" (E0).
     private var learnedFocus: [String: String]
     /// The last screen read. "Click e3" finds its element here.
-    private var last: ScreenRead?
-    private let overlay = NumberOverlay()
+    var last: ScreenRead?
+    let overlay = NumberOverlay()
     /// The field that earshot typed the chat name into, for the current command.
     private var searchField: AXUIElement?
     private var focusMethod = "none"
@@ -529,7 +529,8 @@ public final class EarshotActionRunner: ActionRunner {
         let label = item.element.label
         let pageRules = ActionRules.pageRulesApply(kind: item.kind, inPage: item.inPage)
         let sensitive = pageRules ? SafetyPolicy.sensitive(url: read.snapshot.url, elements: pageElements(read)) : nil
-        if let block = ActionRules.pressBlock(label: label, role: item.element.role, command: command, sensitive: sensitive) { return fail(block) }
+        if let block = ActionRules.pressBlock(label: label, role: item.element.role, subrole: item.element.subrole, command: command,
+                                              sensitive: sensitive) { return fail(block) }
         // Chrome keeps hidden tabs in the tree and ignores a press on them (E2 live run 1).
         if item.inPage, read.web, read.areaPath != "hit test" { return fail("not clicked: the page can be a hidden tab") }
         await waitForKeysUp(watch)
@@ -588,8 +589,8 @@ public final class EarshotActionRunner: ActionRunner {
                 let url = AX.window(app).flatMap { ScreenReader.visibleWebArea($0) }.flatMap { ScreenReader.address($0) }
                 if let block = ActionRules.afterScrollBlock(before: read.snapshot.url, after: url) { return fail(block) }
                 let sensitiveNow = SafetyPolicy.sensitive(url: url, elements: pageElements(read))
-                if let block = ActionRules.pressBlock(label: again.label, role: item.element.role, command: command,
-                                                      sensitive: sensitiveNow) { return fail(block) }
+                if let block = ActionRules.pressBlock(label: again.label, role: item.element.role, subrole: item.element.subrole,
+                                                      command: command, sensitive: sensitiveNow) { return fail(block) }
             }
             point = safePoint(h, f)
             // In view, but the top element at each point is another one, for example a fixed header.
@@ -617,11 +618,11 @@ public final class EarshotActionRunner: ActionRunner {
 
     /// The elements of the page only. A browser toolbar control, for example a "Passwords" button, does not make
     /// a page a sign-in page.
-    private func pageElements(_ read: ScreenRead) -> [ScreenElement] {
+    func pageElements(_ read: ScreenRead) -> [ScreenElement] {
         read.snapshot.elements.filter { read.items[$0.id]?.inPage ?? true }
     }
 
-    private func frontmost(_ pid: pid_t) -> Bool { NSWorkspace.shared.frontmostApplication?.processIdentifier == pid }
+    func frontmost(_ pid: pid_t) -> Bool { NSWorkspace.shared.frontmostApplication?.processIdentifier == pid }
 
     /// True if `node` is `target`, or the same link: same role, same address and same frame.
     private func sameElement(_ node: AXUIElement, _ target: AXUIElement) -> Bool {
@@ -732,9 +733,9 @@ public final class EarshotActionRunner: ActionRunner {
 
     // MARK: - Screen reads
 
-    private func windowFrame(_ pid: pid_t) -> Frame? { AX.window(AX.appElement(pid)).flatMap { AX.frame($0) } }
+    func windowFrame(_ pid: pid_t) -> Frame? { AX.window(AX.appElement(pid)).flatMap { AX.frame($0) } }
 
-    private func freshRead(forceOCR: Bool) async -> ScreenRead? {
+    func freshRead(forceOCR: Bool) async -> ScreenRead? {
         guard AX.trusted(), let pid = AX.frontPid(), pid != getpid() else { return nil }
         guard var read = ScreenReader.read(pid: pid, maxElements: options.maxElements) else { return nil }
         let labelled = read.snapshot.elements.filter { !$0.label.isEmpty }.count
@@ -747,7 +748,7 @@ public final class EarshotActionRunner: ActionRunner {
 
     /// The reason, if the front app shows a sign-in, code or payment page. It uses the last read of the same app,
     /// the page address, and the focused field.
-    private func sensitiveNow(app: AXUIElement, pid: pid_t) -> String? {
+    func sensitiveNow(app: AXUIElement, pid: pid_t) -> String? {
         if let f = AX.focused(app), AX.subrole(f) == "AXSecureTextField" { return "a password field" }
         var url: String?
         var elements: [ScreenElement] = []
@@ -769,7 +770,11 @@ public final class EarshotActionRunner: ActionRunner {
         watch.mark("find")
         let title = AX.string(item, "AXTitle") ?? path.last ?? ""
         guard AX.bool(item, "AXEnabled") != false else { return fail("the menu item \"\(title)\" is off") }
-        if let block = ActionRules.pressBlock(label: title, role: MenuElements.role, command: command, sensitive: nil) {
+        // A title that the strict rule blocks: read the tabs and windows again, to see if it names one of them.
+        let app = AX.appElement(pid)
+        let isTitle = SafetyPolicy.isRisky(title) && WindowTitles.names(title, in: AX.titles(app))
+        if let block = ActionRules.pressBlock(label: title, role: MenuElements.role, subrole: isTitle ? MenuElements.titleSubrole : nil,
+                                              command: command, sensitive: nil) {
             return fail(block)
         }
         await waitForKeysUp(watch)

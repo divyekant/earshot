@@ -6,7 +6,7 @@ import Speech
 
 /// The macOS permissions that earshot needs.
 public enum Permission: String, CaseIterable, Sendable, Identifiable {
-    case accessibility, microphone, speech, inputMonitoring
+    case accessibility, microphone, speech, inputMonitoring, screenRecording
     public var id: String { rawValue }
 
     public var title: String {
@@ -15,6 +15,7 @@ public enum Permission: String, CaseIterable, Sendable, Identifiable {
         case .microphone: return "Microphone"
         case .speech: return "Speech recognition"
         case .inputMonitoring: return "Input Monitoring"
+        case .screenRecording: return "Screen Recording"
         }
     }
 
@@ -25,6 +26,7 @@ public enum Permission: String, CaseIterable, Sendable, Identifiable {
         case .microphone: return "Hear commands. Audio stays on this Mac."
         case .speech: return "Use the Apple speech engine on this Mac."
         case .inputMonitoring: return "Read the hold key while another app is in front."
+        case .screenRecording: return "Optional. Read text in apps with poor labels (on this Mac), and the \"Jev sees the screen\" setting."
         }
     }
 
@@ -36,6 +38,7 @@ public enum Permission: String, CaseIterable, Sendable, Identifiable {
         case .microphone: anchor = "Privacy_Microphone"
         case .speech: anchor = "Privacy_SpeechRecognition"
         case .inputMonitoring: anchor = "Privacy_ListenEvent"
+        case .screenRecording: anchor = "Privacy_ScreenCapture"
         }
         return URL(string: "x-apple.systempreferences:com.apple.preference.security?\(anchor)")!
     }
@@ -45,7 +48,7 @@ public enum Permission: String, CaseIterable, Sendable, Identifiable {
         switch self {
         case .microphone: return "NSMicrophoneUsageDescription"
         case .speech: return "NSSpeechRecognitionUsageDescription"
-        case .accessibility, .inputMonitoring: return nil
+        case .accessibility, .inputMonitoring, .screenRecording: return nil
         }
     }
 }
@@ -68,6 +71,8 @@ public enum Permissions {
             return AXIsProcessTrusted() ? .granted : .denied
         case .inputMonitoring:
             return CGPreflightListenEventAccess() ? .granted : .denied
+        case .screenRecording:
+            return CGPreflightScreenCaptureAccess() ? .granted : .denied
         case .microphone:
             switch AVCaptureDevice.authorizationStatus(for: .audio) {
             case .authorized: return .granted
@@ -97,6 +102,8 @@ public enum Permissions {
             _ = AXIsProcessTrustedWithOptions([key: true] as CFDictionary)
         case .inputMonitoring:
             _ = CGRequestListenEventAccess()
+        case .screenRecording:
+            _ = CGRequestScreenCaptureAccess()
         case .microphone:
             AVCaptureDevice.requestAccess(for: .audio) { _ in }
         case .speech:

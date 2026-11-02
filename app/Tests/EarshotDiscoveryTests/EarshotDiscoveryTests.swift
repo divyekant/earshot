@@ -446,3 +446,21 @@ final class LiveDiscoveryTests: XCTestCase {
         }
     }
 }
+
+final class MenuTitleTests: XCTestCase {
+    func testTabMenuTitlesAndSkippedMenus() {
+        let fpl = "FPL Guru — AI Fantasy Premier League transfer tips, captain picks & chip strategy | FPL Guru"
+        let bar = [
+            MenuNode(title: "Tab", children: [MenuNode(title: "Close Tab"), .line,
+                                              MenuNode(title: "FPL Guru — AI Fantasy Premier L…icks & chip strategy | FPL Guru")]),
+            MenuNode(title: "Bookmarks", children: [MenuNode(title: "Story Number 10,000 - Read Online")]),
+            MenuNode(title: "History", children: [MenuNode(title: "Show Full History")]),
+        ]
+        let items = MenuIndex.flatten(bar, titles: [fpl + " - Memory usage - 491 MB"])
+        XCTAssertEqual(items.map(\.title), ["Close Tab", "FPL Guru — AI Fantasy Premier L…icks & chip strategy | FPL Guru"])
+        XCTAssertEqual(items.map(\.isTitle), [false, true])
+        XCTAssertEqual(items.map(\.risky), [true, false])
+        // A title that starts with a menu risky word stays risky ("Empty" is in MenuIndex.riskyWords).
+        XCTAssertTrue(MenuItem(path: ["Window", "Empty the inbox of the support team"], enabled: true, isTitle: true).risky)
+    }
+}

@@ -14,6 +14,8 @@ You look at the screen and say what you want. earshot finds the correct app, foc
 
 earshot is early software. The first full build of the app is in progress. Expect bugs and changes to the settings format.
 
+Each release has a tag `vX.Y.Z` and notes on the [Releases](https://github.com/divyekant/earshot/releases) page. [CHANGELOG.md](CHANGELOG.md) lists the changes. The `main` branch holds the latest release. The `develop` branch holds the work for the next release.
+
 The experiments that showed that earshot is viable are in [docs/experiments/](docs/experiments/).
 
 ## What earshot does
@@ -145,6 +147,7 @@ earshot waits at most 1 s for Jev. After that, the rules answer wins.
 - [docs/DECISIONS.md](docs/DECISIONS.md) lists the options that were rejected, and the reasons.
 - [docs/BUILD-PLAN.md](docs/BUILD-PLAN.md) splits the build into tasks.
 - [docs/research/](docs/research/) holds the research that supports the design.
+- [docs/RELEASING.md](docs/RELEASING.md) gives the branches, the version numbers and the release procedure.
 - [AGENTS.md](AGENTS.md) holds the rules for coding agents.
 
 ## Contribute

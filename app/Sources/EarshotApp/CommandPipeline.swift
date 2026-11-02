@@ -13,6 +13,14 @@ import Foundation
 protocol CommandActions: AnyObject {
     func screen() async -> ScreenSnapshot?
     func run(_ intent: Intent, context: RouteContext, command: CommandInfo) async -> ActionOutcome
+    /// The screenshot fallback (D-10). EarshotActionRunner has it in VisionFallback.swift.
+    func visionTarget(_ command: String, mode: InputMode, picker: ScreenPicker, budgetMs: Int) async -> VisionTarget
+}
+
+extension CommandActions {
+    func visionTarget(_ command: String, mode: InputMode, picker: ScreenPicker, budgetMs: Int) async -> VisionTarget {
+        VisionTarget(elementID: nil, label: "", note: "no screenshot fallback", stages: [:])
+    }
 }
 
 extension EarshotActionRunner: CommandActions {}
@@ -43,6 +51,10 @@ final class CommandPipeline {
     var namesNotReady: () -> Int = { 0 }
     /// The cached menu items of an app as screen elements (MenuCache.cached). It must not read: a menu read takes up to 1 s.
     var menus: (String) -> [ScreenElement] = { _ in [] }
+    /// The screenshot picker (D-10). Nil is off, the default (ScreenPickerFactory.make).
+    var picker: ScreenPicker?
+    /// The longest wait for the screenshot fallback (settings.jevScreenBudgetMs).
+    var jevScreenBudgetMs = 1500
     private var lastCommandAt: Date?
     /// The speech engine's line for the log of the current command (engine, why, audio length).
     private var speechSummary = ""
@@ -138,6 +150,22 @@ final class CommandPipeline {
             let top = result.alternatives.prefix(3).map { IntentText.describe($0, apps: rows, screen: context.screen) }
             why += String(format: " · confidence %.2f", result.confidence) + (top.isEmpty ? "" : " · considered: " + top.joined(separator: " | "))
         }
+        // The screenshot fallback (D-10): one picture to Jev, only for a hold-key press with no sure target that the
+        // rules did not block. The click path checks the label again at the tier .jev, so a risky label stays blocked.
+        if let picker, mode == .hold, !sensitive, Self.mayAskScreen(text, result) {
+            let v = await actions.visionTarget(text, mode: mode, picker: picker, budgetMs: jevScreenBudgetMs)
+            for (k, ms) in v.stages { stages["vision." + k] = ms }
+            if let id = v.elementID {
+                why += " · Jev (screen): \(v.label) (\(v.note))"
+                let command = CommandInfo(mode: .hold, tier: .jev, spokenTarget: CommandRouter.spokenTarget(text))
+                let outcome = await actions.run(.click(elementID: id), context: context, command: command)
+                for (k, ms) in outcome.stages { stages["action." + k] = ms }
+                lastCommandAt = Date()
+                return done(heard: text, intent: "Click \"\(v.label)\" (screen)", tier: .jev, ok: outcome.ok, note: outcome.note,
+                            stages: stages, clock, why: why)
+            }
+            why += " · Jev (screen): \(v.note)"
+        }
         if result.confidence < SafetyPolicy.minimumConfidence {
             let options = result.alternatives.prefix(2).map { IntentText.describe($0, apps: rows, screen: context.screen) }
             let note = (["not sure: \(result.why)"] + options.map { "maybe \($0)" }).joined(separator: " · ")
@@ -158,6 +186,18 @@ final class CommandPipeline {
         for (k, v) in outcome.stages { stages["action." + k] = v }
         lastCommandAt = Date()
         return done(heard: text, intent: describe, tier: result.tier, ok: outcome.ok, note: outcome.note, stages: stages, clock, why: why)
+    }
+
+    /// True if the screenshot fallback may run for this route: a press by the router's verb parse, no sure target
+    /// (no intent, or an unsure click), and no block. A "blocked: …" route never goes to the screenshot. Never for
+    /// send, typing, a chat or an app.
+    static func mayAskScreen(_ text: String, _ result: RouteResult) -> Bool {
+        guard CommandRouter.isPress(text), !result.why.contains("blocked") else { return false }
+        switch result.intent {
+        case .none: return true
+        case .click: return result.confidence < SafetyPolicy.minimumConfidence
+        default: return false
+        }
     }
 
     /// The Test tab: route typed text, and run the actions only if `runActions` is true. A typed command counts as a
