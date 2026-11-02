@@ -15,6 +15,7 @@ enum Fixtures {
         AppEntry(id: "tigervnc", name: "TigerVNC", bundleID: "com.tigervnc.viewer", aliases: ["tigervnc"], approved: true),
         AppEntry(id: "whatsapp", name: "WhatsApp", bundleID: "net.whatsapp.WhatsApp", aliases: ["whatsapp"], isChat: true,
                  approved: true),
+        AppEntry(id: "chrome", name: "Google Chrome", bundleID: "com.google.Chrome", aliases: ["chrome"], approved: true),
         AppEntry(id: "chatgpt", name: "ChatGPT", bundleID: "com.openai.chat", aliases: ["chatgpt"], approved: true),
         // Not approved: the router must not route to it.
         AppEntry(id: "discord", name: "Discord", bundleID: "com.hnc.Discord", aliases: ["discord"], isChat: true, approved: false),
