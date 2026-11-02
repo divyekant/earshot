@@ -29,6 +29,38 @@ E2 measured voice clicks in Chrome (see [experiments/E2-web-and-speech.md](exper
 
 ## 3. Components
 
+### 3.0 Targets and verbs (R-MT-1, R-MT-2)
+
+earshot uses one model for all apps. A command is one verb and one target.
+
+**Verbs.** The set of verbs is small and fixed.
+
+| Verb | Intent | Examples |
+|---|---|---|
+| open | `openApp`, `openURL`, `openChat` | "open Zoom", "open hn.com", "Slack Ravi" |
+| press | `click` | "click Notifications", "select all", "click 5" |
+| type | `typeText`, `typeInto`, the text of `openChat` | "type see you at five", "search for voice control" |
+| scroll | `scroll` | "scroll down", "go to the top" |
+| back | `back` | "go back" |
+| send | `send` | "send" (hold key only, R-NV-5) |
+
+"Show numbers" and "hide numbers" are display helpers for press.
+
+**Targets.** earshot reads the targets from the apps at run time. It does not keep a list of targets for each app.
+
+| Source | Targets | When earshot reads it |
+|---|---|---|
+| Screen | Buttons, links, fields and rows of the front window. OCR text if the app gives no labels. | At each command (about 15 to 40 ms) |
+| Menus (in progress) | The enabled menu items of the front app, for example Edit > Select All. A menu item is a press target with the id `m:<path>`. | From a cache. earshot reads it again when an app becomes active. |
+| Chats | Sidebar names, the app's own search, the owner's own chat | From a cache (NameWarmer) |
+| Apps and sites | Approved apps, with the names and URL schemes that each app declares. Web addresses. | Catalogue at start |
+
+**Rules for new work.**
+1. Do not add a verb or an intent for one app or for one feature. If a command does not work, find the source that holds its target. Then add that source, or fix how earshot reads it.
+2. Add a new verb only if no current verb can do the command, for example drag. Record the reason in `docs/DECISIONS.md`.
+3. Every target goes through the same matcher and the same safety rules (`SafetyPolicy`), from any source.
+4. Facts about one app are data (`apps.json`, `names.json`, `focus-methods.json`). They are never code.
+
 ### 3.1 Audio gate (R-ON-1, R-ON-3)
 
 | Part | Proposed component | Notes |
