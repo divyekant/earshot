@@ -95,3 +95,23 @@ These are the reasons:
 **Decision:** Keep the direct Accessibility approach of E0 (DESIGN.md, section 3.5). Generic Accessibility logic plus one data row for each app is general and fast. A model that reads the screen for each command is general but slow.
 
 **Idea to keep:** Clicky moves a cursor to the element that it talks about. earshot can use a similar pointer as feedback before a voice click (R-FB-1, R-CL-1).
+
+## D-9. Jev as an opt-in tier 2
+
+Date: 2026-11-02.
+
+The E1 and E2 router tests compared the rules on the Mac, Jev alone, and the rules with Jev only when the rules are unsure.
+
+| Test | Rules on the Mac | Jev alone | Rules, then Jev if unsure |
+|---|---|---|---|
+| E1 chats, 42 commands | 40 | 39 | 42 |
+| E2 web pages, 45 commands (offline) | 42 | 44 | 45 |
+
+Jev added about 100 ms when it was called (warm connection). Jev alone made wrong choices that the rules did not make, for example a press on "Packages" for "click pricing plans".
+
+**Decision:** The router uses Jev only as an opt-in tier 2.
+- It is off by default. The owner switches it on in the app.
+- It sends text only: the command words and the short list of candidate labels. Audio never leaves the Mac.
+- It runs only when the rules are unsure.
+- It has a budget of 1 s. After the budget, the rules answer wins.
+

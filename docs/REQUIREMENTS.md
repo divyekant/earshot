@@ -76,7 +76,7 @@ The owner sees the screen and tells earshot what to do. earshot does not need to
 
 | ID | Requirement | Priority |
 |---|---|---|
-| R-MD-1 | All speech processing and all decisions run on the Mac. Audio does not go to a cloud service. | Must |
+| R-MD-1 | All speech processing runs on the Mac. Audio never leaves the Mac. Decisions run on the Mac by default. The owner can switch on Jev (tier 2) in the app. Then, only when the rules are unsure, earshot sends the command words and the short list of candidate labels to Jev, as text. | Must |
 | R-MD-2 | Use only small models. A model of 30B parameters is not necessary and is not wanted. | Must |
 | R-MD-3 | earshot uses little memory. Target: less than 2 GB total while idle and listening. Wispr Flow uses about 1.4 GB on this Mac, for comparison. | Should |
 | R-MD-4 | earshot uses open-source components where possible. | Should |
