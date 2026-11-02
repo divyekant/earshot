@@ -13,9 +13,11 @@ struct AppRow: Codable {
     let benchRuns: Int?
     /// The number of Part B script lines for this app. Half are "me" lines with text.
     let scriptLines: Int?
+    /// false leaves the app out of every command. The row stays as a record.
+    let enabled: Bool?
 
     enum CodingKeys: String, CodingKey {
-        case id, name, say, aliases, electron
+        case id, name, say, aliases, electron, enabled
         case bundleID = "bundle_id"
         case openChat = "open_chat"
         case typeIntoPrefilled = "type_into_prefilled"
@@ -81,7 +83,7 @@ struct PeopleFile: Codable { let people: [Person] }
 enum Config {
     static func loadApps() throws -> [AppRow] {
         let data = try Data(contentsOf: Paths.apps)
-        return try JSONDecoder().decode(AppTable.self, from: data).apps
+        return try JSONDecoder().decode(AppTable.self, from: data).apps.filter { $0.enabled != false }
     }
 
     static func loadPeople() throws -> [Person] {

@@ -29,9 +29,9 @@ The 1 s mark is an upper limit, not the goal. The owner counts about 100 ms as i
 
 ## 3. Method
 
-- Apps: Slack, WhatsApp and Messages. Each app opens a chat through its own search: the probe types the name and picks the top result. The test data is names only.
+- Apps: Slack and Messages. Each app opens a chat through its own search: the probe types the name and picks the top result. The test data is names only. WhatsApp is out of E0 (see 5.4).
 - Part A: `earshot-probe bench`. Typed commands into the owner's own chats, 10 for each app. Every second command starts from Finder.
-- Part B: `earshot-probe listen`. 23 spoken commands from a script: 10 for Slack, 4 for WhatsApp, 4 for Messages, then 5 in the owner's own words. Real contacts get focus only.
+- Part B: `earshot-probe listen`. 19 spoken commands from a script: 10 for Slack, 4 for Messages, then 5 in the owner's own words. Real contacts get focus only.
 - Speech: Apple SpeechTranscriber (macOS 26, on device), with fast results and the test names as context hints. The second engine is DictationTranscriber.
 
 Stages in the log, in milliseconds after the start (Part B: after key release):
@@ -120,7 +120,17 @@ Fixes in the next build:
 - WhatsApp: press Return in the search field (no Down).
 - The delete step compares word by word, so small changes to the text by the app do not block it.
 
-### 5.4 Part B
+### 5.4 WhatsApp is out of E0 (2026-11-02)
+
+The search for the owner's full name found no WhatsApp chat with that name. Return opened the top result, a message hit in another person's chat. The chat check failed, so the probe typed nothing. The owner chose to leave WhatsApp out of E0 and not to give the name of the WhatsApp self chat. The row stays in `probe/apps.json` with `"enabled": false`.
+
+What E0 learned about WhatsApp (version 26.42.79, a Catalyst app):
+- File > Search is Command-F. The search field is an AXStaticText with the AXSearchField subrole.
+- Search results are AXButton and AXStaticText rows, not AXRow. Down moves the focus to an AXGroup (iOSContentGroup).
+- The chat name is the description of the header button (identifier `NavigationBar_HeaderViewButton`), at 2 % of the window height.
+- A search for a name also lists message hits. If no chat has that name, the top result can be another chat. A later design needs a check of the result type before Return.
+
+### 5.5 Part B
 
 Not run yet.
 

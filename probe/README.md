@@ -45,13 +45,13 @@ Do these steps in your terminal app (for example Ghostty), in `~/projects/earsho
 
 ### Part A: typed commands (about 10 minutes)
 
-1. Open Slack, WhatsApp and Messages. Sign in to each app.
+1. Open Slack and Messages. Sign in to each app.
 2. Run `swift run earshot-probe bench`.
 3. Do not touch the keyboard or the mouse until the report shows.
 
 To test one app only, run `swift run earshot-probe bench slack 3`.
 
-### Part B: voice commands (about 12 minutes)
+### Part B: voice commands (about 10 minutes)
 
 1. Run `swift run earshot-probe listen`.
 2. Read the next line in the note at the top right of the screen.

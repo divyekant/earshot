@@ -19,7 +19,8 @@
       "aliases": ["whatsapp", "whats app"],
       "open_chat": { "kind": "switcher", "keys": "cmd+f", "pick": ["return"], "settle_ms": 300 },
       "bench_runs": 10,
-      "script_lines": 4
+      "script_lines": 4,
+      "enabled": false
     },
     {
       "id": "messages",
