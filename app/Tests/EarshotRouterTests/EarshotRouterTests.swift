@@ -402,6 +402,29 @@ final class EarshotRouterTests: XCTestCase {
         XCTAssertEqual(post.intent, .click(elementID: "e2"), "the exact risky label still gives a click: \(post.why)")
     }
 
+    // MARK: - "On <app>, <screen command>" (live: "On Chrome, click Chat" went to a Slack chat)
+
+    func testAppPrefixGoesToTheScreen() async {
+        let chatLink = ScreenSnapshot(bundleID: "com.google.Chrome", windowTitle: "Gemini", elements: [
+            Fixtures.el("e1", "AXLink", "Chat", y: 10), Fixtures.el("e2", "AXLink", "Settings", y: 10, x: 80),
+        ])
+        let chrome = RouteContext(apps: Fixtures.apps, names: Fixtures.names, frontBundleID: "com.google.Chrome", screen: chatLink)
+        await expect("On Chrome, click Chat", .click(elementID: "e1"), chrome)
+        await expect("uh, on Google Chrome click settings", .click(elementID: "e2"), chrome)
+        await expect("in Chrome scroll down", .scroll(.down), chrome)
+        let threads = ScreenSnapshot(bundleID: "com.tinyspeck.slackmacgap", windowTitle: "Slack", elements: [
+            Fixtures.el("e1", "AXButton", "Threads", y: 10),
+        ])
+        let slack = RouteContext(apps: Fixtures.apps, names: Fixtures.names, frontBundleID: "com.tinyspeck.slackmacgap",
+                                 screen: threads)
+        await expect("on Slack, click Threads", .click(elementID: "e1"), slack)
+        // The app is not in front: open it, and do not click on another app's screen.
+        let r = await route("On Chrome, click Chat", slack)
+        XCTAssertEqual(r.intent, .openApp(appID: "chrome"), r.why)
+        // Not a screen command: the chat rules still apply ("Francis on Messages" form).
+        await expect("on Slack message Ravi", chat("slack", "Ravi Kumar"), slack)
+    }
+
     func testE2NoCommand() async {
         let r = await route("what a lovely day", news)
         XCTAssertEqual(r.intent, .none)
