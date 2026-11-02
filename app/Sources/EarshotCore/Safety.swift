@@ -25,17 +25,43 @@ public enum SafetyPolicy {
         return String(scalars).split(separator: " ").joined(separator: " ")
     }
 
+    /// The strict rule: the label has a risky word or phrase anywhere.
     public static func isRisky(_ label: String) -> Bool {
         let n = normalize(label)
         if !Set(n.split(separator: " ").map(String.init)).isDisjoint(with: riskyWords) { return true }
         return riskyPhrases.contains { " \(n) ".contains(" \($0) ") }
     }
 
+    /// Roles that are not action controls: links, rows, cells and text. A label of these roles can hold
+    /// message text, for example a chat row "Darshan Pania · You: Sent a post". Every other role, and an unknown
+    /// role, keeps the strict rule. Groups and images keep it too: a click on a group or an image can land on a
+    /// child control, for example a group "Type a message Send" around a Send button.
+    public static let nonControlRoles: Set<String> = ["AXLink", "AXRow", "AXCell", "AXStaticText", "AXOutlineRow",
+                                                      "AXHeading", "AXListItem"]
+    /// A non-control label of this many words or fewer is a command label ("Delete account"), so the strict rule applies.
+    public static let shortLabelWords = 3
+
+    /// True if a press on an element with this label and role can change data, send something or spend money.
+    /// - A control (button, menu item, checkbox, pop-up button and similar), or an unknown role: the strict rule.
+    /// - A link, row, cell or text: risky only if the label is short (3 words or fewer) and has a risky word,
+    ///   or if the label starts with a risky word or phrase ("Delete this repository and all its issues").
+    public static func isRisky(_ label: String, role: String?) -> Bool {
+        guard let role, nonControlRoles.contains(role) else { return isRisky(label) }
+        let words = normalize(label).split(separator: " ").map(String.init)
+        if words.count <= shortLabelWords { return isRisky(label) }
+        if let first = words.first, riskyWords.contains(first) { return true }
+        let n = words.joined(separator: " ")
+        return riskyPhrases.contains { n == $0 || n.hasPrefix($0 + " ") }
+    }
+
+    public static func isRisky(_ element: ScreenElement) -> Bool { isRisky(element.label, role: element.role) }
+
     /// True if earshot may press the element with this label.
     /// A risky label needs all of these: the rules made the decision, the owner said the exact label,
     /// and the hold key started the command (R-NV-5: "click Send"; R-ON-5: no risky press from always-on).
-    public static func mayPress(label: String, spokenTarget: String, tier: RouterTier, mode: InputMode) -> Bool {
-        guard isRisky(label) else { return true }
+    /// `role` is the accessibility role of the element. Nil keeps the strict rule.
+    public static func mayPress(label: String, role: String? = nil, spokenTarget: String, tier: RouterTier, mode: InputMode) -> Bool {
+        guard isRisky(label, role: role) else { return true }
         return tier == .rules && mode == .hold && normalize(spokenTarget) == normalize(label)
     }
 

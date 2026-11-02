@@ -251,7 +251,7 @@ enum ScreenReader {
             let id = ActionRules.elementID(number: i + 1)
             let e = ScreenElement(id: id, role: d.role, subrole: d.subrole, label: d.label, url: d.url,
                                   inHeading: d.kind == "link" && areaPath != "window" ? inHeading(el) : false,
-                                  risky: SafetyPolicy.isRisky(d.label),
+                                  risky: SafetyPolicy.isRisky(d.label, role: d.role),
                                   x: d.frame.x, y: d.frame.y, w: d.frame.w, h: d.frame.h)
             elements.append(e)
             items[id] = ReadElement(element: e, kind: d.kind, handle: el)
@@ -269,7 +269,7 @@ enum ScreenReader {
             let label = ActionText.cleanLabel(text)
             guard !label.isEmpty, ActionRules.visible(f, in: read.viewport) else { continue }
             let id = ActionRules.elementID(number: elements.count + 1)
-            let e = ScreenElement(id: id, role: ActionRules.ocrRole, label: label, risky: SafetyPolicy.isRisky(label),
+            let e = ScreenElement(id: id, role: ActionRules.ocrRole, label: label, risky: SafetyPolicy.isRisky(label, role: ActionRules.ocrRole),
                                   x: f.x, y: f.y, w: f.w, h: f.h)
             elements.append(e)
             items[id] = ReadElement(element: e, kind: "text", handle: nil)
