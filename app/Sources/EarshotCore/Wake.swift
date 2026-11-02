@@ -95,9 +95,12 @@ public enum WakePhrase {
 
     /// Removes the wake phrase, and any words before it, from the start of a transcript.
     /// The speech engine starts before the phrase, so the text can begin with the phrase, a part of the word
-    /// before it, or a misheard form ("Hey, ear shot.", "hey Ershot"). If no form of the phrase is in the first
-    /// words, the text stays as it is.
-    public static func strip(_ text: String, phrase: String) -> String {
+    /// before it, or a misheard form ("Hey, ear shot.", "hey Ershot", "Here, at least" for "hey atlas").
+    /// If no form of the phrase is in the first words, the text stays as it is.
+    /// - Parameter afterWake: true if the spotter heard the phrase at the start of this turn. Then the last word
+    ///   of the phrase alone may also be a loose match. In a follow-up turn the phrase is often not there, so only
+    ///   the full phrase may be a loose match there.
+    public static func strip(_ text: String, phrase: String, afterWake: Bool = false) -> String {
         let target = words(phrase).joined()
         guard !target.isEmpty else { return text }
         let tokens = text.split(whereSeparator: { $0.isWhitespace }).map(String.init)
@@ -106,12 +109,20 @@ public enum WakePhrase {
         let lastWord = words(phrase).last ?? target
         var best: (end: Int, cost: Double)?
         for start in 0..<min(3, normal.count) {
+            // The phrase is the first words, or follows one short word ("So", "Yeah"). Apple speech can write a
+            // known phrase as other words there: in the live trial of 2026-11-02, 7 of 15 commands began with
+            // "Here, at least" or "He at least" for "hey atlas". So allow a loose match at the start only.
+            let early = start == 0 || (start == 1 && normal[0].count <= 4)
             for end in start..<min(start + 4, normal.count) {
                 let joined = normal[start...end].joined()
                 guard !joined.isEmpty else { continue }
                 for candidate in Set([target, lastWord]) where candidate.count >= 4 || candidate == target {
+                    let full = candidate == target
+                    // The last word alone: only at the start, so "search for atlas" keeps its last word.
+                    if !full && start > 1 { continue }
+                    let loose = early && (full || afterWake)
                     let distance = editDistance(joined, candidate)
-                    let allowed = max(1, candidate.count / 4)
+                    let allowed = loose ? max(1, candidate.count / 2) : max(1, candidate.count / 4)
                     guard distance <= allowed else { continue }
                     // Prefer the full phrase, then fewer skipped words, then a closer match.
                     let cost = Double(distance) / Double(candidate.count) + Double(start) * 0.2

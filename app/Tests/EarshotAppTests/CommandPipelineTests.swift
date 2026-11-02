@@ -133,6 +133,15 @@ final class CommandPipelineTests: XCTestCase {
         XCTAssertTrue(runner.runs.isEmpty)
     }
 
+    func testDroppedFollowUpIsLoggedWithNoText() {
+        let (p, _, runner) = make("")
+        let r = p.droppedFollowUp("not the owner's voice (0.31)")
+        XCTAssertEqual(r.heard, "", "the words were not the owner's, so the record has no text")
+        XCTAssertTrue(r.note.contains("0.31"), r.note)
+        XCTAssertFalse(r.ok)
+        XCTAssertTrue(runner.runs.isEmpty)
+    }
+
     func testAlwaysOnNeverSendsFromASentence() async {
         let send = RouteResult(intent: .send, confidence: 1, tier: .rules, ms: 0, why: "test")
         let (p, _, runner) = make("message the team and send it", router: FixedRouter(result: send))
