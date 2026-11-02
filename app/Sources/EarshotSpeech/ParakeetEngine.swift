@@ -12,7 +12,7 @@ public final class ParakeetEngine: SpeechEngine, @unchecked Sendable {
     public let id = ParakeetEngine.engineID
     public let modelPath: String
     public var onPartial: (@Sendable (String) -> Void)?
-    public var partials = PartialSchedule()
+    var partials = PartialSchedule()
 
     /// All model runs go through this queue, because one transcribe.cpp session is not thread safe.
     private let queue = DispatchQueue(label: "earshot.speech.parakeet", qos: .userInitiated)
