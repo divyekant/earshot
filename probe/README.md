@@ -9,7 +9,8 @@ The protocol and the pass marks are in [docs/experiments/E0-viability.md](../doc
 - Apple frameworks only: Speech, AVFoundation, Accessibility, AppKit and the Carbon hot-key service.
 - No third-party package, no model server and no network service.
 - The app table is data in [apps.json](apps.json) (R-MT-2).
-- Your test chats are in `people.json`. Git ignores this file.
+- Your test chats are in `people.json`. It holds names only. Git ignores this file.
+- Each app opens a chat through its own search: the probe types the name and picks the top result. No app needs a phone number or an email address.
 
 ## Safety
 
@@ -18,8 +19,11 @@ The protocol and the pass marks are in [docs/experiments/E0-viability.md](../doc
 The probe obeys these rules (R-NV-5, R-ON-5):
 
 1. It never presses Return or Send in a message box.
-2. It presses Return only in the Slack quick switcher. Before the press, it checks that the focused field holds exactly the name and is in the upper part of the window.
-3. It types text only into your own chats. For other people, it only focuses the box.
+2. It presses Return only to open a search result, one time for each command. Before the press, it checks the focus:
+   - If the focus is in a text field, the field must be in the upper part of the window and hold exactly the name.
+   - If the focus is not in a text field, it must be on a row of a result list.
+   - If the focus is in a message box or on a button, the probe presses Escape and stops.
+3. It types text only into your own chats, and only when the chat name on screen is exactly your name. For other people, it only focuses the box.
 4. It types only into an empty box, or into a box that holds earlier "[earshot test]" text.
 5. It removes control characters from all typed text.
 6. It saves no audio.
@@ -30,7 +34,7 @@ Do these steps in your terminal app (for example Ghostty), in `~/projects/earsho
 
 ### Setup (one time)
 
-1. Run `swift run earshot-probe setup`. Answer the questions about your test chats.
+1. Run `swift run earshot-probe setup`. Give your name as Slack shows it, and up to 5 contact names.
 2. Run `swift run earshot-probe check`.
 3. If Accessibility is off, turn on your terminal app in System Settings > Privacy & Security > Accessibility.
 4. Quit the terminal app, open it again, and run `swift run earshot-probe check` again.
@@ -38,13 +42,13 @@ Do these steps in your terminal app (for example Ghostty), in `~/projects/earsho
 
 ### Part A: typed commands (about 10 minutes)
 
-1. Open Slack, WhatsApp, Messages and Mail. Sign in to each app.
+1. Open Slack, WhatsApp and Messages. Sign in to each app.
 2. Run `swift run earshot-probe bench`.
 3. Do not touch the keyboard or the mouse until the report shows.
 
 To test one app only, run `swift run earshot-probe bench slack 3`.
 
-### Part B: voice commands (about 25 minutes)
+### Part B: voice commands (about 12 minutes)
 
 1. Run `swift run earshot-probe listen`.
 2. Read the next line in the note at the top right of the screen.
@@ -61,6 +65,7 @@ Run `swift run earshot-probe report`. The report shows the result for each app.
 
 | Command | What it does |
 | --- | --- |
+| `swift run earshot-probe inspect --launch` | Reads the menu shortcuts and the text fields of each app. It presses no key and types nothing. |
 | `swift run earshot-probe route "Slack me, running late"` | Shows how the router reads a command. It does no action. |
 | `swift run earshot-probe run "Slack me, running late"` | Runs one typed command. |
 | `swift run earshot-probe transcribe file.aiff` | Transcribes an audio file and shows the time. |

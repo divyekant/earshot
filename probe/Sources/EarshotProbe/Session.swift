@@ -16,14 +16,15 @@ struct ScriptLine {
         guard let me = people.first(where: { $0.me }) else { return [] }
         let others = people.filter { !$0.me }
         var perApp: [[ScriptLine]] = []
-        for (a, app) in apps.enumerated() where me.handles[app.id] != nil {
+        for (a, app) in apps.enumerated() where me.handle(for: app) != nil {
+            let half = max(1, (app.scriptLines ?? 10) / 2)
             var lines: [ScriptLine] = []
-            for i in 0..<5 {
+            for i in 0..<half {
                 let phrase = phrases[(a * 3 + i) % phrases.count]
                 lines.append(ScriptLine(say: "\(app.spoken) me, \(phrase)", appID: app.id, personName: me.name))
             }
-            let reachable = others.filter { $0.handles[app.id] != nil }
-            for i in 0..<5 {
+            let reachable = others.filter { $0.handle(for: app) != nil }
+            for i in 0..<half {
                 if reachable.isEmpty {
                     lines.append(ScriptLine(say: "\(app.spoken) me", appID: app.id, personName: me.name))
                 } else {
@@ -35,7 +36,8 @@ struct ScriptLine {
         }
         // Mix the apps, so that most commands start from another app.
         var mixed: [ScriptLine] = []
-        for i in 0..<10 {
+        let longest = perApp.map(\.count).max() ?? 0
+        for i in 0..<longest {
             for lines in perApp where i < lines.count { mixed.append(lines[i]) }
         }
         let free = [

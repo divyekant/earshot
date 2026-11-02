@@ -7,8 +7,9 @@
       "bundle_id": "com.tinyspeck.slackmacgap",
       "aliases": ["slack"],
       "electron": true,
-      "open_chat": { "kind": "switcher", "keys": "cmd+k", "settle_ms": 250 },
-      "bench_runs": 10
+      "open_chat": { "kind": "switcher", "keys": "cmd+k", "pick": ["return"], "settle_ms": 250 },
+      "bench_runs": 10,
+      "script_lines": 10
     },
     {
       "id": "whatsapp",
@@ -16,8 +17,9 @@
       "say": "WhatsApp",
       "bundle_id": "net.whatsapp.WhatsApp",
       "aliases": ["whatsapp", "whats app"],
-      "open_chat": { "kind": "link", "template": "whatsapp://send?phone={handle}", "handle": "digits" },
-      "bench_runs": 10
+      "open_chat": { "kind": "switcher", "keys": "cmd+f", "pick": ["down", "return"], "settle_ms": 300 },
+      "bench_runs": 10,
+      "script_lines": 4
     },
     {
       "id": "messages",
@@ -25,18 +27,9 @@
       "say": "iMessage",
       "bundle_id": "com.apple.MobileSMS",
       "aliases": ["imessage", "messages", "message", "text", "sms"],
-      "open_chat": { "kind": "link", "template": "imessage:{handle}" },
-      "bench_runs": 10
-    },
-    {
-      "id": "mail",
-      "name": "Mail",
-      "say": "Email",
-      "bundle_id": "com.apple.mail",
-      "aliases": ["email", "mail"],
-      "open_chat": { "kind": "link", "template": "mailto:{handle}" },
-      "type_into_prefilled": true,
-      "bench_runs": 3
+      "open_chat": { "kind": "switcher", "keys": "cmd+f", "pick": ["down", "return"], "settle_ms": 300 },
+      "bench_runs": 10,
+      "script_lines": 4
     }
   ]
 }
