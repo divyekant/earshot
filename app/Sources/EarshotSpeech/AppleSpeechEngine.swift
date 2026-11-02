@@ -9,7 +9,7 @@ import Speech
 /// macOS downloads the speech model for the locale one time.
 /// It needs macOS 26. On older macOS, and if it does not load, `AppleSpeech.make` uses DictationEngine.
 @available(macOS 26, *)
-public final class AppleSpeechEngine: TurnSpeechEngine, @unchecked Sendable {
+public final class AppleSpeechEngine: TurnSpeechEngine, PrerollControl, @unchecked Sendable {
     public static let engineID = AppleSpeech.engineID
     public let id = AppleSpeechEngine.engineID
     public let locale: Locale
@@ -68,6 +68,8 @@ public final class AppleSpeechEngine: TurnSpeechEngine, @unchecked Sendable {
         lock.withLock { resolvedLocale = loc; self.format = format }
         return format
     }
+
+    public func setNextPreroll(seconds: Double) { lock.withLock { mic }?.setNextPreroll(seconds: seconds) }
 
     /// Key down: audio goes to the analyzer at once. The analyzer starts in parallel.
     public func begin() throws {

@@ -41,6 +41,21 @@ struct Preroll<T> {
         frames = 0
         return out
     }
+
+    /// Returns the newest chunks that cover `wanted` frames, oldest first, and empties the queue.
+    /// The older chunks are dropped.
+    mutating func drainLast(frames wanted: Int64) -> [T] {
+        var out: [T] = []
+        var got: Int64 = 0
+        for (item, count) in items.reversed() {
+            if got >= wanted { break }
+            out.append(item)
+            got += count
+        }
+        items.removeAll()
+        frames = 0
+        return out.reversed()
+    }
 }
 
 /// Silence at the end of the audio. The engines can drop the last word when the audio stops

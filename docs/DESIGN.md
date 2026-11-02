@@ -5,11 +5,13 @@ This design is a proposal. Phase 0 measurements can change it. Each section name
 ## 1. Pipeline
 
 ```
-mic ─► [1 Audio gate] ─► [2 Speech to text] ─► [3 "For me?" gate] ─► [4 Router] ─► [5 Actions] ─► [6 Feedback]
-         VAD                streaming ASR         rules + classifier     rules →        navigate /
-         end of turn                                                     embeddings →   focus / type /
-         owner voice                                                     tiny model     click
+mic ─► [1 Wake gate] ─► [2 Speech to text] ─► [3 Strip the phrase] ─► [4 Router] ─► [5 Actions] ─► [6 Feedback]
+        wake phrase       streaming ASR         (always-on only)        rules →        navigate /
+        owner voice                                                     embeddings →   focus / type /
+        end of turn                                                     tiny model     click
 ```
+
+With the hold key, the key replaces stages 1 and 3.
 
 ## 2. Latency budget (R-SP-1, R-SP-3)
 
@@ -17,7 +19,8 @@ mic ─► [1 Audio gate] ─► [2 Speech to text] ─► [3 "For me?" gate] �
 |---|---|
 | End of turn detected | 100–200 ms after speech stops |
 | Final transcript | 100–300 ms |
-| "For me?" gate + router | under 50 ms (tiers 0–1); under 300 ms (tier 2) |
+| Wake phrase detected (always-on) | 300–500 ms after the phrase; the command can follow at once |
+| Router | under 50 ms (tiers 0–1); under 300 ms (tier 2) |
 | Open app + conversation | 100–400 ms (deep link or quick switcher) |
 | Focus text box (accessibility) | under 100 ms native; under 300 ms Electron |
 | **Total to focused box** | **about 1 s** |
@@ -61,15 +64,27 @@ earshot uses one model for all apps. A command is one verb and one target.
 3. Every target goes through the same matcher and the same safety rules (`SafetyPolicy`), from any source.
 4. Facts about one app are data (`apps.json`, `names.json`, `focus-methods.json`). They are never code.
 
-### 3.1 Audio gate (R-ON-1, R-ON-3)
+### 3.1 Wake gate (R-ON-1, R-ON-2, R-ON-3, D-11)
 
-| Part | Proposed component | Notes |
+| Part | Component | Notes |
 |---|---|---|
-| Voice activity detection (VAD) | Silero VAD (about 2 MB, MIT) | Also test TEN VAD on the owner's own audio. |
-| End of turn | Pipecat Smart Turn v3 (about 8 MB, BSD-2) | Runs only after the VAD reports silence. Vendor latency is about 12 ms. |
-| Owner voice check | ECAPA-TDNN or CAM++ speaker embedding (CoreML) | Enroll the owner once. Reject segments below a tuned cosine score. |
+| Wake phrase | icefall KWS Zipformer (gigaspeech, 3.49M parameters, Apache-2.0), Core ML INT8 (`aufklarer/KWS-Zipformer-3M-CoreML-INT8`) | Open vocabulary: the phrase is text, no training. It runs on 320 ms chunks. Vendor time: 5.4 ms for each chunk on Apple silicon. |
+| Owner voice check | WeSpeaker ResNet34-LM (VoxCeleb, CC BY 4.0), Core ML (`aufklarer/WeSpeaker-ResNet34-LM-CoreML`) | 256-value embedding. Cosine similarity against the mean of 5 enrolment phrases. Start threshold 0.45. |
+| End of turn | `SpeechDetector` (energy with a noise floor that adapts) | 550 ms of quiet after the command. After the phrase alone, it waits 2 s for the command. |
 
-Swift SDKs: FluidAudio and speech-swift bundle these parts.
+The code is in `app/Sources/EarshotWake`. The spotter and voice code are copied from soniqo/speech-swift at `a57702e` (Apache-2.0, see THIRD_PARTY_NOTICES.md). The models download one time (about 18 MB) at pinned revisions, with a SHA-256 check, into `~/Library/Application Support/earshot/models/`.
+
+How a command flows (`EarshotInput/WakeTrigger.swift`):
+
+1. The spotter listens to 16 kHz audio. Between turns, nothing else runs. Speech without the phrase never reaches the speech engine.
+2. The spotter fires about 0.3 to 0.5 s after the phrase. If a voice is enrolled, the voice model scores the audio of the phrase. A low score stops here, and the log gets one line with no text.
+3. The speech engine starts at the start of the phrase. `MicrophoneFeed` keeps 3 s of audio, and `PrerollControl.setNextPreroll` gives the engine the phrase and every word after it.
+4. The turn ends after the command. The pipeline removes the phrase from the text (`WakePhrase.strip`), and the router runs as for the hold key.
+5. For 5 s after a command, speech in the owner's voice starts a turn with no phrase. The voice is checked at the end of the turn.
+
+The enrolment (Manage > General > Teach earshot your voice) records 5 phrases. earshot keeps the mean embedding and, for a made-up name, the word pieces that the spotter heard, in `voice.json`. It keeps no audio.
+
+Limits: the spotter is English only. The voice check is less sure on short audio. A made-up name ("hey earshot") also wakes on sound-alikes ("hey, your shot"). Intel Macs run Core ML on the CPU; measure the speed there.
 
 ### 3.2 Speech to text (R-MD-1, R-MD-5)
 
@@ -98,15 +113,11 @@ E2 (section 6.2) chose Parakeet by a small margin: 1 command in 126, on `say` vo
 
 Both engines miss the same names, so the router must also match names by sound.
 
-### 3.3 "Is this for me?" gate (R-ON-2, R-ON-5)
+### 3.3 "Is this for me?" (R-ON-2, R-ON-5)
 
-No open model for device-directed speech detection (DDSD) exists. Apple's work is paper-only, and Attention Labs SAA is cloud-only. Build the gate in layers:
+The wake phrase decides (D-11). The first design had a text gate with no wake word (a prefix rule, a follow-up window and a call context). It passed common command words in normal talk, and it had no voice check. D-11 removed it.
 
-1. **Prefix rule.** A transcript that starts with a known app name, verb or command word passes at once. Examples: "Slack…", "click…", "go to…", "show numbers".
-2. **Follow-up window.** For a few seconds after a command, accept speech without a prefix, for example the dictated message text.
-3. **Context.** If a call app has the microphone, require the prefix.
-4. **Classifier.** A small text classifier for other cases. Train it on the logs from Phase 3.
-5. **Safety.** Actions that cannot be undone, such as Send, need an explicit spoken command. A false trigger can only focus, open or type.
+The safety rule stays: actions that cannot be undone, such as Send, need the hold key. A false wake can only focus, open or type (`ActionRules.sendBlock`).
 
 ### 3.4 Router: "System 1" (R-SP-2, R-MD-2)
 
@@ -206,11 +217,11 @@ Label match, ordinal match, number hints, OCR fallback. E2 tested the label matc
 
 ### Phase 3: Always on
 
-Add the audio gate and the "for me?" gate (prefix rule, follow-up window, call context). Log every trigger and every rejection for one week.
+Add the wake gate (wake phrase, owner voice, follow-up window; D-11). Log every wake, every rejected wake and every voice score for one week. Then tune the voice threshold and decide if a trained wake model (livekit-wakeword) is needed.
 
 ### Phase 4: Learn
 
-Fine-tune the gate classifier and the tier-2 router on the Phase 3 logs. Add Hinglish support if Phase 0 found a usable model.
+Fine-tune the tier-2 router on the Phase 3 logs. Add Hinglish support if Phase 0 found a usable model.
 
 ## 6. Existing projects to study
 

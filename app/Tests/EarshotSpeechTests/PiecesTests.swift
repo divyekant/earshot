@@ -31,6 +31,28 @@ final class PiecesTests: XCTestCase {
         XCTAssertTrue(p.drain().isEmpty)
     }
 
+    // D-11: the feed keeps 3 s, and a normal turn still gets only the last 250 ms.
+    func testPrerollDrainLastTakesTheNewestChunks() {
+        var p = Preroll<Int>(limitFrames: 3000)
+        for i in 0..<40 { p.add(i, frames: 100) }
+        XCTAssertEqual(p.drainLast(frames: 250), [37, 38, 39])
+        XCTAssertEqual(p.frames, 0)
+        XCTAssertTrue(p.drain().isEmpty, "the older chunks are dropped")
+    }
+
+    func testPrerollDrainLastLongWakePreroll() {
+        var p = Preroll<Int>(limitFrames: 3000)
+        for i in 0..<40 { p.add(i, frames: 100) }
+        // A wake turn: start 1.4 s back (frames of 100 here), to hear the whole phrase.
+        XCTAssertEqual(p.drainLast(frames: 1400), Array(26...39))
+    }
+
+    func testPrerollDrainLastWithLessAudio() {
+        var p = Preroll<Int>(limitFrames: 3000)
+        p.add(1, frames: 100)
+        XCTAssertEqual(p.drainLast(frames: 2000), [1], "it gives what it has")
+    }
+
     func testTailPadFrames() {
         XCTAssertEqual(TailPad.frames(sampleRate: 16000), 4800)
         XCTAssertEqual(TailPad.frames(sampleRate: 48000, seconds: 0.25), 12000)

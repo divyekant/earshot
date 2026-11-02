@@ -14,6 +14,13 @@ earshot uses the parts in this file. Each part has its own license. The earshot 
 
 If you give a copy of a built `Earshot.app` to other people, include the transcribe.cpp license text with it.
 
+### speech-swift (copied source files)
+
+- Project: https://github.com/soniqo/speech-swift, commit `a57702e`
+- License: Apache-2.0. The full text is in `LICENSES/Apache-2.0.txt`. The project has no NOTICE file.
+- Use: the keyword spotter code (`Sources/SpeechWakeWord`) and the speaker embedding code (`Sources/SpeechVAD`, Core ML path only) run the wake phrase and the voice check of always-on mode (D-11).
+- The copied files are in `app/Sources/EarshotWake/KWS` and `app/Sources/EarshotWake/Voice`. Each file names its source file and the earshot changes in its first lines. earshot does not depend on the speech-swift package.
+
 ## Not included
 
 ### NVIDIA Parakeet model weights
@@ -21,6 +28,14 @@ If you give a copy of a built `Earshot.app` to other people, include the transcr
 - License: CC BY 4.0
 - earshot does not include and does not download a Parakeet model file. The owner sets the path to a GGUF file, or earshot reads the file of the Hex app if it is installed. earshot never changes, moves or copies that file.
 - If you give a Parakeet model file to other people, credit NVIDIA as CC BY 4.0 requires.
+
+### Wake phrase models (always-on mode)
+
+earshot downloads these model files from Hugging Face one time, when the owner turns on always-on mode. It uses pinned revisions and checks the SHA-256 sum of each file (`app/Sources/EarshotWake/ModelFiles.swift`). The files go to `~/Library/Application Support/earshot/models/`. The repository and the app bundle do not include them.
+
+- Keyword spotter: icefall KWS Zipformer (gigaspeech fine-tune, 3.49M parameters), from `pkufool/keyword-spotting-models`. Core ML conversion: https://huggingface.co/aufklarer/KWS-Zipformer-3M-CoreML-INT8 at revision `45929a2`. License: Apache-2.0.
+- Voice model: WeSpeaker ResNet34-LM, trained on VoxCeleb, from https://huggingface.co/pyannote/wespeaker-voxceleb-resnet34-LM. Core ML conversion: https://huggingface.co/aufklarer/WeSpeaker-ResNet34-LM-CoreML at revision `b358f33` (the conversion card says MIT). The source weights are CC BY 4.0. Credit: WeSpeaker (https://github.com/wenet-e2e/wespeaker) and VoxCeleb (https://www.robots.ox.ac.uk/~vgg/data/voxceleb/).
+- If you give these model files to other people, keep these credits with them.
 
 ### Apple frameworks
 
