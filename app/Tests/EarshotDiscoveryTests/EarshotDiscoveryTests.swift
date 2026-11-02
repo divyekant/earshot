@@ -201,6 +201,7 @@ final class NameRulesTests: XCTestCase {
         }
         XCTAssertNil(NameRules.sidebarName("Connect apps", appName: "Slack"))
         XCTAssertNil(NameRules.sidebarName("end-to-end encrypted", appName: "WhatsApp"))
+        XCTAssertNil(NameRules.sidebarName("message", appName: "WhatsApp"))
         XCTAssertEqual(NameRules.sidebarName("Mummy, 1 unread message", appName: "WhatsApp")?.name, "Mummy")
         XCTAssertEqual(NameRules.sidebarName("Nikhil Bose", appName: "WhatsApp")?.name, "Nikhil Bose")
         XCTAssertEqual(NameRules.sidebarName("Ghar .सब साथ में", appName: "WhatsApp")?.name, "Ghar .सब साथ में")
