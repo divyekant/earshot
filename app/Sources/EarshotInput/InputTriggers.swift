@@ -3,10 +3,14 @@ import Foundation
 
 /// Makes the trigger from the owner's settings. EarshotApp calls this at start and after a settings change.
 public enum InputTriggers {
-    /// Mode `.hold`: the hold key only. Mode `.alwaysOn`: always-on, and the hold key as the fallback (R-ON-4).
-    public static func make(_ settings: EarshotSettings) -> InputSwitch {
+    /// Mode `.hold`: the hold key only. Mode `.alwaysOn`: the wake phrase, and the hold key as the fallback (R-ON-4).
+    /// - Parameter wake: the wake phrase listener (EarshotWake). If it is nil, for example while the models load,
+    ///   always-on mode has the hold key only.
+    public static func make(_ settings: EarshotSettings, wake: WakeListener? = nil) -> InputSwitch {
         let hold = HoldKeyTrigger(settings: settings)
-        return InputSwitch(hold: hold, alwaysOn: settings.mode == .alwaysOn ? AlwaysOnTrigger() : nil)
+        var alwaysOn: InputTrigger?
+        if settings.mode == .alwaysOn, let wake { alwaysOn = WakeTrigger(listener: wake) }
+        return InputSwitch(hold: hold, alwaysOn: alwaysOn)
     }
 }
 
@@ -34,6 +38,12 @@ public final class InputSwitch: InputTrigger {
     }
 
     public var mode: InputMode { alwaysOn == nil ? .hold : .alwaysOn }
+
+    /// Pauses always-on, for example while earshot types, so that earshot does not hear its own typing.
+    public func setAlwaysOnPaused(_ value: Bool) { pauseAlwaysOn(value) }
+
+    /// A command finished: open the follow-up window of always-on.
+    public func commandFinished() { (alwaysOn as? WakeTrigger)?.openFollowUp() }
 
     public func start() throws {
         try hold.start()
@@ -91,7 +101,7 @@ public final class InputSwitch: InputTrigger {
     }
 
     private func pauseAlwaysOn(_ value: Bool) {
-        (alwaysOn as? AlwaysOnTrigger)?.setPaused(value)
+        (alwaysOn as? PausableTrigger)?.setPaused(value)
     }
 
     private func setCancel(_ trigger: InputTrigger, _ handler: @escaping (String) -> Void) {
@@ -104,5 +114,9 @@ public protocol CancellableTrigger: InputTrigger {
     var onCancel: ((String) -> Void)? { get set }
 }
 
+/// A trigger that can pause, for example while the hold key is down.
+public protocol PausableTrigger: InputTrigger {
+    func setPaused(_ value: Bool)
+}
+
 extension HoldKeyTrigger: CancellableTrigger {}
-extension AlwaysOnTrigger: CancellableTrigger {}

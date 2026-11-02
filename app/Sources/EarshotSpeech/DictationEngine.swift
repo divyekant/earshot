@@ -8,7 +8,7 @@ import Speech
 /// Apple silicon, so this engine is the Apple engine on other Macs.
 /// It always sets `requiresOnDeviceRecognition`. If this Mac cannot recognize the locale on the device,
 /// `prepare` throws. The engine never sends audio to a server.
-public final class DictationEngine: TurnSpeechEngine, @unchecked Sendable {
+public final class DictationEngine: TurnSpeechEngine, PrerollControl, @unchecked Sendable {
     public static let engineID = "apple-dictation"
     public let id = DictationEngine.engineID
     public let locale: Locale
@@ -58,6 +58,8 @@ public final class DictationEngine: TurnSpeechEngine, @unchecked Sendable {
         }
         lock.withLock { recognizer = r }
     }
+
+    public func setNextPreroll(seconds: Double) { lock.withLock { mic }?.setNextPreroll(seconds: seconds) }
 
     public func begin() throws {
         guard let mic = lock.withLock({ self.mic }) else {

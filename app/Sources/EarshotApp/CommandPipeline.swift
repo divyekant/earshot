@@ -6,7 +6,7 @@ import EarshotSpeech
 import EarshotUI
 import Foundation
 
-// T7: the command path. Speech → "for me?" gate → router → (app search) → actions → note and log.
+// T7: the command path. Speech → (always-on: strip the wake phrase) → router → (app search) → actions → note and log.
 // The pipeline uses protocols, so that the unit tests can give fake engines and runners.
 
 /// The action module as the pipeline uses it. EarshotActionRunner is the real one.
@@ -46,7 +46,10 @@ final class CommandPipeline {
     /// Pauses always-on while earshot types, so that earshot does not hear its own typing.
     var pauseAlwaysOn: (Bool) -> Void = { _ in }
     var heardName: (String, RouteContext) -> (name: String, appID: String?)? = CommandRouter.heardName
-    var gate = ForMeGate()
+    /// The wake phrase of always-on mode (settings.wakePhrase). The pipeline removes it from the start of the text.
+    var wakePhrase = WakePhrase.defaultPhrase
+    /// The wake of the open always-on turn, for the log (D-11). Nil for a hold-key turn and a follow-up turn.
+    var pendingWake: WakeHit?
     /// The number of chat apps whose names were not ready within the names budget in this command.
     var namesNotReady: () -> Int = { 0 }
     /// The cached menu items of an app as screen elements (MenuCache.cached). It must not read: a menu read takes up to 1 s.
@@ -55,7 +58,6 @@ final class CommandPipeline {
     var picker: ScreenPicker?
     /// The longest wait for the screenshot fallback (settings.jevScreenBudgetMs).
     var jevScreenBudgetMs = 1500
-    private var lastCommandAt: Date?
     /// The speech engine's line for the log of the current command (engine, why, audio length).
     private var speechSummary = ""
 
@@ -80,7 +82,9 @@ final class CommandPipeline {
         let clock = Stopwatch()
         speechSummary = ""  // a speech error must not show the line of the last command
         var stages: [String: Double] = [:]
-        let text: String
+        let wake = mode == .alwaysOn ? pendingWake : nil
+        pendingWake = nil
+        var text: String
         do {
             text = try await engine.end().text.trimmingCharacters(in: .whitespacesAndNewlines)
         } catch {
@@ -94,19 +98,13 @@ final class CommandPipeline {
             stages["speech.audio"] = (timing.audioMs * 10).rounded() / 10
             speechSummary = timing.summary
         }
-        guard !text.isEmpty else { return done(heard: "", intent: "none", tier: .none, ok: false, note: "no words", stages: stages, clock, quiet: true) }
-
-        // Always-on: is it for earshot? (R-ON-2, R-ON-5)
-        var maySend = true
         if mode == .alwaysOn {
-            let since = lastCommandAt.map { Date().timeIntervalSince($0) }
-            switch gate.check(text, apps: apps(), secondsSinceLastCommand: since) {
-            case .notForMe(let why):
-                return done(heard: text, intent: "none", tier: .none, ok: false, note: "not for earshot: \(why)", stages: stages, clock, quiet: true)
-            case .forMe(_, let send, _):
-                maySend = send
-            }
+            // The trigger opens an always-on turn only on the wake phrase, or in the follow-up window in the owner's
+            // voice (D-11). So the text is for earshot. The speech engine starts before the phrase: remove it.
+            if let wake { speechSummary = Self.wakeSummary(wake) + (speechSummary.isEmpty ? "" : " · " + speechSummary) }
+            text = WakePhrase.strip(text, phrase: wakePhrase)
         }
+        guard !text.isEmpty else { return done(heard: "", intent: "none", tier: .none, ok: false, note: "no words", stages: stages, clock, quiet: true) }
 
         let rows = apps().filter { $0.approved && $0.enabled }
         // The names and the screen read do not depend on each other, so they run side by side.
@@ -160,7 +158,6 @@ final class CommandPipeline {
                 let command = CommandInfo(mode: .hold, tier: .jev, spokenTarget: CommandRouter.spokenTarget(text))
                 let outcome = await actions.run(.click(elementID: id), context: context, command: command)
                 for (k, ms) in outcome.stages { stages["action." + k] = ms }
-                lastCommandAt = Date()
                 return done(heard: text, intent: "Click \"\(v.label)\" (screen)", tier: .jev, ok: outcome.ok, note: outcome.note,
                             stages: stages, clock, why: why)
             }
@@ -172,8 +169,12 @@ final class CommandPipeline {
             return done(heard: text, intent: describe, tier: result.tier, ok: false, note: note, stages: stages, clock, why: why)
         }
 
-        var intent = result.intent
-        if mode == .alwaysOn, intent == .send, !maySend { intent = .none }
+        let intent = result.intent
+        if mode == .alwaysOn, intent == .send {
+            // A false wake must never send (R-ON-5, R-NV-5). The action rules block it too (ActionRules.sendBlock).
+            return done(heard: text, intent: describe, tier: result.tier, ok: false, note: "send needs the hold key",
+                        stages: stages, clock, why: why)
+        }
         if intent == .none {
             return done(heard: text, intent: "none", tier: result.tier, ok: false, note: "not a command", stages: stages, clock, why: why)
         }
@@ -184,8 +185,24 @@ final class CommandPipeline {
         let outcome = await actions.run(intent, context: context, command: command)
         if types { pauseAlwaysOn(false) }
         for (k, v) in outcome.stages { stages["action." + k] = v }
-        lastCommandAt = Date()
         return done(heard: text, intent: describe, tier: result.tier, ok: outcome.ok, note: outcome.note, stages: stages, clock, why: why)
+    }
+
+    /// The log line of a wake: the voice score, or that no voice is enrolled.
+    static func wakeSummary(_ wake: WakeHit) -> String {
+        let voice = wake.voiceScore.map { String(format: "voice %.2f", $0) } ?? "voice not checked (not taught)"
+        return String(format: "wake \"%@\", %@, preroll %.2f s", wake.phrase, voice, wake.prerollSeconds)
+    }
+
+    /// Logs a wake phrase in a voice that is not the owner's (R-ON-3). Nothing ran. The record has no text,
+    /// because the speech engine did not run.
+    @discardableResult
+    func rejectedWake(_ wake: WakeHit, threshold: Double) -> ActivityRecord {
+        let score = wake.voiceScore.map { String(format: "%.2f", $0) } ?? "none"
+        let note = String(format: "wake phrase in another voice (score %@, needs %.2f)", score, threshold)
+        let record = ActivityRecord(heard: "", intent: "none", tier: .none, ok: false, note: note, stages: [:])
+        try? log?.append(record)
+        return record
     }
 
     /// True if the screenshot fallback may run for this route: a press by the router's verb parse, no sure target

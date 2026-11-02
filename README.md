@@ -105,7 +105,17 @@ To see the time of each step of each command, open the **Activity** tab.
 
 ### Always-on mode
 
-Always-on mode is off by default. In this mode, earshot listens all the time and decides if you speak to it. To turn it on, open **Manage… > General** and set **Mode** to **Always on**. earshot never presses Send or does a risky action from always-on mode. The hold key stays available.
+Always-on mode is off by default. In this mode, earshot listens for a wake phrase. The default phrase is "hey jarvis". Say the phrase, then the command, for example "hey jarvis, open Notes". Speech without the phrase does not start a command.
+
+To turn on always-on mode:
+
+1. Open **Manage… > General**.
+2. Set **Mode** to **Always on**. The first time, earshot downloads the wake phrase models (about 18 MB). The download sends no audio.
+3. Click **Teach earshot your voice…**, then say the phrase 5 times. earshot keeps a voice summary (256 numbers) on this Mac. It does not keep the audio.
+
+Until you teach earshot your voice, any voice can wake it. For 5 s after a command, your voice can give the next command with no phrase. To change the phrase, type it in **Wake phrase** and click **Save**. Real words work best. A made-up name can also wake earshot on words that sound like it.
+
+earshot never presses Send or does a risky action from always-on mode. The hold key stays available.
 
 ### Speech engines
 
