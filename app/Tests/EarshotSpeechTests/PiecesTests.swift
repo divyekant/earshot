@@ -118,8 +118,10 @@ final class ResolverTests: XCTestCase {
         XCTAssertTrue(SpeechEngines.make(s, locator: locator(["parakeet-a.gguf"])).engine is AppleSpeechEngine)
         s.engine = .auto
         let (e, _) = SpeechEngines.make(s, locator: locator(["parakeet-a.gguf"]))
-        XCTAssertEqual(e.id, "parakeet")
-        XCTAssertTrue(e is FallbackSpeechEngine)
+        XCTAssertEqual(e.id, "apple", "auto reports Apple until Parakeet is loaded")
+        XCTAssertTrue(e is AutoSpeechEngine)
+        s.engine = .parakeet
+        XCTAssertTrue(SpeechEngines.make(s, locator: locator(["parakeet-a.gguf"])).engine is FallbackSpeechEngine)
     }
 }
 
@@ -224,5 +226,33 @@ final class TurnTests: XCTestCase {
         let e = ParakeetEngine(modelPath: "/none.gguf", useMicrophone: false)
         e.feed([Float](repeating: 0.1, count: 1600))
         XCTAssertEqual(e.bufferedFrames, 0)
+    }
+}
+
+final class AutoPolicyTests: XCTestCase {
+    let p = AutoPolicy()
+
+    func testStartParakeetOnlyWhenLoadedAndNormal() {
+        XCTAssertTrue(p.tryParakeet(loaded: true, pressure: .normal).0)
+        XCTAssertFalse(p.tryParakeet(loaded: false, pressure: .normal).0)
+        let (start, why) = p.tryParakeet(loaded: true, pressure: .warning)
+        XCTAssertFalse(start)
+        XCTAssertEqual(why, "apple: memory pressure warning")
+        XCTAssertFalse(p.tryParakeet(loaded: true, pressure: .critical).0)
+    }
+
+    func testUseParakeetOnlyIfWarmUpWasFast() {
+        XCTAssertEqual(p.warmLimit(baselineMs: 10), 120)
+        XCTAssertEqual(p.warmLimit(baselineMs: 50), 200)
+        XCTAssertTrue(p.useParakeet(warmMs: 25, baselineMs: 20).0)
+        let (use, why) = p.useParakeet(warmMs: 900, baselineMs: 20)
+        XCTAssertFalse(use)
+        XCTAssertTrue(why.contains("weights not in memory"))
+        XCTAssertFalse(p.useParakeet(warmMs: nil, baselineMs: 20).0, "a warm-up that is not done means: do not wait for Parakeet")
+    }
+
+    func testPressureLevelReads() {
+        // The call must work on any Mac. The value depends on the Mac.
+        XCTAssertNotNil(MemoryPressureLevel(rawValue: MemoryPressureLevel.current().rawValue))
     }
 }
