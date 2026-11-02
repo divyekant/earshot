@@ -20,6 +20,7 @@ E1 follows [E0](E0-viability.md). E0 showed that one sentence can put the cursor
 - The Jev key comes from the `TYPESAFE_API_KEY` environment variable, else from `~/.config/jev-qa/env`. The probe never prints, logs or saves the key.
 - `catalogue`, `index`, `e1-make`, `e1-try` and `e1-run` press no key, click nothing and type nothing. `index --front` brings each chat app to the front for a moment, and then brings back the app that was in front.
 - `e1-open` presses keys to open the owner's own chat (the same as E0 Part A). It types no text. It runs only after the owner agrees.
+- `e1-search` presses keys: the search keys of the app, the name, Command-A, Delete and Escape. It never presses Return, so it opens no chat. The owner approved it on 2026-11-02.
 - WhatsApp stays out, by the owner's choice in E0.
 
 ## 3. Method
@@ -78,7 +79,18 @@ All routers get the same short list. Step 1 (the probe, on the Mac) makes it: th
 
 `earshot-probe e1-run` sends each command through all three and logs the answers and the times. It also counts each wrong chat: a chat that is not the correct one. A wrong chat is the unsafe error, because the owner can then type into the wrong chat.
 
-### 3.5 Generated rows open the chat
+### 3.5 The app's own search as the name source
+
+The first two runs showed that a sidebar shows only some chats: Slack showed 3 of its chats to Accessibility, and Messages shows only chats with history. But the app's own search knows every chat, and E0 already opens chats through it. `earshot-probe e1-search` tests this source:
+
+1. Bring the app to the front and press its search keys from the catalogue.
+2. Type the name. The E0 checks apply: the focus must move to a search field, and the field must show the name.
+3. Read the names below the search field, in the same column, until the list stops changing.
+4. Select the field text, delete it and press Escape. Never press Return.
+
+For each name, it logs the result names, the time until the list is stable, and the place of the best match. The names are the test contacts, the chat names from the test set, the chat names that another app shows, one misheard name, the owner's name and a name that is not in the owner's chats.
+
+### 3.6 Generated rows open the chat
 
 `earshot-probe e1-open` runs the E0 pipeline with the generated rows: it opens the owner's own chat in each chat app and focuses the box. It types nothing.
 
@@ -93,6 +105,7 @@ All routers get the same short list. Step 1 (the probe, on the Mac) makes it: th
 | Rules safety | When the rules are sure, they are correct for 98 % or more | 95 % to 98 % | Under 95 % |
 | Wrong chat | "Rules, Jev if unsure" opens no wrong chat | 1 or 2 wrong chats | 3 or more |
 | Generated rows | `e1-open` opens the own chat 3 of 3 in each app | 2 of 3 | Under 2 of 3 |
+| Search source | `e1-search` finds a matching chat for 9 of 10 known names in each app, in under 600 ms | 7 to 9 of 10, or under 1 s | Under 7 of 10 |
 
 ## 5. Results
 

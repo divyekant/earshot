@@ -197,42 +197,9 @@ final class Pipeline {
               pick.firstIndex(of: "return").map({ $0 == pick.count - 1 }) ?? true
         else { return "bad pick keys in apps.json: only down, up and one return at the end" }
 
-        // The search keys must move the focus. If the focus stays where it was, for example
-        // in a reply box, the probe stops, so that it never types the name into a message box.
-        let before = AX.focused(app)
-        if let keys = row.openChat.keys {
-            guard let combo = Keys.parse(keys) else { return "bad switcher keys in apps.json" }
-            Keys.press(combo)
-        } else if !focusSearchField(app) {
-            return "no search field found"
-        }
-        var found: AXUIElement?
-        let opened = await waitUntil(timeoutMs: 1200) {
-            guard let el = AX.focused(app), let win = AX.window(app), AX.isSwitcherField(el, in: win) else { return false }
-            if row.openChat.keys != nil, AX.same(el, before) { return false }
-            found = el
-            return true
-        }
-        guard opened, let field = found else { return "the search field did not get focus (\(describeFocus(app)))" }
-        // A search field can keep the last search. Select it, so that the name replaces it.
-        if !(AX.value(field) ?? "").isEmpty { Keys.press(Keys.selectAll) }
-
-        Keys.type(name)
+        let (found, failure) = await typeIntoSwitcher(app: app, row: row, name: name)
+        guard let target = found else { return failure ?? "the search field did not show the name" }
         let wanted = name.lowercased()
-        // Some apps move the focus into an inner text field when typing starts. Accept the
-        // focused element if it is the same field, or another search field that holds exactly the name.
-        var typedInto: AXUIElement?
-        let typed = await waitUntil(timeoutMs: 1000) {
-            guard let el = AX.focused(app), let win = AX.window(app),
-                  self.focusedValue(app)?.lowercased() == wanted,
-                  AX.same(el, field) || AX.isSwitcherField(el, in: win) else { return false }
-            typedInto = el
-            return true
-        }
-        guard typed, let target = typedInto else {
-            Keys.press(Keys.escape)
-            return "the search field did not show the name (\(describeFocus(app)))"
-        }
         searchField = target
         await sleepMs(row.openChat.settleMs ?? 250)
 
@@ -251,6 +218,48 @@ final class Pipeline {
             }
         }
         return nil
+    }
+
+    /// Opens the app's own search and types the name. It presses no Return.
+    /// Returns the field that holds the name, or the reason for the failure.
+    func typeIntoSwitcher(app: AXUIElement, row: AppRow, name: String) async -> (AXUIElement?, String?) {
+        // The search keys must move the focus. If the focus stays where it was, for example
+        // in a reply box, the probe stops, so that it never types the name into a message box.
+        let before = AX.focused(app)
+        if let keys = row.openChat.keys {
+            guard let combo = Keys.parse(keys) else { return (nil, "bad switcher keys in apps.json") }
+            Keys.press(combo)
+        } else if !focusSearchField(app) {
+            return (nil, "no search field found")
+        }
+        var found: AXUIElement?
+        let opened = await waitUntil(timeoutMs: 1200) {
+            guard let el = AX.focused(app), let win = AX.window(app), AX.isSwitcherField(el, in: win) else { return false }
+            if row.openChat.keys != nil, AX.same(el, before) { return false }
+            found = el
+            return true
+        }
+        guard opened, let field = found else { return (nil, "the search field did not get focus (\(describeFocus(app)))") }
+        // A search field can keep the last search. Select it, so that the name replaces it.
+        if !(AX.value(field) ?? "").isEmpty { Keys.press(Keys.selectAll) }
+
+        Keys.type(name)
+        let wanted = name.lowercased()
+        // Some apps move the focus into an inner text field when typing starts. Accept the
+        // focused element if it is the same field, or another search field that holds exactly the name.
+        var typedInto: AXUIElement?
+        let typed = await waitUntil(timeoutMs: 1000) {
+            guard let el = AX.focused(app), let win = AX.window(app),
+                  self.focusedValue(app)?.lowercased() == wanted,
+                  AX.same(el, field) || AX.isSwitcherField(el, in: win) else { return false }
+            typedInto = el
+            return true
+        }
+        guard typed, let target = typedInto else {
+            Keys.press(Keys.escape)
+            return (nil, "the search field did not show the name (\(describeFocus(app)))")
+        }
+        return (target, nil)
     }
 
     /// For an app with no search shortcut: focus the search field through accessibility, else click it.
