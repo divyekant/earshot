@@ -54,6 +54,23 @@ Stages in the log, in milliseconds after the start (Part B: after key release):
 
 ## 5. Results
 
+### 5.1 Before the session: speech from files (2026-11-02)
+
+Audio files made with `say`, no microphone. The time is from the start of analysis to the final text, for the whole file.
+
+| Engine | File | Text | Time |
+| --- | --- | --- | --- |
+| SpeechTranscriber | "Slack me, running late" (first run, model just installed) | "Slack me running late." | 176 ms |
+| SpeechTranscriber | "WhatsApp Ravi" | "WhatsApp Ravi." | 60 ms |
+| SpeechTranscriber | "Email me, call me after lunch" | "Email me, call me after lunch." | 73 ms |
+| SpeechTranscriber | "Slack me, running late" (warm) | "Slack me running late." | 56 ms |
+
+The router read all three transcripts correctly. The model download took about 2 s.
+
+DictationTranscriber with the `.shortDictation` preset sent no final result, so the first build returned empty text. `.progressiveShortDictation` and `.longDictation` send a final result. Both engines can drop the last word when the audio stops right after the speech. The probe now adds 300 ms of silence at key release and keeps the last volatile text if no final result arrives.
+
+### 5.2 Part A and Part B
+
 Not run yet.
 
 ## 6. Decision

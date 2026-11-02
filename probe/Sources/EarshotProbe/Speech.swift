@@ -22,21 +22,26 @@ struct SpeechModuleBox {
                                       attributeOptions: [])
             return SpeechModuleBox(module: t) {
                 Task {
-                    var text = ""
+                    var text = "", pending = ""
                     for try await r in t.results {
                         let s = String(r.text.characters)
-                        if r.isFinal { text += s } else { onVolatile?(text + s) }
+                        if r.isFinal { text += s; pending = "" } else { pending = s; onVolatile?(text + s) }
                     }
-                    return text
+                    // If the engine sends no final result for the last words, keep the volatile text.
+                    return text + pending
                 }
             }
         case .dictation:
-            let d = DictationTranscriber(locale: locale, preset: .shortDictation)
+            // .shortDictation sends no final result (measured on macOS 26.6.2), so use the progressive preset.
+            let d = DictationTranscriber(locale: locale, preset: .progressiveShortDictation)
             return SpeechModuleBox(module: d) {
                 Task {
-                    var text = ""
-                    for try await r in d.results where r.isFinal { text += String(r.text.characters) }
-                    return text
+                    var text = "", pending = ""
+                    for try await r in d.results {
+                        let s = String(r.text.characters)
+                        if r.isFinal { text += s; pending = "" } else { pending = s; onVolatile?(text + s) }
+                    }
+                    return text + pending
                 }
             }
         }
@@ -65,6 +70,8 @@ enum SpeechSetup {
     /// Asks macOS to download the speech model for this locale, if it is missing.
     static func ensureAssets(_ kind: EngineKind, locale: Locale) async throws {
         let box = SpeechModuleBox.make(kind, locale: locale)
+        // assetInstallationRequest returns a request even when the model is installed.
+        if await AssetInventory.status(forModules: [box.module]) == .installed { return }
         if let request = try await AssetInventory.assetInstallationRequest(supporting: [box.module]) {
             print("macOS is downloading the \(locale.identifier) speech model (one time)...")
             try await request.downloadAndInstall()
@@ -167,12 +174,26 @@ final class AudioFeed: @unchecked Sendable {
         continuation = c
     }
 
-    func end() {
+    /// Key up. Adds 300 ms of silence before the end of the input. The engines
+    /// can drop the last word when the audio stops right after the speech.
+    /// Silence costs no wait, because it is not real time.
+    func end(silenceSeconds: Double = 0.3) {
         lock.lock()
         let c = continuation
         continuation = nil
         lock.unlock()
+        if let c, let pad = silence(seconds: silenceSeconds) { c.yield(AnalyzerInput(buffer: pad)) }
         c?.finish()
+    }
+
+    private func silence(seconds: Double) -> AVAudioPCMBuffer? {
+        let frames = AVAudioFrameCount(outFormat.sampleRate * seconds)
+        guard frames > 0, let buffer = AVAudioPCMBuffer(pcmFormat: outFormat, frameCapacity: frames) else { return nil }
+        buffer.frameLength = frames
+        for b in UnsafeMutableAudioBufferListPointer(buffer.mutableAudioBufferList) {
+            if let data = b.mData { memset(data, 0, Int(b.mDataByteSize)) }
+        }
+        return buffer
     }
 }
 
