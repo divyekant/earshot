@@ -109,7 +109,7 @@ enum E2 {
             print(pad(site.id, 12) + pad("\(els.count)", 10) + pad("\(els.filter { $0.kind == "link" }.count)", 7)
                   + pad("\(els.filter { $0.kind == "button" }.count)", 9) + pad("\(els.filter { $0.kind == "field" }.count)", 8)
                   + pad("\(last.unlabelled)", 10) + pad(Stats.ms(read), 9) + pad(Stats.ms(find), 11)
-                  + pad(walkMs.map { "\(Stats.ms($0)) (\(walkCount ?? 0))" } ?? "-", 16) + last.method)
+                  + pad(walkMs.map { "\(Stats.ms($0)) (\(walkCount ?? 0))" } ?? "-", 16) + "\(last.method), page by \(last.areaPath)")
             let headed = els.filter(\.inHeading).count
             let risky = els.filter { WebRouter.isRisky($0.label) }.count
             print("    links in headings: \(headed), search fields: \(els.filter(\.isSearchField).count), risky labels: \(risky), full read with headings: \(Stats.ms(last.ms))")
@@ -461,11 +461,21 @@ enum E2 {
                     let label = e.element.flatMap { id in snap?.elements.first(where: { $0.id == id })?.label } ?? ""
                     return (e.action, Text.key(label))
                 }
-                let t0 = Clock.nowNs()
                 // Only an ordinal command needs the heading check.
                 let headings = WebRouter.parse(t.words).intent == "ordinal"
+                // Act only on a page that the hit test found on screen. A page found by the search can be a hidden tab.
+                if let check = WebPage.read(app, headings: false), check.areaPath != "hit test" {
+                    _ = await bringToFront(bundle)
+                    await sleepMs(500)
+                }
+                let t0 = Clock.nowNs()
                 guard let read = WebPage.read(app, headings: headings) else {
                     print("  no page in the front window. The run stops.")
+                    stop = true
+                    break
+                }
+                guard read.areaPath == "hit test" else {
+                    print("  the page is not on screen (found by \(read.areaPath) only). The run stops, so that no hidden tab gets a press.")
                     stop = true
                     break
                 }
@@ -569,7 +579,7 @@ enum E2 {
                     "event": "act", "id": t.id, "site": t.site, "kind": t.kind, "words": t.words,
                     "choice": choice.dictionary, "picked": picked?.label ?? "", "picked_kind": picked?.kind ?? "",
                     "ok": ok, "sure": r.sure, "why": r.why, "acted": acted, "after": after,
-                    "read_ms": readMs, "elements": read.elements.count, "method": read.method,
+                    "read_ms": readMs, "elements": read.elements.count, "method": read.method, "page_by": read.areaPath,
                     "route_ms": r.ms, "decide_ms": decideMs,
                 ]
                 if let jevMs { entry["jev_ms"] = jevMs }

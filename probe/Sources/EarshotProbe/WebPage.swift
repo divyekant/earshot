@@ -55,6 +55,8 @@ struct LiveRead {
     let ms: Double
     let findMs: Double
     let url: String
+    /// "hit test": the page is on screen. "search": the page can be a hidden tab, so do not act on it.
+    let areaPath: String
 }
 
 /// Not bound to the main actor: AX calls work on any thread.
@@ -123,9 +125,12 @@ enum WebPage {
     }
 
     /// The page of the visible tab: the hit test first, else the largest web area of the window.
+    static func webArea(in window: AXUIElement) -> AXUIElement? { findWebArea(in: window)?.0 }
+
+    /// The page and the way the probe found it: "hit test" (on screen) or "search" (can be a hidden tab).
     /// The search does not go into a web area.
-    static func webArea(in window: AXUIElement, maxNodes: Int = 3000) -> AXUIElement? {
-        if let visible = visibleWebArea(window) { return visible }
+    static func findWebArea(in window: AXUIElement, maxNodes: Int = 3000) -> (AXUIElement, String)? {
+        if let visible = visibleWebArea(window) { return (visible, "hit test") }
         var queue: [AXUIElement] = [window]
         var index = 0
         var best: (AXUIElement, Double)?
@@ -138,7 +143,7 @@ enum WebPage {
             }
             queue.append(contentsOf: AX.elements(el, "AXChildren"))
         }
-        return best?.0
+        return best.map { ($0.0, "search") }
     }
 
     static func address(_ el: AXUIElement) -> String? {
@@ -331,7 +336,9 @@ enum WebPage {
     /// `headings` finds the links in headings. It costs more AX calls, and only an ordinal command needs it.
     static func read(_ app: AXUIElement, walkOnly: Bool = false, headings: Bool = true) -> LiveRead? {
         let t0 = Clock.nowNs()
-        guard let window = AX.window(app), let area = webArea(in: window), let vp = AX.frame(area) else { return nil }
+        guard let window = AX.window(app), let found = findWebArea(in: window), let vp = AX.frame(found.0) else { return nil }
+        let area = found.0
+        let areaPath = found.1
         let findMs = Clock.ms(since: t0)
         var method = "predicate"
         var raw: [AXUIElement] = []
@@ -375,7 +382,7 @@ enum WebPage {
                                        x: d.frame.x, y: d.frame.y, w: d.frame.w, h: d.frame.h))
         }
         return LiveRead(elements: elements, handles: items.map(\.1), unlabelled: unlabelled, method: method,
-                        ms: Clock.ms(since: t0), findMs: findMs, url: address(area) ?? "")
+                        ms: Clock.ms(since: t0), findMs: findMs, url: address(area) ?? "", areaPath: areaPath)
     }
 
     /// Waits until the tab shows the page of `host` and the number of links stops changing.
