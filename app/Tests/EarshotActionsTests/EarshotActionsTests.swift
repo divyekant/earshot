@@ -93,6 +93,50 @@ final class ActionRulesTests: XCTestCase {
         XCTAssertEqual(SwitcherTiming.resultMs, 800)
     }
 
+    /// A fake browser window: a tab strip, a toolbar, and a web page with many links.
+    private final class Node {
+        let role: String, subrole: String, title: String
+        var children: [Node]
+        init(_ role: String, _ subrole: String = "", _ title: String = "", _ children: [Node] = []) {
+            self.role = role; self.subrole = subrole; self.title = title; self.children = children
+        }
+    }
+
+    func testWindowControlsSkipTheWebPage() {
+        let page = Node("AXWebArea", "", "", (0..<500).map { Node("AXLink", "", "link \($0)") })
+        let window = Node("AXWindow", "", "", [
+            Node("AXGroup", "", "", [
+                Node("AXTabGroup", "", "", [Node("AXRadioButton", "AXTabButton", "shadcn/ui"),
+                                            Node("AXRadioButton", "AXTabButton", "FPL Guru"),
+                                            Node("AXButton", "", "New Tab")]),
+                Node("AXToolbar", "", "", [Node("AXButton", "", "Back"), Node("AXButton", "", "Reload"),
+                                           Node("AXTextField", "", "Address and search bar")]),
+            ]),
+            Node("AXGroup", "", "", [page]),
+            Node("AXMenuBar", "", "", [Node("AXMenuItem", "", "File")]),
+        ])
+        let t0 = Clock.nowNs()
+        let found = ScreenReader.controlWalk(window, role: { $0.role }, subrole: { $0.subrole }, children: { $0.children })
+        let ms = Clock.ms(since: t0)
+        XCTAssertEqual(found.map(\.title), ["shadcn/ui", "FPL Guru", "New Tab", "Back", "Reload", "Address and search bar"])
+        XCTAssertEqual(found.compactMap { ActionRules.kind(role: $0.role, subrole: $0.subrole) }, ["tab", "tab", "button", "button", "button", "field"])
+        XCTAssertLessThan(ms, 25)
+    }
+
+    func testPageRulesForWindowControls() {
+        XCTAssertFalse(ActionRules.pageRulesApply(kind: "tab", inPage: false))   // a browser tab: no page rules
+        XCTAssertTrue(ActionRules.pageRulesApply(kind: "button", inPage: false)) // Reload on a payment page: blocked
+        XCTAssertTrue(ActionRules.pageRulesApply(kind: "tab", inPage: true))     // a tab inside the page
+    }
+
+    func testSkipLinksHaveNoVisiblePoint() {
+        let vp = Frame(x: 0, y: 80, w: 1200, h: 800)
+        XCTAssertFalse(ActionRules.visible(Frame(x: 0, y: 80, w: 1, h: 1), in: vp))           // a 1x1 skip link
+        XCTAssertFalse(ActionRules.visible(Frame(x: 0, y: 0, w: 0, h: 0), in: vp))            // an empty frame
+        XCTAssertFalse(ActionRules.visible(Frame(x: -10000, y: -10000, w: 150, h: 20), in: vp)) // off screen
+        XCTAssertTrue(ActionRules.visible(Frame(x: 10, y: 870, w: 150, h: 20), in: vp))       // partly visible: kept
+    }
+
     func testComposerShape() {
         let w = Frame(x: 0, y: 0, w: 1000, h: 800)
         XCTAssertTrue(ActionRules.composerShape(field: Frame(x: 300, y: 720, w: 650, h: 40), window: w))
