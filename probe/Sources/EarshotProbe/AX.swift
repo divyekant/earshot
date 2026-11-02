@@ -147,12 +147,16 @@ enum AX {
 
     /// The switcher rule: a settable text field in the upper part of the window.
     /// If its label says search, it matches. Else its label must not say message, reply or compose,
-    /// because a thread reply box can sit high in the window (seen in Slack).
+    /// because a thread reply box can sit high in the window (seen in Slack). A field with no label
+    /// must be a one-line field (AXTextField or AXComboBox).
     static func isSwitcherField(_ element: AXUIElement, in window: AXUIElement) -> Bool {
         guard isEditableText(element, allowSearch: true), valueSettable(element),
               let f = frame(element), let w = frame(window), f.midY < w.y + 0.6 * w.h else { return false }
         if subrole(element) == "AXSearchField" || looksLikeSearch(element) { return true }
-        return !looksLikeComposer(element)
+        if looksLikeComposer(element) { return false }
+        // A field with no label must be one line. Messages shows chat bubbles as unlabelled,
+        // settable AXTextArea elements; they are not search fields.
+        return !label(element).trimmingCharacters(in: .whitespaces).isEmpty || role(element) != "AXTextArea"
     }
 
     /// Roles of a result list. The probe can press Return on these, never on a text field or a button.
