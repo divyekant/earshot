@@ -452,6 +452,77 @@ final class EarshotRouterTests: XCTestCase {
         await expect("Slack, Ravi", chat("slack", "Ravi Kumar"))
     }
 
+    // MARK: - Menu commands (menu items join the screen elements; the intent stays .click)
+
+    static let menus = MenuElements.elements([
+        MenuEntry(path: ["Edit", "Undo"]), MenuEntry(path: ["Edit", "Redo"], enabled: false),
+        MenuEntry(path: ["Edit", "Copy"]), MenuEntry(path: ["Edit", "Paste"]), MenuEntry(path: ["Edit", "Select All"]),
+        MenuEntry(path: ["File", "New Note"]), MenuEntry(path: ["File", "Export…"]),
+        MenuEntry(path: ["File", "Close Window"]), MenuEntry(path: ["Notes", "Quit Notes"]),
+        MenuEntry(path: ["Meeting", "Mute Audio"]),
+    ])
+
+    func menuContext(_ screen: [ScreenElement] = []) -> RouteContext {
+        RouteContext(apps: Fixtures.apps, names: Fixtures.names, frontBundleID: "com.apple.Notes",
+                     screen: ScreenSnapshot(bundleID: "com.apple.Notes", windowTitle: "Notes", elements: screen + Self.menus))
+    }
+
+    func testMenuElements() {
+        XCTAssertEqual(MenuElements.id(["Edit", "Select All"]), "m:Edit>Select All")
+        XCTAssertEqual(MenuElements.path("m:Edit>Select All"), ["Edit", "Select All"])
+        XCTAssertNil(MenuElements.path("e5"))
+        XCTAssertFalse(Self.menus.contains { $0.label == "Redo" }, "a disabled item is not a candidate")
+        XCTAssertTrue(Self.menus.first { $0.label == "Quit Notes" }!.risky)
+        XCTAssertTrue(Self.menus.first { $0.label == "Close Window" }!.risky)
+        XCTAssertFalse(Self.menus.first { $0.label == "Copy" }!.risky)
+    }
+
+    func testMenuCommandsWithNoVerb() async {
+        let ctx = menuContext()
+        await expect("copy", .click(elementID: "m:Edit>Copy"), ctx)
+        await expect("paste", .click(elementID: "m:Edit>Paste"), ctx)
+        await expect("undo", .click(elementID: "m:Edit>Undo"), ctx)
+        await expect("select all", .click(elementID: "m:Edit>Select All"), ctx)
+        await expect("new note", .click(elementID: "m:File>New Note"), ctx)
+        await expect("export", .click(elementID: "m:File>Export…"), ctx)
+        await expect("uh, mute audio", .click(elementID: "m:Meeting>Mute Audio"), ctx)
+        // A disabled item is not there.
+        let redo = await route("redo", ctx)
+        XCTAssertEqual(redo.intent, .none, redo.why)
+        // Speech that is not a menu title does nothing.
+        let talk = await route("I think the meeting moved to Thursday", ctx)
+        XCTAssertEqual(talk.intent, .none, talk.why)
+    }
+
+    func testMenuAndScreenWithTheSameLabel() async {
+        let ctx = menuContext([Fixtures.el("e1", "AXButton", "Copy", y: 50), Fixtures.el("e2", "AXLink", "All", y: 60)])
+        // "click" prefers the element on the screen; no verb prefers the menu item.
+        await expect("click copy", .click(elementID: "e1"), ctx)
+        await expect("copy", .click(elementID: "m:Edit>Copy"), ctx)
+        // "select all" is the menu title, not "select" + the link "All".
+        await expect("select all", .click(elementID: "m:Edit>Select All"), ctx)
+    }
+
+    func testRiskyMenuItemsNeedTheExactTitle() async {
+        let ctx = menuContext()
+        // The exact title gives a click at tier .rules. The actions then also need the hold key (R-NV-5, R-ON-5).
+        let close = await route("close window", ctx)
+        XCTAssertEqual(close.intent, .click(elementID: "m:File>Close Window"), close.why)
+        XCTAssertEqual(close.tier, .rules)
+        XCTAssertTrue(SafetyPolicy.mayPress(label: "Close Window", role: MenuElements.role,
+                                            spokenTarget: CommandRouter.spokenTarget("close window"), tier: close.tier, mode: .hold))
+        XCTAssertFalse(SafetyPolicy.mayPress(label: "Close Window", role: MenuElements.role,
+                                             spokenTarget: CommandRouter.spokenTarget("close window"), tier: close.tier, mode: .alwaysOn))
+        // Not the exact title: blocked.
+        for s in ["quit", "close the window", "quit note"] {
+            let r = await route(s, ctx)
+            XCTAssertNotEqual(r.intent, .click(elementID: "m:Notes>Quit Notes"), s)
+            XCTAssertNotEqual(r.intent, .click(elementID: "m:File>Close Window"), s)
+        }
+        XCTAssertTrue(SafetyPolicy.isRisky("Empty Trash", role: MenuElements.role))
+        XCTAssertTrue(SafetyPolicy.isRisky("Shut Down…", role: MenuElements.role))
+    }
+
     func testE2NoCommand() async {
         let r = await route("what a lovely day", news)
         XCTAssertEqual(r.intent, .none)

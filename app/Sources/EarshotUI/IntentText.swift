@@ -6,6 +6,7 @@ public enum IntentText {
     public static func describe(_ intent: Intent, apps: [AppEntry] = [], screen: ScreenSnapshot? = nil) -> String {
         func app(_ id: String) -> String { apps.first { $0.id == id }?.name ?? id }
         func element(_ id: String) -> String {
+            if let path = MenuElements.path(id) { return "menu " + path.joined(separator: " › ") }
             guard let e = screen?.elements.first(where: { $0.id == id }) else { return id }
             return e.label.isEmpty ? id : "\"\(e.label)\""
         }
