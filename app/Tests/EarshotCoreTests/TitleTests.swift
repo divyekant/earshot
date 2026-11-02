@@ -5,14 +5,14 @@ import XCTest
 final class TitleTests: XCTestCase {
     static let fpl = "FPL Guru — AI Fantasy Premier League transfer tips, captain picks & chip strategy | FPL Guru"
     static let titles = [
-        "Apple - Google Chrome - Divyekant",                       // a window
+        "Apple - Google Chrome - Profile 1",                       // a window
         fpl + " - Memory usage - 491 MB",                          // a tab button
-        "(1) owen (@owengretzinger) / X - Inactive tab - 84.1 MB freed up",
+        "(1) Sam Lee (@samlee_dev) / X - Inactive tab - 84.1 MB freed up",
     ]
 
     func testMenuTitlesNameTabsAndWindows() {
         XCTAssertTrue(WindowTitles.names("FPL Guru — AI Fantasy Premier L…icks & chip strategy | FPL Guru", in: Self.titles))
-        XCTAssertTrue(WindowTitles.names("(1) owen (@owengretzinger) / X", in: Self.titles))
+        XCTAssertTrue(WindowTitles.names("(1) Sam Lee (@samlee_dev) / X", in: Self.titles))
         XCTAssertTrue(WindowTitles.names("Apple", in: Self.titles), "the window menu lists the tab title of a window")
         XCTAssertTrue(WindowTitles.names(Self.fpl, in: Self.titles))
         XCTAssertFalse(WindowTitles.names("Close Tab", in: Self.titles))

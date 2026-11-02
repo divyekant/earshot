@@ -453,7 +453,7 @@ final class MenuTitleTests: XCTestCase {
         let bar = [
             MenuNode(title: "Tab", children: [MenuNode(title: "Close Tab"), .line,
                                               MenuNode(title: "FPL Guru — AI Fantasy Premier L…icks & chip strategy | FPL Guru")]),
-            MenuNode(title: "Bookmarks", children: [MenuNode(title: "Player Who Returned 10,000 Years Later")]),
+            MenuNode(title: "Bookmarks", children: [MenuNode(title: "Story Number 10,000 - Read Online")]),
             MenuNode(title: "History", children: [MenuNode(title: "Show Full History")]),
         ]
         let items = MenuIndex.flatten(bar, titles: [fpl + " - Memory usage - 491 MB"])
