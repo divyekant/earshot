@@ -30,6 +30,9 @@ final class E3Screens: XCTestCase {
     func testE3() async throws {
         let env = ProcessInfo.processInfo.environment
         guard let casesPath = env["EARSHOT_E3_CASES"] else { throw XCTSkip("set EARSHOT_E3_CASES to run E3") }
+        // xctest has no WindowServer connection until AppKit starts. Without it, the window picture asserts
+        // in CGS_REQUIRE_INIT and the test process stops (E3 live run 1).
+        _ = NSApplication.shared
         let cases = try JSONDecoder().decode([E3Case].self, from: Data(contentsOf: URL(fileURLWithPath: casesPath)))
         let key = try XCTUnwrap(Self.key(env["EARSHOT_E3_KEY_CMD"]), "no Jev key")
         let picker = JevScreenPicker(apiKey: key)
