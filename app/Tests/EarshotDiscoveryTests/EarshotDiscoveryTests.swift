@@ -183,6 +183,13 @@ final class NameRulesTests: XCTestCase {
             XCTAssertNil(NameRules.sidebarName(label, appName: "Slack"), label)
         }
         XCTAssertNil(NameRules.sidebarName("Slack", appName: "Slack"))
+        // Seen live: an open Slack search, and a WhatsApp info pane.
+        for label in ["Search for: happening", "Show results for:", "Media",
+                      "Your personal messages are end-to-end encrypted"] {
+            XCTAssertNil(NameRules.sidebarName(label, appName: "Chat"), label)
+        }
+        XCTAssertEqual(NameRules.sidebarName("Manel & Mrunal", appName: "Messages")?.name, "Manel & Mrunal")
+        XCTAssertEqual(NameRules.sidebarName("Meta AI", appName: "WhatsApp")?.name, "Meta AI")
         // People, channels and the self entry stay.
         XCTAssertEqual(NameRules.sidebarName("Prakash Iyer", appName: "Slack")?.name, "Prakash Iyer")
         XCTAssertEqual(NameRules.sidebarName("eng-alerts", appName: "Slack")?.name, "eng-alerts")

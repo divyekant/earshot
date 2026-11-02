@@ -38,6 +38,7 @@ public enum NameRules {
         "moreactions", "options", "close", "avatar", "image", "photo", "profile", "presence", "inactive", "pin",
         "select", "givefeedback", "selectgivefeedback", "agent", "sirifoundinapps", "suggestions", "topresults",
         "recentsearches", "unreadmessages", "recap", "recaps", "catchup", "allunreads", "mentionsreactions",
+        "media", "links", "docs", "starredmessages", "archived", "locked", "lockedchats", "broadcasts",
     ]
 
     public static let weekdays: Set<String> = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
@@ -101,9 +102,15 @@ public enum NameRules {
     /// - A label that starts with an emoji name, such as "gear Product", is a section with a custom icon.
     /// - A title that ends with a section word ("EU Channels") is a section.
     /// - The app's own name ("Slack" in Slack) is not a chat.
+    /// - Search prompts and sentences of 5 words or more are not chats.
     public static func sidebarName(_ raw: String, appName: String = "") -> (name: String, isSelf: Bool)? {
         guard let c = clean(raw) else { return nil }
+        let lower = c.name.lowercased()
+        // Search prompts of an open search: "Search for: happening".
+        if promptStarts.contains(where: { lower.hasPrefix($0) }) { return nil }
         let words = c.name.split(separator: " ").map(String.init)
+        // A sentence is a notice, not a chat: "Your personal messages are end-to-end encrypted".
+        if words.count >= 5 { return nil }
         if words.count >= 2, isEmojiName(words[0]), words[1].first?.isUppercase == true { return nil }
         if words.count >= 2, let last = words.last, sectionEnds.contains(last.lowercased()) { return nil }
         if !appName.isEmpty, Words.key(c.name) == Words.key(appName) { return nil }
