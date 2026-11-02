@@ -115,7 +115,8 @@ public enum NameRules {
         // A shortcut hint of a button or a menu: "Search ⌘E".
         if c.name.contains(where: { "⌘⌥⇧⌃".contains($0) }) { return nil }
         // A date heading: "Sunday, November 1".
-        if let first = words.first, weekdays.contains(Words.key(first)) { return nil }
+        // Only a full day name counts: "Sun Li" is a name.
+        if let first = words.first, Words.key(first).count > 3, weekdays.contains(Words.key(first)) { return nil }
         // Back and forward buttons: "Back in Chat".
         if words.count >= 2, ["back", "forward"].contains(Words.key(words[0])), words[1].lowercased() == "in" { return nil }
         if words.count >= 2, isEmojiName(words[0]), words[1].first?.isUppercase == true { return nil }
