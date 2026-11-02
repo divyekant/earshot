@@ -272,7 +272,10 @@ final class ActionRunnerTests: XCTestCase {
         var focusSets = 0
         init(showsAt: Double, ownFocus: Bool, acceptsAX: Bool) { fieldShowsAtMs = showsAt; takesFocusOnItsOwn = ownFocus; acceptsAXFocus = acceptsAX }
         var shown: Bool { Clock.ms(since: t0) >= fieldShowsAtMs }
+        /// The number of focus checks after the field showed.
+        var pollsAfterShown = 0
         func focused() -> (String?, Bool, Bool) {
+            if shown { pollsAfterShown += 1 }
             if shown && (takesFocusOnItsOwn || focusedField) { return ("to-field", true, false) }
             return ("message-box", false, true)  // the focus stays in the message box of the open chat
         }
@@ -323,9 +326,13 @@ final class ActionRunnerTests: XCTestCase {
         let ms = Clock.ms(since: fake.t0)
         print("EARSHOT_BENCH fake switcher field: \(ms) ms (field at 100 ms), \(stats.polls) polls")
         XCTAssertEqual(field, "to-field")
-        XCTAssertEqual(scans, 0)  // no scan before scanDelayMs (150 ms)
+        // The behaviour: the first focus check after the field shows ends the wait. No later poll, no sleep in between.
+        XCTAssertEqual(fake.pollsAfterShown, 1)
+        // No scan: a scan runs only after scanDelayMs (150 ms), so the wait also ended before that.
+        XCTAssertEqual(scans, 0)
         XCTAssertFalse(stats.setFocus)
-        XCTAssertLessThan(ms, 100 + 2.0 * Double(SwitcherTiming.pollMs) + 10)
+        // A wall-time bound with margin for a busy CI runner. The two checks above carry the exact behaviour.
+        XCTAssertLessThan(ms, Double(SwitcherTiming.scanDelayMs) + 100)
     }
 
     /// An app without a learned behaviour scans only after scanDelayMs; an app learned as "set" scans at once.
