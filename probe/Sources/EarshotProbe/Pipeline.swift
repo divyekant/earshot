@@ -42,6 +42,8 @@ final class Pipeline {
     let apps: [AppRow]
     /// The search field that the probe typed the name into, for the current command.
     private var searchField: AXUIElement?
+    /// The focus method that worked last time, for each app id.
+    private var learnedFocus: [String: String] = [:]
 
     init(apps: [AppRow]) { self.apps = apps }
 
@@ -147,7 +149,7 @@ final class Pipeline {
         }
 
         // 3. Focus the message box.
-        let focused = await focusComposer(app: app, out: out, waitForAppMs: usedLink ? 900 : 700)
+        let focused = await focusComposer(app: app, row: row, out: out, waitForAppMs: usedLink ? 900 : 500)
         guard focused else {
             out.reason = "no message box found"
             return out
@@ -283,25 +285,40 @@ final class Pipeline {
         return AX.isComposer(el, in: win)
     }
 
-    private func focusComposer(app: AXUIElement, out: Outcome, waitForAppMs: Int) async -> Bool {
-        // Most apps focus the message box by themselves after a chat opens.
-        if await waitUntil(timeoutMs: waitForAppMs, { self.composerFocused(app) }) {
+    /// Focuses the message box. The probe remembers, for each app, which method worked last time:
+    /// "app" (the app focuses the box by itself), "set" (accessibility) or "click".
+    /// If the app did not focus the box by itself last time, the probe does not wait for it again.
+    private func focusComposer(app: AXUIElement, row: AppRow, out: Outcome, waitForAppMs: Int) async -> Bool {
+        let learned = learnedFocus[row.id]
+        let wait = (learned == nil || learned == "app") ? waitForAppMs : 60
+        if await waitUntil(timeoutMs: wait, { self.composerFocused(app) }) {
             out.focusMethod = "app"
+            learnedFocus[row.id] = "app"
             return true
         }
         guard let win = AX.window(app) else { return false }
-        let (found, nodes) = AX.findComposer(in: win)
+        // The new chat can take a moment to show its box.
+        var found: AXUIElement?
+        var nodes = 0
+        _ = await waitUntil(timeoutMs: 500, intervalMs: 30) {
+            (found, nodes) = AX.findComposer(in: win, budgetMs: 150)
+            return found != nil
+        }
         out.nodes = nodes
         guard let box = found else { return false }
-        AX.set(box, "AXFocused", kCFBooleanTrue)
-        if await waitUntil(timeoutMs: 300, { self.composerFocused(app) }) {
-            out.focusMethod = "set"
-            return true
+        if learned != "click" {
+            AX.set(box, "AXFocused", kCFBooleanTrue)
+            if await waitUntil(timeoutMs: 150, { self.composerFocused(app) }) {
+                out.focusMethod = "set"
+                learnedFocus[row.id] = "set"
+                return true
+            }
         }
         if let f = AX.frame(box) {
             Mouse.click(CGPoint(x: f.midX, y: f.midY))
             if await waitUntil(timeoutMs: 300, { self.composerFocused(app) }) {
                 out.focusMethod = "click"
+                learnedFocus[row.id] = "click"
                 return true
             }
         }
@@ -387,8 +404,19 @@ final class Pipeline {
         guard let win = AX.window(app), AX.isComposer(box, in: win) else { return (false, "not the message box now") }
         let value = Text.squash(AX.value(box) ?? "")
         let test = Text.squash(expected)
-        let rest = value.replacingOccurrences(of: test, with: "").trimmingCharacters(in: .whitespaces)
-        guard value.contains(test), rest.isEmpty else {
+        // Some apps change the typed text a little (Slack showed 53 characters for two
+        // 27-character lines). So compare word by word: each word must be close to a word
+        // of the test text, and the box must hold the marker.
+        func words(_ s: String) -> [String] {
+            s.lowercased().replacingOccurrences(of: "[", with: " [").split(separator: " ").map(String.init)
+        }
+        let testWords = Set(words(test))
+        let boxWords = words(value)
+        let onlyTest = value.lowercased().contains("earshot") && value.count <= 4 * test.count
+            && !boxWords.isEmpty && boxWords.allSatisfy { w in testWords.contains { Text.similarity(w, $0) >= 0.6 } }
+        // The box held only test text before the probe typed, so its text is safe to show in the log.
+        let seen = onlyTest ? ", box text \"\(value.prefix(120))\"" : ""
+        guard onlyTest else {
             return (false, "box holds other text: \(value.count) characters, test text \(test.count)")
         }
         if !AX.same(AX.focused(app), box) {
@@ -400,6 +428,6 @@ final class Pipeline {
         Keys.press(Keys.selectAll)
         Keys.press(Keys.deleteKey)
         let empty = await waitUntil(timeoutMs: 800) { Text.squash(AX.value(box) ?? "").isEmpty }
-        return (empty, empty ? "cleared" : "text still there after delete")
+        return (empty, (empty ? "cleared" : "text still there after delete") + seen)
     }
 }

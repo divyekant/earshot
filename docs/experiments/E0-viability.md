@@ -107,7 +107,20 @@ Fixes in the next build:
 - The delete step uses the box that the probe typed into, and it accepts only test text in the box.
 - After each key combination, the probe releases the modifier flags.
 
-### 5.3 Part B
+### 5.3 Part A, second run (2026-11-02)
+
+| App | Reach | Median | Slowest 1 in 10 | Notes |
+| --- | --- | --- | --- | --- |
+| Slack | 10 of 10 | 468 ms | 490 ms | The test text was not deleted again: the box held 53 characters for two 27-character lines. |
+| Messages | 10 of 10 | 1813 ms | 1850 ms | Command-N and "To:" reach the chat at about 700 ms. The probe then waited 700 ms for the app to focus the box, 300 ms for the accessibility focus, and then clicked the box. |
+| WhatsApp | not run | - | - | The guard stopped Return: after Down, the focus was an AXGroup (iOSContentGroup), not a list row. This is correct guard behavior. |
+
+Fixes in the next build:
+- The focus step remembers, for each app, which method worked. If the app did not focus the box by itself, the probe does not wait for it again. The first wait is now 500 ms, and the accessibility wait is 150 ms.
+- WhatsApp: press Return in the search field (no Down).
+- The delete step compares word by word, so small changes to the text by the app do not block it.
+
+### 5.4 Part B
 
 Not run yet.
 
