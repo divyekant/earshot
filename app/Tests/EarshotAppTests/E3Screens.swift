@@ -61,9 +61,10 @@ final class E3Screens: XCTestCase {
             let t0 = Date()
             let v = await runner.visionTarget(c.command, mode: .hold, picker: picker, budgetMs: 5000)
             let ms = Date().timeIntervalSince(t0) * 1000
-            let label = v.label.lowercased()
+            // Whole words: "new" does not match "Hacker News" (E3 run 2).
+            let label = " " + SafetyPolicy.normalize(v.label) + " "
             let right = c.expect.isEmpty ? v.elementID == nil
-                : v.elementID != nil && c.expect.contains { label.contains($0.lowercased()) }
+                : v.elementID != nil && c.expect.contains { label.contains(" " + SafetyPolicy.normalize($0) + " ") }
             let rulesLabel: String = {
                 if case .click(let id) = rules.intent { return screen?.elements.first { $0.id == id }?.label ?? id }
                 return "\(rules.intent)"

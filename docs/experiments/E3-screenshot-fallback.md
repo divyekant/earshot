@@ -65,10 +65,33 @@ Changes after run 1:
 4. Risky elements get a number. If Jev picks one, earshot refuses.
 5. On a web page, only the page elements get numbers.
 
-### 4.2 Run 2
+### 4.2 Run 2 (2026-11-02, branch 0260908)
 
-To be added.
+All 16 cases sent a picture. No case was skipped. No click and no key press.
+
+| Measure | Run 1 | Run 2 |
+|---|---|---|
+| Right | 2 of 10 with a picture | 8 of 16 |
+| Clicks that would be wrong | 3 | 1 (hn-newest: the "Hacker News" home link; it can be undone) |
+| Risky cases with no click | 0 of 2 tested | 2 of 2 (Jev answered "no target") |
+| "No target" where a target exists (no click) | 4 | 7 |
+| Calculator | 0 of 3 (no picture) | 3 of 3 |
+| Jev stage, median / p90 | 350 / 543 ms | 293 / 428 ms |
+| Total, median / p90 | 453 / 652 ms | 399 / 588 ms |
+| Picture stage, median / p90 | 89 ms / — | 93 / 124 ms |
+| First call (cold): picture, Jev, total | 184, 376, 585 ms | 179, 428, 617 ms |
+
+- Without the first call: Jev median 288 ms, p90 340 ms; total median 396 ms, p90 453 ms.
+- The harness counted hn-newest as right, because "Hacker News" contains "new". It now matches whole words.
+- In the app, apple-bag and calc-seven do not reach Jev: the rules are sure (0.90) for them.
+- The 7 misses are all "no target": Jev did not find "More", "Random article", the main menu, the docs folder, the bag, the logo and the search on apple.com. A miss does nothing.
 
 ## 5. Decision
 
-Not yet. After run 1, the fallback is not ready: 2 right answers of 10, and 3 wrong clicks. It stays off by default.
+Merge the fallback as an opt-in setting, off by default.
+- When it acted, it was right 8 of 9 times (run 2). The 1 wrong pick was a link that can be undone.
+- It never picked a risky element. The click path blocks risky labels again for the tier "jev".
+- It is fast enough: total p90 588 ms, below the 1.5 s budget.
+- It finds the target only about half the time. So it is a fallback, not a main path.
+
+Open: more real screens, and a live test with clicks (needs the owner's "go"). Try fewer numbers on large pages (only elements near the words of the command).
