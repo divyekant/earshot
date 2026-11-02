@@ -47,7 +47,7 @@ public struct AutoPolicy: Sendable {
     }
 }
 
-/// The engine "auto": Parakeet when it is fast now, else Apple, per command (E2 decision 6.2, live test 2026-11-02).
+/// The engine for the setting "parakeet": Parakeet when it is fast now, else Apple, per command (live test 2026-11-02).
 ///
 /// Live test: with the memory of the Mac full (swap nearly full), macOS moved the Parakeet weights out of memory
 /// between commands, and the speech stage grew from 0.4 s to 6.9 s. So "auto" checks for each command:
