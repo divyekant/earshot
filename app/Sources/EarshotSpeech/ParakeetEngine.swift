@@ -175,7 +175,7 @@ public final class ParakeetEngine: SpeechEngine, SpeechTimingReporting, @uncheck
             samples.removeAll(keepingCapacity: true)
             lastPartialFrames = 0
             listening = true
-            turn = SpeechTiming(engine: id, why: reason)
+            turn = SpeechTiming(engine: self.id, why: reason)
             turn.idleMs = lastRunEndNs == 0 ? 0 : Double(now &- lastRunEndNs) / 1_000_000
             if warmEveryTurn { turn.warmed = true }
             if let limit = warmAfterIdleSeconds, turn.idleMs >= limit * 1000 { turn.warmed = true }
