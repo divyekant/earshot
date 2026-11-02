@@ -79,6 +79,7 @@ enum Commands {
             case "e1-run": return try await E1.runAll(args)
             case "e1-open": return try await E1.open(args)
             case "e1-search": return try await E1.search(args)
+            case "e1-recheck": return try E1.recheck(args)
             default:
                 print(usage)
                 return 2
