@@ -92,9 +92,9 @@ final class CommandPipeline {
         stages["route"] = routeClock.ms
 
         // A name that no known chat explains: ask the app's own search once, then route again (E1).
-        // Not when the route is already sure, and not for the owner's own chat: the search types into the app,
-        // and in the first live test it searched Slack for the message words ("running late").
-        if result.confidence < CommandRouter.sureConfidence, !Self.namesSelf(text),
+        // Only when the route is not sure or is not a chat, and never for the owner's own chat: the search types
+        // into the app, and in the first live test it searched Slack for the message words ("running late").
+        if Self.needsAppSearch(text, result),
            let heard = heardName(text, context), let appID = heard.appID ?? Self.appID(of: result.intent) {
             let searchClock = Stopwatch()
             let found = await names.search(appID: appID, term: heard.name)
@@ -155,6 +155,13 @@ final class CommandPipeline {
             feedback?.show(ok ? "→ \(intent)" : "✗ \(note)", ok: ok)
         }
         return record
+    }
+
+    /// The app search rule (E1, first live test).
+    static func needsAppSearch(_ text: String, _ result: RouteResult) -> Bool {
+        guard !namesSelf(text) else { return false }
+        if case .openChat = result.intent { return result.confidence < CommandRouter.sureConfidence }
+        return true
     }
 
     /// True if the words name the owner's own chat ("me", "myself", "my own chat").

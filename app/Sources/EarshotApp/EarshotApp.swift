@@ -80,16 +80,23 @@ final class AppController: ObservableObject {
         let pipeline = self.pipeline, catalogue = self.catalogue, store = self.store, names = self.names
         return ManageHooks(
             test: { text, run in await pipeline.test(text, runActions: run) },
-            discoverApps: { [weak self] in
-                do { return try await catalogue.refresh(store: store) } catch {
-                    // For example: Accessibility is off, so the menus cannot be read (first live test).
-                    await MainActor.run { self?.feedback.show("Discover apps: \(error.localizedDescription)", ok: false) }
-                    return store.apps
-                }
+            discoverApps: { [feedback] in
+                await Self.discover(refresh: { try await catalogue.refresh(store: store) }, current: store.apps, feedback: feedback)
             },
             refreshNames: { appID in await names.refresh(appIDs: [appID]) },
             feedback: feedback,
             settingsChanged: { [weak self] new in self?.apply(new) })
+    }
+
+    /// Runs the catalogue scan. On an error, for example DiscoveryError.accessibilityOff (first live test: the scan
+    /// ran before Accessibility was on, and saved rows with no chat keys), the note shows the error, and the Apps tab
+    /// keeps the current rows.
+    nonisolated static func discover(refresh: () async throws -> [AppEntry], current: [AppEntry],
+                                     feedback: FeedbackSink?) async -> [AppEntry] {
+        do { return try await refresh() } catch {
+            feedback?.show("Discover apps: \(error.localizedDescription)", ok: false)
+            return current
+        }
     }
 
     /// The names of every approved, enabled chat app. NameIndex adds the owner's own chat to each app, and reads a
