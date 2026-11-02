@@ -92,7 +92,10 @@ final class CommandPipeline {
         stages["route"] = routeClock.ms
 
         // A name that no known chat explains: ask the app's own search once, then route again (E1).
-        if let heard = heardName(text, context), let appID = heard.appID ?? Self.appID(of: result.intent) {
+        // Not when the route is already sure, and not for the owner's own chat: the search types into the app,
+        // and in the first live test it searched Slack for the message words ("running late").
+        if result.confidence < CommandRouter.sureConfidence, !Self.namesSelf(text),
+           let heard = heardName(text, context), let appID = heard.appID ?? Self.appID(of: result.intent) {
             let searchClock = Stopwatch()
             let found = await names.search(appID: appID, term: heard.name)
             stages["search"] = searchClock.ms
@@ -106,13 +109,13 @@ final class CommandPipeline {
         if result.confidence < SafetyPolicy.minimumConfidence {
             let options = result.alternatives.prefix(2).map { IntentText.describe($0, apps: rows, screen: context.screen) }
             let note = (["not sure: \(result.why)"] + options.map { "maybe \($0)" }).joined(separator: " · ")
-            return done(heard: text, intent: describe, tier: result.tier, ok: false, note: note, stages: stages, clock)
+            return done(heard: text, intent: describe, tier: result.tier, ok: false, note: note, stages: stages, clock, why: result.why)
         }
 
         var intent = result.intent
         if mode == .alwaysOn, intent == .send, !maySend { intent = .none }
         if intent == .none {
-            return done(heard: text, intent: "none", tier: result.tier, ok: false, note: "not a command", stages: stages, clock)
+            return done(heard: text, intent: "none", tier: result.tier, ok: false, note: "not a command", stages: stages, clock, why: result.why)
         }
 
         let types = Self.types(intent)
@@ -122,7 +125,7 @@ final class CommandPipeline {
         if types { pauseAlwaysOn(false) }
         for (k, v) in outcome.stages { stages["action." + k] = v }
         lastCommandAt = Date()
-        return done(heard: text, intent: describe, tier: result.tier, ok: outcome.ok, note: outcome.note, stages: stages, clock)
+        return done(heard: text, intent: describe, tier: result.tier, ok: outcome.ok, note: outcome.note, stages: stages, clock, why: result.why)
     }
 
     /// The Test tab: route typed text, and run the actions only if `runActions` is true. A typed command counts as a
@@ -140,15 +143,24 @@ final class CommandPipeline {
     }
 
     private func done(heard: String, intent: String, tier: RouterTier, ok: Bool, note: String,
-                      stages: [String: Double], _ clock: Stopwatch, quiet: Bool = false) -> ActivityRecord {
+                      stages: [String: Double], _ clock: Stopwatch, quiet: Bool = false, why: String = "") -> ActivityRecord {
         var stages = stages
         stages["total"] = clock.ms
-        let record = ActivityRecord(heard: heard, intent: intent, tier: tier, ok: ok, note: note, stages: stages)
+        // The log keeps the router's reason too, so that a wrong intent can be explained later
+        // (for example "open Slack" when Slack had no chat keys). The note on screen stays short.
+        let logNote = why.isEmpty || note.contains(why) ? note : "\(note) · route: \(why)"
+        let record = ActivityRecord(heard: heard, intent: intent, tier: tier, ok: ok, note: logNote, stages: stages)
         try? log?.append(record)
         if showFeedback, !quiet {
             feedback?.show(ok ? "→ \(intent)" : "✗ \(note)", ok: ok)
         }
         return record
+    }
+
+    /// True if the words name the owner's own chat ("me", "myself", "my own chat").
+    static func namesSelf(_ text: String) -> Bool {
+        let words = Set(SafetyPolicy.normalize(text).split(separator: " ").map(String.init))
+        return !words.isDisjoint(with: ["me", "myself"]) || (words.contains("my") && words.contains("own"))
     }
 
     static func appID(of intent: Intent) -> String? {

@@ -67,7 +67,7 @@ final class AppController: ObservableObject {
         engineWhy = why
         let names = self.names
         pipeline = CommandPipeline(engine: engine, router: Self.router(settings), actions: runner, names: names,
-                                   apps: { store.apps }, allNames: { await names.all() },
+                                   apps: { store.apps }, allNames: { await Self.chatNames(names, apps: store.apps) },
                                    frontBundleID: { NSWorkspace.shared.frontmostApplication?.bundleIdentifier })
         pipeline.feedback = feedback
         pipeline.log = ActivityLog(store: store)
@@ -80,10 +80,27 @@ final class AppController: ObservableObject {
         let pipeline = self.pipeline, catalogue = self.catalogue, store = self.store, names = self.names
         return ManageHooks(
             test: { text, run in await pipeline.test(text, runActions: run) },
-            discoverApps: { (try? await catalogue.refresh(store: store)) ?? [] },
+            discoverApps: { [weak self] in
+                do { return try await catalogue.refresh(store: store) } catch {
+                    // For example: Accessibility is off, so the menus cannot be read (first live test).
+                    await MainActor.run { self?.feedback.show("Discover apps: \(error.localizedDescription)", ok: false) }
+                    return store.apps
+                }
+            },
             refreshNames: { appID in await names.refresh(appIDs: [appID]) },
             feedback: feedback,
             settingsChanged: { [weak self] new in self?.apply(new) })
+    }
+
+    /// The names of every approved, enabled chat app. NameIndex adds the owner's own chat to each app, and reads a
+    /// sidebar only when its cache is old. It presses nothing. (`all()` holds only the cache, so it was empty until
+    /// a manual refresh, and "me" was unknown in the first live test.)
+    nonisolated static func chatNames(_ index: NameIndex, apps: [AppEntry]) async -> [NameEntry] {
+        var out: [NameEntry] = []
+        for app in apps where app.isChat && app.approved && app.enabled {
+            out += await index.names(appID: app.id)
+        }
+        return out
     }
 
     static func router(_ settings: EarshotSettings) -> CommandRouter {
