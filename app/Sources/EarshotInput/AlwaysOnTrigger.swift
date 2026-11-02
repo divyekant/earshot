@@ -9,7 +9,9 @@ import Foundation
 /// with mode `.alwaysOn`, so that SafetyPolicy blocks risky presses (R-ON-5).
 ///
 /// Callbacks run on the main thread.
-public final class AlwaysOnTrigger: InputTrigger {
+/// It is `@unchecked Sendable` because the detector state is used only on `queue`,
+/// and the callbacks are set and called only on the main thread.
+public final class AlwaysOnTrigger: InputTrigger, @unchecked Sendable {
     public var onStart: (() -> Void)?
     public var onStop: (() -> Void)?
     /// The sound was not a command (too short or too long). Drop the text.
