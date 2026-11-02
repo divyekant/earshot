@@ -385,6 +385,8 @@ final class Stopwatch {
     let t0 = Clock.nowNs()
     private(set) var stages: [String: Double] = [:]
     func mark(_ name: String) { stages[name] = (Clock.ms(since: t0) * 10).rounded() / 10 }
+    /// A value that is not a time from the start, for example the number of polls or the cost of a scan.
+    func note(_ name: String, _ value: Double) { stages[name] = (value * 10).rounded() / 10 }
 }
 
 func sleepMs(_ ms: Int) async {
