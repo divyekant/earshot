@@ -58,8 +58,14 @@ enum ScreenRouter {
         if role == "AXRadioButton" { return e.subrole == "AXTabButton" ? "tab" : "choice" }
         if role == "AXTab" { return "tab" }
         if role == "AXMenuItem" { return "choice" }
+        // The actions module also reads list rows (a chat in a sidebar) and the texts of its OCR fallback (R-CL-4).
+        if role == "AXRow" { return "row" }
+        if role == ocrRole { return "text" }
         return nil
     }
+
+    /// The role that the actions module gives to a text found by OCR. It has no accessibility element.
+    static let ocrRole = "OCRText"
 
     static func isSearchField(_ e: ScreenElement) -> Bool {
         kind(e) == "field" && (e.subrole == "AXSearchField" || TextKit.normalize(e.label).contains("search"))
@@ -181,7 +187,16 @@ enum ScreenRouter {
         if content.isEmpty { content = labelWords }
         let found = content.filter { l in target.contains { TextKit.similarity($0, l) >= 0.75 } }.count
         let precision = Double(found) / Double(content.count)
-        return max(full, cover * (0.7 + 0.3 * precision))
+        // Two or more words that match a run of words in the label, in order: a name in a long chat row
+        // ("Darshan Panya" in "user avatar Darshan Pania Verified account 1h ..."). The long label does not count against it.
+        var run = 0.0
+        if target.count >= 2, labelWords.count >= target.count {
+            for start in 0...(labelWords.count - target.count) {
+                let sims = target.indices.map { TextKit.similarity(target[$0], labelWords[start + $0]) }
+                if sims.allSatisfy({ $0 >= 0.75 }) { run = max(run, 0.9 * sims.reduce(0, +) / Double(sims.count)) }
+            }
+        }
+        return max(full, cover * (0.7 + 0.3 * precision), run)
     }
 
     /// The elements in screen order: top to bottom, then left to right.
@@ -192,7 +207,7 @@ enum ScreenRouter {
     /// The list for an ordinal: links in headings, else links with 4 or more words.
     /// A risky element is never a result: on Wikipedia, the fundraising banner is a long link.
     static func ordinalList(_ noun: String, _ all: [ScreenElement]) -> [ScreenElement] {
-        let elements = ordered(all.filter { !$0.risky && !SafetyPolicy.isRisky($0.label) })
+        let elements = ordered(all.filter { !$0.risky && !SafetyPolicy.isRisky($0) })
         switch noun {
         case "button": return elements.filter { kind($0) == "button" }
         case "tab": return elements.filter { kind($0) == "tab" }
@@ -251,7 +266,7 @@ enum ScreenRouter {
             let shown = screen.elements.first { $0.id == "e\(n)" }
             let pick: ScreenElement? = same.first ?? shown
             if let e = pick {
-                if e.risky || SafetyPolicy.isRisky(e.label) { return done(.none, true, true, "blocked: risky label \"\(e.label)\"") }
+                if e.risky || SafetyPolicy.isRisky(e) { return done(.none, true, true, "blocked: risky label \"\(e.label)\"") }
                 let why = same.isEmpty ? "shown number \(n)" : "number label"
                 return done(.click(elementID: e.id), same.count <= 1, true, why)
             }
@@ -267,7 +282,7 @@ enum ScreenRouter {
         scored.sort { $0.1 != $1.1 ? $0.1 > $1.1 : ($0.0.y != $1.0.y ? $0.0.y < $1.0.y : $0.0.x < $1.0.x) }
         // The same label more than once: tell the copies apart for tier 2.
         var seen: [String: Int] = [:]
-        for (e, s) in scored.prefix(shortListSize) where !(e.risky || SafetyPolicy.isRisky(e.label)) {
+        for (e, s) in scored.prefix(shortListSize) where !(e.risky || SafetyPolicy.isRisky(e)) {
             let key = TextKit.key(e.label)
             seen[key, default: 0] += 1
             let copy = seen[key]! > 1 ? " (copy \(seen[key]!) on the page)" : ""
@@ -283,7 +298,7 @@ enum ScreenRouter {
         guard p.isCommand else { return done(.none, top.1 < strongMatch, false, "a label matches, but no command word") }
         let exact = TextKit.key(p.target.joined()) == TextKit.key(TextKit.digitize(TextKit.words(top.0.label)).joined())
         // A risky label needs the exact label from the owner (R-NV-5). A fuzzy match on a risky label does nothing.
-        if top.0.risky || SafetyPolicy.isRisky(top.0.label) {
+        if top.0.risky || SafetyPolicy.isRisky(top.0) {
             if !exact { return done(.none, true, false, "blocked: risky label \"\(top.0.label)\"") }
         }
         let pick = Intent.click(elementID: top.0.id)
