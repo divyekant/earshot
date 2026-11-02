@@ -447,3 +447,61 @@ final class SpeechLineResetTests: XCTestCase {
         XCTAssertFalse(failed.note.contains("speech: apple"), failed.note)
     }
 }
+
+final class SlowNames: NameFinder, @unchecked Sendable {
+    let slow: Set<String>
+    init(slow: Set<String>) { self.slow = slow }
+    func names(appID: String) async -> [NameEntry] {
+        if slow.contains(appID) { try? await Task.sleep(nanoseconds: 2_000_000_000) }
+        return [NameEntry(appID: appID, name: "Self \(appID)", isSelf: true, source: .search)]
+    }
+    func search(appID: String, term: String) async -> [NameEntry] { [] }
+}
+
+final class NameBudgetTests: XCTestCase {
+    func testSlowAppsDoNotBlockTheCommand() async {
+        let apps = Fixture.apps.filter(\.isChat)  // slack, messages
+        var missing = -1
+        let clock = Stopwatch()
+        let names = await AppController.chatNames(SlowNames(slow: ["messages"]), apps: apps, budgetMs: 150,
+                                                  notReady: { missing = $0 })
+        XCTAssertLessThan(clock.ms, 600, "the budget must cut the slow read")
+        XCTAssertEqual(names.map(\.appID), ["slack"])
+        XCTAssertEqual(missing, 1)
+    }
+
+    func testAllReadyWithinTheBudget() async {
+        var missing = -1
+        let names = await AppController.chatNames(SlowNames(slow: []), apps: Fixture.apps.filter(\.isChat), notReady: { missing = $0 })
+        XCTAssertEqual(Set(names.map(\.appID)), ["slack", "messages"])
+        XCTAssertEqual(missing, 0)
+    }
+
+    func testNotReadyGoesToTheLog() async {
+        let engine = TextEngine()
+        engine.text = "open notes"
+        let p = CommandPipeline(engine: engine, router: CommandRouter(), actions: DryRunner(), names: FakeNames(),
+                                apps: { Fixture.apps }, allNames: { Fixture.names }, frontBundleID: { nil })
+        p.namesNotReady = { 2 }
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        p.log = ActivityLog(store: Store(folder: folder))
+        let r = await p.finish(mode: .hold)
+        XCTAssertTrue(r.note.contains("names: 2 apps not ready"), r.note)
+    }
+}
+
+final class WarmerChangeTests: XCTestCase {
+    func testCatalogueChangeMakesAReadDue() async {
+        var token = Date(timeIntervalSince1970: 1)
+        let w = NameWarmer(interval: 3600, trusted: { true }, refresh: {}, changeToken: { token })
+        XCTAssertTrue(w.due(), "the first read is due")
+        await w.tick()
+        XCTAssertFalse(w.due(), "no change, interval not over")
+        token = Date(timeIntervalSince1970: 2)
+        XCTAssertTrue(w.due(), "apps.json changed")
+        await w.tick()
+        XCTAssertFalse(w.due())
+        XCTAssertTrue(w.due(now: Date().addingTimeInterval(3601)), "interval over")
+    }
+}
