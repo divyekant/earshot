@@ -69,7 +69,7 @@ earshot uses one model for all apps. A command is one verb and one target.
 | Part | Component | Notes |
 |---|---|---|
 | Wake phrase | icefall KWS Zipformer (gigaspeech, 3.49M parameters, Apache-2.0), Core ML INT8 (`aufklarer/KWS-Zipformer-3M-CoreML-INT8`) | Open vocabulary: the phrase is text, no training. It runs on 320 ms chunks. Vendor time: 5.4 ms for each chunk on Apple silicon. |
-| Owner voice check | WeSpeaker ResNet34-LM (VoxCeleb, CC BY 4.0), Core ML (`aufklarer/WeSpeaker-ResNet34-LM-CoreML`) | 256-value embedding. Cosine similarity against the mean of 5 enrolment phrases. Start threshold 0.45. |
+| Owner voice check | WeSpeaker ResNet34-LM (VoxCeleb, CC BY 4.0), Core ML (`aufklarer/WeSpeaker-ResNet34-LM-CoreML`) | 256-value embedding. Cosine similarity against the mean of 5 enrolment phrases. Threshold 0.35 (live trial: owner 0.50 to 0.73, another voice 0.06). |
 | End of turn | `SpeechDetector` (energy with a noise floor that adapts) | 550 ms of quiet after the command. After the phrase alone, it waits 2 s for the command. |
 
 The code is in `app/Sources/EarshotWake`. The spotter and voice code are copied from soniqo/speech-swift at `a57702e` (Apache-2.0, see THIRD_PARTY_NOTICES.md). The models download one time (about 18 MB) at pinned revisions, with a SHA-256 check, into `~/Library/Application Support/earshot/models/`.
@@ -79,7 +79,7 @@ How a command flows (`EarshotInput/WakeTrigger.swift`):
 1. The spotter listens to 16 kHz audio. Between turns, nothing else runs. Speech without the phrase never reaches the speech engine.
 2. The spotter fires about 0.3 to 0.5 s after the phrase. If a voice is enrolled, the voice model scores the audio of the phrase. A low score stops here, and the log gets one line with no text.
 3. The speech engine starts at the start of the phrase. `MicrophoneFeed` keeps 3 s of audio, and `PrerollControl.setNextPreroll` gives the engine the phrase and every word after it.
-4. The turn ends after the command. The pipeline removes the phrase from the text (`WakePhrase.strip`), and the router runs as for the hold key.
+4. The turn ends after the command. The pipeline removes the phrase from the text (`WakePhrase.strip`), and the router runs as for the hold key. Apple speech can write the phrase as other words ("Here, at least" for "hey atlas"). So at the start of the text, the match may differ in up to half of the letters of the phrase.
 5. For 5 s after a command, speech in the owner's voice starts a turn with no phrase. The voice is checked at the end of the turn.
 
 The enrolment (Manage > General > Teach earshot your voice) records 5 phrases. earshot keeps the mean embedding and, for a made-up name, the word pieces that the spotter heard, in `voice.json`. It keeps no audio.

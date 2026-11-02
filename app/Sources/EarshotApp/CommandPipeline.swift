@@ -102,7 +102,7 @@ final class CommandPipeline {
             // The trigger opens an always-on turn only on the wake phrase, or in the follow-up window in the owner's
             // voice (D-11). So the text is for earshot. The speech engine starts before the phrase: remove it.
             if let wake { speechSummary = Self.wakeSummary(wake) + (speechSummary.isEmpty ? "" : " · " + speechSummary) }
-            text = WakePhrase.strip(text, phrase: wakePhrase)
+            text = WakePhrase.strip(text, phrase: wakePhrase, afterWake: wake != nil)
         }
         guard !text.isEmpty else { return done(heard: "", intent: "none", tier: .none, ok: false, note: "no words", stages: stages, clock, quiet: true) }
 
@@ -201,6 +201,16 @@ final class CommandPipeline {
         let score = wake.voiceScore.map { String(format: "%.2f", $0) } ?? "none"
         let note = String(format: "wake phrase in another voice (score %@, needs %.2f)", score, threshold)
         let record = ActivityRecord(heard: "", intent: "none", tier: .none, ok: false, note: note, stages: [:])
+        try? log?.append(record)
+        return record
+    }
+
+    /// Logs a follow-up turn that earshot dropped because the voice is not the owner's (R-ON-3). Nothing ran.
+    /// The record has no text: the words were not the owner's.
+    @discardableResult
+    func droppedFollowUp(_ why: String) -> ActivityRecord {
+        let record = ActivityRecord(heard: "", intent: "none", tier: .none, ok: false, note: "follow-up dropped: \(why)",
+                                    stages: [:])
         try? log?.append(record)
         return record
     }

@@ -197,8 +197,11 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
         }
         guard let score = listener.voiceScore(samples) else { return .end }
         if score >= listener.voiceThreshold { return .end }
-        return .drop(String(format: "not the owner's voice (%.2f)", score))
+        return .drop(String(format: "\(Self.otherVoice) (%.2f)", score))
     }
+
+    /// The start of the cancel reason when the voice of a follow-up turn is not the owner's voice.
+    public static let otherVoice = "not the owner's voice"
 
     private func wake(_ hit: WakeHit) {
         guard !inTurn else { return }

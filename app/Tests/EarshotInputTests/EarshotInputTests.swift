@@ -385,6 +385,7 @@ final class WakeTriggerTests: XCTestCase {
         mic.emit(speech, ms: 600)
         mic.emit(quiet, ms: 700)
         wait(for: [third], timeout: 2)
+        XCTAssertTrue("not the owner's voice (0.20)".hasPrefix(WakeTrigger.otherVoice), "the app logs drops by this prefix")
         t.stop()
     }
 
