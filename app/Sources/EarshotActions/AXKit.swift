@@ -1,5 +1,6 @@
 import AppKit
 import ApplicationServices
+import EarshotCore
 
 // Helpers over the macOS Accessibility (AX) API. Ported from probe/Sources/EarshotProbe/AX.swift (E0 to E2).
 // AX coordinates have their origin at the top left of the main screen.
