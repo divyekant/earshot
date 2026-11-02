@@ -175,6 +175,48 @@ final class NameRulesTests: XCTestCase {
         }
     }
 
+    func testSidebarDropsSectionsAndEmojiIcons() {
+        // Seen live in a Slack work workspace (2026-11-02).
+        for label in ["Unread messages", "Recap", "EU Channels", "sunrise_over_mountains Marketing Events", "gear Product",
+                      "melting_face Leanplum Channels", "dollar Sales", "bangbang Internal Alerts",
+                      "rocket Internal Customer Channels"] {
+            XCTAssertNil(NameRules.sidebarName(label, appName: "Slack"), label)
+        }
+        XCTAssertNil(NameRules.sidebarName("Slack", appName: "Slack"))
+        // Seen live: an open Slack search, and a WhatsApp info pane.
+        for label in ["Search for: happening", "Show results for:", "Media",
+                      "Your personal messages are end-to-end encrypted"] {
+            XCTAssertNil(NameRules.sidebarName(label, appName: "Chat"), label)
+        }
+        // Seen live: a Slack header, and Zoom toolbar and pane labels.
+        for label in ["This is your space.", "Search ⌘E", "Back in Chat", "Forward in Chat", "History", "Sunday, November 1"] {
+            XCTAssertNil(NameRules.sidebarName(label, appName: "Chat"), label)
+        }
+        XCTAssertEqual(NameRules.sidebarName("Slackbot", appName: "Slack")?.name, "Slackbot")
+        XCTAssertEqual(NameRules.sidebarName("Sun Li", appName: "Chat")?.name, "Sun Li")
+        // Seen live: Zoom calendar pane, Slack help row, WhatsApp texts.
+        for label in ["Create event", "Previous", "Next", "Recurring", "Open recordings", "Today, Nov 1", "Zoom Meeting",
+                      "Organizer: someone@example.com", "Host: Divyekant Gupta", "Start Zoom Meeting"] {
+            XCTAssertNil(NameRules.sidebarName(label, appName: "Zoom"), label)
+        }
+        XCTAssertNil(NameRules.sidebarName("Connect apps", appName: "Slack"))
+        XCTAssertNil(NameRules.sidebarName("end-to-end encrypted", appName: "WhatsApp"))
+        XCTAssertNil(NameRules.sidebarName("message", appName: "WhatsApp"))
+        XCTAssertEqual(NameRules.sidebarName("Mummy, 1 unread message", appName: "WhatsApp")?.name, "Mummy")
+        XCTAssertEqual(NameRules.sidebarName("Dheeraj Goyal", appName: "WhatsApp")?.name, "Dheeraj Goyal")
+        XCTAssertEqual(NameRules.sidebarName("Ghar .सब साथ में", appName: "WhatsApp")?.name, "Ghar .सब साथ में")
+        XCTAssertEqual(NameRules.sidebarName("release-management", appName: "Slack")?.name, "release-management")
+        XCTAssertEqual(NameRules.sidebarName("Manuel & Mrinal", appName: "Messages")?.name, "Manuel & Mrinal")
+        XCTAssertEqual(NameRules.sidebarName("Meta AI", appName: "WhatsApp")?.name, "Meta AI")
+        // People, channels and the self entry stay.
+        XCTAssertEqual(NameRules.sidebarName("Darshan Pania", appName: "Slack")?.name, "Darshan Pania")
+        XCTAssertEqual(NameRules.sidebarName("eng-alerts", appName: "Slack")?.name, "eng-alerts")
+        XCTAssertEqual(NameRules.sidebarName("Divyekant Gupta (you)", appName: "Slack")?.isSelf, true)
+        XCTAssertEqual(NameRules.sidebarName("Ravi star", appName: "Slack")?.name, "Ravi star")
+        XCTAssertTrue(NameRules.isEmojiName("white_check_mark"))
+        XCTAssertFalse(NameRules.isEmojiName("eng_alerts2X"))
+    }
+
     func testPlaceholderAliases() {
         XCTAssertEqual(NameRules.placeholderAliases("Text Message • iMessage"), ["imessage"])
         XCTAssertEqual(NameRules.placeholderAliases("Message Ravi"), [])
@@ -316,6 +358,8 @@ final class LiveDiscoveryTests: XCTestCase {
             print("LIVE   \(app.name) sidebar: \(names.filter { $0.source == .sidebar }.count) names, self \(names.contains(where: \.isSelf)), "
                   + "one read \(Int(scan?.readMs ?? 0)) ms, settled \(Int(scan?.settleMs ?? 0)) ms in \(scan?.reads ?? 0) reads, "
                   + "\(scan?.windows ?? 0) windows, \(scan?.nodes ?? 0) nodes")
+            let shown = names.filter { $0.source == .sidebar }.prefix(25).map(\.name)
+            if !shown.isEmpty { print("LIVE     names: \(shown.joined(separator: " | "))") }
         }
     }
 

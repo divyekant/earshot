@@ -37,8 +37,14 @@ public enum NameRules {
         "channel", "directmessage", "dm", "group", "private", "public", "huddle", "mute", "muted", "notifications",
         "moreactions", "options", "close", "avatar", "image", "photo", "profile", "presence", "inactive", "pin",
         "select", "givefeedback", "selectgivefeedback", "agent", "sirifoundinapps", "suggestions", "topresults",
-        "recentsearches",
+        "recentsearches", "unreadmessages", "recap", "recaps", "catchup", "allunreads", "mentionsreactions",
+        "media", "links", "docs", "starredmessages", "archived", "locked", "lockedchats", "broadcasts",
+        "history", "back", "forward", "previous", "next", "recurring", "tomorrow", "message", "chat",
     ]
+
+    /// First words of button labels: "Connect apps", "Create event", "Open recordings".
+    public static let actionVerbs: Set<String> = ["connect", "create", "open", "start", "add", "join", "schedule",
+                                                  "invite", "browse", "new", "show", "view", "manage", "edit"]
 
     public static let weekdays: Set<String> = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
                                                "mon", "tue", "wed", "thu", "fri", "sat", "sun"]
@@ -73,6 +79,74 @@ public enum NameRules {
         if lower.range(of: #"^\d+\s?(s|m|h|d|w|min|mins|new|more)$"#, options: .regularExpression) != nil { return nil }
         if lower.range(of: #"\b(am|pm)$"#, options: .regularExpression) != nil, s.contains(where: \.isNumber) { return nil }
         return (s, isSelf)
+    }
+
+    /// Words that end the title of a section of a chat list: "EU Channels", "Team chats".
+    public static let sectionEnds: Set<String> = ["channels", "chats", "conversations", "dms", "messages", "groups"]
+
+    /// Common emoji names that apps show as text for a custom section icon: "gear Product".
+    /// A snake_case word ("sunrise_over_mountains") is also an emoji name.
+    public static let emojiNames: Set<String> = [
+        "gear", "dollar", "bangbang", "rocket", "star", "fire", "tada", "wave", "bell", "zap", "sparkles", "heart",
+        "eyes", "pushpin", "memo", "bulb", "lock", "key", "globe", "house", "briefcase", "calendar", "mag", "warning",
+        "robot", "books", "computer", "hammer", "wrench", "package", "moneybag", "trophy", "rainbow", "sunny",
+        "cloud", "coffee", "pizza", "bug", "art", "megaphone", "loudspeaker", "construction", "rotating_light",
+        "speech_balloon", "handshake", "seedling", "earth_americas", "earth_africa", "earth_asia", "satellite",
+        "chart_with_upwards_trend", "white_check_mark", "heavy_check_mark", "100", "muscle", "brain", "bookmark",
+        "clipboard", "label", "link", "paperclip", "microphone", "headphones", "video_game", "dart", "crown",
+        "gem", "money_with_wings", "credit_card", "shield", "test_tube", "telescope", "unicorn", "dog", "cat",
+    ]
+
+    /// True if the word is an emoji name, as text: in the list, or snake_case in lower case.
+    public static func isEmojiName(_ word: String) -> Bool {
+        if emojiNames.contains(word) { return true }
+        return word.contains("_") && word.allSatisfy { ($0.isLetter && $0.isLowercase) || $0 == "_" || $0.isNumber }
+    }
+
+    /// A name from a sidebar, or nil. The rules of `clean`, and also:
+    /// - A label that starts with an emoji name, such as "gear Product", is a section with a custom icon.
+    /// - A title that ends with a section word ("EU Channels") is a section.
+    /// - The app's own name ("Slack" in Slack) is not a chat.
+    /// - Search prompts and sentences of 5 words or more are not chats.
+    public static func sidebarName(_ raw: String, appName: String = "") -> (name: String, isSelf: Bool)? {
+        var text = Words.squash(raw)
+        // A static text can hold "Name, 1 unread message". Keep the name.
+        if let comma = text.range(of: ", ") {
+            let rest = text[comma.upperBound...].lowercased()
+            if rest.contains(where: \.isNumber) || ["unread", "message", "typing", "muted", "draft"].contains(where: { rest.contains($0) }) {
+                text = String(text[..<comma.lowerBound])
+            }
+        }
+        guard var c = clean(text) else { return nil }
+        if raw.lowercased().contains("(you)") { c.isSelf = true }
+        let lower = c.name.lowercased()
+        // Search prompts of an open search: "Search for: happening".
+        if promptStarts.contains(where: { lower.hasPrefix($0) }) { return nil }
+        let words = c.name.split(separator: " ").map(String.init)
+        // A sentence is a notice, not a chat: "Your personal messages are end-to-end encrypted", "This is your space."
+        if words.count >= 5 || (words.count >= 2 && [".", "!", "?"].contains(where: { c.name.hasSuffix($0) })) { return nil }
+        // A shortcut hint of a button or a menu: "Search ⌘E".
+        if c.name.contains(where: { "⌘⌥⇧⌃".contains($0) }) { return nil }
+        // A date heading: "Sunday, November 1".
+        // Only a full day name counts: "Sun Li" is a name.
+        if let first = words.first, Words.key(first).count > 3, weekdays.contains(Words.key(first)) { return nil }
+        let lowerName = c.name.lowercased()
+        // A field label ("Organizer: x", "Host: y"), an address, or the encryption notice.
+        if c.name.contains(":") || c.name.contains("@") || lowerName.contains("encrypted") { return nil }
+        // A date heading with a short day: "Today, Nov 1", "Mon, Nov 2".
+        if let first = words.first, first.hasSuffix(","),
+           ["today", "yesterday", "tomorrow"].contains(Words.key(first)) || weekdays.contains(Words.key(first)) { return nil }
+        // A button: "Connect apps", "Create event".
+        if words.count >= 2, actionVerbs.contains(Words.key(words[0])), words[1].first?.isLowercase == true { return nil }
+        // A label with the app's own name: "Start Zoom Meeting", "Zoom Meeting".
+        if !c.isSelf, !appName.isEmpty, words.count >= 2,
+           words.contains(where: { Words.key($0) == Words.key(appName) }) { return nil }
+        // Back and forward buttons: "Back in Chat".
+        if words.count >= 2, ["back", "forward"].contains(Words.key(words[0])), words[1].lowercased() == "in" { return nil }
+        if words.count >= 2, isEmojiName(words[0]), words[1].first?.isUppercase == true { return nil }
+        if words.count >= 2, let last = words.last, sectionEnds.contains(last.lowercased()) { return nil }
+        if !appName.isEmpty, Words.key(c.name) == Words.key(appName) { return nil }
+        return c
     }
 
     /// Spoken app names in the placeholder of the message box. Only a word with a capital letter
