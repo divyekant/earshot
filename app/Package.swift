@@ -7,6 +7,22 @@ import PackageDescription
 
 let modules = ["EarshotSpeech", "EarshotRouter", "EarshotActions", "EarshotDiscovery", "EarshotInput", "EarshotUI"]
 
+// T1: transcribe.cpp runs the Parakeet model (E2). Only EarshotSpeech uses it.
+// CTranscribe is a dynamic framework. SwiftPM copies it next to the product, but adds no search path for it (E2).
+// The paths: next to the tool, three levels up from a test bundle binary, and Contents/Frameworks of an app bundle.
+let transcribeSearchPaths = ["@loader_path", "@loader_path/../../..", "@executable_path/../Frameworks"]
+let extraDependencies: [String: [Target.Dependency]] = ["EarshotSpeech": ["TranscribeCpp"]]
+let extraLinker: [String: [LinkerSetting]] = [
+    "EarshotSpeech": [
+        .linkedLibrary("c++"),
+        .linkedLibrary("z"),
+        .linkedFramework("Accelerate"),
+        .linkedFramework("Metal"),
+        .linkedFramework("MetalKit"),
+        .unsafeFlags(transcribeSearchPaths.flatMap { ["-Xlinker", "-rpath", "-Xlinker", $0] }),
+    ],
+]
+
 let package = Package(
     name: "earshot",
     platforms: [.macOS("26.0")],
@@ -20,7 +36,18 @@ let package = Package(
         .executableTarget(name: "EarshotApp", dependencies: ["EarshotCore"] + modules.map { .target(name: $0) },
                           path: "Sources/EarshotApp"),
     ]
-    + modules.map { .target(name: $0, dependencies: ["EarshotCore"], path: "Sources/\($0)") }
+    + [
+        // transcribe.cpp 0.3.1 (MIT), prebuilt for Apple platforms. SwiftPM checks the SHA-256 sum of the file.
+        .binaryTarget(
+            name: "TranscribeCpp",
+            url: "https://github.com/handy-computer/transcribe.cpp/releases/download/v0.3.1/TranscribeCpp.xcframework.zip",
+            checksum: "9fbd7fa74bf2cf903ee291d3fa98a02c5bd1cf07dda6adbc4f64c3a68be287ca"
+        ),
+    ]
+    + modules.map {
+        .target(name: $0, dependencies: ["EarshotCore"] + (extraDependencies[$0] ?? []), path: "Sources/\($0)",
+                linkerSettings: extraLinker[$0] ?? [])
+    }
     + modules.map { .testTarget(name: "\($0)Tests", dependencies: [.target(name: $0), "EarshotCore"], path: "Tests/\($0)Tests") },
     swiftLanguageModes: [.v5]
 )
