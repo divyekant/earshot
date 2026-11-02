@@ -25,6 +25,9 @@ struct E3Case: Codable {
     var waitMs: Int?
     /// The bundle id that must be in front, for example "com.google.Chrome". Else the row is "skipped".
     var front: String?
+    /// Live mode only (EARSHOT_E3_CLICK=1): true lets the harness run the click on Jev's pick. Use it only for
+    /// harmless targets on public pages or Calculator. The click path keeps every safety rule (tier "jev").
+    var click: Bool?
 }
 
 final class E3Screens: XCTestCase {
@@ -69,7 +72,21 @@ final class E3Screens: XCTestCase {
                 if case .click(let id) = rules.intent { return screen?.elements.first { $0.id == id }?.label ?? id }
                 return "\(rules.intent)"
             }()
+            // Live clicks (D-10 live test): run the normal click path on the pick, with the tier "jev".
+            var clicked: [String: Any] = [:]
+            if env["EARSHOT_E3_CLICK"] == "1", c.click == true, let id = v.elementID {
+                let before = Self.page(screen)
+                let command = CommandInfo(mode: .hold, tier: .jev, spokenTarget: CommandRouter.spokenTarget(c.command))
+                let t1 = Date()
+                let outcome = await runner.run(.click(elementID: id), context: context, command: command)
+                let clickMs = Date().timeIntervalSince(t1) * 1000
+                try? await Task.sleep(nanoseconds: 1_500_000_000)
+                let after = await runner.screen()
+                clicked = ["ok": outcome.ok, "note": outcome.note, "ms": (clickMs * 10).rounded() / 10,
+                           "changed": Self.page(after) != before]
+            }
             let row: [String: Any] = [
+                "click": clicked,
                 "name": c.name, "command": c.command, "expect": c.expect, "front": context.frontBundleID ?? "",
                 "elements": screen?.elements.count ?? 0,
                 "rules": rulesLabel, "rulesConfidence": rules.confidence,
@@ -81,6 +98,12 @@ final class E3Screens: XCTestCase {
             lines.append(line)
         }
         if let out { try lines.joined(separator: "\n").appending("\n").write(to: out, atomically: true, encoding: .utf8) }
+    }
+
+    /// The window title, the address and the first labels: enough to see if a click changed the screen.
+    static func page(_ s: ScreenSnapshot?) -> String {
+        guard let s else { return "" }
+        return ([s.windowTitle, s.url ?? ""] + s.elements.prefix(40).map(\.label)).joined(separator: "|")
     }
 
     static func key(_ command: String?) -> String? {
