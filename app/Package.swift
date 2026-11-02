@@ -35,6 +35,9 @@ let package = Package(
         .testTarget(name: "EarshotCoreTests", dependencies: ["EarshotCore"], path: "Tests/EarshotCoreTests"),
         .executableTarget(name: "EarshotApp", dependencies: ["EarshotCore"] + modules.map { .target(name: $0) },
                           path: "Sources/EarshotApp"),
+        // T7: tests of the command path in EarshotApp, with fake engines and runners.
+        .testTarget(name: "EarshotAppTests", dependencies: ["EarshotApp", "EarshotCore"] + modules.map { .target(name: $0) },
+                    path: "Tests/EarshotAppTests"),
     ]
     + [
         // transcribe.cpp 0.3.1 (MIT), prebuilt for Apple platforms. SwiftPM checks the SHA-256 sum of the file.
