@@ -519,10 +519,25 @@ enum E2 {
                     AX.set(field, "AXFocused", kCFBooleanTrue)
                     let wasSet = AX.set(field, "AXValue", text as CFString)
                     actMs = Clock.ms(since: tp)
-                    let shown = AX.value(field) ?? ""
-                    acted = wasSet && Text.normalize(shown) == Text.normalize(text) ? "typed" : "type failed"
+                    acted = wasSet && Text.normalize(AX.value(field) ?? "") == Text.normalize(text) ? "typed (value)" : "type failed"
+                    // Fallback: type the words as key events, only if the focus is in that field.
+                    // Key events never hold Return: Keys.type removes control characters.
+                    var typedKeys = false
+                    if acted == "type failed", await waitUntil(timeoutMs: 500, { AX.same(AX.focused(app), field) }) {
+                        let tk = Clock.nowNs()
+                        Keys.type(text)
+                        typedKeys = true
+                        let shown = await waitUntil(timeoutMs: 1000) { Text.normalize(AX.value(field) ?? "") == Text.normalize(text) }
+                        actMs = Clock.ms(since: tk)
+                        acted = shown ? "typed (keys)" : "type failed (keys too)"
+                    }
                     // Empty the field and move the focus back to the page. No Return.
                     AX.set(field, "AXValue", "" as CFString)
+                    if typedKeys, !(AX.value(field) ?? "").isEmpty, AX.same(AX.focused(app), field) {
+                        Keys.press(Keys.selectAll)
+                        Keys.press(Keys.deleteKey)
+                    }
+                    Keys.press(Keys.escape)
                     if let w = AX.window(app), let area = WebPage.webArea(in: w) { AX.set(area, "AXFocused", kCFBooleanTrue) }
                     await sleepMs(300)
                 case "scroll":
@@ -530,7 +545,13 @@ enum E2 {
                        let w = AX.window(app), let area = WebPage.webArea(in: w) {
                         AX.set(area, "AXFocused", kCFBooleanTrue)
                     }
-                    let firstBefore = read.elements.first.map { "\($0.label)@\(Int($0.y))" } ?? ""
+                    // "Go to the top" on a page that is at the top shows no change. Scroll down first (not timed).
+                    var firstBefore = read.elements.first.map { "\($0.label)@\(Int($0.y))" } ?? ""
+                    if choice.text == "top" || choice.text == "up" {
+                        Keys.press(pageDown)
+                        await sleepMs(500)
+                        firstBefore = WebPage.read(app, headings: false)?.elements.first.map { "\($0.label)@\(Int($0.y))" } ?? ""
+                    }
                     let tp = Clock.nowNs()
                     Keys.press(choice.text == "top" || choice.text == "up" ? home : pageDown)
                     actMs = Clock.ms(since: tp)
