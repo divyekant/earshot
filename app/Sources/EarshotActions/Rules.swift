@@ -90,6 +90,11 @@ enum SwitcherTiming {
     static let resultMs = 800
 }
 
+/// The time limit for "scroll into view" before a click (E2, section 7).
+enum ScrollTiming {
+    static let limitMs = 300
+}
+
 /// The result of the chat check.
 enum ChatCheck: String, Equatable {
     /// A text on screen is the chat name and nothing more. Typing needs this.
@@ -148,6 +153,18 @@ enum ActionRules {
     /// (for example a web "skip link"). The click step cannot reach it, so the read drops it.
     static func visible(_ f: Frame, in vp: Frame) -> Bool {
         f.w >= 2 && f.h >= 2 && f.overlaps(vp)
+    }
+
+    /// True if the frame is fully inside the view, with a margin of 1 point.
+    static func inside(_ f: Frame, _ v: Frame) -> Bool {
+        f.w >= 2 && f.h >= 2 && f.x >= v.x - 1 && f.y >= v.y - 1 && f.maxX <= v.maxX + 1 && f.maxY <= v.maxY + 1
+    }
+
+    /// The reason not to press after a scroll, or nil: the page must still be on the same site.
+    static func afterScrollBlock(before: String?, after: String?) -> String? {
+        guard let before, let host = URL(string: before)?.host else { return nil }
+        guard let after, SafetyPolicy.onHost(after, host) else { return "blocked: the page changed during the scroll" }
+        return nil
     }
 
     /// Roles that the walk for window controls does not go into: the web page, the menu bar, images and scroll bars.

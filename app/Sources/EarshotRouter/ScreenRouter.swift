@@ -189,6 +189,8 @@ enum ScreenRouter {
     /// "Pull requests (1)" gives "Pull requests", "Chats, 44" gives "Chats". Nil if the label has no status part.
     static func statusFree(_ label: String) -> String? {
         var s = label.trimmingCharacters(in: .whitespaces)
+        // Fast path: a status part ends with ")" or a digit. Most labels do not, and a regular expression is slow.
+        guard let last = s.last, last == ")" || last.isNumber else { return nil }
         var changed = false
         while true {
             if let r = s.range(of: #"\s*\([^()]*\)$"#, options: .regularExpression) { s.removeSubrange(r) }
@@ -200,23 +202,94 @@ enum ScreenRouter {
         return changed && !TextKit.key(s).isEmpty ? s : nil
     }
 
-    /// The match keys of a label: letters and digits only, for the label and for the label with no status part.
-    static func keys(_ label: String) -> [String] {
-        [label, statusFree(label)].compactMap { $0 }.map { TextKit.key(TextKit.digitize(TextKit.words($0)).joined()) }
+    /// The match data of one label. The router makes it one time for each label and keeps it in a cache,
+    /// so a command does not parse the same labels again (a menu bar can have 1000 items).
+    struct LabelInfo: Sendable {
+        /// The words of the label, with numbers as digits.
+        let words: [String]
+        /// The words of the label with no status part, or nil if the label has no status part.
+        let bare: [String]?
+        /// Letters and digits only, for the label and for the label with no status part.
+        let keys: [String]
+        /// The sound codes of the keys that have 3 or more letters.
+        let codes: [String]
+        /// The sound code of each word of `bare ?? words`, for the "maybe" note.
+        let wordCodes: [String]
+        let numbers: Set<String>
+        let mostlyNumber: Bool
+        let bareMostlyNumber: Bool
+
+        init(_ label: String) {
+            words = TextKit.digitize(TextKit.words(label))
+            let free = ScreenRouter.statusFree(label)
+            bare = free.map { TextKit.digitize(TextKit.words($0)) }
+            keys = [words.joined()] + (bare.map { [$0.joined()] } ?? [])
+            codes = keys.filter { $0.count >= 3 }.map(SoundCode.code)
+            wordCodes = (bare ?? words).map { $0.count >= 3 ? SoundCode.code($0) : "" }
+            numbers = Set(words.filter(TextKit.isNumber))
+            mostlyNumber = ScreenRouter.mostlyNumber(label)
+            bareMostlyNumber = free.map(ScreenRouter.mostlyNumber) ?? false
+        }
     }
+
+    /// The words that the owner said, with their key and sound code. The router makes it one time for each command.
+    struct Said {
+        let words: [String]
+        let key: String
+        let code: String
+        let numbers: Set<String>
+
+        init(_ words: [String]) {
+            self.words = words
+            key = TextKit.key(words.joined())
+            code = key.count >= 3 ? SoundCode.code(key) : ""
+            numbers = ScreenRouter.numbers(words)
+        }
+    }
+
+    /// The label cache. The labels of the front window and of its menus repeat from one command to the next.
+    final class LabelCache: @unchecked Sendable {
+        private let lock = NSLock()
+        private var infos: [String: LabelInfo] = [:]
+        static let limit = 20_000
+
+        func info(_ label: String) -> LabelInfo {
+            lock.lock()
+            if let i = infos[label] { lock.unlock(); return i }
+            lock.unlock()
+            let i = LabelInfo(label)
+            lock.lock()
+            if infos.count >= Self.limit { infos.removeAll(keepingCapacity: true) }
+            infos[label] = i
+            lock.unlock()
+            return i
+        }
+    }
+
+    static let cache = LabelCache()
+
+    static func info(_ label: String) -> LabelInfo { cache.info(label) }
+
+    /// The match keys of a label: letters and digits only, for the label and for the label with no status part.
+    static func keys(_ label: String) -> [String] { info(label).keys }
 
     /// 1.0 is a full match. The largest of: the score for the label, the score for the label with no status part
     /// ("Home (New unread posts)" for "home"), and a sound match.
     static func score(_ target: [String], _ label: String) -> Double {
-        guard !target.isEmpty else { return 0 }
-        var s = wordScore(target, label)
-        if s < 1, let bare = statusFree(label) { s = max(s, wordScore(target, bare)) }
-        // Letters and digits only: "shad CN/UI" is "shadcn/ui".
-        if s < 1, keys(label).contains(TextKit.key(target.joined())), numbersMatch(target, label) { s = 1 }
+        score(Said(target), info(label))
+    }
+
+    static func score(_ said: Said, _ label: LabelInfo) -> Double {
+        guard !said.words.isEmpty else { return 0 }
+        // Numbers must match exactly: "382 comments" never matches "384 comments" (E2, section 5.6).
+        guard said.numbers.isSubset(of: label.numbers) else { return 0 }
+        // Letters and digits only: "shad CN/UI" is "shadcn/ui". This is a full match, so stop here.
+        if label.keys.contains(said.key), !(label.mostlyNumber && !label.numbers.isSubset(of: said.numbers)) { return 1 }
+        var s = wordScore(said.words, label.words, mostlyNumber: label.mostlyNumber)
+        if s < 1, let bare = label.bare { s = max(s, wordScore(said.words, bare, mostlyNumber: label.bareMostlyNumber)) }
         // A sound match: speech to text writes "clawed" for "Claude". It is never an exact match (R-NV-5).
-        if s < soundMatch, numbersMatch(target, label) {
-            let said = TextKit.key(target.joined())
-            for k in keys(label) where SoundCode.similarity(said, k) >= 1 { s = max(s, soundMatch) }
+        if s < soundMatch, let first = said.code.first {
+            for c in label.codes where c.first == first && c == said.code { s = soundMatch; break }
         }
         return s
     }
@@ -224,27 +297,31 @@ enum ScreenRouter {
     /// The score of a label that only a sound match gives.
     static let soundMatch = 0.82
 
-    static func numbersMatch(_ target: [String], _ label: String) -> Bool {
-        numbers(target).isSubset(of: Set(TextKit.digitize(TextKit.words(label)).filter(TextKit.isNumber)))
-    }
-
     /// True if a word of the label is close to a word that the owner said: the same word, a near spelling,
     /// or a near sound ("chart" for "chat"). A "maybe" for the owner when no label matches well.
     static func near(_ target: [String], _ label: String) -> Bool {
         let said = target.filter { $0.count >= 3 && !smallWords.contains($0) && !TextKit.isNumber($0) }
-        let words = TextKit.words(statusFree(label) ?? label)
+        guard !said.isEmpty else { return false }
+        let l = info(label)
+        let words = l.bare ?? l.words
         return said.contains { t in
-            words.contains { w in w == t || TextKit.similarity(t, w) >= 0.75 || SoundCode.similarity(t, w) >= 0.75 }
+            let tc = SoundCode.code(t)
+            return words.indices.contains { i in
+                let w = words[i]
+                if w == t || TextKit.similarity(t, w) >= 0.75 { return true }
+                let wc = l.wordCodes[i]
+                guard !wc.isEmpty, wc.first == tc.first else { return false }
+                return TextKit.similarity(tc, wc) >= 0.75
+            }
         }
     }
 
-    /// Numbers must match exactly: "382 comments" never matches "384 comments" (E2, section 5.6).
-    static func wordScore(_ target: [String], _ label: String) -> Double {
-        let labelWords = TextKit.digitize(TextKit.words(label))
+    /// The word score of a label, as before the match keys: whole phrase, word cover and a run of words.
+    static func wordScore(_ target: [String], _ labelWords: [String], mostlyNumber: Bool) -> Double {
         let want = numbers(target)
         let have = Set(labelWords.filter(TextKit.isNumber))
         if !want.isSubset(of: have) { return 0 }
-        if mostlyNumber(label), !have.isSubset(of: want) { return 0 }
+        if mostlyNumber, !have.isSubset(of: want) { return 0 }
         let full = TextKit.similarity(target.joined(), labelWords.joined())
         guard !labelWords.isEmpty else { return full }
         var cover = 0.0
@@ -258,7 +335,7 @@ enum ScreenRouter {
         let found = content.filter { l in target.contains { TextKit.similarity($0, l) >= 0.75 } }.count
         let precision = Double(found) / Double(content.count)
         // Two or more words that match a run of words in the label, in order: a name in a long chat row
-        // ("Prakash Iyar" in "user avatar Prakash Iyer Verified account 1h ..."). The long label does not count against it.
+        // ("Prakash Iyyer" in "user avatar Prakash Iyer Verified account 1h ..."). The long label does not count against it.
         var run = 0.0
         if target.count >= 2, labelWords.count >= target.count {
             for start in 0...(labelWords.count - target.count) {
@@ -345,12 +422,14 @@ enum ScreenRouter {
         // Press: score every element with a label.
         var scored: [(ScreenElement, Double)] = []
         let isMenu = MenuElements.isMenu
+        let said = Said(p.target), saidAll = Said(p.words)
         for e in elements where !e.label.isEmpty {
-            var s = score(p.target, e.label)
+            let label = info(e.label)
+            var s = score(said, label)
             if isMenu(e) {
                 // A menu title can hold the verb: "select all" is the item "Select All". A match on all the words
                 // wins by the margin over a full match on the words after the verb (the link "All").
-                let whole = score(p.words, e.label)
+                let whole = score(saidAll, label)
                 if whole >= 1 { s = max(s, 1 + margin) } else { s = max(s, whole) }
             }
             if let hint = p.roleHint, hint == kind(e) || (hint == "tab" && e.role == "AXRadioButton") { s += 0.05 }
@@ -376,11 +455,13 @@ enum ScreenRouter {
 
         guard let first = scored.first, first.1 >= noMatch else {
             // No label matches well. If a label holds a word near a spoken word, the owner can see it: not a sure "none".
-            if p.isCommand, let maybe = elements.filter({ !$0.label.isEmpty && !($0.risky || SafetyPolicy.isRisky($0)) && near(p.target, $0.label) })
-                .max(by: { score(p.target, $0.label) < score(p.target, $1.label) }) {
+            let nearby = p.isCommand ? elements.filter({ !$0.label.isEmpty && !($0.risky || SafetyPolicy.isRisky($0))
+                && ScreenRouter.near(p.target, $0.label) }).map { ($0, score(said, info($0.label))) } : []
+            if let best = nearby.max(by: { $0.1 < $1.1 }) {
+                let maybe = best.0, maybeScore = best.1
                 if !options.contains(where: { $0.intent == .click(elementID: maybe.id) }) {
                     options.insert(RouteOption(intent: .click(elementID: maybe.id), label: "Click the \(kind(maybe) ?? "element") \"\(maybe.label)\"",
-                                               score: score(p.target, maybe.label)), at: 0)
+                                               score: maybeScore), at: 0)
                 }
                 return done(.none, false, false, "no label matches; maybe \"\(maybe.label)\"")
             }

@@ -138,6 +138,17 @@ final class ActionRulesTests: XCTestCase {
         XCTAssertTrue(ActionRules.visible(Frame(x: 10, y: 870, w: 150, h: 20), in: vp))       // partly visible: kept
     }
 
+    func testInsideAndHostAfterScroll() {
+        let v = Frame(x: 0, y: 100, w: 1200, h: 700)
+        XCTAssertTrue(ActionRules.inside(Frame(x: 20, y: 400, w: 200, h: 20), v))
+        XCTAssertFalse(ActionRules.inside(Frame(x: 20, y: 1400, w: 200, h: 20), v))   // below the view
+        XCTAssertFalse(ActionRules.inside(Frame(x: 20, y: 790, w: 200, h: 20), v))    // cut at the bottom
+        XCTAssertNil(ActionRules.afterScrollBlock(before: "https://x.com/home", after: "https://x.com/home#top"))
+        XCTAssertNotNil(ActionRules.afterScrollBlock(before: "https://x.com/home", after: "https://accounts.example.com/"))
+        XCTAssertNotNil(ActionRules.afterScrollBlock(before: "https://x.com/home", after: nil))
+        XCTAssertNil(ActionRules.afterScrollBlock(before: nil, after: nil))  // a native window
+    }
+
     func testComposerShape() {
         let w = Frame(x: 0, y: 0, w: 1000, h: 800)
         XCTAssertTrue(ActionRules.composerShape(field: Frame(x: 300, y: 720, w: 650, h: 40), window: w))
@@ -326,6 +337,32 @@ final class ActionRunnerTests: XCTestCase {
         let learned = FakeSwitcher(showsAt: 0, ownFocus: false, acceptsAX: true)
         _ = await runner.waitForSwitcherField(scanDelayMs: 0, focused: learned.focused, newField: learned.newField, setFocus: learned.setFocus)
         XCTAssertLessThan(Clock.ms(since: learned.t0), 60)
+    }
+
+    /// A fake link below the view. The scroll moves it into view after 60 ms. The wait ends soon after.
+    func testScrollIntoViewWaitsForTheFrame() async {
+        let runner = EarshotActionRunner(store: nil)
+        let view = Frame(x: 0, y: 100, w: 1200, h: 700)
+        var scrolledAt: UInt64?
+        let t0 = Clock.nowNs()
+        let f = await runner.scrollIntoView(perform: { scrolledAt = Clock.nowNs() }, frame: {
+            guard let s = scrolledAt, Clock.ms(since: s) >= 60 else { return Frame(x: 20, y: 1400, w: 200, h: 20) }
+            return Frame(x: 20, y: 400, w: 200, h: 20)
+        }, view: view)
+        let ms = Clock.ms(since: t0)
+        print("EARSHOT_BENCH fake scroll into view: \(ms) ms (frame moves at 60 ms)")
+        XCTAssertEqual(f, Frame(x: 20, y: 400, w: 200, h: 20))
+        XCTAssertLessThan(ms, 120)
+    }
+
+    /// The frame never comes into view: nil at the time limit, so earshot does not click.
+    func testScrollIntoViewTimesOut() async {
+        let runner = EarshotActionRunner(store: nil)
+        let t0 = Clock.nowNs()
+        let f = await runner.scrollIntoView(perform: {}, frame: { Frame(x: 20, y: 1400, w: 200, h: 20) },
+                                            view: Frame(x: 0, y: 100, w: 1200, h: 700))
+        XCTAssertNil(f)
+        XCTAssertGreaterThanOrEqual(Clock.ms(since: t0), Double(ScrollTiming.limitMs))
     }
 
     /// No row: the wait stops at its time limit and reports false, so earshot presses no Return.

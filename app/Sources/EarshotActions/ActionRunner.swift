@@ -572,15 +572,47 @@ public final class EarshotActionRunner: ActionRunner {
         // scroll the element into view and try again (E2, section 7).
         var point = safePoint(h, live.frame)
         if point == nil {
-            AX.perform(h, "AXScrollToVisible")
-            await sleepMs(150)
-            if let f = AX.frame(h) { point = safePoint(h, f) }
+            // Scroll the element into view, if it offers the action. Scrolling changes no data.
+            guard AX.actions(h).contains("AXScrollToVisible") else { return fail("\"\(label)\" is not visible on screen") }
+            let area = read.inPageViewport(item) ? read.viewport : read.window
+            let tsc = Clock.nowNs()
+            let frame = await scrollIntoView(perform: { AX.perform(h, "AXScrollToVisible") }, frame: { AX.frame(h) }, view: area)
+            watch.note("scroll_ms", Clock.ms(since: tsc))
+            guard let f = frame else { return fail("\"\(label)\" did not scroll into view") }
+            // The press checks again after the scroll: the same label, the same site, no sign-in page, no risky label.
+            guard let again = ScreenReader.describe(h, viewport: everywhere), again.label == label else {
+                return fail("\"\(label)\" changed on screen: say the command again")
+            }
+            if pageRules, read.web {
+                let app = AX.appElement(read.pid)
+                let url = AX.window(app).flatMap { ScreenReader.visibleWebArea($0) }.flatMap { ScreenReader.address($0) }
+                if let block = ActionRules.afterScrollBlock(before: read.snapshot.url, after: url) { return fail(block) }
+                let sensitiveNow = SafetyPolicy.sensitive(url: url, elements: pageElements(read))
+                if let block = ActionRules.pressBlock(label: again.label, role: item.element.role, command: command,
+                                                      sensitive: sensitiveNow) { return fail(block) }
+            }
+            point = safePoint(h, f)
+            // In view, but the top element at each point is another one, for example a fixed header.
+            if point == nil { return fail("\"\(label)\" is in view but covered by another element") }
         }
         guard let p = point else { return fail("\"\(label)\" is not visible on screen") }
         guard frontmost(read.pid) else { return fail("the app is not in front") }
         Mouse.click(p)
         watch.mark("pressed")
         return ok("clicked \"\(label)\"")
+    }
+
+    /// Performs the scroll, then polls every 15 ms (limit `ScrollTiming.limitMs`) until the frame is inside `view`.
+    /// It returns the new frame, or nil on a time-out.
+    func scrollIntoView(perform: () -> Void, frame: () -> Frame?, view: Frame,
+                        timeoutMs: Int = ScrollTiming.limitMs) async -> Frame? {
+        perform()
+        var last: Frame?
+        let inside = await waitUntil(timeoutMs: timeoutMs, intervalMs: SwitcherTiming.pollMs) {
+            last = frame()
+            return last.map { ActionRules.inside($0, view) } ?? false
+        }
+        return inside ? last : nil
     }
 
     /// The elements of the page only. A browser toolbar control, for example a "Passwords" button, does not make

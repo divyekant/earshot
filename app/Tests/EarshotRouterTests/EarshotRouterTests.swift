@@ -374,9 +374,9 @@ final class EarshotRouterTests: XCTestCase {
         XCTAssertTrue(SafetyPolicy.isRisky("Delete chat", role: "AXRow"))
         XCTAssertFalse(SafetyPolicy.isRisky(Self.xRow, role: "AXStaticText"))
         // The press gate uses the same rule.
-        XCTAssertTrue(SafetyPolicy.mayPress(label: Self.xRow, role: "AXRow", spokenTarget: "prakash iyar", tier: .fuzzy,
+        XCTAssertTrue(SafetyPolicy.mayPress(label: Self.xRow, role: "AXRow", spokenTarget: "prakash iyyer", tier: .fuzzy,
                                             mode: .hold))
-        XCTAssertFalse(SafetyPolicy.mayPress(label: Self.xRow, spokenTarget: "prakash iyar", tier: .fuzzy, mode: .hold))
+        XCTAssertFalse(SafetyPolicy.mayPress(label: Self.xRow, spokenTarget: "prakash iyyer", tier: .fuzzy, mode: .hold))
     }
 
     func testClickAChatRowWithMessageText() async {
@@ -387,7 +387,7 @@ final class EarshotRouterTests: XCTestCase {
             Fixtures.el("e3", "AXLink", "Home", y: 10, x: 50),
         ])
         let ctx = RouteContext(apps: Fixtures.apps, names: Fixtures.names, screen: page)
-        let r = await route("Click on Prakash Iyar", ctx)
+        let r = await route("Click on Prakash Iyyer", ctx)
         XCTAssertEqual(r.intent, .click(elementID: "e1"), r.why)
         XCTAssertGreaterThanOrEqual(r.confidence, SafetyPolicy.minimumConfidence, "a name in a long row is a sure match: \(r.why)")
         // A text that the OCR fallback found is a click target too (R-CL-4). An OCR text keeps the strict risky rule.
