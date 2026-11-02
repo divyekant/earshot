@@ -40,8 +40,9 @@ public struct EarshotSettings: Codable, Equatable, Sendable {
     /// The phrase that starts a command in always-on mode (R-ON-1, D-11). Known words work best.
     public var wakePhrase: String = WakePhrase.defaultPhrase
     /// The lowest voice score (cosine similarity to the owner's enrolled voice) that counts as the owner (R-ON-3).
-    /// A start value. Tune it from the voice scores in the activity log.
-    public var voiceThreshold: Double = 0.45
+    /// The live trial of 2026-11-02 gave 0.50 to 0.73 for the owner and 0.06 for another voice. Tune it from the
+    /// voice scores in the activity log.
+    public var voiceThreshold: Double = 0.35
 
     public init() {}
 

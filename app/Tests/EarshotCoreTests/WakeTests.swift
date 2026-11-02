@@ -29,6 +29,34 @@ final class WakeTests: XCTestCase {
         XCTAssertEqual(WakePhrase.strip("", phrase: phrase), "")
     }
 
+    func testStripTakesTheFormsFromTheLiveTrial() {
+        // Live trial 2026-11-02 with "hey atlas": Apple speech wrote these forms. The strict match kept them, so the
+        // router saw "Here, at least open slack." and found no command (R-ON-1, D-11).
+        let atlas = "hey atlas"
+        XCTAssertEqual(WakePhrase.strip("Here, at least open slack.", phrase: atlas, afterWake: true), "open slack.")
+        XCTAssertEqual(WakePhrase.strip("He at least open slack.", phrase: atlas, afterWake: true), "open slack.")
+        XCTAssertEqual(WakePhrase.strip("Here at least open Safari.", phrase: atlas, afterWake: true), "open Safari.")
+        XCTAssertEqual(WakePhrase.strip("Yeah, at least open notes.", phrase: atlas, afterWake: true), "open notes.")
+        XCTAssertEqual(WakePhrase.strip("Here, Aglis, open chrome.", phrase: atlas, afterWake: true), "open chrome.")
+        XCTAssertEqual(WakePhrase.strip("Here, at least, type.", phrase: atlas, afterWake: true), "type.")
+        // The owner said the phrase again in the follow-up window.
+        XCTAssertEqual(WakePhrase.strip("He, at least type, this is working so well.", phrase: atlas),
+                       "type, this is working so well.")
+        XCTAssertEqual(WakePhrase.strip("Hey Travis, open notes", phrase: phrase, afterWake: true), "open notes")
+    }
+
+    func testLooseMatchOnlyAtTheStart() {
+        let atlas = "hey atlas"
+        XCTAssertEqual(WakePhrase.strip("open slack.", phrase: atlas, afterWake: true), "open slack.")
+        XCTAssertEqual(WakePhrase.strip("Dude, this is working.", phrase: atlas), "Dude, this is working.")
+        XCTAssertEqual(WakePhrase.strip("Add a list to notes", phrase: atlas), "Add a list to notes")
+        XCTAssertEqual(WakePhrase.strip("search for atlas", phrase: atlas), "search for atlas", "the last word alone, late")
+        XCTAssertEqual(WakePhrase.strip("Hello, open notes", phrase: atlas, afterWake: true), "Hello, open notes")
+        // In a follow-up turn, the last word of the phrase alone needs a close match.
+        XCTAssertEqual(WakePhrase.strip("compose an email", phrase: "hey computer"), "compose an email")
+        XCTAssertEqual(WakePhrase.strip("The meeting is at noon", phrase: phrase, afterWake: true), "The meeting is at noon")
+    }
+
     func testPhraseAloneGivesNoText() {
         XCTAssertEqual(WakePhrase.strip("Hey Jarvis", phrase: phrase), "")
         XCTAssertEqual(WakePhrase.strip("Hey, Jarvis.", phrase: phrase), "")
@@ -59,7 +87,7 @@ final class WakeTests: XCTestCase {
         let s = try JSONDecoder().decode(EarshotSettings.self, from: Data(old.utf8))
         XCTAssertEqual(s.mode, .alwaysOn)
         XCTAssertEqual(s.wakePhrase, WakePhrase.defaultPhrase)
-        XCTAssertEqual(s.voiceThreshold, 0.45)
+        XCTAssertEqual(s.voiceThreshold, 0.35)
     }
 
     func testVoiceProfileRoundTrip() throws {

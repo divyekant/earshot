@@ -15,10 +15,13 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 ### Changed
 
 - Always-on mode no longer acts on speech with no wake phrase. The "for me?" text gate is removed (R-ON-1, R-ON-2, D-11).
+- The default voice threshold is 0.35, from the live trial. A follow-up turn in another voice is logged with its voice score and no text (R-ON-3, D-11).
 
 ### Fixed
 
 - A tab or window title with a word such as "transfer" no longer blocks a switch to that tab. Bookmarks and History menu items are no longer click targets (R-NV-5, R-MT-1).
+- A change in the Manage window to the wake phrase, the mode, the hold key or the speech engine now works at once. Before, it worked only after the next restart of earshot (R-ON-1, R-ON-4).
+- Always-on mode removes the wake phrase also when speech to text writes it as other words, for example "Here, at least" for "hey atlas". Before, the command failed (R-ON-1, D-11).
 
 ## [0.1.0] - 2026-11-02
 
