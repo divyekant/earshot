@@ -143,6 +143,11 @@ final class ResolverTests: XCTestCase {
         XCTAssertEqual(try DictationTurn.outcome("", NSError(domain: "kAFAssistantErrorDomain", code: 1110)).get(), "")
         XCTAssertThrowsError(try DictationTurn.outcome("", NSError(domain: "x", code: 1)).get())
         XCTAssertEqual(try DictationTurn.outcome("", nil).get(), "")
+        let off = NSError(domain: "kAFAssistantErrorDomain", code: 1101,
+                          userInfo: [NSLocalizedDescriptionKey: "Siri and Dictation are disabled"])
+        XCTAssertThrowsError(try DictationTurn.outcome("", off).get()) { e in
+            XCTAssertTrue("\(e)".contains("System Settings > Keyboard"))
+        }
     }
 }
 

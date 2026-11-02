@@ -202,6 +202,9 @@ final class DictationTurn: @unchecked Sendable {
         if !text.isEmpty || error == nil { return .success(text) }
         let ns = error! as NSError
         if ns.domain == "kAFAssistantErrorDomain", [203, 1110].contains(ns.code) { return .success("") }
-        return .failure(SpeechError("Apple dictation failed: \(ns.localizedDescription)"))
+        // macOS gives "Siri and Dictation are disabled" when Dictation is off. On-device dictation needs it on.
+        let hint = ns.localizedDescription.localizedCaseInsensitiveContains("dictation")
+            ? ". Turn on Dictation in System Settings > Keyboard, then restart earshot" : ""
+        return .failure(SpeechError("Apple dictation failed: \(ns.localizedDescription)\(hint)"))
     }
 }
