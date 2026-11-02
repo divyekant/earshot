@@ -164,6 +164,44 @@ final class DeclaredNamesTests: XCTestCase {
     }
 }
 
+final class MenuIndexTests: XCTestCase {
+    func testFlattenSkipsSystemMenusRecentFilesAndWindowList() {
+        let bar: [MenuNode] = [
+            MenuNode(title: "Apple", children: [MenuNode(title: "About This Mac")]),
+            MenuNode(title: "Notes", children: [
+                MenuNode(title: "Services", children: [MenuNode(title: "Make Sticky")]),
+                .line,
+                MenuNode(title: "Quit Notes", keys: "cmd+q"),
+            ]),
+            MenuNode(title: "File", children: [
+                MenuNode(title: "New Note", keys: "cmd+n"),
+                MenuNode(title: "Open Recent", children: [MenuNode(title: "todo.txt")]),
+            ]),
+            MenuNode(title: "Edit", children: [
+                MenuNode(title: "Undo", enabled: false, keys: "cmd+z"),
+                .line,
+                MenuNode(title: "Select All", keys: "cmd+a"),
+                MenuNode(title: "Find", children: [MenuNode(title: "Find…", keys: "cmd+f")]),
+            ]),
+            MenuNode(title: "Window", children: [
+                MenuNode(title: "Minimize", keys: "cmd+m"),
+                .line,
+                MenuNode(title: "Bring All to Front"),
+                .line,
+                MenuNode(title: "Shopping list"),
+            ]),
+        ]
+        let items = MenuIndex.flatten(bar)
+        XCTAssertEqual(items.map(\.path), [
+            ["Notes", "Quit Notes"], ["File", "New Note"], ["Edit", "Undo"], ["Edit", "Select All"],
+            ["Edit", "Find", "Find…"], ["Window", "Minimize"], ["Window", "Bring All to Front"],
+        ])
+        XCTAssertEqual(items[2].enabled, false)
+        XCTAssertEqual(items[3].keys, "cmd+a")
+        XCTAssertEqual(items[3].title, "Select All")
+    }
+}
+
 final class NameRulesTests: XCTestCase {
     func testClean() {
         XCTAssertEqual(NameRules.clean("Ravi Kumar (you)")?.name, "Ravi Kumar")
@@ -360,6 +398,21 @@ final class LiveDiscoveryTests: XCTestCase {
                   + "\(scan?.windows ?? 0) windows, \(scan?.nodes ?? 0) nodes")
             let shown = names.filter { $0.source == .sidebar }.prefix(25).map(\.name)
             if !shown.isEmpty { print("LIVE     names: \(shown.joined(separator: " | "))") }
+        }
+    }
+
+    func testLiveMenus() async throws {
+        try XCTSkipUnless(mode == "read" || mode == "menus", "set EARSHOT_LIVE_DISCOVERY=menus")
+        try XCTSkipUnless(AX.trusted(), "Accessibility is off for this process")
+        let ids = (ProcessInfo.processInfo.environment["EARSHOT_MENU_APPS"] ?? "com.apple.finder,com.apple.MobileSMS,com.tinyspeck.slackmacgap")
+            .split(separator: ",").map(String.init)
+        let index = MenuIndex()
+        for id in ids {
+            let items = await index.refresh(bundleID: id)
+            let read = await index.lastRead[id]
+            let sample = items.filter { $0.keys != nil }.prefix(6).map { $0.path.joined(separator: " > ") + " " + ($0.keys ?? "") }
+            print("LIVE menus \(id): \(items.count) items, \(items.filter(\.enabled).count) enabled, "
+                  + "\(Int(read?.ms ?? 0)) ms, stopped at the limit: \(read?.timedOut ?? false): \(sample.joined(separator: " | "))")
         }
     }
 
