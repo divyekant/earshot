@@ -104,4 +104,58 @@ final class WakeTests: XCTestCase {
         XCTAssertNil(store.voiceProfile)
         XCTAssertNoThrow(try store.saveVoiceProfile(nil), "deleting a missing profile is not an error")
     }
+    // D-11: remove the phrase by time. Live test 2026-11-02: 3 follow-up turns began with "Yeah, let's" for the phrase
+    // said again. The edit distance to "heyatlas" is 5, so the text strip kept it.
+    private func w(_ text: String, _ start: Double, _ end: Double) -> TimedWord { TimedWord(text: text, start: start, end: end) }
+
+    func testCutRemovesAMisheardPhraseByTime() {
+        let words = [w("Yeah, ", -0.10, 0.15), w("let's ", 0.15, 0.45), w("open ", 0.70, 0.95), w("the ", 0.95, 1.05),
+                     w("Slack.", 1.05, 1.50)]
+        // The spotter fired 0.9 s into the follow-up turn, 0.4 s after the phrase end.
+        let hit = WakeHit(phrase: "hey atlas", prerollSeconds: 1.3, phraseEndSeconds: 0.4, voiceScore: 0.6, isOwner: true,
+                          inTurnAfterSeconds: 0.9)
+        XCTAssertEqual(hit.phraseEndInTurn, 0.5, accuracy: 1e-9)
+        XCTAssertEqual(WakePhrase.cut(words, phraseEnd: hit.phraseEndInTurn), "open the Slack.")
+        XCTAssertEqual(WakePhrase.strip("Yeah, let's open the Slack.", phrase: "hey atlas", afterWake: true),
+                       "Yeah, let's open the Slack.", "the text strip alone cannot remove this form")
+    }
+
+    func testCutInAWakeTurn() {
+        // The turn starts at the wake. The phrase is in the preroll: negative times.
+        let hit = WakeHit(phrase: "hey atlas", prerollSeconds: 1.4, phraseEndSeconds: 0.35, voiceScore: 0.6, isOwner: true)
+        XCTAssertEqual(hit.phraseEndInTurn, -0.35, accuracy: 1e-9)
+        let words = [w("Here, ", -1.2, -0.9), w("at ", -0.9, -0.7), w("least, ", -0.7, -0.4), w("open ", -0.1, 0.2),
+                     w("Messages.", 0.2, 0.7)]
+        XCTAssertEqual(WakePhrase.cut(words, phraseEnd: hit.phraseEndInTurn), "open Messages.")
+    }
+
+    func testCutKeepsACommandWordRightAfterThePhrase() {
+        // The phrase end from the spotter is a little late. A command word that starts less than the margin before it
+        // stays.
+        let words = [w("Hey ", -0.9, -0.6), w("Atlas ", -0.6, -0.4), w("open ", -0.4, -0.1), w("Notes", -0.1, 0.3)]
+        XCTAssertEqual(WakePhrase.cut(words, phraseEnd: -0.3), "open Notes")
+    }
+
+    func testCutUsesTheStartOfEachPiece() {
+        // An engine can let the end of a word run until the next word: "Atlas," ends when "open" starts.
+        // A rule on the end of the word would keep "Atlas,".
+        let words = [w("Hey ", -1.3, -1.0), w("Atlas, ", -1.0, -0.1), w("open ", -0.1, 0.2), w("Slack", 0.2, 0.6)]
+        XCTAssertEqual(WakePhrase.cut(words, phraseEnd: -0.55), "open Slack")
+    }
+
+    func testCutNeedsTimesBeforeThePhraseEnd() {
+        XCTAssertNil(WakePhrase.cut([], phraseEnd: 0.5), "no times: the text strip decides")
+        XCTAssertNil(WakePhrase.cut([w("open ", 0.7, 0.9), w("Slack", 0.9, 1.2)], phraseEnd: 0.5),
+                     "no piece before the phrase end: the text strip decides")
+        XCTAssertEqual(WakePhrase.cut([w("Hey ", -0.9, -0.6), w("Atlas.", -0.6, -0.3)], phraseEnd: -0.2), "",
+                       "the phrase alone gives no text")
+    }
+
+    func testNearMissesAdd() {
+        var m = NearMisses(count: 2, best: 0.6)
+        m.add(NearMisses(count: 1, best: 1.0))
+        XCTAssertEqual(m, NearMisses(count: 3, best: 1.0))
+        m.add(NearMisses(count: 4, best: 0.5))
+        XCTAssertEqual(m, NearMisses(count: 7, best: 1.0))
+    }
 }

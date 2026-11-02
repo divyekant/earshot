@@ -8,7 +8,7 @@ import Speech
 /// Apple silicon, so this engine is the Apple engine on other Macs.
 /// It always sets `requiresOnDeviceRecognition`. If this Mac cannot recognize the locale on the device,
 /// `prepare` throws. The engine never sends audio to a server.
-public final class DictationEngine: TurnSpeechEngine, PrerollControl, @unchecked Sendable {
+public final class DictationEngine: TurnSpeechEngine, PrerollControl, PhraseHintControl, @unchecked Sendable {
     public static let engineID = "apple-dictation"
     public let id = DictationEngine.engineID
     public let locale: Locale
@@ -25,6 +25,8 @@ public final class DictationEngine: TurnSpeechEngine, PrerollControl, @unchecked
     private var turn: DictationTurn?
     private var frames: Int64 = 0
     private var timing: SpeechTiming?
+    /// Words to expect, such as the wake phrase (D-11). They go to each request as contextual strings.
+    private var hints: [String] = []
     private let format = AudioUtil.parakeetFormat
     let activity = TurnActivity()
 
@@ -61,6 +63,8 @@ public final class DictationEngine: TurnSpeechEngine, PrerollControl, @unchecked
 
     public func setNextPreroll(seconds: Double) { lock.withLock { mic }?.setNextPreroll(seconds: seconds) }
 
+    public func setPhraseHints(_ phrases: [String]) { lock.withLock { hints = phrases.filter { !$0.isEmpty } } }
+
     public func begin() throws {
         guard let mic = lock.withLock({ self.mic }) else {
             throw SpeechError("Apple dictation is not ready: call prepare() first")
@@ -78,6 +82,7 @@ public final class DictationEngine: TurnSpeechEngine, PrerollControl, @unchecked
         activity.begin("earshot speech command")
         let request = Self.request(SFSpeechAudioBufferRecognitionRequest())
         request.shouldReportPartialResults = onPartial != nil
+        request.contextualStrings = lock.withLock { hints }
         let t = DictationTurn(request: request)
         let partial = onPartial
         t.task = recognizer.recognitionTask(with: request) { result, error in

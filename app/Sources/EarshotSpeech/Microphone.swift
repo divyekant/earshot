@@ -63,12 +63,20 @@ final class MicrophoneFeed: @unchecked Sendable {
     var isRunning: Bool { lock.withLock { running } }
 
     /// Starts to pass audio to `sink`, first the preroll.
-    func begin(_ sink: @escaping (AVAudioPCMBuffer) -> Void) {
+    /// - Returns: the length of the preroll that the sink got, in seconds. It can be a little longer than asked,
+    ///   because the feed keeps whole audio blocks.
+    @discardableResult
+    func begin(_ sink: @escaping (AVAudioPCMBuffer) -> Void) -> Double {
         lock.lock(); defer { lock.unlock() }
         let seconds = nextPreroll ?? prerollSeconds
         nextPreroll = nil
-        for b in preroll.drainLast(frames: Int64(format.sampleRate * seconds)) { sink(b) }
+        var frames: AVAudioFrameCount = 0
+        for b in preroll.drainLast(frames: Int64(format.sampleRate * seconds)) {
+            frames += b.frameLength
+            sink(b)
+        }
         deliver = sink
+        return Double(frames) / format.sampleRate
     }
 
     /// Waits `captureSeconds` so that the last audio block arrives, then calls `end()`.

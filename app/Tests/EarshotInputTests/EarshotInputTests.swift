@@ -241,6 +241,9 @@ final class FakeListener: WakeListener, @unchecked Sendable {
     }
     func voiceScore(_ samples: [Float]) -> Double? { score }
     func reset() { resets += 1; fed = 0 }
+    /// The near misses for the next `takeNearMisses()`.
+    var misses: NearMisses?
+    func takeNearMisses() -> NearMisses? { defer { misses = nil }; return misses }
 }
 
 // R-ON-4: the hold key stays as the fallback in always-on mode.
@@ -294,9 +297,9 @@ final class WakeTriggerTests: XCTestCase {
     let quiet: Float = 0.0005
     let speech: Float = 0.05
 
-    private func make(_ listener: FakeListener) -> (WakeTrigger, FakeSamples, Recorder) {
+    private func make(_ listener: FakeListener, config: WakeConfig = WakeConfig()) -> (WakeTrigger, FakeSamples, Recorder) {
         let source = FakeSamples()
-        let trigger = WakeTrigger(listener: listener, source: source)
+        let trigger = WakeTrigger(listener: listener, config: config, source: source)
         let rec = Recorder()
         trigger.onWake = { _ in rec.add("wake") }
         trigger.onStart = { rec.add("start") }
@@ -406,6 +409,93 @@ final class WakeTriggerTests: XCTestCase {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { settled.fulfill() }
         wait(for: [settled], timeout: 2)
         XCTAssertEqual(rec.log, ["wake", "start", "stop"])
+        t.stop()
+    }
+
+    // D-11, live test 2026-11-02: the owner said the phrase again at the start of a follow-up turn.
+    func testPhraseAgainInAFollowUpTurnMakesAWakeTurn() {
+        let listener = FakeListener()
+        listener.hitAfterSamples = 16000
+        let (t, mic, rec) = make(listener)
+        let first = rec.expect("stop", self)
+        mic.emit(quiet, ms: 1000)
+        mic.emit(speech, ms: 500)
+        mic.emit(quiet, ms: 700)
+        wait(for: [first], timeout: 2)
+
+        var hits: [WakeHit] = []
+        t.onWake = { hit in hits.append(hit); rec.add("wake") }
+        listener.score = 0.2           // the voice of the whole turn would fail; the voice of the phrase counts
+        listener.hitAfterSamples = 9600 // the spotter fires 0.6 s after the window opened
+        t.openFollowUp()
+        let second = rec.expect("stop", self, count: 2)
+        mic.emit(speech, ms: 1000)
+        mic.emit(quiet, ms: 700)
+        wait(for: [second], timeout: 2)
+        XCTAssertEqual(rec.log, ["wake", "start", "stop", "start", "wake", "stop"], "no second start: the engine runs already")
+        XCTAssertEqual(hits.count, 1)
+        let after = hits.first?.inTurnAfterSeconds ?? -1
+        XCTAssertGreaterThan(after, 0.3)
+        XCTAssertLessThanOrEqual(after, 0.6, "the time from the start of the follow-up turn to the wake")
+        t.stop()
+    }
+
+    func testPhraseLateInAFollowUpTurnIsNotHeard() {
+        let listener = FakeListener()
+        listener.hitAfterSamples = 16000
+        var config = WakeConfig()
+        config.followTurnWakeSeconds = 1.0
+        let (t, mic, rec) = make(listener, config: config)
+        let first = rec.expect("stop", self)
+        mic.emit(quiet, ms: 1000)
+        mic.emit(speech, ms: 500)
+        mic.emit(quiet, ms: 700)
+        wait(for: [first], timeout: 2)
+
+        listener.hitAfterSamples = 16000 * 2   // after the 1 s window: the spotter gets no audio then
+        t.openFollowUp()
+        let second = rec.expect("stop", self, count: 2)
+        mic.emit(speech, ms: 3000)
+        mic.emit(quiet, ms: 700)
+        wait(for: [second], timeout: 2)
+        XCTAssertEqual(rec.log, ["wake", "start", "stop", "start", "stop"], "no wake: the phrase came after the window")
+        t.stop()
+    }
+
+    func testOtherVoicePhraseInAFollowUpTurnKeepsTheVoiceCheck() {
+        let listener = FakeListener()
+        listener.hitAfterSamples = 16000
+        let (t, mic, rec) = make(listener)
+        let first = rec.expect("stop", self)
+        mic.emit(quiet, ms: 1000)
+        mic.emit(speech, ms: 500)
+        mic.emit(quiet, ms: 700)
+        wait(for: [first], timeout: 2)
+
+        listener.hit.isOwner = false
+        listener.score = 0.2
+        listener.hitAfterSamples = 9600
+        t.openFollowUp()
+        let dropped = rec.expect("cancel: not the owner's voice (0.20)", self)
+        mic.emit(speech, ms: 1000)
+        mic.emit(quiet, ms: 700)
+        wait(for: [dropped], timeout: 2)
+        XCTAssertEqual(rec.log, ["wake", "start", "stop", "start", "cancel: not the owner's voice (0.20)"])
+        t.stop()
+    }
+
+    func testNearMissesAreReported() {
+        let listener = FakeListener()
+        var config = WakeConfig()
+        config.nearMissReportSeconds = 1
+        let (t, mic, rec) = make(listener, config: config)
+        var got: [NearMisses] = []
+        let reported = rec.expect("near misses", self)
+        t.onNearMisses = { misses in got.append(misses); rec.add("near misses") }
+        listener.misses = NearMisses(count: 2, best: 0.8)
+        mic.emit(quiet, ms: 1200)
+        wait(for: [reported], timeout: 2)
+        XCTAssertEqual(got, [NearMisses(count: 2, best: 0.8)])
         t.stop()
     }
 
