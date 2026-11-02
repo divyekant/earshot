@@ -33,4 +33,4 @@ Write docs, comments and commit messages in Simplified Technical English:
 
 ## Phase status
 
-Phase 0 started with the E0 viability probe (`probe/`, `docs/experiments/E0-viability.md`). See `docs/DESIGN.md`, section 5.
+Phase 0 started with the E0 viability probe (`probe/`, `docs/experiments/E0-viability.md`). E1 tested a generic router with no hand-written app rows or names (`docs/experiments/E1-generic-router.md`). See `docs/DESIGN.md`, section 5.

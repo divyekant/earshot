@@ -6,7 +6,7 @@ You look at the screen and say what you want. earshot finds the correct app, foc
 
 ## Status
 
-**Phase 0.** The only code is the E0 viability probe in [probe/](probe/). It tests whether one spoken sentence can put the cursor in the correct chat box in less than 1 s. See [docs/experiments/E0-viability.md](docs/experiments/E0-viability.md).
+**Phase 0.** The only code is the probe in [probe/](probe/). E0 tests whether one spoken sentence can put the cursor in the correct chat box in less than 1 s. See [docs/experiments/E0-viability.md](docs/experiments/E0-viability.md). E1 tests a router that needs no hand-written app rows or names. See [docs/experiments/E1-generic-router.md](docs/experiments/E1-generic-router.md).
 
 - The requirements are in [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md).
 - The proposed architecture and the phase plan are in [docs/DESIGN.md](docs/DESIGN.md).
