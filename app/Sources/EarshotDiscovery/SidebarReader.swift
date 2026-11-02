@@ -30,6 +30,9 @@ public struct SidebarScan: Sendable {
     public var windows: Int
     /// The accessibility nodes of the last read.
     public var nodes: Int
+    /// True if a search field had the focus. The screen then shows search results, not the chat list,
+    /// so earshot did not read it. The caller keeps the names that it had.
+    public var searchOpen: Bool = false
 }
 
 /// Reads the chat names in the sidebar of a chat app through Accessibility (E1, section 3.2).
@@ -52,6 +55,11 @@ enum SidebarReader {
         let t0 = Clock.nowNs()
         let el = AX.appElement(running.processIdentifier)
         if app.electron { AX.askForTree(el) }
+        // An open search covers the chat list with results and the typed text (seen live in Slack).
+        if SearchReader.searchOpen(el) {
+            return SidebarScan(appID: app.id, names: [], appAliases: [], readMs: 0, settleMs: Clock.round1(Clock.ms(since: t0)),
+                               reads: 0, stillLoading: false, windows: 0, nodes: 0, searchOpen: true)
+        }
         var windows = Array(AX.elements(el, "AXWindows").filter { AX.subrole($0) != "AXSystemDialog" }.prefix(2))
         if windows.isEmpty, let main = AX.window(el) { windows = [main] }
         var check = SettleCheck()
