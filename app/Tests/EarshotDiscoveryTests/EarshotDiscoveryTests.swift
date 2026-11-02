@@ -194,6 +194,17 @@ final class NameRulesTests: XCTestCase {
         }
         XCTAssertEqual(NameRules.sidebarName("Slackbot", appName: "Slack")?.name, "Slackbot")
         XCTAssertEqual(NameRules.sidebarName("Sun Li", appName: "Chat")?.name, "Sun Li")
+        // Seen live: Zoom calendar pane, Slack help row, WhatsApp texts.
+        for label in ["Create event", "Previous", "Next", "Recurring", "Open recordings", "Today, Nov 1", "Zoom Meeting",
+                      "Organizer: someone@example.com", "Host: Divyekant Gupta", "Start Zoom Meeting"] {
+            XCTAssertNil(NameRules.sidebarName(label, appName: "Zoom"), label)
+        }
+        XCTAssertNil(NameRules.sidebarName("Connect apps", appName: "Slack"))
+        XCTAssertNil(NameRules.sidebarName("end-to-end encrypted", appName: "WhatsApp"))
+        XCTAssertEqual(NameRules.sidebarName("Mummy, 1 unread message", appName: "WhatsApp")?.name, "Mummy")
+        XCTAssertEqual(NameRules.sidebarName("Dheeraj Goyal", appName: "WhatsApp")?.name, "Dheeraj Goyal")
+        XCTAssertEqual(NameRules.sidebarName("Ghar .सब साथ में", appName: "WhatsApp")?.name, "Ghar .सब साथ में")
+        XCTAssertEqual(NameRules.sidebarName("release-management", appName: "Slack")?.name, "release-management")
         XCTAssertEqual(NameRules.sidebarName("Manuel & Mrinal", appName: "Messages")?.name, "Manuel & Mrinal")
         XCTAssertEqual(NameRules.sidebarName("Meta AI", appName: "WhatsApp")?.name, "Meta AI")
         // People, channels and the self entry stay.
