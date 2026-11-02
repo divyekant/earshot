@@ -42,8 +42,24 @@ final class Pipeline {
     let apps: [AppRow]
     /// The search field that the probe typed the name into, for the current command.
     private var searchField: AXUIElement?
-    /// The focus method that worked last time, for each app id.
-    private var learnedFocus: [String: String] = [:]
+    /// The focus method that worked last time, for each app id. It is saved in
+    /// probe/logs/focus-methods.json, so that the next run of the probe starts with it.
+    private var learnedFocus: [String: String] = Pipeline.loadLearned() {
+        didSet { if learnedFocus != oldValue { Pipeline.saveLearned(learnedFocus) } }
+    }
+
+    private static var learnedURL: URL { Paths.logs.appendingPathComponent("focus-methods.json") }
+
+    private static func loadLearned() -> [String: String] {
+        guard let data = try? Data(contentsOf: learnedURL),
+              let map = try? JSONDecoder().decode([String: String].self, from: data) else { return [:] }
+        return map
+    }
+
+    private static func saveLearned(_ map: [String: String]) {
+        try? FileManager.default.createDirectory(at: Paths.logs, withIntermediateDirectories: true)
+        try? JSONEncoder().encode(map).write(to: learnedURL)
+    }
 
     init(apps: [AppRow]) { self.apps = apps }
 
@@ -356,7 +372,12 @@ final class Pipeline {
         // The chat name sits above the message box, so read only that column.
         // Leave out the field that holds the typed name: it shows the name in any chat.
         let column = AX.focused(app).flatMap { AX.frame($0) }
-        out.header = AX.headerTexts(in: win, column: column, skip: searchField)
+        out.header = AX.headerHits(app: app, window: win, column: column, skip: searchField)
+        if !out.header.contains(where: exact) {
+            for s in AX.headerTexts(in: win, column: column, skip: searchField) where !out.header.contains(s) {
+                out.header.append(s)
+            }
+        }
         out.chatExact = out.header.contains(where: exact)
         if matches(out.windowTitle) {
             out.chatCheck = "title"

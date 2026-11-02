@@ -196,6 +196,32 @@ enum AX {
         return (best?.0, index)
     }
 
+    /// Reads the names at a few points above the message box: hit tests in the top band of the window.
+    /// One hit test is one call, so this is fast also in apps with a large or slow accessibility tree
+    /// (WhatsApp: the chat name is a button at 2 % of the window height, 6 levels down).
+    static func headerHits(app: AXUIElement, window: AXUIElement, column: Frame?, skip: AXUIElement?) -> [String] {
+        guard let w = frame(window) else { return [] }
+        let c = column ?? Frame(x: w.x, y: w.y, w: w.w, h: w.h)
+        var out: [String] = []
+        for fy in [0.02, 0.04, 0.07] {
+            for fx in [0.05, 0.15, 0.3, 0.5] {
+                var hit: AXUIElement?
+                let x = Float(c.x + fx * c.w), y = Float(w.y + fy * w.h)
+                guard AXUIElementCopyElementAtPosition(app, x, y, &hit) == .success, let el = hit else { continue }
+                if let skip, CFEqual(el, skip) { continue }
+                let r = role(el)
+                // A text field shows what someone typed, not the chat name.
+                if textRoles.contains(r) && isEditableText(el, allowSearch: true) { continue }
+                let attributes = r == "AXStaticText" || r == "AXHeading" ? ["AXValue", "AXTitle", "AXDescription"] : ["AXTitle", "AXDescription"]
+                for attribute in attributes {
+                    if let s = string(el, attribute)?.replacingOccurrences(of: "\u{200E}", with: ""),
+                       !s.isEmpty, s.count < 80, !out.contains(s) { out.append(s) }
+                }
+            }
+        }
+        return out
+    }
+
     /// The header band: the chat name sits in the top 15 % of the window. A lower limit
     /// would also read chat messages near the top of the transcript (seen in WhatsApp).
     static let headerBand = 0.15

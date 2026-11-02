@@ -209,7 +209,9 @@ enum Commands {
                     print("     \(field.kind): \(field.role)\(sub) \"\(field.label)\" at x \(x)%, y \(y)%, width \(w)%\(field.hasText ? ", holds text" : "")")
                 }
                 let (box, _) = AX.findComposer(in: win)
-                let header = AX.headerTexts(in: win, column: box.flatMap { AX.frame($0) })
+                let column = box.flatMap { AX.frame($0) }
+                let header = AX.headerHits(app: el, window: win, column: column, skip: nil)
+                    + AX.headerTexts(in: win, column: column)
                 print("     header for the chat check: \(header.prefix(8).joined(separator: " | "))")
                 let own = AX.ownChatNames(in: win)
                 if !own.isEmpty { print("     Your own chat shows as: \(own.joined(separator: " | "))") }
