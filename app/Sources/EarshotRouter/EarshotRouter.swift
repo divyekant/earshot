@@ -51,7 +51,7 @@ public struct CommandRouter: Router {
     /// The words that no known name explains, and the chat app that the owner named, if any.
     /// The app can give them to the app's own search (NameFinder.search) and then route again with the new names (E1, section 6).
     public static func heardName(_ text: String, context: RouteContext) -> (name: String, appID: String?)? {
-        let d = ChatRouter.decide(text, apps: context.apps, names: context.names)
+        let d = ChatRouter.decide(text, apps: context.apps, names: context.names, frontBundleID: context.frontBundleID)
         guard let n = d.heardName else { return nil }
         return (n, d.heardApp)
     }
@@ -110,7 +110,7 @@ public struct CommandRouter: Router {
             }
         }
 
-        let chat = ChatRouter.decide(text, apps: context.apps, names: context.names)
+        let chat = ChatRouter.decide(text, apps: context.apps, names: context.names, frontBundleID: context.frontBundleID)
         if chat.sure && chat.intent != .none { return chat }
         if let screen = context.screen {
             var web = ScreenRouter.decide(text, screen: screen)
