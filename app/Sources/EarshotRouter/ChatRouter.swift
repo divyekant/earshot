@@ -19,6 +19,8 @@ struct RulesDecision {
     /// The name words that no known name explains, as the owner said them. The app can search for them (E1, section 6).
     var heardName: String?
     var heardApp: String?
+    /// True only for a bare "type" (RouteResult.awaitsText).
+    var awaitsText = false
 }
 
 /// Opens a chat or an app. Ported from probe E1Router (E1, section 6). It knows no app and no person in advance.
