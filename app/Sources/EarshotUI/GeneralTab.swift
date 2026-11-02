@@ -37,7 +37,7 @@ struct GeneralTab: View {
             }
             Section("Speech") {
                 Picker("Speech engine", selection: $settings.engine) {
-                    Text("Automatic (Parakeet if installed, else Apple)").tag(EngineChoice.auto)
+                    Text("Automatic (Apple)").tag(EngineChoice.auto)
                     Text("Apple").tag(EngineChoice.apple)
                     Text("Parakeet").tag(EngineChoice.parakeet)
                 }
