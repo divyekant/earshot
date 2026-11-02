@@ -58,7 +58,7 @@ public struct ManageView: View {
             Divider()
             tabs.padding()
         }
-        .tint(Brand.tileTop)
+        .tint(Brand.accent)
         .background(WindowReader().frame(width: 0, height: 0))
         .onChange(of: settings) { _, new in
             try? store.save(new, "settings.json")
