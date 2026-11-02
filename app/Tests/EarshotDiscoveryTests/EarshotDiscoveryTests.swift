@@ -193,6 +193,7 @@ final class NameRulesTests: XCTestCase {
             XCTAssertNil(NameRules.sidebarName(label, appName: "Chat"), label)
         }
         XCTAssertEqual(NameRules.sidebarName("Slackbot", appName: "Slack")?.name, "Slackbot")
+        XCTAssertEqual(NameRules.sidebarName("Sun Li", appName: "Chat")?.name, "Sun Li")
         XCTAssertEqual(NameRules.sidebarName("Manel & Mrunal", appName: "Messages")?.name, "Manel & Mrunal")
         XCTAssertEqual(NameRules.sidebarName("Meta AI", appName: "WhatsApp")?.name, "Meta AI")
         // People, channels and the self entry stay.
