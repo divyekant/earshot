@@ -11,10 +11,13 @@ public enum SpeechEngines {
         let (resolved, why) = EngineResolver.resolve(settings.engine, configuredModel: settings.parakeetModelPath, locator: locator)
         switch resolved {
         case .apple:
-            return (AppleSpeechEngine(locale: locale), why)
+            let apple = AppleSpeechEngine(locale: locale)
+            apple.reason = why
+            return (apple, why)
         case .parakeet(let path):
-            let engine = FallbackSpeechEngine(primary: ParakeetEngine(modelPath: path),
-                                              fallback: { AppleSpeechEngine(locale: locale) })
+            let parakeet = ParakeetEngine(modelPath: path)
+            parakeet.reason = why
+            let engine = FallbackSpeechEngine(primary: parakeet, fallback: { AppleSpeechEngine(locale: locale) })
             return (engine, why)
         }
     }
@@ -22,7 +25,7 @@ public enum SpeechEngines {
 
 /// Uses `primary`. If `primary` fails in `prepare`, it uses the fallback engine.
 /// So a broken model file never stops voice commands.
-public final class FallbackSpeechEngine: SpeechEngine, @unchecked Sendable {
+public final class FallbackSpeechEngine: SpeechEngine, SpeechTimingReporting, @unchecked Sendable {
     private let lock = NSLock()
     private var current: SpeechEngine
     private var makeFallback: (() -> SpeechEngine)?
@@ -36,6 +39,15 @@ public final class FallbackSpeechEngine: SpeechEngine, @unchecked Sendable {
     }
 
     public var id: String { lock.withLock { current.id } }
+
+    /// The timing of the last command of the engine in use.
+    public var lastTiming: SpeechTiming? { (active as? SpeechTimingReporting)?.lastTiming }
+
+    /// Why the engine in use runs.
+    public var reason: String {
+        get { (active as? SpeechTimingReporting)?.reason ?? "" }
+        set { (active as? SpeechTimingReporting)?.reason = newValue }
+    }
 
     /// The engine in use now.
     public var active: SpeechEngine { lock.withLock { current } }
@@ -53,6 +65,7 @@ public final class FallbackSpeechEngine: SpeechEngine, @unchecked Sendable {
                 guard let make = makeFallback else { return nil }
                 let next = make()
                 next.onPartial = partial
+                (next as? SpeechTimingReporting)?.reason = "fallback to Apple: \(error)"
                 current = next
                 makeFallback = nil
                 fallbackReason = "\(error)"
