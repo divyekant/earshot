@@ -98,7 +98,8 @@ enum SidebarReader {
     /// True if the element opens and closes a group of rows: it has a disclosure state, disclosed rows,
     /// or a heading or a disclosure triangle among its first descendants.
     static func isSectionHeader(_ el: AXUIElement) -> Bool {
-        if AX.bool(el, "AXExpanded") != nil || AX.bool(el, "AXDisclosing") == true { return true }
+        // Slack gives every row AXExpanded, also a chat row (false). Only an open section says true.
+        if AX.bool(el, "AXExpanded") == true || AX.bool(el, "AXDisclosing") == true { return true }
         if !AX.elements(el, "AXDisclosedRows").isEmpty { return true }
         var stack = AX.elements(el, "AXChildren")
         var count = 0
@@ -106,10 +107,23 @@ enum SidebarReader {
             count += 1
             let r = AX.role(child)
             if r == "AXHeading" || r == "AXDisclosureTriangle" { return true }
-            if AX.bool(child, "AXExpanded") != nil { return true }
+            if AX.bool(child, "AXExpanded") == true { return true }
             stack.append(contentsOf: AX.elements(child, "AXChildren"))
         }
         return false
+    }
+
+    /// The rows inside a section row. It does not look inside a row that it found.
+    static func innerRows(_ section: AXUIElement, maxNodes: Int = 2000) -> [AXUIElement] {
+        var stack = AX.elements(section, "AXChildren")
+        var rows: [AXUIElement] = []
+        var count = 0
+        while let el = stack.popLast(), count < maxNodes {
+            count += 1
+            if AX.role(el) == "AXRow" { rows.append(el); continue }
+            stack.append(contentsOf: AX.elements(el, "AXChildren"))
+        }
+        return rows.reversed()
     }
 
     /// The texts of a list row, from the top left. Chat lists put the name there, and the last message after it.
@@ -181,7 +195,8 @@ enum SidebarReader {
             }
             if r == "AXRow" || r == "AXCell" {
                 // A section header ("Channels", a custom section) is a row too. It is not a chat.
-                if isSectionHeader(el) { continue }
+                // Its chat rows are inside it (Slack). Read them, but not the title of the section.
+                if isSectionHeader(el) { queue.append(contentsOf: innerRows(el)); continue }
                 for text in rowTexts(el) {
                     // The first part of a row name: "Ravi, 2 unread" gives "Ravi".
                     let part = text.split(separator: ",").first.map(String.init) ?? text
