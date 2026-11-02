@@ -129,7 +129,7 @@ enum HotKeys {
             MainActor.assumeIsolated { HotKeys.handler?(id, pressed) }
             return noErr
         }
-        InstallEventHandler(GetApplicationEventTarget(), callback, ItemCount(specs.count), &specs, nil, nil)
+        InstallEventHandler(GetApplicationEventTarget(), callback, specs.count, &specs, nil, nil)
     }
 
     @discardableResult
