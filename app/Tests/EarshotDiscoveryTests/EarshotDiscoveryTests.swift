@@ -142,7 +142,8 @@ final class DeclaredNamesTests: XCTestCase {
         // Seen live: apps also declare schemes of other products ("upi", "codex"). They share no word with the name.
         let other: [String: Any] = ["CFBundleName": "Talk Pad",
                                     "CFBundleURLTypes": [["CFBundleURLSchemes": ["upi", "codex", "talkpad", "talk"]]]]
-        XCTAssertEqual(MenuRules.declaredNames(other, appName: "TalkPad"), ["Talk Pad", "talkpad", "talk"])
+        // "talk" shares a word with the name, but it is a command word ("talk to Ravi").
+        XCTAssertEqual(MenuRules.declaredNames(other, appName: "TalkPad"), ["Talk Pad", "talkpad"])
     }
 
     func testNewAliasesJoinOwnerRows() {
