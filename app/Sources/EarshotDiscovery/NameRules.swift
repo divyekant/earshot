@@ -39,6 +39,7 @@ public enum NameRules {
         "select", "givefeedback", "selectgivefeedback", "agent", "sirifoundinapps", "suggestions", "topresults",
         "recentsearches", "unreadmessages", "recap", "recaps", "catchup", "allunreads", "mentionsreactions",
         "media", "links", "docs", "starredmessages", "archived", "locked", "lockedchats", "broadcasts",
+        "history", "back", "forward",
     ]
 
     public static let weekdays: Set<String> = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
@@ -109,8 +110,14 @@ public enum NameRules {
         // Search prompts of an open search: "Search for: happening".
         if promptStarts.contains(where: { lower.hasPrefix($0) }) { return nil }
         let words = c.name.split(separator: " ").map(String.init)
-        // A sentence is a notice, not a chat: "Your personal messages are end-to-end encrypted".
-        if words.count >= 5 { return nil }
+        // A sentence is a notice, not a chat: "Your personal messages are end-to-end encrypted", "This is your space."
+        if words.count >= 5 || (words.count >= 2 && [".", "!", "?"].contains(where: { c.name.hasSuffix($0) })) { return nil }
+        // A shortcut hint of a button or a menu: "Search ⌘E".
+        if c.name.contains(where: { "⌘⌥⇧⌃".contains($0) }) { return nil }
+        // A date heading: "Sunday, November 1".
+        if let first = words.first, weekdays.contains(Words.key(first)) { return nil }
+        // Back and forward buttons: "Back in Chat".
+        if words.count >= 2, ["back", "forward"].contains(Words.key(words[0])), words[1].lowercased() == "in" { return nil }
         if words.count >= 2, isEmojiName(words[0]), words[1].first?.isUppercase == true { return nil }
         if words.count >= 2, let last = words.last, sectionEnds.contains(last.lowercased()) { return nil }
         if !appName.isEmpty, Words.key(c.name) == Words.key(appName) { return nil }
