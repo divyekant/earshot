@@ -461,8 +461,7 @@ enum ScreenRouter {
                 if sims.allSatisfy({ $0 >= 0.75 }) { run = max(run, 0.9 * sims.reduce(0, +) / Double(sims.count)) }
             }
         }
-        // Round off float noise: 1 * (0.7 + 0.3 / 3) must be 0.8, not 0.79999, at the strong mark.
-        return (max(full, cover * (0.7 + 0.3 * precision), run) * 1e9).rounded() / 1e9
+        return max(full, cover * (0.7 + 0.3 * precision), run)
     }
 
     /// The elements in screen order: top to bottom, then left to right.
