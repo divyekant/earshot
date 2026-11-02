@@ -6,6 +6,11 @@
 
 <!-- The requirement IDs from docs/REQUIREMENTS.md, for example R-NV-2. -->
 
+## Branch and changelog
+
+- [ ] The base branch is `develop`. (Only a release or a hotfix uses `main`. See docs/RELEASING.md.)
+- [ ] I added a line under `## [Unreleased]` in CHANGELOG.md, or users cannot see the change.
+
 ## Tests
 
 - [ ] `swift test` passes in `app/`.

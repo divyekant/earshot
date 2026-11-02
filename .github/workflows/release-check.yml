@@ -1,0 +1,33 @@
+# Checks a pull request to main before the merge: VERSION must be new, and CHANGELOG.md must have a section for it.
+name: Release check
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  release-check:
+    name: Release check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check VERSION and CHANGELOG.md
+        run: |
+          set -euo pipefail
+          version="$(tr -d '[:space:]' < VERSION)"
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error file=VERSION::VERSION must be MAJOR.MINOR.PATCH. It is '$version'."
+            exit 1
+          fi
+          if git rev-parse -q --verify "refs/tags/v$version" > /dev/null; then
+            echo "::error file=VERSION::The tag v$version exists. Increase VERSION (docs/RELEASING.md)."
+            exit 1
+          fi
+          .github/scripts/changelog-section.sh "$version" > /dev/null
+          echo "Release v$version is ready."
