@@ -10,21 +10,37 @@ final class NameWarmer {
     let trusted: () -> Bool
     /// The time between reads. Shorter than NameIndex.maxAge, so that a command normally hits the cache.
     let interval: TimeInterval
+    /// Changes when the catalogue changes (apps.json), for example when the owner approves a chat app.
+    /// A change starts a read before the interval ends, so that a new app's names are ready for the next command.
+    let changeToken: () -> Date?
+    /// How often the warmer looks at `changeToken`.
+    let checkEvery: TimeInterval
     private var task: Task<Void, Never>?
+    private var lastRead: Date?
+    private var lastToken: Date?
 
-    init(interval: TimeInterval, trusted: @escaping () -> Bool, refresh: @escaping () async -> Void) {
-        self.interval = interval; self.trusted = trusted; self.refresh = refresh
+    init(interval: TimeInterval, checkEvery: TimeInterval = 15, trusted: @escaping () -> Bool,
+         refresh: @escaping () async -> Void, changeToken: @escaping () -> Date? = { nil }) {
+        self.interval = interval; self.checkEvery = min(checkEvery, interval); self.trusted = trusted
+        self.refresh = refresh; self.changeToken = changeToken
     }
 
-    /// Reads one time now (if Accessibility is on), then every `interval`, until `stop()`.
+    /// Reads one time now (if Accessibility is on), then every `interval`, and after each catalogue change, until `stop()`.
     func start() {
         stop()
         task = Task { [weak self] in
             while let self, !Task.isCancelled {
-                await self.tick()
-                try? await Task.sleep(nanoseconds: UInt64(self.interval * 1_000_000_000))
+                if self.due() { await self.tick() }
+                try? await Task.sleep(nanoseconds: UInt64(self.checkEvery * 1_000_000_000))
             }
         }
+    }
+
+    /// True if a read is due: the first read, the interval ended, or the catalogue changed.
+    func due(now: Date = Date()) -> Bool {
+        let token = changeToken()
+        guard let last = lastRead else { return true }
+        return now.timeIntervalSince(last) >= interval || token != lastToken
     }
 
     func stop() {
@@ -36,7 +52,9 @@ final class NameWarmer {
     @discardableResult
     func tick() async -> Bool {
         guard trusted() else { return false }
+        lastToken = changeToken()
         await refresh()
+        lastRead = Date()
         return true
     }
 }

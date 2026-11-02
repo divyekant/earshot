@@ -69,16 +69,20 @@ final class AppController: ObservableObject {
         let (engine, why) = SpeechEngines.make(settings)
         engineWhy = why
         let names = self.names
+        let lastNotReady = Counter()
         pipeline = CommandPipeline(engine: engine, router: Self.router(settings), actions: runner, names: names,
-                                   apps: { store.apps }, allNames: { await Self.chatNames(names, apps: store.apps) },
+                                   apps: { store.apps }, allNames: { await Self.chatNames(names, apps: store.apps, notReady: { lastNotReady.value = $0 }) },
                                    frontBundleID: { NSWorkspace.shared.frontmostApplication?.bundleIdentifier })
+        pipeline.namesNotReady = { lastNotReady.value }
         pipeline.feedback = feedback
         pipeline.log = ActivityLog(store: store)
         pipeline.showFeedback = settings.showFeedback
         prepareEngine()
         startInput()
+        let appsFile = store.folder.appendingPathComponent("apps.json")
         let warmer = NameWarmer(interval: 480, trusted: { AXIsProcessTrusted() },
-                                refresh: { _ = await names.refresh() })
+                                refresh: { _ = await names.refresh() },
+                                changeToken: { (try? FileManager.default.attributesOfItem(atPath: appsFile.path))?[.modificationDate] as? Date })
         self.warmer = warmer
         let catalogue = self.catalogue
         Task {
@@ -125,15 +129,23 @@ final class AppController: ObservableObject {
     /// The names of every approved, enabled chat app. NameIndex adds the owner's own chat to each app, and reads a
     /// sidebar only when its cache is old. It presses nothing. (`all()` holds only the cache, so it was empty until
     /// a manual refresh, and "me" was unknown in the first live test.)
-    /// A stale cache reads the apps side by side, not one after the other (NameWarmer keeps it fresh).
-    nonisolated static func chatNames(_ index: NameIndex, apps: [AppEntry]) async -> [NameEntry] {
+    /// The names for a command. Each chat app reads in its own task. The command waits at most `budgetMs` in total
+    /// and uses the names that are ready: a cached app answers in under 1 ms. A slow read (a sidebar under memory
+    /// pressure, or a newly approved app) keeps running and fills the cache for the next command.
+    /// Live test: three newly approved chat apps made the names stage 3.4 s.
+    nonisolated static func chatNames(_ index: NameFinder, apps: [AppEntry], budgetMs: Double = 150,
+                                      notReady: ((Int) -> Void)? = nil) async -> [NameEntry] {
         let ids = apps.filter { $0.isChat && $0.approved && $0.enabled }.map(\.id)
-        return await withTaskGroup(of: [NameEntry].self) { group in
-            for id in ids { group.addTask { await index.names(appID: id) } }
-            var out: [NameEntry] = []
-            for await names in group { out += names }
-            return out
+        notReady?(0)
+        guard !ids.isEmpty else { return [] }
+        let box = NameBox()
+        for id in ids { Task { await box.add(await index.names(appID: id)) } }
+        let clock = Stopwatch()
+        while await box.count < ids.count, clock.ms < budgetMs {
+            try? await Task.sleep(nanoseconds: 2_000_000)
         }
+        notReady?(ids.count - (await box.count))
+        return await box.names
     }
 
     static func router(_ settings: EarshotSettings) -> CommandRouter {
@@ -215,5 +227,22 @@ final class AppController: ObservableObject {
             feedback.show("Start at login: \(error.localizedDescription)", ok: false)
         }
         startsAtLogin = SMAppService.mainApp.status == .enabled
+    }
+}
+
+/// Collects the names of the chat apps as their reads finish.
+actor NameBox {
+    private(set) var names: [NameEntry] = []
+    private(set) var count = 0
+    func add(_ more: [NameEntry]) { names += more; count += 1 }
+}
+
+/// The number of chat apps whose names were not ready in the last command (for the log).
+final class Counter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored = 0
+    var value: Int {
+        get { lock.withLock { stored } }
+        set { lock.withLock { stored = newValue } }
     }
 }

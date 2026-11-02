@@ -39,6 +39,8 @@ final class CommandPipeline {
     var pauseAlwaysOn: (Bool) -> Void = { _ in }
     var heardName: (String, RouteContext) -> (name: String, appID: String?)? = CommandRouter.heardName
     var gate = ForMeGate()
+    /// The number of chat apps whose names were not ready within the names budget in this command.
+    var namesNotReady: () -> Int = { 0 }
     private var lastCommandAt: Date?
     /// The speech engine's line for the log of the current command (engine, why, audio length).
     private var speechSummary = ""
@@ -101,6 +103,7 @@ final class CommandPipeline {
         let (known, namesMs) = await namesTimed
         let (screen, screenMs) = await screenTimed
         stages["names"] = namesMs
+        let notReady = namesNotReady()
         stages["screen"] = screenMs
         stages["context"] = contextClock.ms
         var context = RouteContext(apps: rows, names: known, frontBundleID: frontBundleID(), screen: screen)
@@ -126,6 +129,7 @@ final class CommandPipeline {
         // For the log only: what earshot saw, and, for a miss, what else it considered.
         var why = result.why
         why += " · " + Self.screenSummary(context.screen, front: context.frontBundleID)
+        if notReady > 0 { why += " · names: \(notReady) app\(notReady == 1 ? "" : "s") not ready" }
         let sensitive = context.screen.map { SafetyPolicy.sensitive(url: $0.url, elements: $0.elements) != nil } ?? false
         if (result.intent == .none || result.confidence < SafetyPolicy.minimumConfidence), !sensitive {
             let top = result.alternatives.prefix(3).map { IntentText.describe($0, apps: rows, screen: context.screen) }
