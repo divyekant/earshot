@@ -39,7 +39,7 @@ public enum NameRules {
         "select", "givefeedback", "selectgivefeedback", "agent", "sirifoundinapps", "suggestions", "topresults",
         "recentsearches", "unreadmessages", "recap", "recaps", "catchup", "allunreads", "mentionsreactions",
         "media", "links", "docs", "starredmessages", "archived", "locked", "lockedchats", "broadcasts",
-        "history", "back", "forward", "previous", "next", "recurring", "tomorrow",
+        "history", "back", "forward", "previous", "next", "recurring", "tomorrow", "message", "chat",
     ]
 
     /// First words of button labels: "Connect apps", "Create event", "Open recordings".
