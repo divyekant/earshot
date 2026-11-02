@@ -3,6 +3,7 @@ import EarshotDiscovery
 @testable import EarshotApp
 import EarshotCore
 import EarshotRouter
+import EarshotSpeech
 import XCTest
 
 // Unit tests of the T7 command path, with a fake speech engine, a fake action runner and fake names.
@@ -389,5 +390,36 @@ final class MessageWithNoAppTests: XCTestCase {
         p.heardName = { _, _ in ("Ravi", nil) }
         _ = await p.finish(mode: .hold)
         XCTAssertTrue(finder.searches.isEmpty)
+    }
+}
+
+final class TimedEngine: SpeechEngine, SpeechTimingReporting {
+    let id = "apple"
+    var reason = "auto: Apple"
+    var lastTiming: SpeechTiming?
+    var onPartial: (@Sendable (String) -> Void)?
+    func prepare() async throws {}
+    func begin() throws {}
+    func end() async throws -> Utterance {
+        var t = SpeechTiming(engine: "apple", why: reason)
+        t.audioMs = 1840; t.tailMs = 102; t.waitMs = 3; t.decodeMs = 41; t.totalMs = 146
+        lastTiming = t
+        return Utterance(text: "open notes", engine: id, ms: 146)
+    }
+}
+
+final class SpeechTimingTests: XCTestCase {
+    func testSpeechStagesGoToTheRecord() async {
+        let p = CommandPipeline(engine: TimedEngine(), router: CommandRouter(), actions: DryRunner(), names: FakeNames(),
+                                apps: { Fixture.apps }, allNames: { Fixture.names }, frontBundleID: { nil })
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        p.log = ActivityLog(store: Store(folder: folder))
+        let r = await p.finish(mode: .hold)
+        XCTAssertEqual(r.stages["speech.tail"], 102)
+        XCTAssertEqual(r.stages["speech.wait"], 3)
+        XCTAssertEqual(r.stages["speech.decode"], 41)
+        XCTAssertEqual(r.stages["speech.audio"], 1840)
+        XCTAssertTrue(r.note.contains("speech: apple (auto: Apple) audio 1840 ms"), r.note)
     }
 }
