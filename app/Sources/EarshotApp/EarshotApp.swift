@@ -56,6 +56,8 @@ final class AppController: ObservableObject {
     let pipeline: CommandPipeline
     private var input: InputSwitch?
     private var engineWhy = ""
+    /// Reads the name cache at start and every 8 minutes (NameIndex.maxAge is 10 minutes). Read only.
+    private var warmer: NameWarmer?
 
     init() {
         let store = self.store
@@ -74,6 +76,10 @@ final class AppController: ObservableObject {
         pipeline.showFeedback = settings.showFeedback
         prepareEngine()
         startInput()
+        let warmer = NameWarmer(interval: 480, trusted: { AXIsProcessTrusted() },
+                                refresh: { _ = await names.refresh() })
+        warmer.start()
+        self.warmer = warmer
     }
 
     var hooks: ManageHooks {
@@ -102,12 +108,15 @@ final class AppController: ObservableObject {
     /// The names of every approved, enabled chat app. NameIndex adds the owner's own chat to each app, and reads a
     /// sidebar only when its cache is old. It presses nothing. (`all()` holds only the cache, so it was empty until
     /// a manual refresh, and "me" was unknown in the first live test.)
+    /// A stale cache reads the apps side by side, not one after the other (NameWarmer keeps it fresh).
     nonisolated static func chatNames(_ index: NameIndex, apps: [AppEntry]) async -> [NameEntry] {
-        var out: [NameEntry] = []
-        for app in apps where app.isChat && app.approved && app.enabled {
-            out += await index.names(appID: app.id)
+        let ids = apps.filter { $0.isChat && $0.approved && $0.enabled }.map(\.id)
+        return await withTaskGroup(of: [NameEntry].self) { group in
+            for id in ids { group.addTask { await index.names(appID: id) } }
+            var out: [NameEntry] = []
+            for await names in group { out += names }
+            return out
         }
-        return out
     }
 
     static func router(_ settings: EarshotSettings) -> CommandRouter {
