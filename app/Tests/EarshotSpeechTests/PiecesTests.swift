@@ -90,16 +90,17 @@ final class ResolverTests: XCTestCase {
         XCTAssertNil(l.find(configured: "/gone.gguf"))
     }
 
-    func testAutoUsesParakeetIfFileExists() {
+    func testAutoUsesAppleEvenWithTheFile() {
+        // Live test 2026-11-02: Parakeet 0.2-2 s per command with the memory full; Apple about 30 ms.
         let r = EngineResolver.resolve(.auto, configuredModel: "", locator: locator(["parakeet-a.gguf"]))
-        XCTAssertEqual(r.engine, .parakeet(modelPath: "/m/parakeet-a.gguf"))
-        XCTAssertEqual(r.engine.id, "parakeet")
+        XCTAssertEqual(r.engine, .apple)
+        XCTAssertTrue(r.why.hasPrefix("auto: Apple"))
     }
 
-    func testAutoUsesAppleWithNoFile() {
-        let r = EngineResolver.resolve(.auto, configuredModel: "", locator: locator([]))
-        XCTAssertEqual(r.engine, .apple)
-        XCTAssertTrue(r.why.contains("no Parakeet model file"))
+    func testParakeetChoiceUsesTheFile() {
+        let r = EngineResolver.resolve(.parakeet, configuredModel: "", locator: locator(["parakeet-a.gguf"]))
+        XCTAssertEqual(r.engine, .parakeet(modelPath: "/m/parakeet-a.gguf"))
+        XCTAssertEqual(r.engine.id, "parakeet")
     }
 
     func testAppleChoiceIgnoresFile() {
@@ -117,9 +118,11 @@ final class ResolverTests: XCTestCase {
         s.engine = .apple
         XCTAssertTrue(SpeechEngines.make(s, locator: locator(["parakeet-a.gguf"])).engine is AppleSpeechEngine)
         s.engine = .auto
+        XCTAssertTrue(SpeechEngines.make(s, locator: locator(["parakeet-a.gguf"])).engine is AppleSpeechEngine)
+        s.engine = .parakeet
         let (e, _) = SpeechEngines.make(s, locator: locator(["parakeet-a.gguf"]))
-        XCTAssertEqual(e.id, "parakeet")
-        XCTAssertTrue(e is FallbackSpeechEngine)
+        XCTAssertEqual(e.id, "apple", "the guarded Parakeet engine reports Apple until Parakeet is loaded")
+        XCTAssertTrue(e is AutoSpeechEngine)
     }
 }
 
@@ -179,4 +182,78 @@ final class Locked<T>: @unchecked Sendable {
     init(_ v: T) { self.v = v }
     var value: T { lock.lock(); defer { lock.unlock() }; return v }
     func mutate(_ f: (inout T) -> Void) { lock.lock(); f(&v); lock.unlock() }
+}
+
+final class TimingTests: XCTestCase {
+    func testStagesAndSummary() {
+        var t = SpeechTiming(engine: "parakeet", why: "auto: Parakeet model file found")
+        t.tailMs = 0.44; t.waitMs = 12.06; t.decodeMs = 33.33; t.audioMs = 2140; t.idleMs = 61000; t.warmed = true
+        XCTAssertEqual(t.stages, ["speech.tail": 0.4, "speech.wait": 12.1, "speech.decode": 33.3])
+        XCTAssertEqual(t.summary, "parakeet (auto: Parakeet model file found) audio 2140 ms, idle 61000 ms, warmed")
+    }
+
+    func testFactorySetsReason() {
+        var s = EarshotSettings()
+        s.engine = .apple
+        let (e, why) = SpeechEngines.make(s)
+        XCTAssertEqual((e as? SpeechTimingReporting)?.reason, why)
+        XCTAssertNil((e as? SpeechTimingReporting)?.lastTiming)
+    }
+}
+
+final class TurnTests: XCTestCase {
+    func testNewTurnClearsTheBuffer() {
+        let e = ParakeetEngine(modelPath: "/none.gguf", useMicrophone: false)
+        e.beginWithoutMicrophone()
+        e.feed([Float](repeating: 0.1, count: 16000))
+        XCTAssertEqual(e.bufferedFrames, 16000)
+        e.beginWithoutMicrophone()
+        XCTAssertEqual(e.bufferedFrames, 0, "a new turn must not keep the audio of the last turn")
+        e.feed([Float](repeating: 0.1, count: 800))
+        XCTAssertEqual(e.bufferedFrames, 800)
+    }
+
+    func testEndOfTurnClearsTheBufferAndTheActivity() async {
+        let e = ParakeetEngine(modelPath: "/none.gguf", useMicrophone: false)
+        e.beginWithoutMicrophone()
+        XCTAssertTrue(e.activity.isActive)
+        e.feed([Float](repeating: 0.1, count: 1600))
+        _ = try? await e.end()   // throws: no model. The buffer and the activity must still be cleared.
+        XCTAssertEqual(e.bufferedFrames, 0)
+        XCTAssertFalse(e.activity.isActive)
+    }
+
+    func testFeedOutsideATurnIsIgnored() {
+        let e = ParakeetEngine(modelPath: "/none.gguf", useMicrophone: false)
+        e.feed([Float](repeating: 0.1, count: 1600))
+        XCTAssertEqual(e.bufferedFrames, 0)
+    }
+}
+
+final class AutoPolicyTests: XCTestCase {
+    let p = AutoPolicy()
+
+    func testStartParakeetOnlyWhenLoadedAndNormal() {
+        XCTAssertTrue(p.tryParakeet(loaded: true, pressure: .normal).0)
+        XCTAssertFalse(p.tryParakeet(loaded: false, pressure: .normal).0)
+        let (start, why) = p.tryParakeet(loaded: true, pressure: .warning)
+        XCTAssertFalse(start)
+        XCTAssertEqual(why, "apple: memory pressure warning")
+        XCTAssertFalse(p.tryParakeet(loaded: true, pressure: .critical).0)
+    }
+
+    func testUseParakeetOnlyIfWarmUpWasFast() {
+        XCTAssertEqual(p.warmLimit(baselineMs: 10), 120)
+        XCTAssertEqual(p.warmLimit(baselineMs: 50), 200)
+        XCTAssertTrue(p.useParakeet(warmMs: 25, baselineMs: 20).0)
+        let (use, why) = p.useParakeet(warmMs: 900, baselineMs: 20)
+        XCTAssertFalse(use)
+        XCTAssertTrue(why.contains("weights not in memory"))
+        XCTAssertFalse(p.useParakeet(warmMs: nil, baselineMs: 20).0, "a warm-up that is not done means: do not wait for Parakeet")
+    }
+
+    func testPressureLevelReads() {
+        // The call must work on any Mac. The value depends on the Mac.
+        XCTAssertNotNil(MemoryPressureLevel(rawValue: MemoryPressureLevel.current().rawValue))
+    }
 }

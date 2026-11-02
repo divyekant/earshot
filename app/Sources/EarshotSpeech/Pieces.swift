@@ -48,6 +48,10 @@ struct Preroll<T> {
 /// because the engines do not read it in real time.
 enum TailPad {
     static let seconds = 0.3
+    /// Real audio that the microphone still records after key release, before the silence. The microphone gives
+    /// audio in blocks of up to about 100 ms, and people often release the key on the last sound of a word.
+    /// Live test 2026-11-02: one command was heard as "Open up", with the end lost.
+    static let captureSeconds = 0.1
 
     static func frames(sampleRate: Double, seconds: Double = TailPad.seconds) -> Int {
         max(0, Int((sampleRate * seconds).rounded()))

@@ -278,6 +278,8 @@ How earshot acts on a web page (section 5.6 and safety rule 6):
 
 ### 6.2 Speech: Parakeet as the default, when the Hex model file is on the Mac
 
+Changed on 2026-11-02 by the live test of the app: the default is now Apple. With the memory of the Mac full, macOS moved the Parakeet weights out of memory between commands. The Parakeet speech stage was 0.4 to 6.9 s live, and 110 to 2000 ms in a replay. Apple was about 30 ms. Parakeet stays an option in Settings. See DESIGN.md, section 3.2. The text below is the E2 decision.
+
 Parakeet meets the pass mark: 114 of 126 correct routes against 113, and 22 ms faster. But the gain is 1 command in 126, and `say` voices are not real speech. So the decision is weak:
 
 - Use Parakeet when the Hex model file is on the Mac. earshot reads the file and does not copy it, so there is no download and no setup. Keep the model loaded (14.4 s load, about 890 MB).
