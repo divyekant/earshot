@@ -2,6 +2,17 @@ import AppKit
 import EarshotCore
 import Foundation
 
+/// Errors of the discovery module. The text is for the owner.
+public enum DiscoveryError: Error, LocalizedError, Equatable {
+    case accessibilityOff
+
+    public var errorDescription: String? {
+        switch self {
+        case .accessibilityOff: return "Turn on Accessibility for earshot first"
+        }
+    }
+}
+
 /// The time and the result of one menu read, for the log and the management window.
 public struct CatalogueRead: Sendable {
     public var bundleID: String
@@ -13,7 +24,8 @@ public struct CatalogueRead: Sendable {
 
 /// Builds catalogue rows from the menu bars of the running apps, and from the installed apps
 /// (R-MT-1, R-MT-2, E1 section 3.1). It reads only: it opens no menu and presses nothing.
-/// It needs the Accessibility permission for the menu read. Without it, it lists the installed apps only.
+/// It needs the Accessibility permission. Without it, `scan()` and `refresh(store:)` throw and save nothing,
+/// and `discover()` returns no rows: rows with no menu data would lose the chat keys of the chat apps.
 public final class MenuCatalogue: CatalogueBuilder, @unchecked Sendable {
     /// Bundle ids to leave out, by the owner's choice. earshot always leaves itself out.
     public var skip: Set<String>
@@ -24,12 +36,25 @@ public final class MenuCatalogue: CatalogueBuilder, @unchecked Sendable {
     /// The time of the last scan in ms.
     public private(set) var lastMs: Double = 0
 
+    /// The Accessibility check. Tests can replace it.
+    let trusted: @Sendable () -> Bool
+
     public init(skip: Set<String> = [], includeInstalled: Bool = true) {
-        self.skip = skip
-        self.includeInstalled = includeInstalled
+        self.init(skip: skip, includeInstalled: includeInstalled, trusted: { AX.trusted() })
     }
 
-    public func discover() async -> [AppEntry] {
+    init(skip: Set<String>, includeInstalled: Bool, trusted: @escaping @Sendable () -> Bool) {
+        self.skip = skip
+        self.includeInstalled = includeInstalled
+        self.trusted = trusted
+    }
+
+    /// Returns no rows if Accessibility is off. Use `scan()` to get the reason.
+    public func discover() async -> [AppEntry] { (try? await scan()) ?? [] }
+
+    /// Scans the apps. Throws `DiscoveryError.accessibilityOff` if Accessibility is off.
+    public func scan() async throws -> [AppEntry] {
+        guard trusted() else { throw DiscoveryError.accessibilityOff }
         let t0 = Clock.nowNs()
         var skipped = skip
         if let own = Bundle.main.bundleIdentifier { skipped.insert(own) }
@@ -37,7 +62,6 @@ public final class MenuCatalogue: CatalogueBuilder, @unchecked Sendable {
             guard app.activationPolicy == .regular, let id = app.bundleIdentifier else { return false }
             return !skipped.contains(id)
         }
-        let trusted = AX.trusted()
         // Read the menu bars side by side: one slow app (up to 700 ms in E1) must not hold up the others.
         let reads: [(AppEntry, CatalogueRead)] = await withTaskGroup(of: (AppEntry, CatalogueRead)?.self) { group in
             for app in running {
@@ -46,7 +70,7 @@ public final class MenuCatalogue: CatalogueBuilder, @unchecked Sendable {
                 let name = app.localizedName ?? bundleID
                 let url = app.bundleURL
                 group.addTask {
-                    MenuCatalogue.read(pid: pid, bundleID: bundleID, name: name, url: url, menus: trusted)
+                    MenuCatalogue.read(pid: pid, bundleID: bundleID, name: name, url: url, menus: true)
                 }
             }
             var out: [(AppEntry, CatalogueRead)] = []
@@ -117,10 +141,11 @@ public final class MenuCatalogue: CatalogueBuilder, @unchecked Sendable {
 
 extension MenuCatalogue {
     /// Scans, joins the scan with the rows in apps.json (the owner's approvals and edits stay), and saves.
+    /// Throws `DiscoveryError.accessibilityOff`, and saves nothing, if Accessibility is off.
     /// Returns the joined rows.
     @discardableResult
     public func refresh(store: Store) async throws -> [AppEntry] {
-        let rows = MenuRules.merge(existing: store.apps, found: await discover())
+        let rows = MenuRules.merge(existing: store.apps, found: try await scan())
         try store.save(rows, "apps.json")
         return rows
     }
