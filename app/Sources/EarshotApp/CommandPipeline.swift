@@ -101,8 +101,7 @@ final class CommandPipeline {
         // A name that no known chat explains: ask the app's own search once, then route again (E1).
         // Only when the route is not sure or is not a chat, and never for the owner's own chat: the search types
         // into the app, and in the first live test it searched Slack for the message words ("running late").
-        if Self.needsAppSearch(text, result),
-           let heard = heardName(text, context), let appID = heard.appID ?? Self.appID(of: result.intent) {
+        if let heard = heardName(text, context), let appID = heard.appID, Self.needsAppSearch(text, result, appID: appID) {
             let searchClock = Stopwatch()
             let found = await names.search(appID: appID, term: heard.name)
             stages["search"] = searchClock.ms
@@ -182,10 +181,19 @@ final class CommandPipeline {
     }
 
     /// The app search rule (E1, first live test).
-    static func needsAppSearch(_ text: String, _ result: RouteResult) -> Bool {
-        guard !namesSelf(text) else { return false }
-        if case .openChat = result.intent { return result.confidence < CommandRouter.sureConfidence }
-        return true
+    /// The search runs only in the chat app that the words name (`appID` comes from `heardName`, never from the
+    /// router's guess), when the route opens that same app or a chat in it, and not for garbled words (confidence
+    /// below 0.3). A sure chat route needs no search. It never runs for the owner's own chat.
+    /// Live test: a garbled Chrome command ran a 5 s search in Slack, because the app came from the router's weak guess.
+    static let minimumSearchConfidence = 0.3
+
+    static func needsAppSearch(_ text: String, _ result: RouteResult, appID: String) -> Bool {
+        guard !namesSelf(text), result.confidence >= minimumSearchConfidence else { return false }
+        switch result.intent {
+        case .openChat(let id, _, _): return id == appID && result.confidence < CommandRouter.sureConfidence
+        case .openApp(let id): return id == appID
+        default: return false
+        }
     }
 
     /// True if the name part names the owner's own chat ("me", "myself", "my own chat").
