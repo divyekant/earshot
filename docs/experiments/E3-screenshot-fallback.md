@@ -86,6 +86,20 @@ All 16 cases sent a picture. No case was skipped. No click and no key press.
 - In the app, apple-bag and calc-seven do not reach Jev: the rules are sure (0.90) for them.
 - The 7 misses are all "no target": Jev did not find "More", "Random article", the main menu, the docs folder, the bag, the logo and the search on apple.com. A miss does nothing.
 
+### 4.3 Live clicks (2026-11-02, branch d9d34cd)
+
+The owner said "go". The harness ran earshot's own click path on Jev's pick, with the tier "jev" (`EARSHOT_E3_CLICK=1`, [E3-live-clicks.json](E3-live-clicks.json)). 8 cases on Wikipedia, GitHub, Hacker News and Calculator. No other click and no key press.
+
+| Measure | Result |
+|---|---|
+| Right picks | 7 of 8 (5 targets, and "no target" for the 2 risky commands) |
+| Clicks that ran | 6, all ok; 5 changed the screen (Calculator "+" shows no change) |
+| Wrong clicks | 1: "open the menu with the three lines" clicked "Help" (it can be undone) |
+| Risky labels clicked | 0 of 2 (Star, HN submit) |
+| Jev stage, median / p90 | 274 / 654 ms (first call 654 ms; others 169 to 439 ms) |
+| Total, median / p90 | 374 / 844 ms |
+| Click stage | 1 to 25 ms |
+
 ## 5. Decision
 
 Merge the fallback as an opt-in setting, off by default.
@@ -94,4 +108,4 @@ Merge the fallback as an opt-in setting, off by default.
 - It is fast enough: total p90 588 ms, below the 1.5 s budget.
 - It finds the target only about half the time. So it is a fallback, not a main path.
 
-Open: more real screens, and a live test with clicks (needs the owner's "go"). Try fewer numbers on large pages (only elements near the words of the command).
+Open: more real screens. The live test (4.3) clicked the right element 5 of 6 times. Try fewer numbers on large pages (only elements near the words of the command).
