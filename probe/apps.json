@@ -17,7 +17,7 @@
       "say": "WhatsApp",
       "bundle_id": "net.whatsapp.WhatsApp",
       "aliases": ["whatsapp", "whats app"],
-      "open_chat": { "kind": "switcher", "keys": "cmd+f", "pick": ["down", "return"], "settle_ms": 300 },
+      "open_chat": { "kind": "switcher", "keys": "cmd+f", "pick": ["return"], "settle_ms": 300 },
       "bench_runs": 10,
       "script_lines": 4
     },
@@ -27,7 +27,7 @@
       "say": "iMessage",
       "bundle_id": "com.apple.MobileSMS",
       "aliases": ["imessage", "messages", "message", "text", "sms"],
-      "open_chat": { "kind": "switcher", "keys": "cmd+n", "pick": ["return"], "settle_ms": 400 },
+      "open_chat": { "kind": "switcher", "keys": "cmd+n", "pick": ["return"], "settle_ms": 300 },
       "bench_runs": 10,
       "script_lines": 4
     }
