@@ -423,3 +423,27 @@ final class SpeechTimingTests: XCTestCase {
         XCTAssertTrue(r.note.contains("speech: apple (auto: Apple) audio 1840 ms"), r.note)
     }
 }
+
+final class FailingEngine: SpeechEngine {
+    let id = "apple"
+    var onPartial: (@Sendable (String) -> Void)?
+    func prepare() async throws {}
+    func begin() throws {}
+    func end() async throws -> Utterance { throw NSError(domain: "test", code: 1) }
+}
+
+final class SpeechLineResetTests: XCTestCase {
+    func testSpeechErrorHasNoOldSpeechLine() async {
+        let p = CommandPipeline(engine: TimedEngine(), router: CommandRouter(), actions: DryRunner(), names: FakeNames(),
+                                apps: { Fixture.apps }, allNames: { Fixture.names }, frontBundleID: { nil })
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let log = ActivityLog(store: Store(folder: folder))
+        p.log = log
+        let first = await p.finish(mode: .hold)
+        XCTAssertTrue(first.note.contains("speech: apple"), first.note)
+        p.engine = FailingEngine()
+        let failed = await p.finish(mode: .hold)
+        XCTAssertFalse(failed.note.contains("speech: apple"), failed.note)
+    }
+}
