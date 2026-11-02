@@ -196,7 +196,11 @@ enum AX {
         return (best?.0, index)
     }
 
-    /// Reads short visible texts in the top 30 % of the window, for the chat check.
+    /// The header band: the chat name sits in the top 15 % of the window. A lower limit
+    /// would also read chat messages near the top of the transcript (seen in WhatsApp).
+    static let headerBand = 0.15
+
+    /// Reads short visible texts in the header band of the window, for the chat check.
     /// If `column` is given, it reads only texts above that element, for example above the message box.
     /// This skips the chat list at the side, which shows the names of other chats.
     /// `skip` is an element to leave out with its children, for example the field that the probe typed the name into.
@@ -213,13 +217,17 @@ enum AX {
             if let skip, CFEqual(element, skip) { continue }
             let r = role(element)
             if let f = frame(element), f.w > 0 {
-                if f.y > w.y + 0.3 * w.h { continue }
+                if f.y > w.y + headerBand * w.h { continue }
                 if let c = column, f.x + f.w < c.x || f.x > c.x + c.w { continue }
             }
-            if r == "AXStaticText" || r == "AXTextField" || r == "AXHeading" {
+            // Text roles give their value. Buttons, links and groups give only their name:
+            // WhatsApp shows the chat name as a button or a group in the header bar.
+            let textRole = r == "AXStaticText" || r == "AXTextField" || r == "AXHeading"
+            let namedRole = r == "AXButton" || r == "AXLink" || r == "AXGroup"
+            if textRole || namedRole {
                 if let f = frame(element), let c = column, f.midX < c.x || f.midX > c.x + c.w { continue }
-                for attribute in ["AXValue", "AXTitle", "AXDescription"] {
-                    if let s = string(element, attribute), !s.isEmpty, s.count < 80 { out.append(s) }
+                for attribute in textRole ? ["AXValue", "AXTitle", "AXDescription"] : ["AXTitle", "AXDescription"] {
+                    if let s = string(element, attribute), !s.isEmpty, s.count < 80, !out.contains(s) { out.append(s) }
                 }
             }
             if skipRoles.contains(r) { continue }
