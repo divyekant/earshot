@@ -35,8 +35,9 @@ private struct OpenManageButton: View {
     @Environment(\.openWindow) private var openWindow
     var body: some View {
         Button("Manage…") {
-            NSApplication.shared.activate()
             openWindow(id: "manage")
+            // T6: activate the app, move the window to this Space and bring it to the front.
+            ManageWindow.bringToFront()
         }
     }
 }

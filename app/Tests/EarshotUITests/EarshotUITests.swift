@@ -177,3 +177,53 @@ final class SettingsSaveTests: XCTestCase {
         XCTAssertEqual(store.settings, s)
     }
 }
+
+final class AppsFilterTests: XCTestCase {
+    private let apps = [
+        AppEntry(id: "a", name: "Alpha Chat", bundleID: "com.example.alphachat", aliases: ["al"], isChat: true, approved: true),
+        AppEntry(id: "b", name: "Beta", bundleID: "org.beta.app", approved: false, enabled: false),
+        AppEntry(id: "c", name: "Gamma Notes", bundleID: "io.gamma.notes", approved: false),
+    ]
+
+    func testSearchLooksAtNameBundleAndAliases() {
+        XCTAssertEqual(CatalogueEdit.filter(apps, query: "gamma", scope: .all).map(\.id), ["c"])
+        XCTAssertEqual(CatalogueEdit.filter(apps, query: "ORG.BETA", scope: .all).map(\.id), ["b"])
+        XCTAssertEqual(CatalogueEdit.filter(apps, query: "al", scope: .all).map(\.id), ["a"])
+        XCTAssertEqual(CatalogueEdit.filter(apps, query: "  ", scope: .all).count, 3)
+    }
+
+    func testScopes() {
+        XCTAssertEqual(CatalogueEdit.filter(apps, query: "", scope: .needsApproval).map(\.id), ["b", "c"])
+        XCTAssertEqual(CatalogueEdit.filter(apps, query: "", scope: .approved).map(\.id), ["a"])
+        XCTAssertEqual(CatalogueEdit.filter(apps, query: "", scope: .chat).map(\.id), ["a"])
+        XCTAssertEqual(CatalogueEdit.filter(apps, query: "", scope: .off).map(\.id), ["b"])
+        XCTAssertEqual(CatalogueEdit.filter(apps, query: "notes", scope: .needsApproval).map(\.id), ["c"])
+    }
+
+    func testBulkSet() {
+        let out = CatalogueEdit.set(\.approved, true, ids: ["b", "c"], in: apps)
+        XCTAssertEqual(out.map(\.approved), [true, true, true])
+        let off = CatalogueEdit.set(\.enabled, false, ids: ["a"], in: out)
+        XCTAssertEqual(off.map(\.enabled), [false, false, true])
+        XCTAssertEqual(off.map(\.id), ["a", "b", "c"])
+    }
+}
+
+final class BrandTests: XCTestCase {
+    func testMarkMatchesTheSVG() {
+        // glyph.svg: viewBox "276 286 472 452".
+        let all = (MarkShapes.bars + [MarkShapes.cursor]).map(\.rect).reduce(CGRect.null) { $0.union($1) }
+        XCTAssertEqual(all, CGRect(x: 276, y: 286, width: 472, height: 452))
+        XCTAssertEqual(MarkShapes.bars.count, 4)
+        // The bars rise to the third bar, then fall. The cursor is the tallest shape.
+        let heights = MarkShapes.bars.map(\.rect.height)
+        XCTAssertEqual(heights.max(), heights[2])
+        XCTAssertGreaterThan(MarkShapes.cursor.rect.height, heights[2])
+    }
+
+    func testMarkIsCentredInTheTile() {
+        let all = (MarkShapes.bars + [MarkShapes.cursor]).map(\.rect).reduce(CGRect.null) { $0.union($1) }
+        XCTAssertEqual(all.midX, 512, accuracy: 1)
+        XCTAssertEqual(all.midY, 512, accuracy: 1)
+    }
+}

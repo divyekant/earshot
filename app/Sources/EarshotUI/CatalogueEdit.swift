@@ -50,6 +50,34 @@ public enum CatalogueEdit {
         return saved + [NameEntry(appID: appID, name: trimmed, aliases: aliases, isSelf: isSelf, source: .manual)]
     }
 
+    /// The rows that match the search text and the scope. The search looks at the name, the bundle ID and the
+    /// spoken names. Case and punctuation do not count.
+    public static func filter(_ apps: [AppEntry], query: String, scope: AppScope) -> [AppEntry] {
+        let q = SafetyPolicy.normalize(query)
+        return apps.filter { app in
+            switch scope {
+            case .all: break
+            case .needsApproval: if app.approved { return false }
+            case .approved: if !app.approved { return false }
+            case .chat: if !app.isChat { return false }
+            case .off: if app.enabled { return false }
+            }
+            guard !q.isEmpty else { return true }
+            let hay = SafetyPolicy.normalize(([app.name, app.bundleID] + app.aliases).joined(separator: " "))
+            return hay.contains(q)
+        }
+    }
+
+    /// Sets one Boolean field on every row whose id is in `ids`.
+    public static func set(_ field: WritableKeyPath<AppEntry, Bool>, _ value: Bool, ids: Set<String>, in apps: [AppEntry]) -> [AppEntry] {
+        apps.map { app in
+            guard ids.contains(app.id) else { return app }
+            var row = app
+            row[keyPath: field] = value
+            return row
+        }
+    }
+
     /// "imessage, text , ,Text" becomes ["imessage", "text"].
     public static func parseAliases(_ text: String) -> [String] {
         unique(text.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty })
