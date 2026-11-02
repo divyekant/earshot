@@ -2,7 +2,7 @@ import EarshotCore
 
 /// What the words ask for on the screen.
 struct ScreenParse {
-    enum Kind { case press, type, ordinal, scroll, back }
+    enum Kind: Equatable { case press, type, ordinal, scroll, back }
     var kind: Kind = .press
     var isCommand = false
     var target: [String] = []

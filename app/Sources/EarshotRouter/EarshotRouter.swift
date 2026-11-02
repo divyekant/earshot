@@ -97,6 +97,15 @@ public struct CommandRouter: Router {
             return RulesDecision(intent: .hideNumbers, sure: true, exact: true, why: "hide numbers", options: [])
         }
 
+        // "On Chrome, click Chat": the screen command is for that app's window, not a chat command.
+        if let (app, rest) = appPrefix(text, apps: context.apps), isScreenCommand(rest) {
+            let front = context.screen?.bundleID ?? context.frontBundleID
+            if front == app.bundleID { return rules(rest, context: context) }
+            // The app is not in front, so the screen is not its screen. Open the app (it can be undone) and do not click.
+            return RulesDecision(intent: .openApp(appID: app.id), sure: true, exact: true,
+                                 why: "\(app.name) was not in front: say the command again", options: [])
+        }
+
         // "open hn.com", "go to news dot ycombinator dot com", "Openhn.com" (R-NV-7).
         if let address = WebAddress.parse(text) {
             return RulesDecision(intent: .openURL(address), sure: true, exact: true, why: "web address", options: [])
@@ -130,6 +139,36 @@ public struct CommandRouter: Router {
             }
         }
         return chat
+    }
+
+    /// A leading "on <app>" or "in <app>": the app, and the raw words after it. "On Chrome, click Chat" gives Chrome
+    /// and "click Chat". Only approved and enabled rows count, and the app name must match exactly (R-MT-1).
+    static func appPrefix(_ text: String, apps: [AppEntry]) -> (AppEntry, String)? {
+        var tokens = Tokens(text)
+        var lead = 0
+        while lead < tokens.count, fillers.contains(tokens.words[lead]) { lead += 1 }
+        tokens.dropFirst(lead)
+        let w = tokens.words
+        guard w.count >= 3, ["on", "in"].contains(w[0]) else { return nil }
+        for span in stride(from: min(3, w.count - 2), through: 1, by: -1) {
+            let phrase = w[1...span].joined()
+            for app in apps where app.approved && app.enabled {
+                let names = (app.aliases + [app.name]).map(TextKit.key)
+                if names.contains(phrase) { return (app, tokens.raw((span + 1)..<w.count)) }
+            }
+        }
+        return nil
+    }
+
+    /// True if the words are a command for the screen: click, type, scroll, back, an ordinal, or show or hide numbers.
+    static func isScreenCommand(_ text: String) -> Bool {
+        var words = TextKit.words(text)
+        while let f = words.first, fillers.contains(f), words.count > 1 { words.removeFirst() }
+        let phrase = words.joined(separator: " ")
+        if showNumbers.contains(phrase) || hideNumbers.contains(phrase) { return true }
+        guard let first = words.first else { return false }
+        if pressOnly.contains(first) || typeFirst.contains(first) { return true }
+        return [.scroll, .back, .ordinal].contains(ScreenRouter.parse(text).kind)
     }
 
     static func confidence(_ d: RulesDecision) -> Double {
