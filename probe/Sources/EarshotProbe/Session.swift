@@ -16,7 +16,7 @@ struct ScriptLine {
         guard let me = people.first(where: { $0.me }) else { return [] }
         let others = people.filter { !$0.me }
         var perApp: [[ScriptLine]] = []
-        for (a, app) in apps.enumerated() {
+        for (a, app) in apps.enumerated() where me.handles[app.id] != nil {
             var lines: [ScriptLine] = []
             for i in 0..<5 {
                 let phrase = phrases[(a * 3 + i) % phrases.count]
