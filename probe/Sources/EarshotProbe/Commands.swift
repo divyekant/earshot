@@ -27,6 +27,16 @@ enum Commands {
     swift run earshot-probe e1-open [app] [runs]  Open your own chat with the generated rows (types nothing)
     swift run earshot-probe e1-search [app...]    Type names into each app's own search and read the results (no Return)
 
+    E2 (docs/experiments/E2-web-and-speech.md):
+    swift run earshot-probe e2-page [site...]     Open the test pages in Chrome as new tabs and read them (no click)
+    swift run earshot-probe e2-make               Make the web test commands from the page reads
+    swift run earshot-probe e2-try <site> "<words>"  Show the short list, the rules answer and the Jev answer
+    swift run earshot-probe e2-run [--no-jev]     Route all web test commands with rules, Jev, and rules then Jev
+    swift run earshot-probe e2-act [site...]      Live: press links, type into search fields, scroll (no Return)
+    swift run earshot-probe e2-say [--voices a,b] Make WAV files of the E1 commands with `say`
+    swift run earshot-probe e2-asr                Transcribe the WAV files with Apple speech
+    swift run earshot-probe e2-asr-score          Compare Apple speech and Parakeet (run probe/parakeet first)
+
     Options: --engine transcriber|dictation   --locale en-IN
     """
 
@@ -80,6 +90,14 @@ enum Commands {
             case "e1-open": return try await E1.open(args)
             case "e1-search": return try await E1.search(args)
             case "e1-recheck": return try E1.recheck(args)
+            case "e2-page": return try await E2.page(args)
+            case "e2-make": return try E2.make(args)
+            case "e2-try": return try await E2.tryOne(args)
+            case "e2-run": return try await E2.runAll(args)
+            case "e2-act": return try await E2.act(args)
+            case "e2-say": return try E2Speech.say(args)
+            case "e2-asr": return try await E2Speech.asr(args)
+            case "e2-asr-score": return try E2Speech.score(args)
             default:
                 print(usage)
                 return 2
