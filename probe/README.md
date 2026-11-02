@@ -11,7 +11,8 @@ The protocol and the pass marks are in [docs/experiments/E0-viability.md](../doc
 - The app table is data in [apps.json](apps.json) (R-MT-2).
 - Your test chats are in `people.json`. It holds names only. Git ignores this file.
 - Each app opens a chat through its own search: the probe types the name and picks the top result. No app needs a phone number or an email address.
-- If an app has no search shortcut (Messages), the probe finds the search field through accessibility and focuses it.
+- Messages opens the chat through File > New Message (Command-N): the probe types the name in the "To:" field and picks the first suggestion.
+- If an app row has no search keys, the probe finds the search field through accessibility and focuses it.
 
 ## Safety
 

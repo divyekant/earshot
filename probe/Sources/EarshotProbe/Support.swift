@@ -100,6 +100,17 @@ enum Text {
         return String(scalars).split(separator: " ").joined(separator: " ")
     }
 
+    /// Removes invisible characters, turns no-break spaces into spaces, and joins runs of white space.
+    /// Text fields can add these characters to the text that the probe typed.
+    static func squash(_ s: String) -> String {
+        let invisible: Set<UInt32> = [0x200B, 0x200C, 0x200D, 0x200E, 0x200F, 0xFEFF, 0xFFFC]
+        var view = String.UnicodeScalarView()
+        for u in s.unicodeScalars where !invisible.contains(u.value) {
+            view.append(u.value == 0xA0 ? " " : u)
+        }
+        return String(view).split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
+    }
+
     /// The normalized text with no spaces. "Whats App" and "WhatsApp" have the same key.
     static func key(_ s: String) -> String { normalize(s).replacingOccurrences(of: " ", with: "") }
 

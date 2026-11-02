@@ -150,7 +150,9 @@ enum AX {
     /// because a thread reply box can sit high in the window (seen in Slack). A field with no label
     /// must be a one-line field (AXTextField or AXComboBox).
     static func isSwitcherField(_ element: AXUIElement, in window: AXUIElement) -> Bool {
-        guard isEditableText(element, allowSearch: true), valueSettable(element),
+        // WhatsApp shows its search field as AXStaticText with the AXSearchField subrole.
+        let searchSubrole = subrole(element) == "AXSearchField"
+        guard (isEditableText(element, allowSearch: true) && valueSettable(element)) || searchSubrole,
               let f = frame(element), let w = frame(window), f.midY < w.y + 0.6 * w.h else { return false }
         if subrole(element) == "AXSearchField" || looksLikeSearch(element) { return true }
         if looksLikeComposer(element) { return false }
@@ -197,7 +199,9 @@ enum AX {
     /// Reads short visible texts in the top 30 % of the window, for the chat check.
     /// If `column` is given, it reads only texts above that element, for example above the message box.
     /// This skips the chat list at the side, which shows the names of other chats.
-    static func headerTexts(in window: AXUIElement, column: Frame? = nil, budgetMs: Int = 120, maxNodes: Int = 1500) -> [String] {
+    /// `skip` is an element to leave out with its children, for example the field that the probe typed the name into.
+    static func headerTexts(in window: AXUIElement, column: Frame? = nil, skip: AXUIElement? = nil,
+                            budgetMs: Int = 120, maxNodes: Int = 1500) -> [String] {
         guard let w = frame(window) else { return [] }
         let t0 = Clock.nowNs()
         var queue: [AXUIElement] = [window]
@@ -206,6 +210,7 @@ enum AX {
         while index < queue.count, index < maxNodes, Clock.ms(since: t0) < Double(budgetMs) {
             let element = queue[index]
             index += 1
+            if let skip, CFEqual(element, skip) { continue }
             let r = role(element)
             if let f = frame(element), f.w > 0 {
                 if f.y > w.y + 0.3 * w.h { continue }
