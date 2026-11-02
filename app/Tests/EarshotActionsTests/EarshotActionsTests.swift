@@ -351,15 +351,20 @@ final class ActionRunnerTests: XCTestCase {
         let runner = EarshotActionRunner(store: nil)
         let view = Frame(x: 0, y: 100, w: 1200, h: 700)
         var scrolledAt: UInt64?
+        var readsAfterMove = 0  // frame reads after the frame moved into view
         let t0 = Clock.nowNs()
         let f = await runner.scrollIntoView(perform: { scrolledAt = Clock.nowNs() }, frame: {
             guard let s = scrolledAt, Clock.ms(since: s) >= 60 else { return Frame(x: 20, y: 1400, w: 200, h: 20) }
+            readsAfterMove += 1
             return Frame(x: 20, y: 400, w: 200, h: 20)
         }, view: view)
         let ms = Clock.ms(since: t0)
         print("EARSHOT_BENCH fake scroll into view: \(ms) ms (frame moves at 60 ms)")
         XCTAssertEqual(f, Frame(x: 20, y: 400, w: 200, h: 20))
-        XCTAssertLessThan(ms, 120)
+        // The behaviour: the first frame read after the move ends the wait. No later read.
+        XCTAssertEqual(readsAfterMove, 1)
+        // A wall-time bound with margin for a busy CI runner. The check above carries the exact behaviour.
+        XCTAssertLessThan(ms, 60 + 100)
     }
 
     /// The frame never comes into view: nil at the time limit, so earshot does not click.
