@@ -8,6 +8,8 @@
 	<string>earshot</string>
 	<key>CFBundleDisplayName</key>
 	<string>earshot</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>CFBundleExecutable</key>
 	<string>earshot</string>
 	<key>CFBundlePackageType</key>
