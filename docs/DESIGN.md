@@ -158,6 +158,7 @@ E0 used each app's own search in place of links, so the owner gives names only. 
 5. For ordinal commands ("second email", "second result"), sort the rows by position on screen. On a web page, a result is a link in a heading.
 6. If no label matches, run Apple Vision OCR (about 130–230 ms) and click the matched text.
 7. For "show numbers", draw numbered labels over the same element list.
+8. Optional, off by default (D-10, "Jev sees the screen"): if no label matches a hold-key click, take one picture of the front window, draw the numbers of step 7 on it, and ask Jev once. Jev picks a number, or else gives a box. For a box, earshot clicks its middle only if the element under the point is of the front app, has a label, and is not risky. The click then goes through steps 3 and 4. Never on a sign-in, code or payment page.
 
 E2 measured this in Chrome on 4 public pages: 42 of 43 commands correct, 25 of 25 link clicks changed the page, 0 risky elements pressed.
 

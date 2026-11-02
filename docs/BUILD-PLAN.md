@@ -21,6 +21,7 @@ The experiments E0, E1 and E2 showed that earshot is viable. This plan builds th
 | T5 Input | Hold key (configurable; default right Option alone, key code 61, read with a flagsChanged monitor). Always-on: speech detection, end of turn, "for me?" gate. A false trigger never does an action that cannot be undone (R-ON-5). | `app/Sources/EarshotInput`, `app/Tests/EarshotInputTests` | T0, T1 |
 | T6 Management window and note | Tabs: General, Apps, Names, Activity, Permissions, Test. Jev key in the Keychain. The feedback note on screen (FeedbackSink, R-FB-1). Uses EarshotCore types only. | `app/Sources/EarshotUI`, `app/Tests/EarshotUITests` | T0 |
 | T7 Integration | Connect the modules in EarshotApp. App bundle, Info.plist usage text, signing, start at login. Live tests on the Mac. | `app/Sources/EarshotApp`, `app/scripts` | T1 to T6 |
+| T9 Jev sees the screen | Opt-in click fallback (D-10): one marked picture of the front window to Jev, a number or a box back, a point check, then the normal click path. E3 measures it. | `app/Sources/EarshotCore/Vision.swift`, `app/Sources/EarshotRouter/JevVision.swift`, `app/Sources/EarshotActions/WindowShot.swift`, `app/Sources/EarshotActions/VisionFallback.swift` | T2, T3, T7 |
 | T8 Docs | README, user guide, design and decisions updates. | `README.md`, `docs/` | T7 |
 
 T0 freezes the protocols in `app/Sources/EarshotCore/Protocols.swift` and the types in `app/Sources/EarshotCore/Types.swift`. If a task needs a change to them, ask the coordinator first.
@@ -33,7 +34,7 @@ T0 declares every module target in `app/Package.swift`. Threads do not edit `app
 2. Add unit tests for the logic in your folder.
 3. Record latency numbers for every change to the command path in the pull request (AGENTS.md).
 4. Write docs, comments and commit messages in Simplified Technical English.
-5. No cloud service by default. Jev is the only exception: opt-in tier 2, off by default, text only, 1 s budget (R-MD-1, D-9). Audio never leaves the Mac.
+5. No cloud service by default. Jev is the only exception: opt-in tier 2, off by default, text only, 1 s budget (R-MD-1, D-9). The separate opt-in "Jev sees the screen" sends one picture of the front window for a hold-key click that found no target, 1.5 s budget (D-10). Audio never leaves the Mac.
 6. Never press Return or a Send button unless the owner says "send" (R-NV-5, R-ON-5). Use `SafetyPolicy`.
 7. App support is data, not code. Do not add an `if app == "slack"` branch (R-MT-1, R-MT-2).
 8. Work in your own git worktree on the Mac, for example `~/projects/earshot-t1`. Never build in `~/projects/earshot`, so that builds do not collide.
