@@ -245,9 +245,7 @@ final class AppController: ObservableObject {
     /// Stops an engine: the microphone closes and the timers stop (T1).
     static func shutdown(_ engine: SpeechEngine) {
         let active = (engine as? FallbackSpeechEngine)?.active ?? engine
-        (active as? AutoSpeechEngine)?.shutdown()
-        (active as? AppleSpeechEngine)?.shutdown()
-        (active as? ParakeetEngine)?.shutdown()
+        (active as? TurnSpeechEngine)?.shutdown()
     }
 
     /// Start at login: off by default. The state lives in macOS (SMAppService), not in settings.json.

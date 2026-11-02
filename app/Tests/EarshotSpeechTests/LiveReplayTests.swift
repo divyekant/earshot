@@ -89,8 +89,10 @@ final class LiveReplayTests: XCTestCase {
         XCTAssertLessThan(last, first * 2 + 20, "the speech stage grew over 20 commands")
     }
 
+    #if compiler(>=6.2)
     func testAppleReplay() async throws {
         try XCTSkipUnless(enabled, "set EARSHOT_SPEECH_BENCH=1")
+        guard #available(macOS 26, *) else { throw XCTSkip("SpeechTranscriber needs macOS 26") }
         let engine = AppleSpeechEngine()
         engine.reason = "bench"
         let format = try await engine.prepareModel()
@@ -111,6 +113,7 @@ final class LiveReplayTests: XCTestCase {
             }
         }
     }
+    #endif
 
     func read(_ url: URL, as format: AVAudioFormat) throws -> AVAudioPCMBuffer {
         let file = try AVAudioFile(forReading: url)
