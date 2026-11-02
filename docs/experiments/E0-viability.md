@@ -67,7 +67,7 @@ Audio files made with `say`, no microphone. The time is from the start of analys
 
 The router read all three transcripts correctly. The model download took about 2 s.
 
-DictationTranscriber with the `.shortDictation` preset sent no final result, so the first build returned empty text. `.progressiveShortDictation` and `.longDictation` send a final result. Both engines can drop the last word when the audio stops right after the speech. The probe now adds 300 ms of silence at key release and keeps the last volatile text if no final result arrives.
+DictationTranscriber with the `.shortDictation` preset sent no final result, so the first build returned empty text. `.progressiveShortDictation` and `.longDictation` send a final result. The dictation engine can drop the last word when the audio stops right after the speech; the transcriber did not. The probe now adds 300 ms of silence at key release and keeps the last volatile text if no final result arrives.
 
 ### 5.2 Part A and Part B
 
