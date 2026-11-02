@@ -32,17 +32,18 @@ public enum SafetyPolicy {
         return riskyPhrases.contains { " \(n) ".contains(" \($0) ") }
     }
 
-    /// Roles that are not action controls: links, rows, cells, groups and text. A label of these roles can hold
+    /// Roles that are not action controls: links, rows, cells and text. A label of these roles can hold
     /// message text, for example a chat row "Darshan Pania · You: Sent a post". Every other role, and an unknown
-    /// role, keeps the strict rule.
-    public static let nonControlRoles: Set<String> = ["AXLink", "AXRow", "AXCell", "AXGroup", "AXStaticText",
-                                                      "AXOutlineRow", "AXHeading", "AXImage", "AXListItem"]
+    /// role, keeps the strict rule. Groups and images keep it too: a click on a group or an image can land on a
+    /// child control, for example a group "Type a message Send" around a Send button.
+    public static let nonControlRoles: Set<String> = ["AXLink", "AXRow", "AXCell", "AXStaticText", "AXOutlineRow",
+                                                      "AXHeading", "AXListItem"]
     /// A non-control label of this many words or fewer is a command label ("Delete account"), so the strict rule applies.
     public static let shortLabelWords = 3
 
     /// True if a press on an element with this label and role can change data, send something or spend money.
     /// - A control (button, menu item, checkbox, pop-up button and similar), or an unknown role: the strict rule.
-    /// - A link, row, cell, group or text: risky only if the label is short (3 words or fewer) and has a risky word,
+    /// - A link, row, cell or text: risky only if the label is short (3 words or fewer) and has a risky word,
     ///   or if the label starts with a risky word or phrase ("Delete this repository and all its issues").
     public static func isRisky(_ label: String, role: String?) -> Bool {
         guard let role, nonControlRoles.contains(role) else { return isRisky(label) }

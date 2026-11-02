@@ -367,6 +367,9 @@ final class EarshotRouterTests: XCTestCase {
         XCTAssertTrue(SafetyPolicy.isRisky("Send", role: "OCRText"))
         XCTAssertTrue(SafetyPolicy.isRisky("Post now", role: "OCRText"))
         XCTAssertTrue(SafetyPolicy.isRisky("Send", role: "AXUnknownRole"))
+        // A click on a group or an image can land on a child control: strict rule.
+        XCTAssertTrue(SafetyPolicy.isRisky("Type a message Send", role: "AXGroup"))
+        XCTAssertTrue(SafetyPolicy.isRisky("Photo of the team you can share with friends", role: "AXImage"))
         // A short row keeps the strict rule; a long row follows the non-control rule.
         XCTAssertTrue(SafetyPolicy.isRisky("Delete chat", role: "AXRow"))
         XCTAssertFalse(SafetyPolicy.isRisky(Self.xRow, role: "AXStaticText"))
