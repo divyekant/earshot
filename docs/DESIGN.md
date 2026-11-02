@@ -25,6 +25,8 @@ mic ─► [1 Audio gate] ─► [2 Speech to text] ─► [3 "For me?" gate] �
 
 E0 measured these stages on this Mac (see [experiments/E0-viability.md](experiments/E0-viability.md), sections 5 and 6). Voice commands: median 582 ms from key release to focused box. Final transcript: 23 to 101 ms. Slack switcher (Command-K, name, Return): about 400 ms, including a fixed 250 ms wait. Focus after the chat opens: about 100 ms. The owner's goal is about 100 ms in total, so the next work is on the switcher step and on the wait for held keys.
 
+E2 measured voice clicks in Chrome (see [experiments/E2-web-and-speech.md](experiments/E2-web-and-speech.md), section 5.7). From the text to the click: 33 ms median, 122 ms for the slowest 1 in 10 (with the tier-2 model for some commands). With speech, the click occurs about 70 to 90 ms after the end of speech. Chrome then needs about 320 ms to show the new page.
+
 ## 3. Components
 
 ### 3.1 Audio gate (R-ON-1, R-ON-3)
@@ -41,12 +43,14 @@ Swift SDKs: FluidAudio and speech-swift bundle these parts.
 
 | Option | Use when |
 |---|---|
-| Apple SpeechTranscriber (Speech framework, macOS 26 and later) | First choice for English. It is built into macOS and runs on the device. macOS manages the model, so earshot ships no speech model. It accepts name hints (`AnalysisContext.contextualStrings`). E0: 14 of 14 commands heard correctly, final text 23 to 101 ms after key release. |
-| Parakeet TDT 0.6B v3 (CoreML through FluidAudio) | English only. It does not support Hindi. |
+| Parakeet 0.6B, the model file of Hex (`parakeet-unified-en-0.6b-Q8_0.gguf`, transcribe.cpp on Metal) | Default for English when the file is on the Mac. earshot reads the file in place, so there is no download. E2: 114 of 126 commands routed correctly, 14.9 % word errors, 34 ms median on short commands. It loads in 14.4 s and uses about 890 MB, so it must stay loaded. English only. Weights CC BY 4.0. |
+| Apple SpeechTranscriber (Speech framework, macOS 26 and later) | Default when the Parakeet file is not on the Mac. It is built into macOS and runs on the device. macOS manages the model, so earshot ships no speech model. E0: 14 of 14 commands heard correctly, final text 23 to 101 ms after key release. E2: 113 of 126 routed correctly, 18.8 % word errors, 56 ms median. It takes name hints (`AnalysisContext.contextualStrings`), but in E2 the hints did not change the text. |
 | Nemotron-3.5-ASR-Streaming-0.6B (speech-swift) | English and Hindi. Hindi word error rate is 8.0 at 160 ms chunks (model card). Test the Hinglish fine-tunes. |
 | Moonshine v2 small (MIT, 123M) | Fastest English-only option. The vendor reports 73 ms. |
 
 No source measured end-of-speech latency on an M4 Pro. Measure it in Phase 0.
+
+E2 (section 6.2) chose Parakeet by a small margin: 1 command in 126, on `say` voices. Keep both engines behind one interface, log the engine with each command, and check the choice on the owner's real commands. Both engines miss the same names, so the router must also match names by sound.
 
 ### 3.3 "Is this for me?" gate (R-ON-2, R-ON-5)
 
@@ -100,11 +104,15 @@ E0 used each app's own search in place of links, so the owner gives names only. 
 **Type text.** Set the accessibility value, or paste through the clipboard and restore the clipboard afterwards.
 
 **Click.**
-1. Collect buttons, links, menu items and rows from the front window.
-2. Fuzzy-match the spoken label to `AXTitle`, `AXDescription` and `AXValue`, then press the match.
-3. For ordinal commands ("second email"), sort the rows by position on screen.
-4. If no label matches, run Apple Vision OCR (about 130–230 ms) and click the matched text.
-5. For "show numbers", draw numbered labels over the same element list.
+1. Collect buttons, links, menu items and rows from the front window. In a browser, find the page on screen with a hit test in the front window, and read its visible elements with one `AXUIElementsForSearchPredicate` call (12 ms in E2). Chrome keeps the pages of hidden tabs in the tree, so a page found by a tree search can be a hidden tab.
+2. Fuzzy-match the spoken label to `AXTitle`, `AXDescription` and `AXValue`. Numbers must match exactly. Block every label with a risky word (send, pay, delete, submit, vote, star and similar).
+3. Act only on a page of the expected app or site. Never act on a sign-in, code or payment page.
+4. Press the match with `AXPress` if the element offers it. A Chrome link does not offer it: `AXPress` returns success and does nothing (E2, section 5.6). Else click a point where the top element on screen is the match, and move the pointer back. If no such point exists, scroll the element into view (`AXScrollToVisible`) and try again.
+5. For ordinal commands ("second email", "second result"), sort the rows by position on screen. On a web page, a result is a link in a heading.
+6. If no label matches, run Apple Vision OCR (about 130–230 ms) and click the matched text.
+7. For "show numbers", draw numbered labels over the same element list.
+
+E2 measured this in Chrome on 4 public pages: 42 of 43 commands correct, 25 of 25 link clicks changed the page, 0 risky elements pressed.
 
 Libraries: AXorcist (MIT) for accessibility. Peekaboo (MIT) is a reference for the user-interface map and background input.
 
@@ -145,7 +153,7 @@ One key, then speech, then routing (tiers 0–1), then navigation through the ap
 
 ### Phase 2: Voice clicks
 
-Label match, ordinal match, number hints, OCR fallback.
+Label match, ordinal match, number hints, OCR fallback. E2 tested the label match and the ordinal match in Chrome (go). Number hints and the OCR fallback are still open.
 
 ### Phase 3: Always on
 

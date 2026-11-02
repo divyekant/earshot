@@ -1,6 +1,6 @@
 # E2: voice clicks on web pages, and Parakeet against Apple speech
 
-Status: running, 2026-11-02. The owner chose "Both (E2)". The press test (section 5.6) found the cause of the failed presses. Live run 3 waits for the owner.
+Status: done, 2026-11-02. The owner chose "Both (E2)". Decision: go for voice clicks in Chrome, and Parakeet as the default speech engine when the Hex model file is on the Mac (section 6).
 
 E2 follows [E1](E1-generic-router.md). E0 and E1 put the cursor in a chat. The owner asked two more questions:
 
@@ -233,8 +233,65 @@ Fixes (safety rule 6):
 - The hit test now skips a page that is in another window.
 - `e2-page`, `e2-make`, `e2-act` and `e2-press` act only on a page of the expected site, and never on a sign-in, code or payment page.
 
-Second try: not run yet.
+Second try (commit 9eebf6d). Before the run, the page on screen was Hacker News. `e2-page` saved all 4 sites, and `e2-make` made 44 tests.
+
+| Measure | Result |
+| --- | --- |
+| Correct element or answer | 42 of 43 |
+| Read the page | 12 ms median, 22 ms for the slowest 1 in 10 |
+| Text to action (read, route, Jev if unsure, act) | 33 ms median, 122 ms for the slowest 1 in 10 (31 actions) |
+| Links clicked, page changed | 25 of 25 |
+| Time from the click to the new address (Chrome loads the page) | 321 ms median |
+| Not clicked: no point on screen is the link | 2 |
+| Typed into a search field | 1 of 2 |
+| Scrolled | 2 of 2 |
+| Risky items blocked | 4 of 4 |
+
+- The clicks work. 25 of 25 link clicks changed the page, against 0 of 22 presses in live run 2. Back worked after each one.
+- 3 Hacker News links went to other sites (historytoday.com, radiaverse.com, fosscomics.com). These are normal visits. Back worked.
+- 2 links got no click, because no point on screen was that link. "Skip to main content" shows only when it has the focus, so no click is correct. "GitHub" on the Google page was probably out of view. earshot must scroll an element into view (`AXScrollToVisible`, which Chrome offers) and do the hit test again.
+- The search on Wikipedia did not type. The focus probably did not move to the field after the clicks and the Back steps. The search on Google typed in 6 ms. earshot must set the focus, check it, and then type.
+- The miss: "click 382 comments" clicked "384 comments". The count changed between `e2-make` and the run, so this was the same story. But a fuzzy match on numbers can pick a wrong row. Numbers in a command must match exactly.
+- Safety held: nothing was submitted, no Return was pressed, all 4 risky items were blocked, and the run did not use the sign-in window.
 
 ## 6. Decision
 
-Not made yet.
+### 6.1 Voice clicks on web pages: go, for Chrome
+
+| Measure | Pass | Result |
+| --- | --- | --- |
+| Read time, visible elements | 150 ms median or less | 12 ms (live run 3) |
+| Hybrid router, correct | 90 % or more | 45 of 45 offline, 42 of 43 live |
+| Risky elements pressed | 0 | 0 (4 of 4 blocked in each run) |
+| Live, text to action | 300 ms median or less | 33 ms median, 122 ms for the slowest 1 in 10 |
+
+All marks pass. With speech (34 to 56 ms), the click occurs about 70 to 90 ms after the end of speech. This is well under the 500 ms of R-SP-3. The browser then needs about 320 ms to show a new page. earshot does not control that time.
+
+How earshot acts on a web page (section 5.6 and safety rule 6):
+
+1. Find the page on screen with a hit test in the front window. Skip a page in another window.
+2. Act only on a page of the expected site. Never act on a sign-in, code or payment page.
+3. Read the visible links, buttons and fields with one `AXUIElementsForSearchPredicate` call.
+4. Route with rules and fuzzy match. Ask the tier-2 model only when the rules are unsure, with a time budget.
+5. Block every risky label.
+6. Use `AXPress` if the element offers it. Else click a point where the top element on screen is that element, and move the pointer back.
+
+### 6.2 Speech: Parakeet as the default, when the Hex model file is on the Mac
+
+Parakeet meets the pass mark: 114 of 126 correct routes against 113, and 22 ms faster. But the gain is 1 command in 126, and `say` voices are not real speech. So the decision is weak:
+
+- Use Parakeet when the Hex model file is on the Mac. earshot reads the file and does not copy it, so there is no download and no setup. Keep the model loaded (14.4 s load, about 890 MB).
+- Else use Apple SpeechTranscriber. It needs no file.
+- Keep both engines behind one interface, and log the engine with each command. Check the choice again on the owner's real commands from the Phase 1 logs. That needs no extra recording step.
+- The larger gain is in the router, not in the engine. Both engines miss the same names ("a ditty" for Aditi). Match names by sound (section 7).
+
+## 7. Changes for the next steps
+
+1. Scroll an element into view (`AXScrollToVisible`), then do the hit test again, before earshot says that it cannot click.
+2. Before typing into a web field, set the focus and check it. Setting the value of a Chrome web field fails. Key events work.
+3. Numbers in a command must match exactly. "382 comments" must not match "384 comments".
+4. Keep the time budget for the tier-2 model (1 s in E2).
+5. Match names by sound in the router: join short words ("a ditty" → "aditi") and compare sound codes. This is the next experiment for names.
+6. Add a short silence at the end of the audio before Parakeet runs. The end of one test file was cut ("Aditi's ch").
+7. Canvas pages (Google Docs, Sheets, Figma) still need the OCR fallback (R-CL-4) and "show numbers" (R-CL-3).
+8. Test other browsers (Safari, Arc) later. The click rule does not depend on the browser.
