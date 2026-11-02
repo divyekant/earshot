@@ -706,6 +706,47 @@ final class EarshotRouterTests: XCTestCase {
         XCTAssertTrue(CommandRouter.hasCommandWord("open hn.com", context: ctx))
     }
 
+    // MARK: - Live always-on cases: the message box, UI word pairs
+
+    func chatPage(focused: String? = nil) -> RouteContext {
+        RouteContext(apps: Fixtures.apps, names: Fixtures.names, frontBundleID: "com.tinyspeck.slackmacgap",
+                     screen: ScreenSnapshot(bundleID: "com.tinyspeck.slackmacgap", windowTitle: "Team chat", elements: [
+                        Fixtures.el("s1", "AXTextField", "Find a conversation…", y: 10, subrole: "AXSearchField"),
+                        Fixtures.el("s2", "AXTextArea", "Message the team", y: 600),
+                     ], focusedID: focused))
+    }
+
+    func testTypePrefersTheMessageBox() async {
+        await expect("type, dude, this is working beautifully.", .typeInto(elementID: "s2", text: "dude, this is working beautifully"),
+                     chatPage())
+        await expect("enter hello there", .typeInto(elementID: "s2", text: "hello there"), chatPage())
+        // "search for X" keeps the search field.
+        await expect("search for weekly notes", .typeInto(elementID: "s1", text: "weekly notes"), chatPage())
+        // The focus still wins.
+        await expect("type hello there", .typeText("hello there"), chatPage(focused: "s1"))
+        // A one-line field alone is not a message box.
+        let form = RouteContext(apps: Fixtures.apps, names: Fixtures.names, screen: ScreenSnapshot(bundleID: "com.example.form",
+            windowTitle: "Form", elements: [Fixtures.el("f1", "AXTextField", "Email", y: 10)]))
+        let r = await route("type hello there", form)
+        XCTAssertNotEqual(r.intent, .typeInto(elementID: "f1", text: "hello there"), r.why)
+    }
+
+    func testUIWordPairs() async {
+        let menus = MenuElements.elements([MenuEntry(path: ["View", "Reload This Page"]), MenuEntry(path: ["File", "New Tab"])])
+        let toolbar = [Fixtures.el("b1", "AXButton", "Back", y: 5), Fixtures.el("b2", "AXButton", "Reload", y: 5, x: 40)]
+        let ctx = liveContext(toolbar + menus)
+        let r = await route("click on refresh.", ctx)
+        XCTAssertEqual(r.intent, .click(elementID: "b2"), r.why)
+        XCTAssertEqual(r.tier, .fuzzy, "a word pair is never an exact match")
+        await expect("click on refresh.", .click(elementID: "m:View>Reload This Page"), liveContext(menus))
+        await expect("open settings", .click(elementID: "p1"), liveContext([Fixtures.el("p1", "AXButton", "Preferences", y: 5)]))
+        // No pair holds a risky word.
+        for (w, others) in UIWords.other {
+            XCTAssertFalse(SafetyPolicy.isRisky(w), w)
+            for o in others { XCTAssertFalse(SafetyPolicy.isRisky(o), o) }
+        }
+    }
+
     func testE2NoCommand() async {
         let r = await route("what a lovely day", news)
         XCTAssertEqual(r.intent, .none)

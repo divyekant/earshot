@@ -89,6 +89,17 @@ enum ScreenRouter {
     /// The role that the actions module gives to a text found by OCR. It has no accessibility element.
     static let ocrRole = "OCRText"
 
+    /// The message box: the one text area, else the text area that is clearly the largest (1.5 times the next).
+    /// A one-line text field never counts: it can be a sign-in or form field. Nil if unsure.
+    static func messageBox(_ fields: [ScreenElement]) -> ScreenElement? {
+        let areas = fields.filter { $0.role == "AXTextArea" }
+        if areas.count == 1 { return areas[0] }
+        let sorted = areas.sorted { $0.w * $0.h > $1.w * $1.h }
+        guard let top = sorted.first else { return nil }
+        if let next = sorted.dropFirst().first, top.w * top.h < 1.5 * next.w * next.h { return nil }
+        return top
+    }
+
     static func isSearchField(_ e: ScreenElement) -> Bool {
         kind(e) == "field" && (e.subrole == "AXSearchField" || TextKit.normalize(e.label).contains("search"))
     }
@@ -322,9 +333,12 @@ enum ScreenRouter {
         let numbers: Set<String>
         /// The words with a short letter group and its number joined ("gw 8" gives "gw8"), or nil if nothing joins.
         let joined: [String]?
+        /// The words with each UI word changed to its other word ("refresh" gives "reload"), or nil if none changes.
+        let swapped: [[String]]
 
         init(_ words: [String]) {
             self.words = words
+            swapped = UIWords.swaps(words)
             let j = ScreenRouter.joinLetterNumber(words)
             joined = j == words ? nil : j
             key = TextKit.key(words.joined())
@@ -376,6 +390,14 @@ enum ScreenRouter {
         if s < 1, let j = said.joined {
             s = max(s, wordScore(j, label.words, mostlyNumber: label.mostlyNumber))
             if let bare = label.bare { s = max(s, wordScore(j, bare, mostlyNumber: label.bareMostlyNumber)) }
+        }
+        // Another common word for the same UI action: "refresh" for the button "Reload". It is a fuzzy match, never exact.
+        if s < UIWords.score {
+            for w in said.swapped {
+                let alt = Said(w)
+                if label.keys.contains(alt.key) { s = UIWords.score; break }
+                s = max(s, min(UIWords.score, wordScore(w, label.words, mostlyNumber: label.mostlyNumber)))
+            }
         }
         // A sound match: speech to text writes "clawed" for "Claude". It is never an exact match (R-NV-5).
         if s < soundMatch, let first = said.code.first {
@@ -495,6 +517,14 @@ enum ScreenRouter {
                 return done(.typeText(text), true, true, "focused text field")
             }
             let fields = elements.filter { kind($0) == "field" && !$0.risky }
+            // "type X" and "enter X" with no box name and no focus: the message box, not a search field.
+            // The message box is the one text area, else the clearly largest text area. "search for X" keeps the search field.
+            if p.target.isEmpty, p.verb == "type" || p.verb == "enter", let text = p.text, !text.isEmpty,
+               let box = messageBox(fields.filter { !isSearchField($0) }) {
+                options.append(RouteOption(intent: .typeInto(elementID: box.id, text: text),
+                                           label: "Type the words into the field \"\(box.label)\"", score: 1))
+                return done(.typeInto(elementID: box.id, text: text), true, true, "message box")
+            }
             let ranked = fields.map { f -> (ScreenElement, Double) in
                 let s = p.target.isEmpty ? (isSearchField(f) ? 1.0 : (f.role == "AXTextArea" ? 0.4 : 0.6)) : score(p.target, f.label)
                 return (f, s)
