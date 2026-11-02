@@ -12,6 +12,8 @@ final class Outcome {
     var focusMethod = "none"
     var nodes = 0
     var chatCheck = "unknown"
+    /// True when a chat name on screen is exactly the person's name. Typing needs it.
+    var chatExact = false
     var windowTitle = ""
     var header: [String] = []
     var typed = false
@@ -21,7 +23,7 @@ final class Outcome {
     var dictionary: [String: Any] {
         var d: [String: Any] = [
             "ok": ok, "warm": warm, "open": openMethod, "focus": focusMethod, "nodes": nodes,
-            "chat_check": chatCheck, "window_title": windowTitle, "header": Array(header.prefix(8)),
+            "chat_check": chatCheck, "chat_exact": chatExact, "window_title": windowTitle, "header": Array(header.prefix(8)),
             "typed": typed, "notes": notes,
         ]
         if let reason { d["reason"] = reason }
@@ -47,11 +49,7 @@ final class Pipeline {
         NSWorkspace.shared.urlForApplication(withBundleIdentifier: row.bundleID)
     }
 
-    func handle(_ row: AppRow, _ person: Person) -> String? {
-        guard var h = person.handles[row.id]?.trimmingCharacters(in: .whitespaces), !h.isEmpty else { return nil }
-        if row.openChat.handle == "digits" { h = h.filter(\.isNumber) }
-        return h
-    }
+    func handle(_ row: AppRow, _ person: Person) -> String? { person.handle(for: row) }
 
     func link(_ row: AppRow, _ person: Person) -> URL? {
         guard let template = row.openChat.template, let h = handle(row, person) else { return nil }
@@ -129,7 +127,7 @@ final class Pipeline {
         // 2. Open the chat with the switcher, if the row says so.
         if row.openChat.kind == "switcher" {
             guard let h = handle(row, person) else {
-                out.reason = "\(person.name) has no \(row.id) handle in people.json"
+                out.reason = "people.json skips \(row.id) for \(person.name)"
                 return out
             }
             if let failure = await openWithSwitcher(app: app, row: row, name: h) {
@@ -166,30 +164,58 @@ final class Pipeline {
 
     // MARK: - Steps
 
-    /// Returns nil on success, else the reason for the failure.
+    /// Opens the chat through the app's own search. Returns nil on success, else the reason for the failure.
     private func openWithSwitcher(app: AXUIElement, row: AppRow, name: String) async -> String? {
         guard let keys = row.openChat.keys, let combo = Keys.parse(keys) else { return "bad switcher keys in apps.json" }
+        let pick = row.openChat.pick ?? ["return"]
+        guard pick.allSatisfy({ ["down", "up", "return"].contains($0) }),
+              pick.filter({ $0 == "return" }).count <= 1,
+              pick.firstIndex(of: "return").map({ $0 == pick.count - 1 }) ?? true
+        else { return "bad pick keys in apps.json: only down, up and one return at the end" }
+
         Keys.press(combo)
         let opened = await waitUntil(timeoutMs: 1200) { self.switcherFocused(app) }
-        guard opened else { return "the switcher did not open" }
+        guard opened else { return "the search field did not get focus" }
+        // A search field can keep the last search. Select it, so that the name replaces it.
+        if !(focusedValue(app) ?? "").isEmpty, switcherFocused(app) { Keys.press(Keys.selectAll) }
 
         Keys.type(name)
         let wanted = name.lowercased()
         let typed = await waitUntil(timeoutMs: 1000) { self.focusedValue(app)?.lowercased() == wanted }
         guard typed else {
             Keys.press(Keys.escape)
-            return "the switcher field did not show the name"
+            return "the search field did not show the name"
         }
         await sleepMs(row.openChat.settleMs ?? 250)
 
-        // SAFETY (R-NV-5): press Return only in the switcher field, and only when
-        // it holds exactly the name. A message box is never in the upper part of the window.
-        guard switcherFocused(app), focusedValue(app)?.lowercased() == wanted else {
-            Keys.press(Keys.escape)
-            return "safety guard stopped the Return key"
+        for key in pick {
+            if key == "return" {
+                // SAFETY (R-NV-5): a Return in a message box sends the message.
+                guard returnIsSafe(app, wanted: wanted) else {
+                    Keys.press(Keys.escape)
+                    return "safety guard stopped the Return key"
+                }
+                Keys.press(Keys.returnKey)
+            } else if let arrow = Keys.parse(key) {
+                Keys.press(arrow)
+                await sleepMs(60)
+            }
         }
-        Keys.press(Keys.returnKey)
         return nil
+    }
+
+    /// The probe presses Return only in one of these two places:
+    /// - the search field, in the upper part of the window, when it holds exactly the name
+    /// - a row of a result list, which is not a text field
+    /// It never presses Return in a message box or on a button.
+    private func returnIsSafe(_ app: AXUIElement, wanted: String) -> Bool {
+        guard let el = AX.focused(app), let win = AX.window(app) else { return false }
+        if AX.isComposer(el, in: win) { return false }
+        if AX.textRoles.contains(AX.role(el)) {
+            return AX.isSwitcherField(el, in: win)
+                && AX.value(el)?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == wanted
+        }
+        return AX.listRoles.contains(AX.role(el))
     }
 
     private func switcherFocused(_ app: AXUIElement) -> Bool {
@@ -232,23 +258,43 @@ final class Pipeline {
         return false
     }
 
+    /// Looks for the person's name in the window title, or in the texts above the message box.
+    /// "exact" needs a text that is the name and nothing more, apart from the words "you" and "dm".
     private func checkChat(app: AXUIElement, row: AppRow, person: Person, out: Outcome) {
         guard let win = AX.window(app) else { return }
         out.windowTitle = AX.string(win, "AXTitle") ?? ""
-        var words = [person.name] + (person.display ?? [])
-        if let h = person.handles[row.id] { words.append(h) }
+        var names = [person.name]
+        if let h = person.handle(for: row) { names.append(h) }
+        let exactKeys = Set(names.map { Text.normalize($0) }.filter { $0.count >= 2 })
+        var words = names + (person.display ?? [])
         if !person.me { words += person.aliases ?? [] }
         let keys = words.map { Text.key($0) }.filter { $0.count >= 2 }
         func matches(_ s: String) -> Bool {
             let k = Text.key(s)
             return keys.contains { k.contains($0) }
         }
-        if matches(out.windowTitle) {
+        func exact(_ s: String) -> Bool {
+            // Window titles join parts with " - " or " | ". Test each part.
+            let parts = s.components(separatedBy: " - ").flatMap { $0.components(separatedBy: " | ") }
+            return parts.contains { part in
+                let tokens = Text.normalize(part).split(separator: " ").filter { $0 != "you" && $0 != "dm" }
+                return exactKeys.contains(tokens.joined(separator: " "))
+            }
+        }
+        if exact(out.windowTitle) {
+            out.chatExact = true
             out.chatCheck = "title"
             return
         }
-        out.header = AX.headerTexts(in: win)
-        if out.header.contains(where: matches) { out.chatCheck = "header" }
+        // The chat name sits above the message box, so read only that column.
+        let column = AX.focused(app).flatMap { AX.frame($0) }
+        out.header = AX.headerTexts(in: win, column: column)
+        out.chatExact = out.header.contains(where: exact)
+        if matches(out.windowTitle) {
+            out.chatCheck = "title"
+        } else if out.header.contains(where: matches) {
+            out.chatCheck = "header"
+        }
     }
 
     private func typeText(_ text: String, app: AXUIElement, row: AppRow, person: Person, mode: TypingMode, out: Outcome) async {
@@ -257,8 +303,8 @@ final class Pipeline {
             out.notes.append("focus only: not your own chat")
             return
         }
-        guard out.chatCheck == "title" || out.chatCheck == "header" else {
-            out.notes.append("no typing: chat not verified")
+        guard out.chatExact else {
+            out.notes.append("no typing: no exact chat name on screen")
             return
         }
         guard let box = AX.focused(app), let win = AX.window(app), AX.isComposer(box, in: win) else {

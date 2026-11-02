@@ -29,8 +29,9 @@ The 1 s mark is an upper limit, not the goal. The owner counts about 100 ms as i
 
 ## 3. Method
 
-- Part A: `earshot-probe bench`. Typed commands into the owner's own chats, 10 for each app (3 for Mail). Every second command starts from Finder.
-- Part B: `earshot-probe listen`. 40 spoken commands from a script, 10 for each app, then 5 in the owner's own words. Real contacts get focus only.
+- Apps: Slack, WhatsApp and Messages. Each app opens a chat through its own search: the probe types the name and picks the top result. The test data is names only.
+- Part A: `earshot-probe bench`. Typed commands into the owner's own chats, 10 for each app. Every second command starts from Finder.
+- Part B: `earshot-probe listen`. 23 spoken commands from a script: 10 for Slack, 4 for WhatsApp, 4 for Messages, then 5 in the owner's own words. Real contacts get focus only.
 - Speech: Apple SpeechTranscriber (macOS 26, on device), with fast results and the test names as context hints. The second engine is DictationTranscriber.
 
 Stages in the log, in milliseconds after the start (Part B: after key release):
@@ -41,7 +42,7 @@ Stages in the log, in milliseconds after the start (Part B: after key release):
 | `route` | Router done |
 | `keys_up` | Held modifier keys released (only if the probe had to wait) |
 | `front` | Target app has keyboard focus |
-| `chat` | Switcher Return pressed (Slack only) |
+| `chat` | Return pressed on the top search result |
 | `focus` | Message box has focus |
 | `checked` | Chat name check done |
 | `typed` | Text shows in the box |
@@ -50,7 +51,13 @@ Stages in the log, in milliseconds after the start (Part B: after key release):
 
 - Mac Mini, Apple M4 Pro, 24 GB, macOS 26.6.2.
 - Xcode with the macOS 27 SDK, Swift 6.4. Deployment target macOS 26.0.
-- Slack 4.52.178 (Electron), WhatsApp 26.42.79, Messages 26.0, Mail 16.0.
+- Slack 4.52.178 (Electron), WhatsApp 26.42.79, Messages 26.0.
+
+### 4.1 Change on 2026-11-02: names only
+
+The first plan opened WhatsApp, Messages and Mail chats through links. The links need a phone number or an email address for each person. The owner found this setup too slow. Now each app opens the chat through its own search, as Slack does. This is also closer to the final design: the owner says a name, not a number. Mail is out of E0, because a new email needs an address.
+
+The probe presses Return only on a search result (see the safety rules in [probe/README.md](../../probe/README.md)). It types text only when the chat name on screen is exactly the owner's name.
 
 ## 5. Results
 

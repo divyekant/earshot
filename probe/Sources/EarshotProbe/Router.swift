@@ -97,7 +97,8 @@ struct Router {
             let phrase = tokens.prefix(length).map(\.key).joined()
             for person in people {
                 var candidates = [person.name] + (person.aliases ?? [])
-                if let slack = person.handles["slack"] { candidates.append(slack) }
+                // A name that one app shows in place of the spoken name.
+                candidates += person.handles.values.filter { $0 != "-" && !$0.contains(where: \.isNumber) && !$0.contains("@") }
                 for candidate in candidates {
                     let score = Text.similarity(phrase, Text.key(candidate))
                     guard score >= 0.75 else { continue }

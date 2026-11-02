@@ -133,6 +133,9 @@ enum AX {
         return f.midY < w.y + 0.6 * w.h
     }
 
+    /// Roles of a result list. The probe can press Return on these, never on a text field or a button.
+    static let listRoles: Set<String> = ["AXRow", "AXCell", "AXList", "AXTable", "AXOutline"]
+
     private static let skipRoles: Set<String> = ["AXList", "AXTable", "AXOutline", "AXRow", "AXCell", "AXMenuBar", "AXMenu", "AXImage"]
 
     /// Breadth-first search of one window for the message box. It skips message
@@ -162,7 +165,9 @@ enum AX {
     }
 
     /// Reads short visible texts in the top 30 % of the window, for the chat check.
-    static func headerTexts(in window: AXUIElement, budgetMs: Int = 120, maxNodes: Int = 1500) -> [String] {
+    /// If `column` is given, it reads only texts above that element, for example above the message box.
+    /// This skips the chat list at the side, which shows the names of other chats.
+    static func headerTexts(in window: AXUIElement, column: Frame? = nil, budgetMs: Int = 120, maxNodes: Int = 1500) -> [String] {
         guard let w = frame(window) else { return [] }
         let t0 = Clock.nowNs()
         var queue: [AXUIElement] = [window]
@@ -172,13 +177,112 @@ enum AX {
             let element = queue[index]
             index += 1
             let r = role(element)
-            if let f = frame(element), f.w > 0, f.y > w.y + 0.3 * w.h { continue }
+            if let f = frame(element), f.w > 0 {
+                if f.y > w.y + 0.3 * w.h { continue }
+                if let c = column, f.x + f.w < c.x || f.x > c.x + c.w { continue }
+            }
             if r == "AXStaticText" || r == "AXTextField" || r == "AXHeading" {
+                if let f = frame(element), let c = column, f.midX < c.x || f.midX > c.x + c.w { continue }
                 for attribute in ["AXValue", "AXTitle", "AXDescription"] {
                     if let s = string(element, attribute), !s.isEmpty, s.count < 80 { out.append(s) }
                 }
             }
             if skipRoles.contains(r) { continue }
+            queue.append(contentsOf: elements(element, "AXChildren"))
+        }
+        return out
+    }
+
+    // MARK: - Read-only inspection (the inspect command)
+
+    struct MenuShortcut {
+        let path: String
+        let keys: String
+    }
+
+    /// Reads the menu bar of an app: each menu item that has a key shortcut.
+    /// It reads only. It opens no menu and presses nothing.
+    static func menuShortcuts(_ app: AXUIElement) -> [MenuShortcut] {
+        guard let bar = element(app, "AXMenuBar") else { return [] }
+        var out: [MenuShortcut] = []
+        func walk(_ element: AXUIElement, _ path: [String], depth: Int) {
+            guard depth < 4 else { return }
+            for child in elements(element, "AXChildren") {
+                let title = string(child, "AXTitle") ?? ""
+                let next = title.isEmpty ? path : path + [title]
+                if role(child) == "AXMenuItem", let char = string(child, "AXMenuItemCmdChar"), !char.isEmpty {
+                    let mods = (copy(child, "AXMenuItemCmdModifiers") as? NSNumber)?.intValue ?? 0
+                    out.append(MenuShortcut(path: next.joined(separator: " > "), keys: shortcutText(char, mods)))
+                }
+                walk(child, next, depth: depth + 1)
+            }
+        }
+        walk(bar, [], depth: 0)
+        return out
+    }
+
+    /// AXMenuItemCmdModifiers: 0 = Command only. Add 1 for Shift, 2 for Option, 4 for Control, 8 for no Command.
+    private static func shortcutText(_ char: String, _ mods: Int) -> String {
+        var parts: [String] = []
+        if mods & 4 != 0 { parts.append("ctrl") }
+        if mods & 2 != 0 { parts.append("opt") }
+        if mods & 1 != 0 { parts.append("shift") }
+        if mods & 8 == 0 { parts.append("cmd") }
+        parts.append(char.lowercased())
+        return parts.joined(separator: "+")
+    }
+
+    struct FieldInfo {
+        let role: String
+        let subrole: String
+        let label: String
+        let frame: Frame
+        let kind: String
+        let hasText: Bool
+    }
+
+    /// Lists the editable text fields of one window, with the probe's name for each.
+    /// It reads only. It reads no field text: it reports only whether a field holds text.
+    static func textFields(in window: AXUIElement, budgetMs: Int = 1500, maxNodes: Int = 6000) -> [FieldInfo] {
+        let t0 = Clock.nowNs()
+        var queue: [AXUIElement] = [window]
+        var index = 0
+        var out: [FieldInfo] = []
+        while index < queue.count, index < maxNodes, Clock.ms(since: t0) < Double(budgetMs) {
+            let element = queue[index]
+            index += 1
+            let r = role(element)
+            if textRoles.contains(r), let f = frame(element) {
+                let label = ["AXPlaceholderValue", "AXDescription", "AXTitle"]
+                    .compactMap { string(element, $0) }.first(where: { !$0.isEmpty }) ?? ""
+                let kind = isComposer(element, in: window) ? "message box"
+                    : isSwitcherField(element, in: window) ? "search field" : "other"
+                out.append(FieldInfo(role: r, subrole: subrole(element), label: String(label.prefix(40)),
+                                     frame: f, kind: kind, hasText: !(value(element) ?? "").isEmpty))
+                continue
+            }
+            if ["AXRow", "AXCell", "AXMenuBar", "AXMenu", "AXImage"].contains(r) { continue }
+            queue.append(contentsOf: elements(element, "AXChildren"))
+        }
+        return out
+    }
+
+    /// Finds short texts that contain "(you)". Chat apps mark the owner's own chat this way.
+    /// The result gives the name that the owner's own chat shows. It reads no other text.
+    static func ownChatNames(in window: AXUIElement, budgetMs: Int = 1500, maxNodes: Int = 8000) -> [String] {
+        let t0 = Clock.nowNs()
+        var queue: [AXUIElement] = [window]
+        var index = 0
+        var out: [String] = []
+        while index < queue.count, index < maxNodes, out.count < 5, Clock.ms(since: t0) < Double(budgetMs) {
+            let element = queue[index]
+            index += 1
+            for attribute in ["AXValue", "AXTitle", "AXDescription"] {
+                if let s = string(element, attribute), s.count < 60, s.lowercased().contains("(you)"), !out.contains(s) {
+                    out.append(s)
+                }
+            }
+            if ["AXMenuBar", "AXMenu", "AXImage"].contains(role(element)) { continue }
             queue.append(contentsOf: elements(element, "AXChildren"))
         }
         return out
