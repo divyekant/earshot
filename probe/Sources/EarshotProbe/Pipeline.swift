@@ -166,14 +166,18 @@ final class Pipeline {
 
     /// Opens the chat through the app's own search. Returns nil on success, else the reason for the failure.
     private func openWithSwitcher(app: AXUIElement, row: AppRow, name: String) async -> String? {
-        guard let keys = row.openChat.keys, let combo = Keys.parse(keys) else { return "bad switcher keys in apps.json" }
         let pick = row.openChat.pick ?? ["return"]
         guard pick.allSatisfy({ ["down", "up", "return"].contains($0) }),
               pick.filter({ $0 == "return" }).count <= 1,
               pick.firstIndex(of: "return").map({ $0 == pick.count - 1 }) ?? true
         else { return "bad pick keys in apps.json: only down, up and one return at the end" }
 
-        Keys.press(combo)
+        if let keys = row.openChat.keys {
+            guard let combo = Keys.parse(keys) else { return "bad switcher keys in apps.json" }
+            Keys.press(combo)
+        } else if !focusSearchField(app) {
+            return "no search field found"
+        }
         let opened = await waitUntil(timeoutMs: 1200) { self.switcherFocused(app) }
         guard opened else { return "the search field did not get focus" }
         // A search field can keep the last search. Select it, so that the name replaces it.
@@ -202,6 +206,15 @@ final class Pipeline {
             }
         }
         return nil
+    }
+
+    /// For an app with no search shortcut: focus the search field through accessibility, else click it.
+    private func focusSearchField(_ app: AXUIElement) -> Bool {
+        guard let win = AX.window(app), let field = AX.findSearchField(in: win) else { return false }
+        if AX.set(field, "AXFocused", kCFBooleanTrue), AX.same(AX.focused(app), field) { return true }
+        guard let f = AX.frame(field) else { return false }
+        Mouse.click(CGPoint(x: f.midX, y: f.midY))
+        return true
     }
 
     /// The probe presses Return only in one of these two places:

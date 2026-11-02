@@ -151,11 +151,15 @@ enum Commands {
 
     /// Reads the shortcuts, windows and text fields of each app. It presses no key and types nothing.
     /// --launch opens an app that is not running, in the background. --all shows every shortcut.
+    /// --front brings each app to the front first, so that macOS shows its window. At the end it
+    /// brings back the app that was in front before.
     static func inspect(_ args: [String]) async throws -> Int32 {
         guard AX.trusted(prompt: false) else { throw ProbeError("Accessibility is off for this terminal") }
         let apps = try Config.loadApps()
         let wanted = positional(args)
-        let launch = args.contains("--launch"), all = args.contains("--all")
+        let launch = args.contains("--launch"), all = args.contains("--all"), front = args.contains("--front")
+        let before = NSWorkspace.shared.frontmostApplication
+        defer { if front { before?.activate() } }
         let words = ["search", "find", "new", "chat", "conversation", "go to", "jump", "switch", "message", "compose", "quick"]
         for row in apps where wanted.isEmpty || wanted.contains(row.id) {
             print("== \(row.name) (\(row.bundleID))")
@@ -176,7 +180,12 @@ enum Commands {
             }
             let el = AX.appElement(app.processIdentifier)
             if row.electron == true { AX.set(el, "AXManualAccessibility", kCFBooleanTrue) }
+            if front {
+                let ok = await Pipeline(apps: apps).bringToFront(bundleID: row.bundleID)
+                print("   brought to the front: \(ok ? "yes" : "no")")
+            }
             _ = await waitUntil(timeoutMs: 3000) { !AX.elements(el, "AXWindows").isEmpty }
+            await sleepMs(front ? 500 : 0)
 
             let shortcuts = AX.menuShortcuts(el).filter { s in all || words.contains { s.path.lowercased().contains($0) } }
             print("   Shortcuts\(all ? "" : " (search, chat and message items)"):")
@@ -185,7 +194,13 @@ enum Commands {
 
             for (i, win) in AX.elements(el, "AXWindows").prefix(3).enumerated() {
                 guard let f = AX.frame(win) else { continue }
-                print("   Window \(i + 1): \(Int(f.w)) x \(Int(f.h))")
+                print("   Window \(i + 1): \(Int(f.w)) x \(Int(f.h)), title \"\(AX.string(win, "AXTitle") ?? "")\"")
+                if let search = AX.findSearchField(in: win), let sf = AX.frame(search) {
+                    let label = AX.string(search, "AXPlaceholderValue") ?? AX.string(search, "AXDescription") ?? ""
+                    print("     search field for the probe: \"\(label.prefix(40))\" at y \(Int(((sf.midY - f.y) / max(f.h, 1) * 100).rounded()))%")
+                } else {
+                    print("     search field for the probe: none found")
+                }
                 for field in AX.textFields(in: win) {
                     let x = Int(((field.frame.x - f.x) / max(f.w, 1) * 100).rounded())
                     let y = Int(((field.frame.midY - f.y) / max(f.h, 1) * 100).rounded())
