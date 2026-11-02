@@ -90,15 +90,18 @@ final class AppController: ObservableObject {
                                    apps: { store.apps }, allNames: { await Self.chatNames(names, apps: store.apps, notReady: { lastNotReady.value = $0 }) },
                                    frontBundleID: { NSWorkspace.shared.frontmostApplication?.bundleIdentifier })
         pipeline.namesNotReady = { lastNotReady.value }
+        let frontTracker = FrontTracker(own: Bundle.main.bundleIdentifier)
+        pipeline.ownBundleID = Bundle.main.bundleIdentifier
+        pipeline.restoreFront = { await frontTracker.restore() }
         let menuIndex = MenuIndex()
         let menus = MenuCache(read: { await menuIndex.refresh(bundleID: $0) })
         self.menus = menus
         pipeline.menus = { menus.cached($0) }
         menuObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: nil) { note in
-            if let id = (note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?.bundleIdentifier {
-                menus.refresh(id)
-            }
+            guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
+            frontTracker.activated(app)
+            if let id = app.bundleIdentifier { menus.refresh(id) }
         }
         if let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier { menus.refresh(front) }
         applyJev()
