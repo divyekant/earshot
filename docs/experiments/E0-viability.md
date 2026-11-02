@@ -1,6 +1,6 @@
 # E0: viability probe ("one sentence to the box")
 
-Status: built, not run yet. Plan date: 2026-11-01.
+Status: run on 2026-11-02. Result: Go, with changes (section 6). Plan date: 2026-11-01.
 
 E0 replaces step 1 of Phase 0 in [DESIGN.md](../DESIGN.md). It measures the numbers that decide viability directly, with no setup of other projects.
 
@@ -130,10 +130,45 @@ What E0 learned about WhatsApp (version 26.42.79, a Catalyst app):
 - The chat name is the description of the header button (identifier `NavigationBar_HeaderViewButton`), at 2 % of the window height.
 - A search for a name also lists message hits. If no chat has that name, the top result can be another chat. A later design needs a check of the result type before Return.
 
-### 5.5 Part B
+### 5.5 Part B: voice (2026-11-02)
 
-Not run yet.
+The owner spoke 19 lines. The probe ran on the owner's Mac from the remote session. Speech engine: SpeechTranscriber, en_US. Log: `e0-listen-20261101-172814.jsonl`. Nothing was sent. Text went only into the owner's own chats.
+
+The first start heard no key press: the Control-Option-E hot key never reached the probe. A restart after the microphone prompt fixed it. The cause is not known.
+
+| Target | Reach | Median, key release to focused box | Slowest |
+| --- | --- | --- | --- |
+| Slack, own DM | 5 of 5 | 592 ms | 846 ms |
+| Slack, prakash | 5 of 5 | 540 ms | 623 ms |
+| Slack, all 11 (with "Open Slack") | 11 of 11 | 571 ms | 846 ms |
+| Messages, own chat | 2 of 2 | 986 ms and 1271 ms | 1271 ms |
+| Messages, prakash | 0 of 2 | - | - |
+| All scored commands | 13 of 16 | 582 ms | - |
+
+Hearing: 14 of 14 scored lines routed to the correct app and person. Speech to final text took 23 to 101 ms (median 52 ms). "iMessage" was heard once as "I message"; the router still matched it.
+
+Stages of a voice command to Slack (median, ms after key release): text 52, front 75, chat 470, focus 571. The chat step (Command-K, type the name, wait 250 ms, Return) is about 400 ms of the total.
+
+Findings:
+- Held keys: in 7 of 16 commands, the probe waited 63 to 467 ms for the owner to release Control and Option after E. This wait is part of the total. In Messages #4 it was 467 ms of 1271 ms.
+- Messages, prakash: hearing and routing were correct, but no chat name was on screen. The "To:" suggestion for "prakash" probably did not open his chat. Two runs only.
+- Free lines show what the owner wants next: "iMessage Udita" and "Open Kavya Rao" (a name, not in the test list), and "Open Cloud" (probably "Open Claude", an app not in the table). "Open Slack" worked in 66 ms.
 
 ## 6. Decision
 
-Not made yet.
+| Check | Result | Mark |
+| --- | --- | --- |
+| Reach | Slack 21 of 21 (Part A and B). Messages, own chat 12 of 12. Messages, a contact 0 of 2. | Go for Slack. Change for Messages contacts. |
+| Speed | Voice median 582 ms. Slack 571 ms. Messages 731 ms typed, 986 and 1271 ms by voice. | Go. Messages needs work. |
+| Hearing | 14 of 14 | Go |
+| Safety | 0 sent. Text only in the owner's own chats. | Go |
+| Worth it | Asked the owner on 2026-11-02. | Open |
+
+Result: **Go, with changes**. One spoken sentence puts the cursor in the correct Slack box in about 0.6 s, with on-device speech and no app script. WhatsApp is out of E0 (5.4).
+
+Changes before Phase 1:
+1. Names: match the spoken name against Contacts and each app's own chat list, not a hand-made list. The owner used names that were not in the list.
+2. Speed toward 100 ms: start to open the app while the owner still holds the keys, replace the fixed 250 to 300 ms waits after typing the name with a check of the result list, and test a Slack link to a known chat in place of the switcher.
+3. Messages: find out why the "To:" field did not open a contact's chat.
+4. Add "open <any app>".
+5. Delete test text through the accessibility value, not Command-A and Delete (Slack kept the old lines).
