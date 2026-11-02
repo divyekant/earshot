@@ -1,4 +1,5 @@
 import EarshotActions
+import EarshotDiscovery
 @testable import EarshotApp
 import EarshotCore
 import EarshotRouter
@@ -181,5 +182,33 @@ final class CommandPipelineTests: XCTestCase {
         XCTAssertTrue(runner.runs.isEmpty)
         let ran = await p.test("open notes", runActions: true)
         XCTAssertEqual(ran.outcome?.note, "dry run")
+    }
+}
+
+final class NoteRecorder: FeedbackSink {
+    var shown: [(String, Bool)] = []
+    func show(_ text: String, ok: Bool) { shown.append((text, ok)) }
+    func hide() {}
+}
+
+final class DiscoverHookTests: XCTestCase {
+    func testAccessibilityOffShowsTheErrorAndKeepsTheRows() async {
+        let note = NoteRecorder()
+        let current = [Fixture.apps[0]]
+        let rows = await AppController.discover(refresh: { throw DiscoveryError.accessibilityOff }, current: current, feedback: note)
+        XCTAssertEqual(rows, current)
+        XCTAssertEqual(note.shown.first?.0, "Discover apps: Turn on Accessibility for earshot first")
+        XCTAssertEqual(note.shown.first?.1, false)
+    }
+
+    func testSearchRule() {
+        let sureChat = RouteResult(intent: .openChat(appID: "slack", target: "Prakash", text: nil), confidence: 0.95, tier: .rules, ms: 0)
+        let unsureChat = RouteResult(intent: .openChat(appID: "slack", target: "Prakash", text: nil), confidence: 0.5, tier: .rules, ms: 0)
+        let app = RouteResult(intent: .openApp(appID: "slack"), confidence: 0.9, tier: .rules, ms: 0)
+        XCTAssertFalse(CommandPipeline.needsAppSearch("Slack Prakash", sureChat))
+        XCTAssertTrue(CommandPipeline.needsAppSearch("Slack Prakash", unsureChat))
+        XCTAssertTrue(CommandPipeline.needsAppSearch("Slack Ravi", app))
+        XCTAssertFalse(CommandPipeline.needsAppSearch("Slack me running late", app))
+        XCTAssertFalse(CommandPipeline.needsAppSearch("open my own chat in Slack", unsureChat))
     }
 }
