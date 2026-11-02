@@ -747,6 +747,38 @@ final class EarshotRouterTests: XCTestCase {
         }
     }
 
+    // MARK: - Bare command words and lead fillers (always-on trial)
+
+    func testBareCommandWordNeverMatchesATarget() async {
+        let menus = MenuElements.elements([MenuEntry(path: ["Window", "Move & Resize", "Top"]),
+                                           MenuEntry(path: ["Window", "Move & Resize", "Bottom"]),
+                                           MenuEntry(path: ["File", "Open…"])])
+        let ctx = liveContext(menus + [Fixtures.el("e1", "AXButton", "Tap", y: 10)])
+        for s in ["type.", "Type", "open", "click", "click on", "focus", "go to", "Yeah, let's type."] {
+            let r = await route(s, ctx)
+            XCTAssertEqual(r.intent, .none, "\(s): \(r.why)")
+            XCTAssertEqual(r.awaitsText, s.lowercased().contains("type"), s)
+        }
+        let bare = await route("type.", ctx)
+        XCTAssertEqual(bare.why, "type with no text")
+        // "type" with text still types. Nothing else sets awaitsText.
+        let typed = await route("type hello there", boxes())
+        XCTAssertEqual(typed.intent, .typeText("hello there"))
+        XCTAssertFalse(typed.awaitsText)
+        // With no verb, a sound match on a menu item is not enough.
+        let top = await route("tup", ctx)
+        XCTAssertNotEqual(top.intent, .click(elementID: "m:Window>Move & Resize>Top"), top.why)
+        // "go back" and "scroll" are still commands.
+        await expect("go back", .back, ctx)
+    }
+
+    func testLeadFillersAndTheBeforeAnApp() async {
+        await expect("Yeah, let's open the Slack", .openApp(appID: "slack"))
+        await expect("okay so open Slack", .openApp(appID: "slack"))
+        await expect("um, let's open the Notes app", .openApp(appID: "notes"))
+        XCTAssertEqual(CommandRouter.dropLeadFillers("Yeah, let's open the Slack"), "open the Slack")
+    }
+
     func testE2NoCommand() async {
         let r = await route("what a lovely day", news)
         XCTAssertEqual(r.intent, .none)

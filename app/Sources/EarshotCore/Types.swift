@@ -128,10 +128,14 @@ public struct RouteResult: Sendable {
     public var why: String
     /// Other intents that the router also considered, best first. The feedback note can offer them.
     public var alternatives: [Intent]
+    /// True only for a bare "type" with no text (intent .none). The app can then type the next turn
+    /// into the focused text field. Nothing else sets it.
+    public var awaitsText: Bool
 
-    public init(intent: Intent, confidence: Double, tier: RouterTier, ms: Double, why: String = "", alternatives: [Intent] = []) {
+    public init(intent: Intent, confidence: Double, tier: RouterTier, ms: Double, why: String = "", alternatives: [Intent] = [],
+                awaitsText: Bool = false) {
         self.intent = intent; self.confidence = confidence; self.tier = tier; self.ms = ms
-        self.why = why; self.alternatives = alternatives
+        self.why = why; self.alternatives = alternatives; self.awaitsText = awaitsText
     }
 }
 

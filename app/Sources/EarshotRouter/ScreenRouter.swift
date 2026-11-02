@@ -61,6 +61,8 @@ enum ScreenRouter {
                                             "button", "tab", "headline", "hit", "one"]
 
     static let strongMatch = 0.8
+    /// The score that a menu item needs when the owner says no verb. Above a sound match (0.82).
+    static let noVerbMenuMatch = 0.9
     static let margin = 0.08
     static let noMatch = 0.5
     static let shortListSize = 8
@@ -609,9 +611,10 @@ enum ScreenRouter {
             }
             return done(.none, true, true, p.isCommand ? "no label matches" : "no command word")
         }
-        // With no verb, only a menu item can match, and only a strong match: "copy", "export", "mute".
+        // With no verb, only a menu item can match, and only a near-exact match: "copy", "export", "mute".
+        // A sound match or a fuzzy match on one word is not enough: "type" sounds like the item "Top".
         let pool = p.isCommand ? scored : scored.filter { isMenu($0.0) }
-        guard let top = pool.first, p.isCommand || top.1 >= strongMatch else {
+        guard let top = pool.first, p.isCommand || top.1 >= noVerbMenuMatch else {
             return done(.none, first.1 < strongMatch, false, "a label matches, but no command word")
         }
         // Exact: the spoken words are the label, or the label with no status part, on letters and digits only.
