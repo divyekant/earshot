@@ -25,6 +25,34 @@ let extraLinker: [String: [LinkerSetting]] = [
     ],
 ]
 
+// The targets are built in parts with explicit types. As one expression, the list took too long to type-check
+// for Swift 6.1 (Command Line Tools on an Intel Mac): "unable to type-check this expression in reasonable time".
+var targets: [Target] = [
+    .target(name: "EarshotCore", path: "Sources/EarshotCore"),
+    .testTarget(name: "EarshotCoreTests", dependencies: ["EarshotCore"], path: "Tests/EarshotCoreTests"),
+]
+let moduleDependencies: [Target.Dependency] = modules.map { .target(name: $0) }
+let appDependencies: [Target.Dependency] = ["EarshotCore"] + moduleDependencies
+targets.append(.executableTarget(name: "EarshotApp", dependencies: appDependencies, path: "Sources/EarshotApp"))
+// T7: tests of the command path in EarshotApp, with fake engines and runners.
+let appTestDependencies: [Target.Dependency] = ["EarshotApp", "EarshotCore"] + moduleDependencies
+targets.append(.testTarget(name: "EarshotAppTests", dependencies: appTestDependencies, path: "Tests/EarshotAppTests"))
+// transcribe.cpp 0.3.1 (MIT), prebuilt for Apple platforms. SwiftPM checks the SHA-256 sum of the file.
+targets.append(.binaryTarget(
+    name: "TranscribeCpp",
+    url: "https://github.com/handy-computer/transcribe.cpp/releases/download/v0.3.1/TranscribeCpp.xcframework.zip",
+    checksum: "9fbd7fa74bf2cf903ee291d3fa98a02c5bd1cf07dda6adbc4f64c3a68be287ca"
+))
+for name in modules {
+    let deps: [Target.Dependency] = ["EarshotCore"] + (extraDependencies[name] ?? [])
+    let linker: [LinkerSetting] = extraLinker[name] ?? []
+    targets.append(.target(name: name, dependencies: deps, path: "Sources/\(name)", linkerSettings: linker))
+}
+for name in modules {
+    let deps: [Target.Dependency] = [.target(name: name), "EarshotCore"]
+    targets.append(.testTarget(name: "\(name)Tests", dependencies: deps, path: "Tests/\(name)Tests"))
+}
+
 let package = Package(
     name: "earshot",
     platforms: [.macOS("14.0")],
@@ -32,27 +60,6 @@ let package = Package(
         .executable(name: "earshot", targets: ["EarshotApp"]),
         .library(name: "EarshotCore", targets: ["EarshotCore"]),
     ],
-    targets: [
-        .target(name: "EarshotCore", path: "Sources/EarshotCore"),
-        .testTarget(name: "EarshotCoreTests", dependencies: ["EarshotCore"], path: "Tests/EarshotCoreTests"),
-        .executableTarget(name: "EarshotApp", dependencies: ["EarshotCore"] + modules.map { .target(name: $0) },
-                          path: "Sources/EarshotApp"),
-        // T7: tests of the command path in EarshotApp, with fake engines and runners.
-        .testTarget(name: "EarshotAppTests", dependencies: ["EarshotApp", "EarshotCore"] + modules.map { .target(name: $0) },
-                    path: "Tests/EarshotAppTests"),
-    ]
-    + [
-        // transcribe.cpp 0.3.1 (MIT), prebuilt for Apple platforms. SwiftPM checks the SHA-256 sum of the file.
-        .binaryTarget(
-            name: "TranscribeCpp",
-            url: "https://github.com/handy-computer/transcribe.cpp/releases/download/v0.3.1/TranscribeCpp.xcframework.zip",
-            checksum: "9fbd7fa74bf2cf903ee291d3fa98a02c5bd1cf07dda6adbc4f64c3a68be287ca"
-        ),
-    ]
-    + modules.map {
-        .target(name: $0, dependencies: ["EarshotCore"] + (extraDependencies[$0] ?? []), path: "Sources/\($0)",
-                linkerSettings: extraLinker[$0] ?? [])
-    }
-    + modules.map { .testTarget(name: "\($0)Tests", dependencies: [.target(name: $0), "EarshotCore"], path: "Tests/\($0)Tests") },
+    targets: targets,
     swiftLanguageModes: [.v5]
 )
