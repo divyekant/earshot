@@ -54,7 +54,7 @@ A native menu-bar app also uses less memory than Electron.
 
 ## D-7. Do not use computer-use agents or Cua Driver
 
-The owner asked about "CUA" on 2026-11-02. The facts below come from the trycua/cua README and the cua.ai documentation. Nobody ran Cua Driver on this Mac.
+The owner asked about "CUA" on 2026-11-02. The facts below come from the trycua/cua README and the cua.ai documentation. Later the same day, E4 ran Cua Driver on this Mac (see the end of this section).
 
 | Option | Result | Reason |
 |---|---|---|
@@ -72,6 +72,8 @@ Cua Driver is the only part of trycua/cua that operates the real Mac. These are 
 - If a model controls it, the model can press Return. Return sends the message in Slack, WhatsApp and Messages (R-NV-5).
 
 **Decision:** Keep the direct Accessibility approach (DESIGN.md, section 3.5). The E0 probe uses it, and it reached the Slack text box in a median of 466 ms (docs/experiments/E0-viability.md). Cua Driver reads the accessibility state again after each action to make sure that the change occurred. E0 already does a similar check: it types text only when the chat name on the screen is correct. Keep this check in the final design.
+
+**E4 (2026-11-02):** E4 ran Cua Driver 0.38 on this Mac, with the same glue program as a direct AX executor ([experiments/E4-hex-cua.md](experiments/E4-hex-cua.md)). A Cua click took 1.8 to 2.2 s. The AX click took 318 to 333 ms. A bare Cua call took 15 ms, so the cost is in the action tools. One Cua click reported success, but the page did not change. Cua shows no keyboard focus, so a chat step cannot prove where its text goes (R-NV-5). The decision stands.
 
 ## D-8. Do not use Clicky, HeyClicky or LocalClicky
 
