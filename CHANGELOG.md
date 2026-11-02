@@ -22,6 +22,7 @@ The first public release. earshot is early software. Expect bugs and changes to 
 - Open a web address by voice (R-NV-7).
 - Names matched by sound, so that a misheard name still finds the correct chat (R-NV-2, R-CL-1).
 - Jev as an optional tier 2 of the router: off by default, text only, 1 s budget (R-MD-1, D-9).
+- Optional click fallback: if a click finds no target, earshot can send one picture of the front window to Jev and click the item that Jev picks. It is off by default and a separate setting (R-MD-1, D-10).
 - Open-source documents: license (MIT), contribution guide, code of conduct, security policy, third-party notices.
 
 ### Security
