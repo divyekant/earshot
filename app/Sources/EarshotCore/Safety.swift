@@ -91,7 +91,8 @@ public enum SafetyPolicy {
             if let w = sensitivePathWords.first(where: { path.contains($0) }) { return "the address has \"\(w)\"" }
         }
         if elements.contains(where: { $0.subrole == "AXSecureTextField" }) { return "a password field" }
-        for e in elements where e.role != "AXLink" {
+        // Menu items are not on the page: a menu "Passwords…" does not make every page a sign-in page.
+        for e in elements where e.role != "AXLink" && !MenuElements.isMenu(e) {
             let l = e.label.lowercased()
             if sensitiveLabelWords.contains(where: { l.contains($0) }) { return "the label \"\(e.label)\"" }
         }

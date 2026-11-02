@@ -59,6 +59,9 @@ final class AppController: ObservableObject {
     private var engineWhy = ""
     /// Reads the name cache at start and every 8 minutes (NameIndex.maxAge is 10 minutes). Read only.
     private var warmer: NameWarmer?
+    /// The menu items of the front app. Read when an app comes to the front and after each command, never in a command.
+    let menus: MenuCache
+    private var menuObserver: NSObjectProtocol?
 
     init() {
         let store = self.store
@@ -74,6 +77,17 @@ final class AppController: ObservableObject {
                                    apps: { store.apps }, allNames: { await Self.chatNames(names, apps: store.apps, notReady: { lastNotReady.value = $0 }) },
                                    frontBundleID: { NSWorkspace.shared.frontmostApplication?.bundleIdentifier })
         pipeline.namesNotReady = { lastNotReady.value }
+        let menuIndex = MenuIndex()
+        let menus = MenuCache(read: { await menuIndex.refresh(bundleID: $0) })
+        self.menus = menus
+        pipeline.menus = { menus.cached($0) }
+        menuObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: nil) { note in
+            if let id = (note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?.bundleIdentifier {
+                menus.refresh(id)
+            }
+        }
+        if let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier { menus.refresh(front) }
         pipeline.feedback = feedback
         pipeline.log = ActivityLog(store: store)
         pipeline.showFeedback = settings.showFeedback
@@ -169,14 +183,18 @@ final class AppController: ObservableObject {
     private func startInput() {
         input?.stop()
         let input = InputTriggers.make(settings)
-        let pipeline = self.pipeline
+        let pipeline = self.pipeline, menus = self.menus
         input.onStart = { [weak self] in
             if let problem = pipeline.begin() { self?.feedback.show(problem, ok: false) }
         }
         input.onCancel = { _ in Task { await pipeline.cancel() } }
         input.onStop = { [weak input] in
             let mode = input?.current ?? .hold
-            Task { await pipeline.finish(mode: mode) }
+            Task {
+                await pipeline.finish(mode: mode)
+                // A command can change which items are enabled ("Copy" after "select all"). Read again for the next one.
+                if let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier { menus.refresh(front) }
+            }
         }
         pipeline.pauseAlwaysOn = { [weak input] paused in
             DispatchQueue.main.async { (input?.alwaysOn as? AlwaysOnTrigger)?.setPaused(paused) }

@@ -41,6 +41,8 @@ final class CommandPipeline {
     var gate = ForMeGate()
     /// The number of chat apps whose names were not ready within the names budget in this command.
     var namesNotReady: () -> Int = { 0 }
+    /// The cached menu items of an app as screen elements (MenuCache.cached). It must not read: a menu read takes up to 1 s.
+    var menus: (String) -> [ScreenElement] = { _ in [] }
     private var lastCommandAt: Date?
     /// The speech engine's line for the log of the current command (engine, why, audio length).
     private var speechSummary = ""
@@ -106,7 +108,8 @@ final class CommandPipeline {
         let notReady = namesNotReady()
         stages["screen"] = screenMs
         stages["context"] = contextClock.ms
-        var context = RouteContext(apps: rows, names: known, frontBundleID: frontBundleID(), screen: screen)
+        let front = frontBundleID()
+        var context = RouteContext(apps: rows, names: known, frontBundleID: front, screen: withMenus(screen, front: front))
 
         let routeClock = Stopwatch()
         var result = await router.route(text, context: context)
@@ -163,7 +166,7 @@ final class CommandPipeline {
         speechSummary = ""  // a typed command has no speech
         let rows = apps().filter { $0.approved && $0.enabled }
         var context = RouteContext(apps: rows, names: await allNames(), frontBundleID: frontBundleID())
-        context.screen = await actions.screen()
+        context.screen = withMenus(await actions.screen(), front: context.frontBundleID)
         let result = await router.route(text, context: context)
         guard runActions, result.confidence >= SafetyPolicy.minimumConfidence, result.intent != .none else {
             return TestReport(heard: text, route: result)
@@ -188,13 +191,25 @@ final class CommandPipeline {
         return record
     }
 
+    /// The screen with the menu items of its app added, so that menu commands use the same matcher (R-MT-1).
+    /// With no screen read, a snapshot of the menu items alone.
+    func withMenus(_ screen: ScreenSnapshot?, front: String?) -> ScreenSnapshot? {
+        guard let app = screen?.bundleID ?? front else { return screen }
+        let items = menus(app)
+        guard !items.isEmpty else { return screen }
+        var s = screen ?? ScreenSnapshot(bundleID: app, windowTitle: "", elements: [])
+        s.elements += items
+        return s
+    }
+
     /// One line about the screen for the log: the front app, the host (no path, no query) and the element count.
     /// A sign-in, code or payment page shows only "sensitive".
     static func screenSummary(_ screen: ScreenSnapshot?, front: String?) -> String {
         guard let s = screen else { return "screen: none, front \(front ?? "unknown")" }
         if SafetyPolicy.sensitive(url: s.url, elements: s.elements) != nil { return "screen: \(s.bundleID), sensitive" }
         let host = s.url.flatMap { URL(string: $0)?.host }.map { " \($0)" } ?? ""
-        return "screen: \(s.bundleID)\(host), \(s.elements.count) elements"
+        let menu = s.elements.filter(MenuElements.isMenu).count
+        return "screen: \(s.bundleID)\(host), \(s.elements.count - menu) elements" + (menu > 0 ? ", \(menu) menu items" : "")
     }
 
     /// The app search rule (E1, first live test).
