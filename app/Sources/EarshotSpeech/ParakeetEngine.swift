@@ -7,7 +7,7 @@ import Foundation
 /// It reads the model file in place (for example the GGUF file of Hex) and keeps it loaded:
 /// the load takes about 14 s and about 890 MB (E2, section 5.4).
 /// The model weights are CC BY 4.0 (NVIDIA Parakeet). Credit them in the app's About text.
-public final class ParakeetEngine: SpeechEngine, SpeechTimingReporting, @unchecked Sendable {
+public final class ParakeetEngine: TurnSpeechEngine, @unchecked Sendable {
     public static let engineID = "parakeet"
     public let id = ParakeetEngine.engineID
     public let modelPath: String

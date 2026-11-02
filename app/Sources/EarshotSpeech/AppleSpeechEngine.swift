@@ -3,10 +3,14 @@ import EarshotCore
 import Foundation
 import Speech
 
+#if compiler(>=6.2)   // Swift 6.2 comes with the macOS 26 SDK, which has SpeechTranscriber.
+
 /// Apple SpeechTranscriber, on the Mac (R-MD-1, E0). It needs no model file from the owner:
 /// macOS downloads the speech model for the locale one time.
-public final class AppleSpeechEngine: SpeechEngine, SpeechTimingReporting, @unchecked Sendable {
-    public static let engineID = "apple"
+/// It needs macOS 26. On older macOS, and if it does not load, `AppleSpeech.make` uses DictationEngine.
+@available(macOS 26, *)
+public final class AppleSpeechEngine: TurnSpeechEngine, @unchecked Sendable {
+    public static let engineID = AppleSpeech.engineID
     public let id = AppleSpeechEngine.engineID
     public let locale: Locale
     public var onPartial: (@Sendable (String) -> Void)?
@@ -198,3 +202,5 @@ public final class AppleSpeechEngine: SpeechEngine, SpeechTimingReporting, @unch
         }
     }
 }
+
+#endif
