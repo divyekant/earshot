@@ -23,6 +23,8 @@ mic ─► [1 Audio gate] ─► [2 Speech to text] ─► [3 "For me?" gate] �
 | **Total to focused box** | **about 1 s** |
 | Voice click (label match) | under 500 ms total |
 
+E0 measured these stages on this Mac (see [experiments/E0-viability.md](experiments/E0-viability.md), sections 5 and 6). Voice commands: median 582 ms from key release to focused box. Final transcript: 23 to 101 ms. Slack switcher (Command-K, name, Return): about 400 ms, including a fixed 250 ms wait. Focus after the chat opens: about 100 ms. The owner's goal is about 100 ms in total, so the next work is on the switcher step and on the wait for held keys.
+
 ## 3. Components
 
 ### 3.1 Audio gate (R-ON-1, R-ON-3)
@@ -39,7 +41,7 @@ Swift SDKs: FluidAudio and speech-swift bundle these parts.
 
 | Option | Use when |
 |---|---|
-| Apple SpeechTranscriber (Speech framework, macOS 26 and later) | First choice for English. It is built into macOS and runs on the device. macOS manages the model, so earshot ships no speech model. It accepts name hints (`AnalysisContext.contextualStrings`). E0 measures it. |
+| Apple SpeechTranscriber (Speech framework, macOS 26 and later) | First choice for English. It is built into macOS and runs on the device. macOS manages the model, so earshot ships no speech model. It accepts name hints (`AnalysisContext.contextualStrings`). E0: 14 of 14 commands heard correctly, final text 23 to 101 ms after key release. |
 | Parakeet TDT 0.6B v3 (CoreML through FluidAudio) | English only. It does not support Hindi. |
 | Nemotron-3.5-ASR-Streaming-0.6B (speech-swift) | English and Hindi. Hindi word error rate is 8.0 at 160 ms chunks (model card). Test the Hinglish fine-tunes. |
 | Moonshine v2 small (MIT, 123M) | Fastest English-only option. The vendor reports 73 ms. |
@@ -86,6 +88,8 @@ free-mac-voice (MIT) already uses the same tiers. Read its code before you write
 ```
 
 Verify the deep-link formats for WhatsApp, Messages and Discord. The research did not confirm them.
+
+E0 used each app's own search in place of links, so the owner gives names only. Slack: Command-K. Messages: File > New Message (Command-N) and the "To:" field. WhatsApp (left out of E0): Command-F; the search also lists message hits, so a later design must check the type of the top result before Return.
 
 **Generic focus.** Run a depth-limited accessibility search of the focused window. Find the lowest and widest editable element (`AXTextArea`, `AXTextField`, or an editable web area), then focus it. For Electron apps, first set `AXManualAccessibility`, then poll `AXChildren` for up to 200 ms. Never walk the full tree of an Electron app.
 
