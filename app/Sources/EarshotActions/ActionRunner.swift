@@ -103,7 +103,7 @@ public final class EarshotActionRunner: ActionRunner {
     }
 
     /// Brings the app to the front. With `link`, the app opens the link and comes to the front with it.
-    private func bringToFront(_ e: AppEntry, link: URL?, watch: Stopwatch) async -> (Fronted?, String?) {
+    private func bringToFront(_ e: AppEntry, link: URL?, waitActive: Bool = true, watch: Stopwatch) async -> (Fronted?, String?) {
         guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: e.bundleID) else { return (nil, "\(e.name) is not installed") }
         let warm = running(e.bundleID) != nil
         let config = NSWorkspace.OpenConfiguration()
@@ -120,11 +120,14 @@ public final class EarshotActionRunner: ActionRunner {
         guard front, let pid = running(e.bundleID)?.processIdentifier else { return (nil, "\(e.name) did not come to the front") }
         watch.mark("front")
         let app = AX.appElement(pid)
-        // Keys go to the key window. Wait until the app is active and has a focused window, then press at once.
-        _ = await waitUntil(timeoutMs: 500, intervalMs: SwitcherTiming.pollMs) {
-            (self.running(e.bundleID)?.isActive ?? false) && AX.element(app, "AXFocusedWindow") != nil
+        // Keys go to the key window. If a key or a type step follows, wait until the app is active and has a
+        // focused window, then press at once. "Open <app>" alone ends here.
+        if waitActive {
+            _ = await waitUntil(timeoutMs: 500, intervalMs: SwitcherTiming.pollMs) {
+                (self.running(e.bundleID)?.isActive ?? false) && AX.element(app, "AXFocusedWindow") != nil
+            }
+            watch.mark("active")
         }
-        watch.mark("active")
         if e.electron { AX.set(app, "AXManualAccessibility", kCFBooleanTrue) }
         return (Fronted(app: app, pid: pid), nil)
     }
@@ -148,7 +151,7 @@ public final class EarshotActionRunner: ActionRunner {
         let (found, why) = approvedEntry(appID, context)
         guard let e = found else { return fail(why ?? "no app") }
         await waitForKeysUp(watch)
-        let (fronted, error) = await bringToFront(e, link: nil, watch: watch)
+        let (fronted, error) = await bringToFront(e, link: nil, waitActive: false, watch: watch)
         return fronted == nil ? fail(error ?? "no front") : ok("→ \(e.name)")
     }
 
@@ -472,9 +475,9 @@ public final class EarshotActionRunner: ActionRunner {
         guard let pair = found else { return fail(why ?? "no element") }
         let (read, item) = pair
         guard let h = item.handle else { return fail("\(id) is not a text field") }
-        let sensitive = SafetyPolicy.sensitive(url: read.snapshot.url, elements: read.snapshot.elements)
+        let sensitive = SafetyPolicy.sensitive(url: read.snapshot.url, elements: pageElements(read))
         if let block = ActionRules.typeIntoBlock(role: item.element.role, subrole: item.element.subrole, sensitive: sensitive) { return fail(block) }
-        if read.web, read.areaPath != "hit test" { return fail("not typed: the page can be a hidden tab") }
+        if item.inPage, read.web, read.areaPath != "hit test" { return fail("not typed: the page can be a hidden tab") }
         await waitForKeysUp(watch)
         let app = AX.appElement(read.pid)
         func inField() -> Bool { AX.same(AX.focused(app), h) || AX.elements(h, "AXChildren").contains { AX.same(AX.focused(app), $0) } }
@@ -524,10 +527,11 @@ public final class EarshotActionRunner: ActionRunner {
         guard let pair = found else { return fail(why ?? "no element") }
         let (read, item) = pair
         let label = item.element.label
-        let sensitive = SafetyPolicy.sensitive(url: read.snapshot.url, elements: read.snapshot.elements)
+        let pageRules = ActionRules.pageRulesApply(kind: item.kind, inPage: item.inPage)
+        let sensitive = pageRules ? SafetyPolicy.sensitive(url: read.snapshot.url, elements: pageElements(read)) : nil
         if let block = ActionRules.pressBlock(label: label, role: item.element.role, command: command, sensitive: sensitive) { return fail(block) }
         // Chrome keeps hidden tabs in the tree and ignores a press on them (E2 live run 1).
-        if read.web, read.areaPath != "hit test" { return fail("not clicked: the page can be a hidden tab") }
+        if item.inPage, read.web, read.areaPath != "hit test" { return fail("not clicked: the page can be a hidden tab") }
         await waitForKeysUp(watch)
 
         // An OCR text has no accessibility element: click its middle, if the top element there is this app's.
@@ -577,6 +581,12 @@ public final class EarshotActionRunner: ActionRunner {
         Mouse.click(p)
         watch.mark("pressed")
         return ok("clicked \"\(label)\"")
+    }
+
+    /// The elements of the page only. A browser toolbar control, for example a "Passwords" button, does not make
+    /// a page a sign-in page.
+    private func pageElements(_ read: ScreenRead) -> [ScreenElement] {
+        read.snapshot.elements.filter { read.items[$0.id]?.inPage ?? true }
     }
 
     private func frontmost(_ pid: pid_t) -> Bool { NSWorkspace.shared.frontmostApplication?.processIdentifier == pid }
