@@ -258,3 +258,22 @@ final class ReviewFixTests: XCTestCase {
         w.stop()
     }
 }
+
+final class EndToEndRouterTests: XCTestCase {
+    /// The first live test, with the T2 fix (PR #20): no comma, a self entry, the real CommandRouter.
+    func testSlackMeRunningLateOpensTheOwnChatWithTheText() async {
+        let finder = FakeNames()
+        let engine = TextEngine()
+        engine.text = "Slack me running late."
+        let runner = DryRunner()
+        let p = CommandPipeline(engine: engine, router: CommandRouter(), actions: runner, names: finder,
+                                apps: { Fixture.apps }, allNames: { Fixture.names }, frontBundleID: { nil })
+        let r = await p.finish(mode: .hold)
+        XCTAssertTrue(r.ok, r.note)
+        XCTAssertTrue(finder.searches.isEmpty, "\(finder.searches)")
+        guard case .openChat(let app, let target, let text)? = runner.runs.first?.0 else { return XCTFail("\(runner.runs)") }
+        XCTAssertEqual(app, "slack")
+        XCTAssertEqual(target, "Divyekant Gupta")
+        XCTAssertEqual(text?.lowercased().trimmingCharacters(in: .punctuationCharacters), "running late")
+    }
+}
