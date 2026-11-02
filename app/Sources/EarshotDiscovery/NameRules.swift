@@ -37,7 +37,7 @@ public enum NameRules {
         "channel", "directmessage", "dm", "group", "private", "public", "huddle", "mute", "muted", "notifications",
         "moreactions", "options", "close", "avatar", "image", "photo", "profile", "presence", "inactive", "pin",
         "select", "givefeedback", "selectgivefeedback", "agent", "sirifoundinapps", "suggestions", "topresults",
-        "recentsearches",
+        "recentsearches", "unreadmessages", "recap", "recaps", "catchup", "allunreads", "mentionsreactions",
     ]
 
     public static let weekdays: Set<String> = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
@@ -73,6 +73,41 @@ public enum NameRules {
         if lower.range(of: #"^\d+\s?(s|m|h|d|w|min|mins|new|more)$"#, options: .regularExpression) != nil { return nil }
         if lower.range(of: #"\b(am|pm)$"#, options: .regularExpression) != nil, s.contains(where: \.isNumber) { return nil }
         return (s, isSelf)
+    }
+
+    /// Words that end the title of a section of a chat list: "EU Channels", "Team chats".
+    public static let sectionEnds: Set<String> = ["channels", "chats", "conversations", "dms", "messages", "groups"]
+
+    /// Common emoji names that apps show as text for a custom section icon: "gear Product".
+    /// A snake_case word ("sunrise_over_mountains") is also an emoji name.
+    public static let emojiNames: Set<String> = [
+        "gear", "dollar", "bangbang", "rocket", "star", "fire", "tada", "wave", "bell", "zap", "sparkles", "heart",
+        "eyes", "pushpin", "memo", "bulb", "lock", "key", "globe", "house", "briefcase", "calendar", "mag", "warning",
+        "robot", "books", "computer", "hammer", "wrench", "package", "moneybag", "trophy", "rainbow", "sunny",
+        "cloud", "coffee", "pizza", "bug", "art", "megaphone", "loudspeaker", "construction", "rotating_light",
+        "speech_balloon", "handshake", "seedling", "earth_americas", "earth_africa", "earth_asia", "satellite",
+        "chart_with_upwards_trend", "white_check_mark", "heavy_check_mark", "100", "muscle", "brain", "bookmark",
+        "clipboard", "label", "link", "paperclip", "microphone", "headphones", "video_game", "dart", "crown",
+        "gem", "money_with_wings", "credit_card", "shield", "test_tube", "telescope", "unicorn", "dog", "cat",
+    ]
+
+    /// True if the word is an emoji name, as text: in the list, or snake_case in lower case.
+    public static func isEmojiName(_ word: String) -> Bool {
+        if emojiNames.contains(word) { return true }
+        return word.contains("_") && word.allSatisfy { ($0.isLetter && $0.isLowercase) || $0 == "_" || $0.isNumber }
+    }
+
+    /// A name from a sidebar, or nil. The rules of `clean`, and also:
+    /// - A label that starts with an emoji name, such as "gear Product", is a section with a custom icon.
+    /// - A title that ends with a section word ("EU Channels") is a section.
+    /// - The app's own name ("Slack" in Slack) is not a chat.
+    public static func sidebarName(_ raw: String, appName: String = "") -> (name: String, isSelf: Bool)? {
+        guard let c = clean(raw) else { return nil }
+        let words = c.name.split(separator: " ").map(String.init)
+        if words.count >= 2, isEmojiName(words[0]), words[1].first?.isUppercase == true { return nil }
+        if words.count >= 2, let last = words.last, sectionEnds.contains(last.lowercased()) { return nil }
+        if !appName.isEmpty, Words.key(c.name) == Words.key(appName) { return nil }
+        return c
     }
 
     /// Spoken app names in the placeholder of the message box. Only a word with a capital letter
