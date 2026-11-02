@@ -15,8 +15,11 @@ public enum SafetyPolicy {
         "favorite", "favourite", "like", "follow", "unfollow", "star", "unstar", "fork", "watch", "unwatch", "sponsor",
         "logout", "signout", "save", "discard", "reply", "comment", "invite", "leave", "cancel", "reset", "revoke",
         "disconnect", "unpublish", "retweet", "repost",
+        // Menu commands that end or erase something.
+        "quit", "erase", "revert", "restart", "shutdown", "trash", "logoff",
     ]
-    public static let riskyPhrases = ["sign out", "log out", "add to cart", "buy now", "place order", "pay now", "check out"]
+    public static let riskyPhrases = ["sign out", "log out", "add to cart", "buy now", "place order", "pay now", "check out",
+                                      "shut down", "empty trash", "move to trash", "force quit"]
 
     /// Lower case, letters and digits only, single spaces. "Owner's" becomes "owners".
     public static func normalize(_ s: String) -> String {

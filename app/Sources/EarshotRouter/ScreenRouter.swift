@@ -13,6 +13,8 @@ struct ScreenParse {
     /// The words to type, as the owner said them.
     var text: String?
     var scroll: ScrollDirection?
+    /// All the words after the lead fillers, with numbers as digits. A menu title can start with a verb ("Select All").
+    var words: [String] = []
 }
 
 /// Voice clicks on the front window. Ported from probe WebRouter (E2, section 6.1). It knows no site.
@@ -81,6 +83,7 @@ enum ScreenRouter {
         tokens.dropFirst(lead)
         let t = tokens.words
         guard !t.isEmpty else { return p }
+        p.words = TextKit.digitize(t)
         let joined = " \(t.joined(separator: " ")) "
 
         // Scroll.
@@ -274,12 +277,23 @@ enum ScreenRouter {
 
         // Press: score every element with a label.
         var scored: [(ScreenElement, Double)] = []
+        let isMenu = MenuElements.isMenu
         for e in elements where !e.label.isEmpty {
             var s = score(p.target, e.label)
+            if isMenu(e) {
+                // A menu title can hold the verb: "select all" is the item "Select All". A match on all the words wins a tie.
+                let whole = score(p.words, e.label)
+                if whole >= 1 { s = max(s, 1.02) } else { s = max(s, whole) }
+            }
             if let hint = p.roleHint, hint == kind(e) { s += 0.05 }
             if s >= 0.3 { scored.append((e, s)) }
         }
-        scored.sort { $0.1 != $1.1 ? $0.1 > $1.1 : ($0.0.y != $1.0.y ? $0.0.y < $1.0.y : $0.0.x < $1.0.x) }
+        // Same score: "click copy" prefers the element on the screen to the menu item.
+        scored.sort {
+            if $0.1 != $1.1 { return $0.1 > $1.1 }
+            if isMenu($0.0) != isMenu($1.0) { return !isMenu($0.0) }
+            return $0.0.y != $1.0.y ? $0.0.y < $1.0.y : $0.0.x < $1.0.x
+        }
         // The same label more than once: tell the copies apart for tier 2.
         var seen: [String: Int] = [:]
         for (e, s) in scored.prefix(shortListSize) where !(e.risky || SafetyPolicy.isRisky(e)) {
@@ -292,22 +306,27 @@ enum ScreenRouter {
         options.append(RouteOption(intent: .scroll(.down), label: "Scroll down the page", score: 0))
         options.append(RouteOption(intent: .back, label: "Go back to the previous page", score: 0))
 
-        guard let top = scored.first, top.1 >= noMatch else {
+        guard let first = scored.first, first.1 >= noMatch else {
             return done(.none, true, true, p.isCommand ? "no label matches" : "no command word")
         }
-        guard p.isCommand else { return done(.none, top.1 < strongMatch, false, "a label matches, but no command word") }
-        let exact = TextKit.key(p.target.joined()) == TextKit.key(TextKit.digitize(TextKit.words(top.0.label)).joined())
+        // With no verb, only a menu item can match, and only a strong match: "copy", "export", "mute".
+        let pool = p.isCommand ? scored : scored.filter { isMenu($0.0) }
+        guard let top = pool.first, p.isCommand || top.1 >= strongMatch else {
+            return done(.none, first.1 < strongMatch, false, "a label matches, but no command word")
+        }
+        let labelKey = TextKit.key(TextKit.digitize(TextKit.words(top.0.label)).joined())
+        let exact = TextKit.key(p.target.joined()) == labelKey || (isMenu(top.0) && TextKit.key(p.words.joined()) == labelKey)
         // A risky label needs the exact label from the owner (R-NV-5). A fuzzy match on a risky label does nothing.
         if top.0.risky || SafetyPolicy.isRisky(top.0) {
             if !exact { return done(.none, true, false, "blocked: risky label \"\(top.0.label)\"") }
         }
         let pick = Intent.click(elementID: top.0.id)
         // The next element with a different label, or the same label with a different address.
-        let rival = scored.dropFirst().first { e in
+        let rival = pool.dropFirst().first { e in
             TextKit.key(e.0.label) != TextKit.key(top.0.label) || (e.0.url ?? "") != (top.0.url ?? "")
         }
         if top.1 >= strongMatch, rival == nil || rival!.1 <= top.1 - margin {
-            return done(pick, true, exact, "label match")
+            return done(pick, true, exact, isMenu(top.0) ? "menu item" : "label match")
         }
         return done(pick, false, exact, rival != nil && rival!.1 > top.1 - margin ? "two labels match" : "weak label match")
     }
