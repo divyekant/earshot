@@ -35,7 +35,8 @@ The probe obeys these rules:
 3. It never presses Return. It types only into a search field, through the field value, and then empties the field. It submits no form.
 4. After each press, it goes back to the start page with the Back button of Chrome. If the start page does not come back in 4 s, the run stops.
 5. It brings back the app that was in front when the run ends.
-6. A real mouse click occurs only on a link that does not offer `AXPress`, only while Chrome is in front, and only at a point where the top element on screen (over all apps) is that link or a part of it. The pointer goes back after the click. `e2-press` clicks only with `--mouse`.
+6. It acts only on a page of the expected site. It never acts on a page that looks like a sign-in, code check or payment page: a password field, a field or button label such as "verification code", or an address path such as "signin" or "checkout". It stops there. `e2-page` does not save such a page.
+7. A real mouse click occurs only on a link that does not offer `AXPress`, only while Chrome is in front, and only at a point where the top element on screen (over all apps) is that link or a part of it. The pointer goes back after the click. `e2-press` clicks only with `--mouse`.
 
 ## 3. Method
 
@@ -223,7 +224,16 @@ Rule for earshot (commit after 743fc8f, `WebPage.press`):
 
 ### 5.7 Live run 3
 
-`e2-act` with the rule of section 5.6, on the 4 live pages. Not run yet.
+`e2-act` with the rule of section 5.6, on the 4 live pages.
+
+The first try stopped before any action. A Samsung account sign-in window of Chrome was on top of the test window. The hit test on the Chrome app element gives the top Chrome element at a point, so the probe read the sign-in window. `e2-page` saved those reads, and `e2-make` made tests from them. The run stopped by hand before `e2-act`. Nothing was clicked or typed.
+
+Fixes (safety rule 6):
+
+- The hit test now skips a page that is in another window.
+- `e2-page`, `e2-make`, `e2-act` and `e2-press` act only on a page of the expected site, and never on a sign-in, code or payment page.
+
+Second try: not run yet.
 
 ## 6. Decision
 
