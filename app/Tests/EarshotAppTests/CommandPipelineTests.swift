@@ -204,12 +204,15 @@ final class DiscoverHookTests: XCTestCase {
     func testSearchRule() {
         let sureChat = RouteResult(intent: .openChat(appID: "slack", target: "Darshan", text: nil), confidence: 0.95, tier: .rules, ms: 0)
         let unsureChat = RouteResult(intent: .openChat(appID: "slack", target: "Darshan", text: nil), confidence: 0.5, tier: .rules, ms: 0)
-        let app = RouteResult(intent: .openApp(appID: "slack"), confidence: 0.9, tier: .rules, ms: 0)
-        XCTAssertFalse(CommandPipeline.needsAppSearch("Slack Darshan", sureChat))
-        XCTAssertTrue(CommandPipeline.needsAppSearch("Slack Darshan", unsureChat))
-        XCTAssertTrue(CommandPipeline.needsAppSearch("Slack Ravi", app))
-        XCTAssertFalse(CommandPipeline.needsAppSearch("Slack me running late", app))
-        XCTAssertFalse(CommandPipeline.needsAppSearch("open my own chat in Slack", unsureChat))
+        let app = RouteResult(intent: .openApp(appID: "slack"), confidence: 0.65, tier: .rules, ms: 0)
+        let garbled = RouteResult(intent: .openChat(appID: "slack", target: "Slack", text: nil), confidence: 0.2, tier: .fuzzy, ms: 0)
+        XCTAssertFalse(CommandPipeline.needsAppSearch("Slack Darshan", sureChat, appID: "slack"))
+        XCTAssertTrue(CommandPipeline.needsAppSearch("Slack Darshan", unsureChat, appID: "slack"))
+        XCTAssertTrue(CommandPipeline.needsAppSearch("Slack Ravi", app, appID: "slack"), "unknown name: openApp of the named app")
+        XCTAssertFalse(CommandPipeline.needsAppSearch("Slack Ravi", app, appID: "messages"), "a different app than the words name")
+        XCTAssertFalse(CommandPipeline.needsAppSearch("Slack me running late", app, appID: "slack"))
+        XCTAssertFalse(CommandPipeline.needsAppSearch("happening click on tab in Chrome Home X", garbled, appID: "slack"))
+        XCTAssertFalse(CommandPipeline.needsAppSearch("open my own chat in Slack", unsureChat, appID: "slack"))
     }
 }
 
@@ -356,5 +359,35 @@ final class ScreenSummaryTests: XCTestCase {
         XCTAssertTrue(r.note.contains("screen: none, front com.apple.Notes"), r.note)
         XCTAssertTrue(r.note.contains("confidence 0.30"), r.note)
         XCTAssertTrue(r.note.contains("considered:"), r.note)
+    }
+}
+
+
+final class SearchOnlyForANamedAppTests: XCTestCase {
+    /// Live test: no chat app was named, the router's weak guess was Slack, and a 5 s search ran in Slack.
+    func testNoSearchWhenTheWordsNameNoApp() async {
+        let finder = FakeNames()
+        let weak = RouteResult(intent: .openChat(appID: "slack", target: "Slack", text: nil), confidence: 0.5, tier: .fuzzy, ms: 0)
+        let engine = TextEngine()
+        engine.text = "happening click on tab in Chrome Home X"
+        let p = CommandPipeline(engine: engine, router: FixedRouter(result: weak), actions: DryRunner(), names: finder,
+                                apps: { Fixture.apps }, allNames: { Fixture.names }, frontBundleID: { nil })
+        p.heardName = { _, _ in ("happening", nil) }
+        _ = await p.finish(mode: .hold)
+        XCTAssertTrue(finder.searches.isEmpty, "\(finder.searches)")
+    }
+}
+
+final class MessageWithNoAppTests: XCTestCase {
+    func testMessageRaviWithNoAppDoesNotSearch() async {
+        let finder = FakeNames()
+        let unsure = RouteResult(intent: .openChat(appID: "messages", target: "Ravi", text: nil), confidence: 0.5, tier: .rules, ms: 0)
+        let engine = TextEngine()
+        engine.text = "message Ravi"
+        let p = CommandPipeline(engine: engine, router: FixedRouter(result: unsure), actions: DryRunner(), names: finder,
+                                apps: { Fixture.apps }, allNames: { Fixture.names }, frontBundleID: { nil })
+        p.heardName = { _, _ in ("Ravi", nil) }
+        _ = await p.finish(mode: .hold)
+        XCTAssertTrue(finder.searches.isEmpty)
     }
 }
