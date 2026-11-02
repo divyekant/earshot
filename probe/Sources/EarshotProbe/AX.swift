@@ -156,7 +156,11 @@ enum AX {
         if looksLikeComposer(element) { return false }
         // A field with no label must be one line. Messages shows chat bubbles as unlabelled,
         // settable AXTextArea elements; they are not search fields.
-        return !label(element).trimmingCharacters(in: .whitespaces).isEmpty || role(element) != "AXTextArea"
+        // Test the field's own name only: AXRoleDescription is never empty ("text entry area").
+        let named = ["AXPlaceholderValue", "AXDescription", "AXTitle"].contains {
+            !(string(element, $0) ?? "").trimmingCharacters(in: .whitespaces).isEmpty
+        }
+        return named || role(element) != "AXTextArea"
     }
 
     /// Roles of a result list. The probe can press Return on these, never on a text field or a button.
