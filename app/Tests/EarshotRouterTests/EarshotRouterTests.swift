@@ -76,6 +76,54 @@ final class EarshotRouterTests: XCTestCase {
         await expect("open my own chat in Slack", chat("slack", "Owner (you)"))
     }
 
+    // MARK: - No comma (live test: speech to text often drops it)
+
+    func testSelfWithNoComma() async {
+        await expect("Slack me running late.", chat("slack", "Owner (you)", "running late"))
+        await expect("iMessage me sounds good", chat("messages", "Owner", "sounds good"))
+        // No app named: the front chat app decides between the two own chats.
+        let front = RouteContext(apps: Fixtures.apps, names: Fixtures.names, frontBundleID: "com.apple.MobileSMS")
+        await expect("message myself buy milk", chat("messages", "Owner", "buy milk"), front)
+        let noFront = await route("message myself buy milk")
+        XCTAssertLessThan(noFront.confidence, SafetyPolicy.minimumConfidence, "two own chats, no front app: \(noFront.why)")
+        await expect("text me on Slack", chat("slack", "Owner (you)"))
+        await expect("ping myself on Slack call the bank", chat("slack", "Owner (you)", "call the bank"))
+        await expect("open my own chat in Slack", chat("slack", "Owner (you)"))
+        await expect("Slack my own chat pick up the parcel", chat("slack", "Owner (you)", "pick up the parcel"))
+        for s in ["Slack me running late", "message myself buy milk", "Slack me, running late"] {
+            XCTAssertNil(CommandRouter.heardName(s, context: Fixtures.context), s)
+        }
+    }
+
+    func testSelfWithComma() async {
+        await expect("Slack me, running late", chat("slack", "Owner (you)", "running late"))
+        await expect("Messages myself, buy milk", chat("messages", "Owner", "buy milk"))
+    }
+
+    func testKnownNameWithNoComma() async {
+        await expect("Slack Darshan running late", chat("slack", "Darshan Pania", "running late"))
+        await expect("Slack Darshan Pania running late", chat("slack", "Darshan Pania", "running late"))
+        await expect("message Francis see you at 6", chat("messages", "Francis", "see you at 6"))
+        await expect("Slack Darshan, running late", chat("slack", "Darshan Pania", "running late"))
+        XCTAssertNil(CommandRouter.heardName("Slack Darshan running late", context: Fixtures.context))
+    }
+
+    func testUnknownNameWithNoComma() async {
+        let r = await route("Slack Zorawar running late")
+        XCTAssertTrue(r.intent == .none || r.intent == .openApp(appID: "slack"), "\(r.intent)")
+        // The end of an unknown name is not known: search for the first word only.
+        let heard = CommandRouter.heardName("Slack Zorawar running late", context: Fixtures.context)
+        XCTAssertEqual(heard?.name, "Zorawar")
+        XCTAssertEqual(heard?.appID, "slack")
+        // With a comma, the whole name part goes to the search.
+        XCTAssertEqual(CommandRouter.heardName("message Ingrid Vasquez, running late", context: Fixtures.context)?.name,
+                       "Ingrid Vasquez")
+        // After the search adds the name, the next route takes the rest as the text.
+        let ctx = RouteContext(apps: Fixtures.apps,
+                               names: Fixtures.names + [NameEntry(appID: "slack", name: "Zorawar Singh", source: .search)])
+        await expect("Slack Zorawar running late", chat("slack", "Zorawar Singh", "running late"), ctx)
+    }
+
     func testE1OpenApp() async {
         await expect("switch to Slack", .openApp(appID: "slack"))
         await expect("open Notes", .openApp(appID: "notes"))
