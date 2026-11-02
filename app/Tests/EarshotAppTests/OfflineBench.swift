@@ -14,6 +14,7 @@ final class OfflineBench: XCTestCase {
         "Slack me, call me after lunch", "Messages me, buy milk", "go to alerts on slack", "Slack darshan pania",
         "I think the meeting moved to Thursday", "running late, be there in ten minutes", "what is the weather like today",
         "Slack Ravi", "message Zorawar on Messages", "open my own chat in Slack", "text darshan", "Slack posthog",
+        "open hn.com", "go to news dot ycombinator dot com",
     ]
 
     func testBench() async {
