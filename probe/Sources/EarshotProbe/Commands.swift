@@ -33,6 +33,8 @@ enum Commands {
     swift run earshot-probe e2-try <site> "<words>"  Show the short list, the rules answer and the Jev answer
     swift run earshot-probe e2-run [--no-jev]     Route all web test commands with rules, Jev, and rules then Jev
     swift run earshot-probe e2-act [site...]      Live: press links, type into search fields, scroll (no Return)
+    swift run earshot-probe e2-press [site] [--label "<text>"] [--mouse]
+                                                  Live: try each way to press one link (no Return)
     swift run earshot-probe e2-say [--voices a,b] Make WAV files of the E1 commands with `say`
     swift run earshot-probe e2-asr                Transcribe the WAV files with Apple speech
     swift run earshot-probe e2-asr-score          Compare Apple speech and Parakeet (run probe/parakeet first)
@@ -95,6 +97,7 @@ enum Commands {
             case "e2-try": return try await E2.tryOne(args)
             case "e2-run": return try await E2.runAll(args)
             case "e2-act": return try await E2.act(args)
+            case "e2-press": return try await E2Press.run(args)
             case "e2-say": return try E2Speech.say(args)
             case "e2-asr": return try await E2Speech.asr(args)
             case "e2-asr-score": return try E2Speech.score(args)

@@ -99,7 +99,7 @@ E2 tests voice clicks on web pages in Chrome, and compares Apple speech with Par
 
 > **CAUTION:** `e2-try`, `e2-run` and `e2-act` send the command words and up to 8 element labels of the test page to Jev, a cloud service. They send no audio and no screenshot.
 
-> **WARNING:** `e2-act` presses links on live pages. It never presses Return, and never presses a label with a risky word such as Send, Pay, Delete, Submit, Star or upvote. Do not touch the keyboard or the mouse while it runs.
+> **WARNING:** `e2-act` and `e2-press` press links on live pages. They never press Return, and never press a label with a risky word such as Send, Pay, Delete, Submit, Star or upvote. Do not touch the keyboard or the mouse while they run.
 
 The test pages are data in [e2-sites.json](e2-sites.json).
 
@@ -110,6 +110,7 @@ The test pages are data in [e2-sites.json](e2-sites.json).
 | `swift run earshot-probe e2-try wikipedia "click talk"` | Shows the short list, the rules answer and the Jev answer for one command on a saved page. |
 | `swift run earshot-probe e2-run` | Routes all web test commands with the rules, with Jev, and with the rules first and Jev only when the rules are unsure. Add `--no-jev` to use the rules only. |
 | `swift run earshot-probe e2-act [site...]` | Live run. For each command: read the page, route, and act. It presses links only, types into search fields only and then empties them, and scrolls. After each press, it goes back. |
+| `swift run earshot-probe e2-press [site] [--label "<text>"] [--mouse]` | Live test of one link. It tries each way to press the link: press, focus and press, press the text inside, press with the enhanced user interface of Chrome, and open the address in a new tab. `--mouse` adds a real mouse click, and the pointer then goes back. After each page change, it goes back. The default site is `wikipedia`. |
 | `swift run earshot-probe e2-say` | Makes WAV files of the E1 test commands with `say`, with up to 3 English voices, in `logs/e2-audio/`. |
 | `swift run earshot-probe e2-asr` | Transcribes the WAV files with Apple SpeechTranscriber, without and with the chat names as hints. |
 | `cd parakeet && swift run -c release parakeet-ab` | Transcribes the same files with Parakeet. It reads the model file of Hex in `~/Library/Application Support/hex/models/` and does not change it. Give another file with `--model <file.gguf>`. |

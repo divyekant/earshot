@@ -1,6 +1,6 @@
 # E2: voice clicks on web pages, and Parakeet against Apple speech
 
-Status: running, 2026-11-02. The owner chose "Both (E2)". Live run 2 is open.
+Status: running, 2026-11-02. The owner chose "Both (E2)". Live run 2 is done. The press test (section 5.6) waits for the owner.
 
 E2 follows [E1](E1-generic-router.md). E0 and E1 put the cursor in a chat. The owner asked two more questions:
 
@@ -35,6 +35,7 @@ The probe obeys these rules:
 3. It never presses Return. It types only into a search field, through the field value, and then empties the field. It submits no form.
 4. After each press, it goes back to the start page with the Back button of Chrome. If the start page does not come back in 4 s, the run stops.
 5. It brings back the app that was in front when the run ends.
+6. A real mouse click occurs only in `e2-press --mouse`, on one plain link, and only if a hit test shows that the point is on that link. The pointer goes back after the click.
 
 ## 3. Method
 
@@ -162,6 +163,39 @@ The probe ran on the owner's Mac from the remote session on 2026-11-02. Chrome w
 - The macOS sandbox of the remote session blocked SwiftPM downloads and the run of a downloaded library. The owner ran `parakeet-ab` once in the terminal.
 
 ### 5.5 Live run 2
+
+`e2-act`, 42 commands on the 4 live pages (commit 545fe11, with the hit test of commit c43dfa8):
+
+| Measure | Result |
+| --- | --- |
+| Page found by the hit test | 4 of 4 sites |
+| Read the page | 12 ms median, 21 ms for the slowest 1 in 10 |
+| Correct element or answer | 39 of 42 |
+| Text to action (read, route, Jev if unsure, act) | 29 ms median, 51 ms for the slowest 1 in 10 (26 actions) |
+| Link pressed, page changed | 0 of 22 |
+| Typed into a search field | 2 of 2 (key events; the field was emptied after) |
+| Scrolled | 2 of 2 |
+| Risky items blocked | 4 of 4 |
+
+- The hit test fixed the tab problem. The read is also faster: 12 ms against 29 ms in live run 1.
+- The press call (`AXPress`) still returned success at once, and Chrome still did not follow the link. This time the link was on the visible tab. So the hidden tab of live run 1 was not the only cause.
+- Setting the value of a search field failed again. The fallback with key events worked, because the probe first put the focus in the field.
+- 2 misses were test drift: a Google result and a Hacker News story were gone from the live page. The router said "none" for both, and "none" is the correct answer for a label that is not on the page. `e2-act` now scores these commands this way.
+- 1 miss was a Jev call that took 5 s and then failed ("nvidia build please"). `e2-act` now gives Jev 1 s at most, and then keeps the rules answer. Jev took 106 ms (median) in `e2-run`.
+- Safety held: nothing was submitted, no Return was pressed, and no dialog, sign-in page or form page appeared.
+
+### 5.6 Press test
+
+`e2-press` opens the Wikipedia page, picks one plain link to another article, and tries each way once. After each page change, it goes back.
+
+| Way | What it does |
+| --- | --- |
+| press | `AXPress` on the link, as in live runs 1 and 2 |
+| focus, then press | Set `AXFocused` on the link, then `AXPress` |
+| press the text inside | `AXPress` on the first child of the link |
+| enhanced UI, then press | Set `AXEnhancedUserInterface` on Chrome, as VoiceOver does, then `AXPress`. The probe sets the old value again after. |
+| open the address | Open the address of the link (`AXURL`) in Chrome. This makes a new tab. |
+| mouse click (`--mouse` only) | A real click at the link, after a hit test shows that the point is on the link. The pointer goes back after. |
 
 Not run yet.
 

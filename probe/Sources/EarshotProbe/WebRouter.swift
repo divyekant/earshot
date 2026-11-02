@@ -320,10 +320,30 @@ enum WebRouter {
     If no label has the meaning of the command, or the words are not a command for this page, pick none.
     """
 
-    static func askJev(_ words: String, _ r: WebRoute, elements: [WebElement], jev: JevClient) async throws
+    /// With `budgetMs`, it waits at most that time for Jev, and then throws. The caller then keeps the rules answer.
+    static func askJev(_ words: String, _ r: WebRoute, elements: [WebElement], jev: JevClient, budgetMs: Int? = nil) async throws
         -> (WebChoice, JevClient.Answer) {
-        let answer = try await jev.choose(id: "web", options: r.options.map { (id: $0.id, label: $0.label) },
-                                          goal: jevGoal, rules: jevRules, state: ["command": words])
+        let options = r.options.map { (id: $0.id, label: $0.label) }
+        let ask: @Sendable () async throws -> JevClient.Answer = {
+            try await jev.choose(id: "web", options: options, goal: jevGoal, rules: jevRules, state: ["command": words])
+        }
+        let answer: JevClient.Answer
+        if let budgetMs {
+            answer = try await withThrowingTaskGroup(of: JevClient.Answer?.self) { group in
+                group.addTask { try await ask() }
+                group.addTask {
+                    try await Task.sleep(nanoseconds: UInt64(budgetMs) * 1_000_000)
+                    return nil
+                }
+                defer { group.cancelAll() }
+                guard let first = try await group.next(), let a = first else {
+                    throw ProbeError("no answer in \(budgetMs) ms")
+                }
+                return a
+            }
+        } else {
+            answer = try await ask()
+        }
         let choice = r.options.first(where: { $0.id == answer.choice })?.choice ?? WebChoice.noAction
         return (guarded(choice, elements), answer)
     }
