@@ -51,7 +51,7 @@ earshot uses one model for all apps. A command is one verb and one target.
 | Source | Targets | When earshot reads it |
 |---|---|---|
 | Screen | Buttons, links, fields and rows of the front window. OCR text if the app gives no labels. | At each command (about 15 to 40 ms) |
-| Menus (in progress) | The enabled menu items of the front app, for example Edit > Select All. A menu item is a press target with the id `m:<path>`. | From a cache. earshot reads it again when an app becomes active. |
+| Menus | The enabled menu items of the front app, for example Edit > Select All. A menu item is a press target with the id `m:<path>`. | From a cache. earshot reads it again when an app becomes active, at start and after each command. A command never reads the menus. |
 | Chats | Sidebar names, the app's own search, the owner's own chat | From a cache (NameWarmer) |
 | Apps and sites | Approved apps, with the names and URL schemes that each app declares. Web addresses. | Catalogue at start |
 

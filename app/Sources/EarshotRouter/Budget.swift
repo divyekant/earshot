@@ -6,11 +6,18 @@ func withBudget<T: Sendable>(_ ms: Int, _ op: @escaping @Sendable () async -> T?
     let once = Once<T>()
     return await withCheckedContinuation { (continuation: CheckedContinuation<T?, Never>) in
         once.start(continuation)
-        let work = Task { once.finish(await op()) }
+        let deadline = DispatchTime.now().uptimeNanoseconds + UInt64(max(ms, 0)) * 1_000_000
+        let work = Task {
+            let value = await op()
+            // An answer after the budget does not count, even if the timer task has not run yet (a busy Mac).
+            guard !Task.isCancelled, DispatchTime.now().uptimeNanoseconds <= deadline else { return }
+            once.finish(value)
+        }
         Task {
             try? await Task.sleep(nanoseconds: UInt64(max(ms, 0)) * 1_000_000)
-            work.cancel()
+            // Finish first, then cancel: a cancelled operation can return at once, and it must not win.
             once.finish(nil)
+            work.cancel()
         }
     }
 }

@@ -1,0 +1,57 @@
+name: Bug report
+description: Tell us about a command that did the wrong thing, or a crash.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not report a security problem here. Read SECURITY.md.
+        The Activity tab can show contact names and dictated text. Remove private data before you paste it.
+  - type: textarea
+    id: command
+    attributes:
+      label: Command
+      description: What did you say or type?
+      placeholder: "Slack Ravi, running late"
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+    validations:
+      required: true
+  - type: textarea
+    id: activity
+    attributes:
+      label: Activity log
+      description: Paste the line for this command from Manage > Activity.
+      render: text
+  - type: input
+    id: app
+    attributes:
+      label: Target app and version
+      placeholder: "Slack 4.47"
+  - type: dropdown
+    id: engine
+    attributes:
+      label: Speech engine
+      options: ["Automatic (Apple)", "Apple", "Parakeet", "Not a speech problem"]
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version and Mac model
+      placeholder: "macOS 26.1, Mac mini M4 Pro"
+    validations:
+      required: true
+  - type: input
+    id: commit
+    attributes:
+      label: earshot commit
+      description: Run `git rev-parse --short HEAD`.

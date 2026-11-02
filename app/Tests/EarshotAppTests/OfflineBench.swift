@@ -1,5 +1,7 @@
 @testable import EarshotApp
 import EarshotCore
+import EarshotActions
+import EarshotDiscovery
 import EarshotRouter
 import XCTest
 
@@ -39,5 +41,47 @@ final class OfflineBench: XCTestCase {
                           Self.commands.count, pct(totals, 0.5), pct(totals, 0.9), pct(routes, 0.5), pct(routes, 0.9), acted, totals.count)
         print(line)
         XCTAssertLessThan(pct(totals, 0.9), 50, "the command path without speech and apps must stay fast")
+    }
+
+    /// Menu commands (R-MT-1): the same path with 70 screen elements and 250 menu items of the front app, from the cache.
+    func testMenuBench() async {
+        var items = [MenuItem(path: ["Edit", "Undo"], enabled: true), MenuItem(path: ["Edit", "Copy"], enabled: true),
+                     MenuItem(path: ["Edit", "Paste"], enabled: true), MenuItem(path: ["Edit", "Select All"], enabled: true),
+                     MenuItem(path: ["File", "New Note"], enabled: true), MenuItem(path: ["View", "Show Sidebar"], enabled: true)]
+        for m in 0..<10 { for k in 0..<24 { items.append(MenuItem(path: ["Menu \(m)", "Command \(m) \(k) item"], enabled: true)) } }
+        let menu = MenuCache.elements(items)
+        let page = (0..<70).map { ScreenElement(id: "e\($0)", role: "AXLink", label: "Story number \($0) title", risky: false, y: Double($0)) }
+        final class PageRunner: CommandActions {
+            let page: [ScreenElement]
+            init(_ page: [ScreenElement]) { self.page = page }
+            func screen() async -> ScreenSnapshot? { ScreenSnapshot(bundleID: "com.apple.Notes", windowTitle: "t", elements: page) }
+            func run(_ intent: Intent, context: RouteContext, command: CommandInfo) async -> ActionOutcome { ActionOutcome(ok: true, note: "dry run") }
+        }
+        let engine = TextEngine()
+        let p = CommandPipeline(engine: engine, router: CommandRouter(), actions: PageRunner(page), names: FakeNames(),
+                                apps: { Fixture.apps }, allNames: { Fixture.names }, frontBundleID: { "com.apple.Notes" })
+        p.menus = { _ in menu }
+        let commands = ["select all", "undo", "copy", "paste", "new note", "show sidebar", "click story number 5 title",
+                        "Slack me, running late", "open hn.com", "what is the weather like today"]
+        var totals: [Double] = [], routes: [Double] = []
+        for _ in 0..<5 {
+            for c in commands {
+                engine.text = c
+                let r = await p.finish(mode: .hold)
+                totals.append(r.stages["total"] ?? 0)
+                routes.append(r.stages["route"] ?? 0)
+            }
+        }
+        func pct(_ a: [Double], _ q: Double) -> Double { let s = a.sorted(); return s[min(s.count - 1, Int(Double(s.count) * q))] }
+        print(String(format: "MenuBench: %d commands × 5, %d menu items + 70 elements. Total median %.2f ms, slowest 1 in 10 %.2f ms. Route median %.2f ms, slowest 1 in 10 %.2f ms.",
+                     commands.count, menu.count, pct(totals, 0.5), pct(totals, 0.9), pct(routes, 0.5), pct(routes, 0.9)))
+        // The debug build scores labels about 15 times slower than the release build (the app bundle is release).
+        // Release: route median 5.7 ms, slowest 1 in 10 11.5 ms. The router budget is 300 ms (R-SP-2).
+        #if DEBUG
+        let limit = 300.0
+        #else
+        let limit = 50.0
+        #endif
+        XCTAssertLessThan(pct(totals, 0.9), limit, "menu items must not slow the command path")
     }
 }

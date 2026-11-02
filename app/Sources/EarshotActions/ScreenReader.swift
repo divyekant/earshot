@@ -10,6 +10,8 @@ struct ReadElement {
     var element: ScreenElement
     let kind: String
     let handle: AXUIElement?
+    /// False for a control of the window outside the web page, for example a browser tab or the address field.
+    var inPage: Bool = true
 }
 
 /// One screen read. earshot keeps the last one, so that "click e3" can find its element.
@@ -137,6 +139,34 @@ enum ScreenReader {
         return out
     }
 
+    /// The window's own controls outside the web page: tab buttons, toolbar buttons and the address field.
+    /// The walk does not go into a web area. It is small: the page is most of the tree.
+    static func windowControls(_ window: AXUIElement, maxNodes: Int = 1500, budgetMs: Double = 25) -> [AXUIElement] {
+        controlWalk(window, maxNodes: maxNodes, budgetMs: budgetMs, role: { AX.role($0) }, subrole: { AX.subrole($0) },
+                    children: { AX.elements($0, "AXChildren") })
+    }
+
+    /// The walk of `windowControls` over any tree, so that tests can give a fake tree.
+    static func controlWalk<T>(_ root: T, maxNodes: Int = 1500, budgetMs: Double = 25, role: (T) -> String,
+                               subrole: (T) -> String, children: (T) -> [T]) -> [T] {
+        var queue: [T] = [root]
+        var index = 0
+        var out: [T] = []
+        let t0 = Clock.nowNs()
+        while index < queue.count, index < maxNodes, Clock.ms(since: t0) < budgetMs {
+            let el = queue[index]
+            index += 1
+            let r = role(el)
+            if ActionRules.skipForControls.contains(r) { continue }
+            if ActionRules.kind(role: r, subrole: r == "AXRadioButton" ? subrole(el) : "") != nil {
+                out.append(el)
+                continue
+            }
+            queue.append(contentsOf: children(el))
+        }
+        return out
+    }
+
     /// The text inside an element, for a link, a button or a row that has no title.
     static func innerText(_ el: AXUIElement, depth: Int = 0) -> String {
         guard depth < 3 else { return "" }
@@ -170,7 +200,7 @@ enum ScreenReader {
     }
 
     static let attributes = ["AXRole", "AXSubrole", "AXTitle", "AXDescription", "AXValue", "AXPlaceholderValue",
-                             "AXPosition", "AXSize", "AXURL"]
+                             "AXPosition", "AXSize", "AXURL", "AXHelp"]
 
     struct Draft: Equatable {
         let role: String, subrole: String, kind: String, label: String, url: String?
@@ -193,6 +223,8 @@ enum ScreenReader {
             label = [AX.text(a["AXTitle"]), AX.text(a["AXDescription"])]
                 .compactMap { $0 }.first(where: { !$0.trimmingCharacters(in: .whitespaces).isEmpty }) ?? ""
             if label.isEmpty { label = innerText(el) }
+            // An icon-only link or button can have its name only in its help text (a collapsed side bar).
+            if label.isEmpty { label = AX.text(a["AXHelp"])?.trimmingCharacters(in: .whitespaces) ?? "" }
             // A link can give its address as its value, so only a button uses the value.
             if label.isEmpty, kind == "button" { label = AX.text(a["AXValue"]) ?? "" }
         }
@@ -245,16 +277,28 @@ enum ScreenReader {
         drafts.sort { ActionRules.readingOrder($0.0.frame, $1.0.frame) }
         if drafts.count > maxElements { drafts = Array(drafts.prefix(maxElements)) }
 
+        // With a web page, also read the window's own controls (tabs, toolbar, address field). They come after
+        // the page elements, so that the numbers of the page stay the same.
+        var controls: [(Draft, AXUIElement)] = []
+        if areaPath != "window" {
+            for el in windowControls(window) {
+                guard let d = describe(el, viewport: wf), !(d.label.isEmpty && d.kind != "field") else { continue }
+                controls.append((d, el))
+            }
+            controls.sort { ActionRules.readingOrder($0.0.frame, $1.0.frame) }
+        }
+
         var elements: [ScreenElement] = []
         var items: [String: ReadElement] = [:]
-        for (i, (d, el)) in drafts.enumerated() {
+        for (i, (d, el)) in (drafts + controls).enumerated() {
             let id = ActionRules.elementID(number: i + 1)
+            let page = i < drafts.count
             let e = ScreenElement(id: id, role: d.role, subrole: d.subrole, label: d.label, url: d.url,
-                                  inHeading: d.kind == "link" && areaPath != "window" ? inHeading(el) : false,
+                                  inHeading: page && d.kind == "link" && areaPath != "window" ? inHeading(el) : false,
                                   risky: SafetyPolicy.isRisky(d.label, role: d.role),
                                   x: d.frame.x, y: d.frame.y, w: d.frame.w, h: d.frame.h)
             elements.append(e)
-            items[id] = ReadElement(element: e, kind: d.kind, handle: el)
+            items[id] = ReadElement(element: e, kind: d.kind, handle: el, inPage: page || areaPath == "window")
         }
         let snapshot = ScreenSnapshot(bundleID: bundleID, windowTitle: title, url: url, elements: elements)
         return ScreenRead(snapshot: snapshot, pid: pid, areaPath: areaPath, window: wf, viewport: vp, items: items,

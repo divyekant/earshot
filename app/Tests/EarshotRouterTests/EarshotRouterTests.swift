@@ -523,6 +523,78 @@ final class EarshotRouterTests: XCTestCase {
         XCTAssertTrue(SafetyPolicy.isRisky("Shut Down…", role: MenuElements.role))
     }
 
+    // MARK: - Live x.com cases (status part, "on open Chrome window", sound match, tabs)
+
+    /// A Chrome window on x.com, with two tabs in the tab strip (AXRadioButton in an AXTabGroup).
+    static let xcomScreen = ScreenSnapshot(bundleID: "com.google.Chrome", windowTitle: "Home / X", url: "https://x.com/home", elements: [
+        Fixtures.el("t1", "AXRadioButton", "shadcn/ui", y: 5, x: 100),
+        Fixtures.el("t2", "AXRadioButton", "FPL Guru", y: 5, x: 300),
+        Fixtures.el("e1", "AXLink", "Skip to home timeline", y: 60),
+        Fixtures.el("e2", "AXLink", "Home (New unread posts)", y: 100),
+        Fixtures.el("e3", "AXLink", "Chat", y: 140),
+        Fixtures.el("e4", "AXButton", "More", y: 180),
+        Fixtures.el("e5", "AXTextField", "Search", y: 60, x: 900),
+        Fixtures.el("e6", "AXLink", "Pull requests (1)", y: 220),
+        Fixtures.el("e7", "AXLink", "Chats, 44", y: 260),
+    ])
+
+    func xcom(_ elements: [ScreenElement]? = nil) -> RouteContext {
+        var screen = Self.xcomScreen
+        if let elements { screen.elements = elements }
+        return RouteContext(apps: Fixtures.apps, names: Fixtures.names, frontBundleID: "com.google.Chrome", screen: screen)
+    }
+
+    func testLiveClickHomeOnXcom() async {
+        let noSkip = xcom(Self.xcomScreen.elements.filter { $0.id != "e1" })
+        for ctx in [xcom(), noSkip] {
+            for s in ["Click home.", "Click home on Chrome.", "Click home on open Chrome window."] {
+                await expect(s, .click(elementID: "e2"), ctx)
+                let r = await route(s, ctx)
+                XCTAssertEqual(r.tier, .rules, "\(s): the label with no status part is exact")
+            }
+        }
+        await expect("click pull requests", .click(elementID: "e6"), xcom())
+        await expect("click chats", .click(elementID: "e7"), xcom())
+    }
+
+    func testStatusFreeLabels() {
+        XCTAssertEqual(ScreenRouter.statusFree("Home (New unread posts)"), "Home")
+        XCTAssertEqual(ScreenRouter.statusFree("Pull requests (1)"), "Pull requests")
+        XCTAssertEqual(ScreenRouter.statusFree("Chats, 44"), "Chats")
+        XCTAssertNil(ScreenRouter.statusFree("Home"))
+        XCTAssertNil(ScreenRouter.statusFree("(3)"), "a label that is only a status part keeps its label")
+    }
+
+    func testLiveTabTitles() async {
+        await expect("Open the shad CN/UI tab.", .click(elementID: "t1"), xcom())
+        await expect("Open the FPL guru tab on Chrome.", .click(elementID: "t2"), xcom())
+        await expect("go to the FPL Guru tab", .click(elementID: "t2"), xcom())
+        await expect("switch to FPL Guru", .click(elementID: "t2"), xcom())
+        // An app name still wins: "switch to Slack" opens Slack.
+        await expect("switch to Slack", .openApp(appID: "slack"), xcom())
+    }
+
+    func testLiveSoundAlikeLabel() async {
+        let r = await route("Click on chart.", xcom())
+        XCTAssertEqual(r.intent, .click(elementID: "e3"), r.why)
+        XCTAssertEqual(r.tier, .fuzzy, "a near spelling or sound match is never exact")
+        // A sound match is fuzzy, so it never presses a risky label (R-NV-5).
+        let risky = await route("click delight", RouteContext(apps: Fixtures.apps, names: Fixtures.names,
+            screen: ScreenSnapshot(bundleID: "com.google.Chrome", windowTitle: "x", elements: [Fixtures.el("b1", "AXButton", "Delete", y: 10)])))
+        XCTAssertNotEqual(risky.intent, .click(elementID: "b1"), risky.why)
+    }
+
+    func testNoSureNoneWhenALabelIsNear() async {
+        // Only one word of four is near a label: not a match, but not a sure "none".
+        let r = await route("click homer simpson fan page", xcom())
+        XCTAssertEqual(r.intent, .none, r.why)
+        XCTAssertLessThan(r.confidence, SafetyPolicy.minimumConfidence, r.why)
+        // Words that are near no label: a sure "none".
+        let far = await route("click zebra quantum", xcom())
+        XCTAssertEqual(far.intent, .none)
+        XCTAssertEqual(far.why, "no label matches")
+    }
+
     func testE2NoCommand() async {
         let r = await route("what a lovely day", news)
         XCTAssertEqual(r.intent, .none)

@@ -43,7 +43,7 @@ extension EarshotActionRunner {
             read = await freshRead(forceOCR: false)
         }
         guard let read else { return none("earshot cannot read the front window") }
-        if let why = SafetyPolicy.sensitive(url: read.snapshot.url, elements: read.snapshot.elements)
+        if let why = SafetyPolicy.sensitive(url: read.snapshot.url, elements: pageElements(read))
             ?? sensitiveNow(app: AX.appElement(read.pid), pid: read.pid) {
             return none("no screenshot: this looks like a sign-in, code or payment page (\(why))")
         }
@@ -130,7 +130,8 @@ extension EarshotActionRunner {
         var snapshot = read.snapshot
         snapshot.elements.append(e)
         var items = read.items
-        items[id] = ReadElement(element: e, kind: d.kind, handle: el)
+        // On a web page, an element outside the page area is browser chrome (a tab, the address field).
+        items[id] = ReadElement(element: e, kind: d.kind, handle: el, inPage: !read.web || read.viewport.contains(p))
         last = ScreenRead(snapshot: snapshot, pid: read.pid, areaPath: read.areaPath, window: read.window, viewport: read.viewport,
                           items: items, at: read.at, ms: read.ms, method: read.method + "+jev")
         return .success((id, d.label))
