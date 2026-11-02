@@ -82,13 +82,17 @@ final class CommandPipeline {
         }
 
         let rows = apps().filter { $0.approved && $0.enabled }
-        let namesClock = Stopwatch()
-        let known = await allNames()
-        stages["names"] = namesClock.ms
-        var context = RouteContext(apps: rows, names: known, frontBundleID: frontBundleID())
-        let screenClock = Stopwatch()
-        context.screen = await actions.screen()
-        stages["screen"] = screenClock.ms
+        // The names and the screen read do not depend on each other, so they run side by side.
+        // Each keeps its own timer. "context" is the wall time of both together.
+        let contextClock = Stopwatch()
+        async let namesTimed: ([NameEntry], Double) = { let c = Stopwatch(); let n = await allNames(); return (n, c.ms) }()
+        async let screenTimed: (ScreenSnapshot?, Double) = { let c = Stopwatch(); let s = await actions.screen(); return (s, c.ms) }()
+        let (known, namesMs) = await namesTimed
+        let (screen, screenMs) = await screenTimed
+        stages["names"] = namesMs
+        stages["screen"] = screenMs
+        stages["context"] = contextClock.ms
+        var context = RouteContext(apps: rows, names: known, frontBundleID: frontBundleID(), screen: screen)
 
         let routeClock = Stopwatch()
         var result = await router.route(text, context: context)
