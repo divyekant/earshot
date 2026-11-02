@@ -26,4 +26,15 @@ final class VisionMarksTests: XCTestCase {
         // e4 at the bottom edge: the badge stays inside the picture.
         XCTAssertGreaterThanOrEqual(marks[1].y, 0)
     }
+
+    /// A pick from the screenshot fallback runs with the tier "jev". Then a risky label is never pressed,
+    /// even if the owner said the exact label (R-NV-5).
+    func testJevTierNeverPressesRisky() {
+        let jev = CommandInfo(mode: .hold, tier: .jev, spokenTarget: "send")
+        XCTAssertNotNil(ActionRules.pressBlock(label: "Send", role: "AXButton", command: jev, sensitive: nil))
+        XCTAssertNotNil(ActionRules.pressBlock(label: "Delete account", role: "AXLink", command: jev, sensitive: nil))
+        XCTAssertNil(ActionRules.pressBlock(label: "Settings", role: "AXButton", command: jev, sensitive: nil))
+        // A sensitive page blocks every press.
+        XCTAssertNotNil(ActionRules.pressBlock(label: "Settings", role: "AXButton", command: jev, sensitive: "a password field"))
+    }
 }
