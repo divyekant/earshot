@@ -130,6 +130,33 @@ final class CommandPipelineTests: XCTestCase {
         XCTAssertEqual(target, "Ravi Kumar")
     }
 
+    func testNoAppSearchForTheOwnChat() async {
+        // First live test: "Slack me running late" (no comma) searched Slack for "running late".
+        let finder = FakeNames()
+        let (p, _, _) = make("Slack me running late", finder: finder)
+        _ = await p.finish(mode: .hold)
+        XCTAssertTrue(finder.searches.isEmpty, "\(finder.searches)")
+    }
+
+    func testNoAppSearchWhenTheRouteIsSure() async {
+        let finder = FakeNames()
+        let sure = RouteResult(intent: .openChat(appID: "slack", target: "Prakash Iyer", text: nil), confidence: 0.95,
+                               tier: .rules, ms: 0, why: "name match")
+        let (p, _, runner) = make("Slack Prakash extra words", router: FixedRouter(result: sure), finder: finder)
+        _ = await p.finish(mode: .hold)
+        XCTAssertTrue(finder.searches.isEmpty)
+        XCTAssertEqual(runner.runs.count, 1)
+    }
+
+    func testLogKeepsTheRouteReason() async {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let (p, _, _) = make("open notes")
+        p.log = ActivityLog(store: Store(folder: folder))
+        let r = await p.finish(mode: .hold)
+        XCTAssertTrue(r.note.contains("route:"), r.note)
+    }
+
     func testTypingPausesAlwaysOn() async {
         let (p, _, _) = make("Slack me, buy milk")
         var pauses: [Bool] = []
