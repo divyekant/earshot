@@ -35,6 +35,7 @@ final class MenuRulesTests: XCTestCase {
         XCTAssertNil(MenuRules.guess([s("Window > Open Finder", "cmd+opt+f")]))
         XCTAssertNil(MenuRules.guess([s("Apple > Search", "cmd+space")]))
         XCTAssertNil(MenuRules.guess([s("Edit > Find > Find Next", "cmd+g")]))
+        XCTAssertNil(MenuRules.guess([s("Chat > Jump to End", "opt+down")]))
         // A shortcut with Return can send a message. It never counts.
         XCTAssertNil(MenuRules.guess([s("File > New Message", "cmd+return")]))
         XCTAssertNil(MenuRules.guess([s("File > New Chat", "key code 99")]))
@@ -217,12 +218,17 @@ final class LiveDiscoveryTests: XCTestCase {
             print("LIVE   \(r.name): \(r.guess!.rule.rawValue) \(r.guess!.keys) (\(r.guess!.menuPath)), \(r.shortcuts) shortcuts, \(Int(r.ms)) ms")
         }
         let chat = rows.filter(\.isChat).map { var e = $0; e.approved = true; return e }
+        let front = ProcessInfo.processInfo.environment["EARSHOT_LIVE_FRONT"] == "1"
         let index = NameIndex(apps: { chat })
+        await index.setReadInFront(front)
+        await index.refresh()
+        print("LIVE sidebar read with apps in front: \(front)")
         for app in chat {
             let names = await index.names(appID: app.id)
             let scan = await index.lastScans[app.id]
             print("LIVE   \(app.name) sidebar: \(names.filter { $0.source == .sidebar }.count) names, self \(names.contains(where: \.isSelf)), "
-                  + "one read \(Int(scan?.readMs ?? 0)) ms, settled \(Int(scan?.settleMs ?? 0)) ms in \(scan?.reads ?? 0) reads")
+                  + "one read \(Int(scan?.readMs ?? 0)) ms, settled \(Int(scan?.settleMs ?? 0)) ms in \(scan?.reads ?? 0) reads, "
+                  + "\(scan?.windows ?? 0) windows, \(scan?.nodes ?? 0) nodes")
         }
     }
 

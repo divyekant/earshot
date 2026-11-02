@@ -15,6 +15,9 @@ public actor NameIndex: NameFinder {
     public var useContacts: Bool
     /// Names older than this are read again on the next `names(appID:)` call, in seconds.
     public var maxAge: TimeInterval
+    /// Bring each app to the front for a moment during `refresh`. Some apps show no window to
+    /// Accessibility while they are in the background. It presses no key.
+    public var readInFront: Bool = false
     private let store: Store?
     private var cache: [String: (at: Date, names: [NameEntry])] = [:]
     private var contactsCache: [NameEntry]?
@@ -33,6 +36,8 @@ public actor NameIndex: NameFinder {
         self.maxAge = maxAge
         self.store = store
     }
+
+    public func setReadInFront(_ on: Bool) { readInFront = on }
 
     public func setUseContacts(_ on: Bool) {
         useContacts = on
@@ -65,7 +70,7 @@ public actor NameIndex: NameFinder {
     @discardableResult
     public func refresh(appIDs: [String]? = nil) async -> [NameEntry] {
         let ids = appIDs ?? apps().filter { $0.isChat && $0.approved && $0.enabled }.map(\.id)
-        for id in ids { _ = await read(appID: id) }
+        for id in ids { _ = await read(appID: id, front: readInFront) }
         let all = NameMerge.merge(cache.values.map(\.names))
         if let store { try? store.save(all.filter { $0.source != .contacts }, "names.json") }
         return all
@@ -74,11 +79,11 @@ public actor NameIndex: NameFinder {
     /// All names in the cache.
     public func all() -> [NameEntry] { NameMerge.merge(cache.values.map(\.names)) }
 
-    private func read(appID: String) async -> [NameEntry] {
+    private func read(appID: String, front: Bool = false) async -> [NameEntry] {
         let manual = (store?.names ?? []).filter { $0.appID == appID && $0.source == .manual }
         guard let app = chatApp(appID) else { return manual }
         var found: [NameEntry] = []
-        if let scan = await SidebarReader.scan(app) {
+        if let scan = await SidebarReader.scan(app, front: front) {
             lastScans[appID] = scan
             found = scan.names.map { NameEntry(appID: appID, name: $0.name, isSelf: $0.isSelf, source: .sidebar) }
         }
