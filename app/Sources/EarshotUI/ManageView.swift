@@ -53,6 +53,20 @@ public struct ManageView: View {
     }
 
     public var body: some View {
+        VStack(spacing: 0) {
+            BrandHeader()
+            Divider()
+            tabs.padding()
+        }
+        .tint(Brand.accent)
+        .background(WindowReader().frame(width: 0, height: 0))
+        .onChange(of: settings) { _, new in
+            try? store.save(new, "settings.json")
+            hooks.settingsChanged?(new)
+        }
+    }
+
+    private var tabs: some View {
         TabView {
             GeneralTab(settings: $settings, hooks: hooks).tabItem { Text("General") }
             AppsTab(store: store, hooks: hooks).tabItem { Text("Apps") }
@@ -60,11 +74,6 @@ public struct ManageView: View {
             ActivityTab(store: store).tabItem { Text("Activity") }
             PermissionsTab().tabItem { Text("Permissions") }
             TestTab(store: store, hooks: hooks).tabItem { Text("Test") }
-        }
-        .padding()
-        .onChange(of: settings) { _, new in
-            try? store.save(new, "settings.json")
-            hooks.settingsChanged?(new)
         }
     }
 }
