@@ -82,7 +82,10 @@ final class CommandPipeline {
         }
 
         let rows = apps().filter { $0.approved && $0.enabled }
-        var context = RouteContext(apps: rows, names: await allNames(), frontBundleID: frontBundleID())
+        let namesClock = Stopwatch()
+        let known = await allNames()
+        stages["names"] = namesClock.ms
+        var context = RouteContext(apps: rows, names: known, frontBundleID: frontBundleID())
         let screenClock = Stopwatch()
         context.screen = await actions.screen()
         stages["screen"] = screenClock.ms
@@ -164,10 +167,15 @@ final class CommandPipeline {
         return true
     }
 
-    /// True if the words name the owner's own chat ("me", "myself", "my own chat").
+    /// True if the name part names the owner's own chat ("me", "myself", "my own chat").
+    /// The name part: the words before the first comma, or, with no comma, the first three words.
+    /// So "Slack Ravi, call me later" and "Slack Ravi call me later" do not count: "me" is in the message.
     static func namesSelf(_ text: String) -> Bool {
-        let words = Set(SafetyPolicy.normalize(text).split(separator: " ").map(String.init))
-        return !words.isDisjoint(with: ["me", "myself"]) || (words.contains("my") && words.contains("own"))
+        let head = text.split(separator: ",", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init) ?? text
+        var words = SafetyPolicy.normalize(head).split(separator: " ").map(String.init)
+        if !text.contains(",") { words = Array(words.prefix(3)) }
+        let set = Set(words)
+        return !set.isDisjoint(with: ["me", "myself"]) || (set.contains("my") && set.contains("own"))
     }
 
     static func appID(of intent: Intent) -> String? {

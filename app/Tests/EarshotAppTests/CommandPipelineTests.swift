@@ -212,3 +212,49 @@ final class DiscoverHookTests: XCTestCase {
         XCTAssertFalse(CommandPipeline.needsAppSearch("open my own chat in Slack", unsureChat))
     }
 }
+
+final class ReviewFixTests: XCTestCase {
+    func testUnknownNameWithMeInTheMessageStillSearches() async {
+        let finder = FakeNames()
+        finder.found = [NameEntry(appID: "slack", name: "Ravi Kumar", source: .search)]
+        let unsure = RouteResult(intent: .openChat(appID: "slack", target: "Ravi", text: "call me later"), confidence: 0.5,
+                                 tier: .rules, ms: 0, why: "unknown name")
+        let engine = TextEngine()
+        engine.text = "Slack Ravi call me later"
+        let p = CommandPipeline(engine: engine, router: FixedRouter(result: unsure), actions: DryRunner(), names: finder,
+                                apps: { Fixture.apps }, allNames: { Fixture.names }, frontBundleID: { nil })
+        p.heardName = { _, _ in ("Ravi", "slack") }
+        let r = await p.finish(mode: .hold)
+        XCTAssertEqual(finder.searches.count, 1)
+        XCTAssertNotNil(r.stages["names"])
+    }
+
+    func testNamesSelfLooksOnlyAtTheNamePart() {
+        XCTAssertTrue(CommandPipeline.namesSelf("Slack me running late"))
+        XCTAssertTrue(CommandPipeline.namesSelf("Slack me, running late"))
+        XCTAssertTrue(CommandPipeline.namesSelf("open my own chat in Slack"))
+        XCTAssertFalse(CommandPipeline.namesSelf("Slack Ravi call me later"))
+        XCTAssertFalse(CommandPipeline.namesSelf("Slack Ravi, call me later"))
+    }
+
+    func testWarmerReadsOnlyWithAccessibility() async {
+        var reads = 0
+        var trusted = false
+        let w = NameWarmer(interval: 3600, trusted: { trusted }, refresh: { reads += 1 })
+        let first = await w.tick()
+        XCTAssertFalse(first)
+        XCTAssertEqual(reads, 0)
+        trusted = true
+        let second = await w.tick()
+        XCTAssertTrue(second)
+        XCTAssertEqual(reads, 1)
+    }
+
+    func testWarmerReadsAtStart() async throws {
+        let done = expectation(description: "first read")
+        let w = NameWarmer(interval: 3600, trusted: { true }, refresh: { done.fulfill() })
+        w.start()
+        await fulfillment(of: [done], timeout: 2)
+        w.stop()
+    }
+}
