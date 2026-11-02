@@ -52,3 +52,25 @@ public protocol SpeechTimingReporting: AnyObject {
     /// Why this engine runs. `SpeechEngines.make` sets it.
     var reason: String { get set }
 }
+
+/// Keeps macOS from slowing the process during one command. earshot is a menu-bar app and is almost
+/// never the front app, so App Nap can lower its CPU and timer priority between commands.
+/// An activity with `.userInitiated` and `.latencyCritical` turns App Nap off until `end`.
+final class TurnActivity: @unchecked Sendable {
+    private let lock = NSLock()
+    private var token: NSObjectProtocol?
+
+    func begin(_ reason: String) {
+        lock.withLock {
+            if token != nil { return }
+            token = ProcessInfo.processInfo.beginActivity(options: [.userInitiated, .latencyCritical], reason: reason)
+        }
+    }
+
+    func end() {
+        let t = lock.withLock { () -> NSObjectProtocol? in defer { token = nil }; return token }
+        if let t { ProcessInfo.processInfo.endActivity(t) }
+    }
+
+    var isActive: Bool { lock.withLock { token != nil } }
+}

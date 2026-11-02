@@ -197,3 +197,32 @@ final class TimingTests: XCTestCase {
         XCTAssertNil((e as? SpeechTimingReporting)?.lastTiming)
     }
 }
+
+final class TurnTests: XCTestCase {
+    func testNewTurnClearsTheBuffer() {
+        let e = ParakeetEngine(modelPath: "/none.gguf", useMicrophone: false)
+        e.beginWithoutMicrophone()
+        e.feed([Float](repeating: 0.1, count: 16000))
+        XCTAssertEqual(e.bufferedFrames, 16000)
+        e.beginWithoutMicrophone()
+        XCTAssertEqual(e.bufferedFrames, 0, "a new turn must not keep the audio of the last turn")
+        e.feed([Float](repeating: 0.1, count: 800))
+        XCTAssertEqual(e.bufferedFrames, 800)
+    }
+
+    func testEndOfTurnClearsTheBufferAndTheActivity() async {
+        let e = ParakeetEngine(modelPath: "/none.gguf", useMicrophone: false)
+        e.beginWithoutMicrophone()
+        XCTAssertTrue(e.activity.isActive)
+        e.feed([Float](repeating: 0.1, count: 1600))
+        _ = try? await e.end()   // throws: no model. The buffer and the activity must still be cleared.
+        XCTAssertEqual(e.bufferedFrames, 0)
+        XCTAssertFalse(e.activity.isActive)
+    }
+
+    func testFeedOutsideATurnIsIgnored() {
+        let e = ParakeetEngine(modelPath: "/none.gguf", useMicrophone: false)
+        e.feed([Float](repeating: 0.1, count: 1600))
+        XCTAssertEqual(e.bufferedFrames, 0)
+    }
+}

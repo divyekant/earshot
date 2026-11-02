@@ -60,6 +60,35 @@ final class LiveReplayTests: XCTestCase {
         }
     }
 
+    /// 20 commands in a row, 1 s apart. The speech stage must not grow over the session.
+    func testParakeetTwentyCommands() async throws {
+        try XCTSkipUnless(enabled, "set EARSHOT_SPEECH_BENCH=1")
+        guard let model = ParakeetModelLocator().find(configured: "") else { throw XCTSkip("no Parakeet model file") }
+        let engine = ParakeetEngine(modelPath: model, useMicrophone: false)
+        try await engine.prepare()
+        let pcm = try AudioUtil.readSamples16k(say(phrases[0], 0))
+        let chunk = Int(16000 * chunkSeconds)
+        var totals: [Double] = []
+        for i in 0..<20 {
+            engine.beginWithoutMicrophone()
+            var at = 0
+            while at < pcm.count {
+                engine.feed(Array(pcm[at..<min(at + chunk, pcm.count)]))
+                at += chunk
+                try await Task.sleep(nanoseconds: UInt64(chunkSeconds * 1e9))
+            }
+            let u = try await engine.end()
+            line("parakeet run20 #\(i)", engine.lastTiming, u.text)
+            totals.append(engine.lastTiming?.totalMs ?? 0)
+            XCTAssertEqual(engine.lastTiming?.audioMs ?? 0, Double(pcm.count) / 16 + TailPad.seconds * 1000, accuracy: 1,
+                           "the audio of one command must not include earlier commands")
+            try await Task.sleep(nanoseconds: 1_000_000_000)
+        }
+        let first = totals.prefix(5).sorted()[2], last = totals.suffix(5).sorted()[2]
+        print(String(format: "REPLAY run20: median of first 5 %.1f ms, of last 5 %.1f ms", first, last))
+        XCTAssertLessThan(last, first * 2 + 20, "the speech stage grew over 20 commands")
+    }
+
     func testAppleReplay() async throws {
         try XCTSkipUnless(enabled, "set EARSHOT_SPEECH_BENCH=1")
         let engine = AppleSpeechEngine()
