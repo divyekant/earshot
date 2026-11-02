@@ -24,7 +24,8 @@ struct RulesDecision {
 /// Opens a chat or an app. Ported from probe E1Router (E1, section 6). It knows no app and no person in advance.
 /// It uses only the catalogue rows and the name entries of the context (R-MT-1, R-MT-2).
 enum ChatRouter {
-    static let leadFillers: Set<String> = ["hey", "ok", "okay", "earshot", "please", "can", "could", "you", "would"]
+    static let leadFillers: Set<String> = Set(["hey", "ok", "okay", "earshot", "please", "can", "could", "you", "would"])
+        .union(TextKit.hesitations)
     static let commandVerbs: Set<String> = ["message", "text", "ping", "dm", "tell", "write", "chat", "open", "go",
                                             "switch", "launch", "show", "reply", "jump", "start", "send", "bring",
                                             "pull", "talk", "find", "reach"]

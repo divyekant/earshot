@@ -9,6 +9,10 @@ enum TextKit {
     /// The normalized text with no spaces. "Whats App" and "WhatsApp" have the same key.
     static func key(_ s: String) -> String { normalize(s).replacingOccurrences(of: " ", with: "") }
 
+    /// Hesitation words that speech to text writes at the start of a command: "Uh, Slack me running late".
+    /// The router drops them like the other lead fillers. "so" counts only at the start; "so what" stays not a command.
+    static let hesitations: Set<String> = ["uh", "uhh", "um", "umm", "uhm", "er", "erm", "ah", "hmm", "hm", "so"]
+
     static func words(_ s: String) -> [String] { normalize(s).split(separator: " ").map(String.init) }
 
     static func levenshtein(_ a: String, _ b: String) -> Int {

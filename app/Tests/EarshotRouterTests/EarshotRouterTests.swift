@@ -153,6 +153,22 @@ final class EarshotRouterTests: XCTestCase {
         await expect("message Prakash", chat("slack", "Prakash Iyer"))
     }
 
+    // MARK: - Hesitation words (live: "Uh slack me running tomorrow." was "no command word")
+
+    func testHesitationWordsAreDropped() async {
+        await expect("Uh slack me running late.", chat("slack", "Owner (you)", "running late"))
+        await expect("um, Slack me running late", chat("slack", "Owner (you)", "running late"))
+        await expect("okay message me sounds good", chat("messages", "Owner", "sounds good"))
+        await expect("so message Felix", chat("messages", "Felix"))
+        await expect("erm click new", .click(elementID: "e2"), news)
+        let um = await route("um open hn.com"), plain = await route("open hn.com")
+        XCTAssertEqual(um.intent, plain.intent)
+        XCTAssertEqual(um.why, plain.why)
+        let so = await route("so what")
+        XCTAssertEqual(so.intent, .none)
+        XCTAssertEqual(so.why, "no command word or app name")
+    }
+
     func testE1OpenApp() async {
         await expect("switch to Slack", .openApp(appID: "slack"))
         await expect("open Notes", .openApp(appID: "notes"))
