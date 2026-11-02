@@ -7,12 +7,25 @@ import Foundation
 /// It reads the model file in place (for example the GGUF file of Hex) and keeps it loaded:
 /// the load takes about 14 s and about 890 MB (E2, section 5.4).
 /// The model weights are CC BY 4.0 (NVIDIA Parakeet). Credit them in the app's About text.
-public final class ParakeetEngine: SpeechEngine, @unchecked Sendable {
+public final class ParakeetEngine: SpeechEngine, SpeechTimingReporting, @unchecked Sendable {
     public static let engineID = "parakeet"
     public let id = ParakeetEngine.engineID
     public let modelPath: String
     public var onPartial: (@Sendable (String) -> Void)?
+    public var reason = ""
     var partials = PartialSchedule()
+
+    /// At the key press, if the model was idle for this time or more, the engine starts a short warm-up run.
+    /// The warm-up runs while the owner speaks, so that the final run does not pay for an idle GPU.
+    /// Nil turns the warm-up off.
+    public var warmAfterIdleSeconds: Double? = 2.0
+    /// The length of the warm-up audio (silence).
+    var warmSeconds = 0.5
+    /// True: start the warm-up run at every key press. AutoSpeechEngine uses its time to see if the
+    /// model weights are in memory.
+    public var warmEveryTurn = false
+    /// The time of a warm-up run right after the load, when the weights are surely in memory.
+    public private(set) var baselineWarmMs: Double = 0
 
     /// All model runs go through this queue, because one transcribe.cpp session is not thread safe.
     private let queue = DispatchQueue(label: "earshot.speech.parakeet", qos: .userInitiated)
@@ -22,13 +35,21 @@ public final class ParakeetEngine: SpeechEngine, @unchecked Sendable {
     private var lastPartialFrames = 0
     private var listening = false
     private var timer: DispatchSourceTimer?
+    private var lastRunEndNs: UInt64 = 0
+    private var turn = SpeechTiming(engine: ParakeetEngine.engineID, why: "")
+    private var timing: SpeechTiming?
+    private var turnID = 0
+    private var turnWarm: Double?
     private let mic: MicrophoneFeed
+    let activity = TurnActivity()
     private let useMicrophone: Bool
 
     /// The time of the last load, in ms. For the log and the management window.
     public private(set) var loadMs: Double = 0
 
-    /// - Parameter useMicrophone: false for tests that give audio with `transcribe(samples:)`.
+    public var lastTiming: SpeechTiming? { lock.withLock { timing } }
+
+    /// - Parameter useMicrophone: false for tests that give audio with `transcribe(samples:)` or `feed`.
     public init(modelPath: String, useMicrophone: Bool = true) {
         self.modelPath = modelPath
         self.useMicrophone = useMicrophone
@@ -64,43 +85,75 @@ public final class ParakeetEngine: SpeechEngine, @unchecked Sendable {
         }
         session = s
         // The first run prepares the GPU code. Do it now, not on the first command.
-        let warm = [Float](repeating: 0, count: 16000)
-        _ = warm.withUnsafeBufferPointer { transcribe_run(s, $0.baseAddress, Int32($0.count), nil) }
+        warmNow(seconds: 1.0)
         loadMs = SpeechClock.ms(since: t0)
+        let tb = SpeechClock.nowNs()
+        warmNow(seconds: warmSeconds)
+        baselineWarmMs = SpeechClock.ms(since: tb)
     }
 
     public func begin() throws {
         guard useMicrophone else { throw SpeechError("this Parakeet engine has no microphone") }
         guard mic.isRunning else { throw SpeechError("Parakeet is not ready: call prepare() first") }
-        lock.withLock {
-            samples.removeAll(keepingCapacity: true)
-            lastPartialFrames = 0
-            listening = true
-        }
-        mic.begin { [weak self] buffer in self?.append(AudioUtil.floats(buffer)) }
-        startTimer()
+        startTurn()
+        mic.begin { [weak self] buffer in self?.feed(AudioUtil.floats(buffer)) }
+    }
+
+    /// Starts a turn with no microphone. The caller gives the audio with `feed`. For measurements.
+    func beginWithoutMicrophone() { startTurn() }
+
+    /// The time of the warm-up run of this turn, or nil if it did not run or is not done.
+    public var turnWarmMs: Double? { lock.withLock { turnWarm } }
+
+    /// Drops the turn with no decode. The microphone stops to pass audio.
+    public func cancelTurn() {
+        if useMicrophone { mic.end() }
+        stopTimer()
+        lock.withLock { samples.removeAll(); listening = false }
+        activity.end()
+    }
+
+    /// The samples of the turn so far. For tests.
+    var bufferedFrames: Int { lock.withLock { samples.count } }
+
+    /// Adds audio (16 kHz mono float) to the turn.
+    func feed(_ floats: [Float]) {
+        lock.withLock { if listening { samples.append(contentsOf: floats) } }
     }
 
     public func end() async throws -> Utterance {
         let t0 = SpeechClock.nowNs()
-        mic.end()                      // adds the tail silence
+        if useMicrophone {
+            await mic.end(captureSeconds: TailPad.captureSeconds)   // then adds the tail silence through `feed`
+        } else {
+            feed([Float](repeating: 0, count: TailPad.frames(sampleRate: 16000)))
+        }
         stopTimer()
-        let pcm = lock.withLock {
+        let (pcm, started) = lock.withLock { () -> ([Float], SpeechTiming) in
             let out = samples
             samples.removeAll()
             listening = false
-            return out
+            return (out, turn)
         }
-        let text = try await run(pcm)
-        return Utterance(text: text, engine: id, ms: SpeechClock.ms(since: t0))
+        var t = started
+        t.why = reason
+        t.audioMs = Double(pcm.count) / 16.0
+        t.tailMs = SpeechClock.ms(since: t0)
+        defer { activity.end() }
+        let r = try await run(pcm)
+        t.waitMs = r.waitMs
+        t.decodeMs = r.decodeMs
+        t.totalMs = SpeechClock.ms(since: t0)
+        lock.withLock { timing = t }
+        return Utterance(text: r.text, engine: id, ms: t.totalMs)
     }
 
     /// Transcribes samples (16 kHz mono float) with the loaded model. Adds the tail silence.
     /// For the Test tab and for measurements.
     public func transcribe(samples pcm: [Float]) async throws -> Utterance {
         let t0 = SpeechClock.nowNs()
-        let text = try await run(pcm + [Float](repeating: 0, count: TailPad.frames(sampleRate: 16000)))
-        return Utterance(text: text, engine: id, ms: SpeechClock.ms(since: t0))
+        let r = try await run(pcm + [Float](repeating: 0, count: TailPad.frames(sampleRate: 16000)))
+        return Utterance(text: r.text, engine: id, ms: SpeechClock.ms(since: t0))
     }
 
     /// Transcribes an audio file of any format that AVAudioFile reads.
@@ -113,14 +166,54 @@ public final class ParakeetEngine: SpeechEngine, @unchecked Sendable {
 
     // MARK: - Private
 
-    private func append(_ floats: [Float]) {
-        lock.withLock { if listening { samples.append(contentsOf: floats) } }
+    private func startTurn() {
+        activity.begin("earshot speech command")
+        let now = SpeechClock.nowNs()
+        let (warm, id): (Bool, Int) = lock.withLock {
+            turnID += 1
+            turnWarm = nil
+            samples.removeAll(keepingCapacity: true)
+            lastPartialFrames = 0
+            listening = true
+            turn = SpeechTiming(engine: id, why: reason)
+            turn.idleMs = lastRunEndNs == 0 ? 0 : Double(now &- lastRunEndNs) / 1_000_000
+            if warmEveryTurn { turn.warmed = true }
+            if let limit = warmAfterIdleSeconds, turn.idleMs >= limit * 1000 { turn.warmed = true }
+            return (turn.warmed, turnID)
+        }
+        if warm {
+            let seconds = warmSeconds
+            queue.async { [weak self] in
+                guard let self else { return }
+                let t0 = SpeechClock.nowNs()
+                self.warmNow(seconds: seconds)
+                let ms = SpeechClock.ms(since: t0)
+                self.lock.withLock { if self.turnID == id { self.turnWarm = ms } }
+            }
+        }
+        if onPartial != nil { startTimer() }
     }
 
-    private func run(_ pcm: [Float]) async throws -> String {
-        try await withCheckedThrowingContinuation { (c: CheckedContinuation<String, Error>) in
+    /// Runs on `queue`. A run on silence, to wake the GPU and bring the model weights back into memory.
+    private func warmNow(seconds: Double) {
+        guard let session else { return }
+        let pcm = [Float](repeating: 0, count: Int(16000 * seconds))
+        _ = pcm.withUnsafeBufferPointer { transcribe_run(session, $0.baseAddress, Int32($0.count), nil) }
+        lock.withLock { lastRunEndNs = SpeechClock.nowNs() }
+    }
+
+    private struct RunResult { let text: String; let waitMs: Double; let decodeMs: Double }
+
+    private func run(_ pcm: [Float]) async throws -> RunResult {
+        let queued = SpeechClock.nowNs()
+        return try await withCheckedThrowingContinuation { (c: CheckedContinuation<RunResult, Error>) in
             queue.async { [self] in
-                do { c.resume(returning: try runNow(pcm)) } catch { c.resume(throwing: error) }
+                let wait = SpeechClock.ms(since: queued)
+                let t0 = SpeechClock.nowNs()
+                do {
+                    let text = try runNow(pcm)
+                    c.resume(returning: RunResult(text: text, waitMs: wait, decodeMs: SpeechClock.ms(since: t0)))
+                } catch { c.resume(throwing: error) }
             }
         }
     }
@@ -130,6 +223,7 @@ public final class ParakeetEngine: SpeechEngine, @unchecked Sendable {
         guard let session else { throw SpeechError("Parakeet is not loaded: call prepare() first") }
         if pcm.isEmpty { return "" }
         let status = pcm.withUnsafeBufferPointer { transcribe_run(session, $0.baseAddress, Int32($0.count), nil) }
+        lock.withLock { lastRunEndNs = SpeechClock.nowNs() }
         guard status == TRANSCRIBE_OK else { throw SpeechError("Parakeet run failed: \(Self.statusText(status))") }
         guard let c = transcribe_full_text(session) else { return "" }
         return TextClean.clean(String(cString: c))

@@ -5,11 +5,13 @@ import Speech
 
 /// Apple SpeechTranscriber, on the Mac (R-MD-1, E0). It needs no model file from the owner:
 /// macOS downloads the speech model for the locale one time.
-public final class AppleSpeechEngine: SpeechEngine, @unchecked Sendable {
+public final class AppleSpeechEngine: SpeechEngine, SpeechTimingReporting, @unchecked Sendable {
     public static let engineID = "apple"
     public let id = AppleSpeechEngine.engineID
     public let locale: Locale
     public var onPartial: (@Sendable (String) -> Void)?
+    public var reason = ""
+    public var lastTiming: SpeechTiming? { lock.withLock { timing } }
 
     private static let options = SpeechAnalyzer.Options(priority: .userInitiated, modelRetention: .processLifetime)
     private let lock = NSLock()
@@ -17,6 +19,11 @@ public final class AppleSpeechEngine: SpeechEngine, @unchecked Sendable {
     private var resolvedLocale: Locale?
     private var setup: Task<(SpeechAnalyzer, Task<String, Error>), Error>?
     private var finish: (() -> Void)?
+    private var sink: ((AVAudioPCMBuffer) -> Void)?
+    private var format: AVAudioFormat?
+    private var frames: Int64 = 0
+    private var timing: SpeechTiming?
+    let activity = TurnActivity()
 
     public init(locale: Locale = Locale(identifier: "en_US")) { self.locale = locale }
 
@@ -54,42 +61,93 @@ public final class AppleSpeechEngine: SpeechEngine, @unchecked Sendable {
         let warm = SpeechAnalyzer(modules: [module], options: Self.options)
         try await warm.prepareToAnalyze(in: format)
         await warm.cancelAndFinishNow()
-        lock.withLock { resolvedLocale = loc }
+        lock.withLock { resolvedLocale = loc; self.format = format }
         return format
     }
 
     /// Key down: audio goes to the analyzer at once. The analyzer starts in parallel.
     public func begin() throws {
-        guard let (mic, loc) = lock.withLock({ () -> (MicrophoneFeed, Locale)? in
-            guard let mic, let loc = resolvedLocale else { return nil }
-            return (mic, loc)
-        }) else {
+        guard let mic = lock.withLock({ self.mic }) else {
             throw SpeechError("Apple speech is not ready: call prepare() first")
         }
+        mic.begin(try startTurn())
+    }
+
+    /// Starts a turn with no microphone, for measurements. Give the audio (in the model format) to the returned function.
+    func beginWithoutMicrophone() throws -> (AVAudioPCMBuffer) -> Void { try startTurn() }
+
+    /// The audio format of the model, after `prepareModel`.
+    var modelFormat: AVAudioFormat? { lock.withLock { format } }
+
+    private func startTurn() throws -> (AVAudioPCMBuffer) -> Void {
+        guard let loc = lock.withLock({ resolvedLocale }) else {
+            throw SpeechError("Apple speech is not ready: call prepare() first")
+        }
+        activity.begin("earshot speech command")
         let (stream, continuation) = AsyncStream.makeStream(of: AnalyzerInput.self)
-        mic.begin { buffer in continuation.yield(AnalyzerInput(buffer: buffer)) }
         let task = Self.startAnalyzer(locale: loc, input: stream, onPartial: onPartial)
+        let feed: (AVAudioPCMBuffer) -> Void = { [weak self] buffer in
+            self?.lock.withLock { self?.frames += Int64(buffer.frameLength) }
+            continuation.yield(AnalyzerInput(buffer: buffer))
+        }
         lock.withLock {
             setup = task
+            sink = feed
+            frames = 0
             finish = { continuation.finish() }   // `end` closes the stream.
         }
+        return feed
     }
 
     /// Key up: closes the audio (with the tail silence), finalizes, and returns the text.
     public func end() async throws -> Utterance {
         let t0 = SpeechClock.nowNs()
+        let (mic, task, close, feed, format) = lock.withLock {
+            let out = (self.mic, setup, finish, sink, self.format)
+            setup = nil; finish = nil; sink = nil
+            return out
+        }
+        if let mic {
+            await mic.end(captureSeconds: TailPad.captureSeconds)   // then adds the tail silence through the sink
+        } else if let feed, let format, let pad = AudioUtil.silence(format: format, frames: TailPad.frames(sampleRate: format.sampleRate)) {
+            feed(pad)
+        }
+        close?()
+        defer { activity.end() }
+        guard let task else { return Utterance(text: "", engine: id, ms: 0) }
+        var t = SpeechTiming(engine: id, why: reason)
+        t.tailMs = SpeechClock.ms(since: t0)
+        let tWait = SpeechClock.nowNs()
+        let (analyzer, collector) = try await task.value
+        t.waitMs = SpeechClock.ms(since: tWait)
+        let tDecode = SpeechClock.nowNs()
+        try await analyzer.finalizeAndFinishThroughEndOfInput()
+        let text = TextClean.clean(try await collector.value)
+        t.decodeMs = SpeechClock.ms(since: tDecode)
+        t.totalMs = SpeechClock.ms(since: t0)
+        lock.withLock {
+            if let format { t.audioMs = Double(frames) / format.sampleRate * 1000 }
+            timing = t
+        }
+        return Utterance(text: text, engine: id, ms: t.totalMs)
+    }
+
+    /// Drops the turn with no final text.
+    public func cancelTurn() {
         let (mic, task, close) = lock.withLock {
             let out = (self.mic, setup, finish)
-            setup = nil; finish = nil
+            setup = nil; finish = nil; sink = nil
             return out
         }
         mic?.end()
         close?()
-        guard let task else { return Utterance(text: "", engine: id, ms: 0) }
-        let (analyzer, collector) = try await task.value
-        try await analyzer.finalizeAndFinishThroughEndOfInput()
-        let text = TextClean.clean(try await collector.value)
-        return Utterance(text: text, engine: id, ms: SpeechClock.ms(since: t0))
+        activity.end()
+        guard let task else { return }
+        Task {
+            guard let (analyzer, collector) = try? await task.value else { return }
+            await analyzer.cancelAndFinishNow()
+            collector.cancel()
+        }
     }
 
     /// Transcribes an audio file. For the Test tab and for measurements. `ms` is the full run time.
