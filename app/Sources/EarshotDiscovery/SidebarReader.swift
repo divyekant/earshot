@@ -64,7 +64,7 @@ enum SidebarReader {
             oneRead = 0
             nodes = 0
             for win in windows {
-                let r = read(window: win)
+                let r = read(window: win, appName: app.name)
                 oneRead += r.ms
                 nodes += r.nodes
                 loading = loading || r.loading
@@ -78,6 +78,23 @@ enum SidebarReader {
         return SidebarScan(appID: app.id, names: check.kept, appAliases: extra, readMs: Clock.round1(oneRead),
                            settleMs: Clock.round1(Clock.ms(since: t0)), reads: check.reads, stillLoading: check.stillLoading,
                            windows: windows.count, nodes: nodes)
+    }
+
+    /// True if the element opens and closes a group of rows: it has a disclosure state, disclosed rows,
+    /// or a heading or a disclosure triangle among its first descendants.
+    static func isSectionHeader(_ el: AXUIElement) -> Bool {
+        if AX.bool(el, "AXExpanded") != nil || AX.bool(el, "AXDisclosing") == true { return true }
+        if !AX.elements(el, "AXDisclosedRows").isEmpty { return true }
+        var stack = AX.elements(el, "AXChildren")
+        var count = 0
+        while let child = stack.popLast(), count < 40 {
+            count += 1
+            let r = AX.role(child)
+            if r == "AXHeading" || r == "AXDisclosureTriangle" { return true }
+            if AX.bool(child, "AXExpanded") != nil { return true }
+            stack.append(contentsOf: AX.elements(child, "AXChildren"))
+        }
+        return false
     }
 
     /// The texts of a list row, from the top left. Chat lists put the name there, and the last message after it.
@@ -111,7 +128,7 @@ enum SidebarReader {
     }
 
     /// Reads the sidebar of one window. It skips the main pane, the title bar, menus, images and live regions.
-    static func read(window: AXUIElement, budgetMs: Int = 1500, maxNodes: Int = 20000) -> SidebarRead {
+    static func read(window: AXUIElement, appName: String = "", budgetMs: Int = 1500, maxNodes: Int = 20000) -> SidebarRead {
         var result = SidebarRead()
         guard let w = AX.frame(window) else { return result }
         let t0 = Clock.nowNs()
@@ -131,7 +148,7 @@ enum SidebarReader {
             if let f = frame, f.w == 0 || f.h == 0 { return false }
             if NameRules.isLoading(raw) { result.loading = true }
             if !placeholderKey.isEmpty, Words.key(raw) == placeholderKey { return false }
-            guard let c = NameRules.clean(raw) else { return false }
+            guard let c = NameRules.sidebarName(raw, appName: appName) else { return false }
             if seen.insert(Words.key(c.name)).inserted {
                 result.names.append(SidebarName(name: c.name, isSelf: c.isSelf, fromRow: fromRow))
             }
@@ -148,6 +165,8 @@ enum SidebarReader {
                 if f.x >= right || f.maxY <= top { continue }
             }
             if r == "AXRow" || r == "AXCell" {
+                // A section header ("Channels", a custom section) is a row too. It is not a chat.
+                if isSectionHeader(el) { continue }
                 for text in rowTexts(el) {
                     // The first part of a row name: "Ravi, 2 unread" gives "Ravi".
                     let part = text.split(separator: ",").first.map(String.init) ?? text
@@ -162,8 +181,9 @@ enum SidebarReader {
                 _ = add(text, fromRow: false, frame: frame)
             }
             if r == "AXLink" || r == "AXButton" {
-                _ = add(AX.string(el, "AXTitle") ?? AX.string(el, "AXDescription"), fromRow: false, frame: frame)
+                if !isSectionHeader(el) { _ = add(AX.string(el, "AXTitle") ?? AX.string(el, "AXDescription"), fromRow: false, frame: frame) }
             }
+            if r == "AXHeading" || r == "AXDisclosureTriangle" { continue }
             queue.append(contentsOf: AX.elements(el, "AXChildren"))
         }
         result.nodes = index
