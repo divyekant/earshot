@@ -56,7 +56,7 @@ enum SidebarReader {
         let el = AX.appElement(running.processIdentifier)
         if app.electron { AX.askForTree(el) }
         // An open search covers the chat list with results and the typed text (seen live in Slack).
-        if SearchReader.searchOpen(el) {
+        if SearchReader.searchOpen(el) || AX.window(el).map(searchHasText) == true {
             return SidebarScan(appID: app.id, names: [], appAliases: [], readMs: 0, settleMs: Clock.round1(Clock.ms(since: t0)),
                                reads: 0, stillLoading: false, windows: 0, nodes: 0, searchOpen: true)
         }
@@ -86,6 +86,13 @@ enum SidebarReader {
         return SidebarScan(appID: app.id, names: check.kept, appAliases: extra, readMs: Clock.round1(oneRead),
                            settleMs: Clock.round1(Clock.ms(since: t0)), reads: check.reads, stillLoading: check.stillLoading,
                            windows: windows.count, nodes: nodes)
+    }
+
+    /// True if the window has a search field with text in it. An app in the background can keep its
+    /// search open without the focus in the field (seen live in Slack).
+    static func searchHasText(_ window: AXUIElement) -> Bool {
+        guard let field = AX.findSearchField(in: window, budgetMs: 100) else { return false }
+        return !(AX.value(field) ?? "").trimmingCharacters(in: .whitespaces).isEmpty
     }
 
     /// True if the element opens and closes a group of rows: it has a disclosure state, disclosed rows,

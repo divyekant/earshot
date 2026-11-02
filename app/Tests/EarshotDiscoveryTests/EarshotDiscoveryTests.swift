@@ -188,6 +188,11 @@ final class NameRulesTests: XCTestCase {
                       "Your personal messages are end-to-end encrypted"] {
             XCTAssertNil(NameRules.sidebarName(label, appName: "Chat"), label)
         }
+        // Seen live: a Slack header, and Zoom toolbar and pane labels.
+        for label in ["This is your space.", "Search ⌘E", "Back in Chat", "Forward in Chat", "History", "Sunday, November 1"] {
+            XCTAssertNil(NameRules.sidebarName(label, appName: "Chat"), label)
+        }
+        XCTAssertEqual(NameRules.sidebarName("Slackbot", appName: "Slack")?.name, "Slackbot")
         XCTAssertEqual(NameRules.sidebarName("Manel & Mrunal", appName: "Messages")?.name, "Manel & Mrunal")
         XCTAssertEqual(NameRules.sidebarName("Meta AI", appName: "WhatsApp")?.name, "Meta AI")
         // People, channels and the self entry stay.
