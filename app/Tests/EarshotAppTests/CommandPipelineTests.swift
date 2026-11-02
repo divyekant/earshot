@@ -277,3 +277,29 @@ final class EndToEndRouterTests: XCTestCase {
         XCTAssertEqual(text?.lowercased().trimmingCharacters(in: .punctuationCharacters), "running late")
     }
 }
+
+final class SlowScreenRunner: CommandActions {
+    func screen() async -> ScreenSnapshot? {
+        try? await Task.sleep(nanoseconds: 60_000_000)
+        return nil
+    }
+    func run(_ intent: Intent, context: RouteContext, command: CommandInfo) async -> ActionOutcome {
+        ActionOutcome(ok: true, note: "dry run")
+    }
+}
+
+final class ParallelContextTests: XCTestCase {
+    func testNamesAndScreenRunSideBySide() async {
+        let engine = TextEngine()
+        engine.text = "open notes"
+        let p = CommandPipeline(engine: engine, router: CommandRouter(), actions: SlowScreenRunner(), names: FakeNames(),
+                                apps: { Fixture.apps },
+                                allNames: { try? await Task.sleep(nanoseconds: 60_000_000); return Fixture.names },
+                                frontBundleID: { nil })
+        let r = await p.finish(mode: .hold)
+        let names = r.stages["names"] ?? 0, screen = r.stages["screen"] ?? 0, context = r.stages["context"] ?? 0
+        XCTAssertGreaterThan(names, 50)
+        XCTAssertGreaterThan(screen, 50)
+        XCTAssertLessThan(context, names + screen - 30, "names \(names), screen \(screen), context \(context)")
+    }
+}
