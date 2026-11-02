@@ -46,5 +46,8 @@ jobs:
       - name: Build
         run: swift build
 
-      - name: Test
-        run: swift test
+      # The tests run on the release build, the same build as the app bundle (build-app.sh).
+      # The latency benches (OfflineBench, MenuBench) assert release limits there. A debug build
+      # on a shared runner is about 15 times slower and does not show the latency of the app.
+      - name: Test (release build)
+        run: swift test -c release -Xswiftc -enable-testing
