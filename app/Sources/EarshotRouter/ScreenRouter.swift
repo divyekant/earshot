@@ -16,6 +16,19 @@ struct ScreenParse {
     var scroll: ScrollDirection?
     /// All the words after the lead fillers, with numbers as digits. A menu title can start with a verb ("Select All").
     var words: [String] = []
+    /// The first command word: "type", "search", "click", "focus" and so on.
+    var verb: String?
+    /// Ways to read the words as a text box and the text to type into it: "type hi into the notes box",
+    /// "in notes type hi", "click notes and type hi". The router uses a split only if the box words match a text field well.
+    var splits: [BoxSplit] = []
+    /// True if the words make sense only with a box ("in notes type hi"): no box match gives no action.
+    var splitOnly = false
+}
+
+/// One way to read a command as a text box and the text for it.
+struct BoxSplit {
+    let box: [String]
+    let text: String
 }
 
 /// Voice clicks on the front window. Ported from probe WebRouter (E2, section 6.1). It knows no site.
@@ -24,7 +37,11 @@ enum ScreenRouter {
     static let fillers: Set<String> = Set(["hey", "ok", "okay", "earshot", "please", "can", "could", "you", "would", "now", "then",
                                            "just", "lets", "let", "us", "i", "want", "to", "need"]).union(TextKit.hesitations)
     static let pressVerbs: Set<String> = ["click", "press", "tap", "open", "select", "choose", "hit", "follow", "visit", "go",
-                                          "show", "check", "toggle", "expand", "view", "take", "jump", "pick", "switch"]
+                                          "show", "check", "toggle", "expand", "view", "take", "jump", "pick", "switch", "focus"]
+    /// Words that end a box name before the text: "click notes and type hi".
+    static let thenType: [[String]] = [["and", "type"], ["then", "type"], ["and", "enter"], ["and", "write"]]
+    /// Words after "type" that stand for the text that comes later: "type a message in notes: hi".
+    static let textStandIns: Set<String> = ["a", "the", "some", "message", "text", "this", "note"]
     /// Words before a window word at the end of a command: "on open Chrome window", "in this window".
     static let windowWords: Set<String> = ["window", "app", "application"]
     static let typeVerbs: Set<String> = ["search", "find", "look", "type", "enter"]
@@ -109,14 +126,35 @@ enum ScreenRouter {
         }
         if joined.contains(" previous page ") { p.kind = .back; p.isCommand = true; return p }
 
-        // Type: "search for X", "look up X", "type X into Y".
+        // "in <box> type X", "into <box> enter X".
+        if ["in", "into", "on"].contains(t[0]),
+           let k = t.indices.dropFirst(2).first(where: { t[$0] == "type" || t[$0] == "enter" }), k + 1 < t.count {
+            p.kind = .type
+            p.verb = t[k]
+            p.isCommand = true
+            p.text = tokens.raw((k + 1)..<t.count)
+            p.splits = [BoxSplit(box: strip(TextKit.digitize(Array(t[1..<k]))), text: p.text ?? "")]
+            p.splitOnly = true
+            return p
+        }
+
+        // Type: "search for X", "look up X", "type X", "type X into Y".
         if let first = t.first, typeVerbs.contains(first), t.count >= 2 {
             var start = 1
-            var end = t.count
+            let end = t.count
+            p.verb = first
             if first == "type" || first == "enter" {
-                if let into = t.indices.dropFirst(2).last(where: { t[$0] == "into" || t[$0] == "in" }) {
-                    p.target = strip(Array(t[(into + 1)...]))
-                    end = into
+                // "type X in/into <box>". The box must match a text field, else all the words are the text:
+                // "type I'm in the meeting" types all of it.
+                if let into = t.indices.dropFirst(2).last(where: { t[$0] == "into" || t[$0] == "in" }), into + 1 < t.count {
+                    p.splits.append(BoxSplit(box: strip(TextKit.digitize(Array(t[(into + 1)...]))), text: tokens.raw(1..<into)))
+                }
+                // "type a message in <box>. <text>": the box part ends at a stop mark.
+                var j = 1
+                while j < t.count, textStandIns.contains(t[j]) { j += 1 }
+                if j < t.count, ["in", "into", "and", "to", "on"].contains(t[j]),
+                   let stop = tokens.stops.first(where: { $0 > j + 1 && $0 < t.count }) {
+                    p.splits.append(BoxSplit(box: strip(TextKit.digitize(Array(t[(j + 1)..<stop]))), text: tokens.raw(stop..<t.count)))
                 }
             } else {
                 while start < end - 1, ["for", "up", "the", "web"].contains(t[start]) { start += 1 }
@@ -145,7 +183,14 @@ enum ScreenRouter {
         if let v = t.prefix(3).firstIndex(where: { pressVerbs.contains($0) }) {
             p.isCommand = true
             verb = t[v]
+            p.verb = t[v]
             p.target = strip(TextKit.digitize(dropWindow(Array(t[(v + 1)...]))))
+            // "click <box> and type X", "focus on <box> then type X".
+            for pair in thenType {
+                guard let a = t.indices.dropFirst(v + 2).first(where: { $0 + 1 < t.count && Array(t[$0...($0 + 1)]) == pair }),
+                      a + 2 < t.count else { continue }
+                p.splits.append(BoxSplit(box: strip(TextKit.digitize(Array(t[(v + 1)..<a]))), text: tokens.raw((a + 2)..<t.count)))
+            }
         } else {
             p.target = strip(TextKit.digitize(dropWindow(t)))
         }
@@ -423,12 +468,32 @@ enum ScreenRouter {
             RulesDecision(intent: intent, sure: sure, exact: exact, why: why, options: options)
         }
 
+        // A text box and the text for it, if the box words match a text field well.
+        if !p.splits.isEmpty {
+            let fields = elements.filter { kind($0) == "field" && !$0.risky }
+            for split in p.splits where !split.box.isEmpty && !split.text.isEmpty {
+                let said = Said(split.box)
+                let ranked = fields.map { ($0, score(said, info($0.label))) }.sorted { $0.1 > $1.1 }
+                guard let top = ranked.first, top.1 >= strongMatch else { continue }
+                if let next = ranked.dropFirst().first, next.1 > top.1 - margin { continue }
+                options.append(RouteOption(intent: .typeInto(elementID: top.0.id, text: split.text),
+                                           label: "Type the words into the field \"\(top.0.label)\"", score: top.1))
+                let exact = info(top.0.label).keys.contains(said.key)
+                return done(.typeInto(elementID: top.0.id, text: split.text), true, exact, "text box \"\(top.0.label)\"")
+            }
+            if p.splitOnly { return done(.none, true, true, "no text box matches") }
+        }
+
         switch p.kind {
         case .scroll:
             return done(.scroll(p.scroll ?? .down), true, true, "scroll words")
         case .back:
             return done(.back, true, true, "back words")
         case .type:
+            // "type X" with no box name: the focused text field. "search for X" still prefers a search field.
+            if p.target.isEmpty, p.verb == "type" || p.verb == "enter", screen.focusedID != nil, let text = p.text, !text.isEmpty {
+                return done(.typeText(text), true, true, "focused text field")
+            }
             let fields = elements.filter { kind($0) == "field" && !$0.risky }
             let ranked = fields.map { f -> (ScreenElement, Double) in
                 let s = p.target.isEmpty ? (isSearchField(f) ? 1.0 : (f.role == "AXTextArea" ? 0.4 : 0.6)) : score(p.target, f.label)

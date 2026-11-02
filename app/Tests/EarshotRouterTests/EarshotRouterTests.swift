@@ -647,6 +647,65 @@ final class EarshotRouterTests: XCTestCase {
         XCTAssertNotEqual(off.intent, .openApp(appID: "claude"), off.why)
     }
 
+    // MARK: - Typing into a text box (live strings; the page and its labels are made up)
+
+    func boxes(focused: String? = "e2") -> RouteContext {
+        RouteContext(apps: Fixtures.apps, names: Fixtures.names, frontBundleID: "com.google.Chrome",
+                     screen: ScreenSnapshot(bundleID: "com.google.Chrome", windowTitle: "Assistant", elements: [
+                        Fixtures.el("e1", "AXTextArea", "Ask a question…", y: 500),
+                        Fixtures.el("e2", "AXTextArea", "Steer this thread…", y: 300),
+                        Fixtures.el("e3", "AXLink", "Home", y: 10),
+                     ], focusedID: focused))
+    }
+
+    func testTypeIntoTheFocusedField() async {
+        await expect("Type hi, this is a test.", .typeText("hi, this is a test"), boxes())
+        await expect("type I'm in the meeting", .typeText("I'm in the meeting"), boxes())
+        // With no focus and no search field, "type X" does not guess a box.
+        let r = await route("Type hi, this is a test.", boxes(focused: nil))
+        XCTAssertNotEqual(r.intent, .typeText("hi, this is a test"), r.why)
+        XCTAssertFalse({ if case .typeInto = r.intent { return true }; return false }(), r.why)
+    }
+
+    func testFocusIsAPressWord() async {
+        await expect("Focus on steer this thread.", .click(elementID: "e2"), boxes())
+        await expect("focus to steer this thread", .click(elementID: "e2"), boxes())
+    }
+
+    func testBoxAndTextInOneCommand() async {
+        let into = Intent.typeInto(elementID: "e2", text: "hi there")
+        await expect("type a message and steer this thread. Hi, this is a test",
+                     .typeInto(elementID: "e2", text: "Hi, this is a test"), boxes(focused: nil))
+        await expect("type hi there into steer this thread", into, boxes(focused: nil))
+        await expect("in steer this thread type hi there", into, boxes(focused: nil))
+        await expect("click steer this thread and type hi there", into, boxes(focused: nil))
+        await expect("focus on steer this thread then type hi there", into, boxes(focused: nil))
+        // The box words must match a text field: else the words stay whole.
+        await expect("type I'm in the meeting", .typeText("I'm in the meeting"), boxes())
+        let none = await route("in the kitchen type hi", boxes())
+        XCTAssertEqual(none.intent, .none, none.why)
+    }
+
+    func testCommandInALaterSentence() async {
+        await expect("Not a … useful functionality. Click on steer this thread and type, hi, this is thread.",
+                     .typeInto(elementID: "e2", text: "hi, this is thread"), boxes(focused: nil))
+        // A command in the first sentence keeps all the words.
+        await expect("Type hi. This is a test.", .typeText("hi. This is a test"), boxes())
+        XCTAssertEqual(CommandRouter.fromCommandSentence("Slack me. Click home", apps: Fixtures.apps), "Slack me. Click home")
+    }
+
+    func testHasCommandWord() {
+        let ctx = boxes()
+        XCTAssertFalse(CommandRouter.hasCommandWord("hi, this is a test", context: ctx))
+        XCTAssertFalse(CommandRouter.hasCommandWord("I think the meeting moved to Thursday", context: ctx))
+        XCTAssertTrue(CommandRouter.hasCommandWord("Type hi", context: ctx))
+        XCTAssertTrue(CommandRouter.hasCommandWord("uh, click home", context: ctx))
+        XCTAssertTrue(CommandRouter.hasCommandWord("Not a useful thing. Click home", context: ctx))
+        XCTAssertTrue(CommandRouter.hasCommandWord("Slack me, running late", context: ctx))
+        XCTAssertTrue(CommandRouter.hasCommandWord("send", context: ctx))
+        XCTAssertTrue(CommandRouter.hasCommandWord("open hn.com", context: ctx))
+    }
+
     func testE2NoCommand() async {
         let r = await route("what a lovely day", news)
         XCTAssertEqual(r.intent, .none)

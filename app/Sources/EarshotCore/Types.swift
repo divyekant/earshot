@@ -83,9 +83,13 @@ public struct ScreenSnapshot: Codable, Hashable, Sendable {
     public var windowTitle: String
     public var url: String?
     public var elements: [ScreenElement]
+    /// The id of the element that has the keyboard focus, if it is a text field that is not secure.
+    /// "type X" with no box name types there.
+    public var focusedID: String?
 
-    public init(bundleID: String, windowTitle: String, url: String? = nil, elements: [ScreenElement]) {
+    public init(bundleID: String, windowTitle: String, url: String? = nil, elements: [ScreenElement], focusedID: String? = nil) {
         self.bundleID = bundleID; self.windowTitle = windowTitle; self.url = url; self.elements = elements
+        self.focusedID = focusedID
     }
 }
 
