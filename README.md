@@ -6,7 +6,7 @@ You look at the screen and say what you want. earshot finds the correct app, foc
 
 ## Status
 
-**Design phase.** The project contains no code yet.
+**Phase 0.** The only code is the E0 viability probe in [probe/](probe/). It tests whether one spoken sentence can put the cursor in the correct chat box in less than 1 s. See [docs/experiments/E0-viability.md](docs/experiments/E0-viability.md).
 
 - The requirements are in [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md).
 - The proposed architecture and the phase plan are in [docs/DESIGN.md](docs/DESIGN.md).
@@ -26,7 +26,7 @@ You look at the screen and say what you want. earshot finds the correct app, foc
 ## Target machine
 
 - Mac Mini, Apple M4 Pro, 24 GB of memory
-- macOS 26.3.1 (Tahoe)
+- macOS 26.6.2 (Tahoe)
 - Local MLX model server (oMLX) at `http://localhost:11434/v1`, which is OpenAI-compatible
 
 ## Starting points

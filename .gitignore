@@ -11,3 +11,6 @@ models/
 *.wav
 logs/
 .env
+
+# E0 probe: personal test contacts stay on the Mac
+probe/people.json

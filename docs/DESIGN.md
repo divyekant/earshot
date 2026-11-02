@@ -39,6 +39,7 @@ Swift SDKs: FluidAudio and speech-swift bundle these parts.
 
 | Option | Use when |
 |---|---|
+| Apple SpeechTranscriber (Speech framework, macOS 26 and later) | First choice for English. It is built into macOS and runs on the device. macOS manages the model, so earshot ships no speech model. It accepts name hints (`AnalysisContext.contextualStrings`). E0 measures it. |
 | Parakeet TDT 0.6B v3 (CoreML through FluidAudio) | English only. It does not support Hindi. |
 | Nemotron-3.5-ASR-Streaming-0.6B (speech-swift) | English and Hindi. Hindi word error rate is 8.0 at 160 ms chunks (model card). Test the Hinglish fine-tunes. |
 | Moonshine v2 small (MIT, 123M) | Fastest English-only option. The vendor reports 73 ms. |
@@ -116,6 +117,8 @@ The oMLX server can clean up dictated text: punctuation and filler words. Make i
 ## 5. Phase plan
 
 ### Phase 0: Measure (do this first)
+
+E0 replaces step 1 below. E0 measures the speech, focus and total times directly, with no setup of other projects. Read the code of free-mac-voice and jev-voice as reference only. See [experiments/E0-viability.md](experiments/E0-viability.md).
 
 1. Clone free-mac-voice and jev-voice, and run them. Record:
    - speed

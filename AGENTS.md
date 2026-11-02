@@ -16,7 +16,7 @@
 
 ## Environment
 
-- Mac Mini, Apple M4 Pro, 24 GB of memory, macOS 26.3.1.
+- Mac Mini, Apple M4 Pro, 24 GB of memory, macOS 26.6.2.
 - Local OpenAI-compatible MLX server (oMLX) at `http://localhost:11434/v1`. It is not Ollama. Do not use Ollama model names or endpoints.
 - Homebrew is at `/opt/homebrew`.
 - Swift: use Swift Package Manager.
@@ -33,4 +33,4 @@ Write docs, comments and commit messages in Simplified Technical English:
 
 ## Phase status
 
-Phase 0 (measurements) has not started. Start there. See `docs/DESIGN.md`, section 5.
+Phase 0 started with the E0 viability probe (`probe/`, `docs/experiments/E0-viability.md`). See `docs/DESIGN.md`, section 5.
