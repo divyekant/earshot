@@ -29,6 +29,9 @@ struct ScreenRead {
     let method: String
 
     var web: Bool { areaPath != "window" }
+
+    /// A page element scrolls inside the page area. A window control or a native element uses the window.
+    func inPageViewport(_ item: ReadElement) -> Bool { web && item.inPage }
 }
 
 enum ScreenReader {
