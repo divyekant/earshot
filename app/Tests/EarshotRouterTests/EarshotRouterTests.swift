@@ -363,6 +363,13 @@ final class EarshotRouterTests: XCTestCase {
         XCTAssertTrue(SafetyPolicy.isRisky("Delete this repository and all of its issues", role: "AXLink"))
         XCTAssertTrue(SafetyPolicy.isRisky("Sign out of all your devices now", role: "AXLink"))
         XCTAssertFalse(SafetyPolicy.isRisky("How we post a new release every week", role: "AXLink"))
+        // OCR text has no reliable role: a "Send" button in a canvas can arrive as OCR text. Strict rule.
+        XCTAssertTrue(SafetyPolicy.isRisky("Send", role: "OCRText"))
+        XCTAssertTrue(SafetyPolicy.isRisky("Post now", role: "OCRText"))
+        XCTAssertTrue(SafetyPolicy.isRisky("Send", role: "AXUnknownRole"))
+        // A short row keeps the strict rule; a long row follows the non-control rule.
+        XCTAssertTrue(SafetyPolicy.isRisky("Delete chat", role: "AXRow"))
+        XCTAssertFalse(SafetyPolicy.isRisky(Self.xRow, role: "AXStaticText"))
         // The press gate uses the same rule.
         XCTAssertTrue(SafetyPolicy.mayPress(label: Self.xRow, role: "AXRow", spokenTarget: "darshan panya", tier: .fuzzy,
                                             mode: .hold))

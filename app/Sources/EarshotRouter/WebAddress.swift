@@ -1,3 +1,4 @@
+import EarshotCore
 import Foundation
 
 /// "Open <web address>" (R-NV-7). The words after a command word must look like a domain name:
