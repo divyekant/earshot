@@ -133,11 +133,16 @@ final class DeclaredNamesTests: XCTestCase {
                 ["CFBundleURLSchemes": ["https", "mailto", "x-chatter", "chatter2", "message", "Chatter"]],
             ],
         ]
-        XCTAssertEqual(MenuRules.declaredNames(info), ["Chatter", "imessage", "sms"])
+        // "imessage" shares "message" with the app name. "sms" shares no word with it.
+        XCTAssertEqual(MenuRules.declaredNames(info, appName: "Messages"), ["Chatter", "imessage"])
         XCTAssertEqual(MenuRules.declaredNames([:]), [])
-        let row = MenuRules.entry(name: "Messages", bundleID: "x.m", extraNames: MenuRules.declaredNames(info),
-                                  shortcuts: nil, electron: false)
-        XCTAssertEqual(row.aliases, ["messages", "chatter", "imessage", "sms"])
+        let row = MenuRules.entry(name: "Messages", bundleID: "x.m",
+                                  extraNames: MenuRules.declaredNames(info, appName: "Messages"), shortcuts: nil, electron: false)
+        XCTAssertEqual(row.aliases, ["messages", "chatter", "imessage"])
+        // Seen live: apps also declare schemes of other products ("upi", "codex"). They share no word with the name.
+        let other: [String: Any] = ["CFBundleName": "Talk Pad",
+                                    "CFBundleURLTypes": [["CFBundleURLSchemes": ["upi", "codex", "talkpad", "talk"]]]]
+        XCTAssertEqual(MenuRules.declaredNames(other, appName: "TalkPad"), ["Talk Pad", "talkpad", "talk"])
     }
 
     func testNewAliasesJoinOwnerRows() {
@@ -292,6 +297,9 @@ final class LiveDiscoveryTests: XCTestCase {
         let times = catalogue.lastReads.map(\.ms).sorted()
         if !times.isEmpty { print("LIVE menu read per app: median \(Int(times[times.count / 2])) ms, max \(Int(times.last!)) ms") }
         for row in rows where row.isChat { print("LIVE   \(row.name) aliases: \(row.aliases.joined(separator: ", "))") }
+        for r in catalogue.lastReads where r.timedOut || r.ms > 1000 {
+            print("LIVE   SLOW menu read: \(r.name) \(Int(r.ms)) ms, stopped at the limit: \(r.timedOut)")
+        }
         for r in catalogue.lastReads where r.guess != nil {
             print("LIVE   \(r.name): \(r.guess!.rule.rawValue) \(r.guess!.keys) (\(r.guess!.menuPath)), \(r.shortcuts) shortcuts, \(Int(r.ms)) ms")
         }

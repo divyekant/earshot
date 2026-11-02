@@ -138,15 +138,32 @@ public enum MenuRules {
     /// Spoken names that an app declares in its Info.plist:
     /// - CFBundleDisplayName and CFBundleName.
     /// - The URL schemes in CFBundleURLTypes, if a scheme has only letters, at least 3 of them,
-    ///   is not generic and is not a command word. Messages declares "imessage" and "sms" this way.
-    public static func declaredNames(_ info: [String: Any]) -> [String] {
+    ///   is not generic, is not a command word, and shares a word with the app name.
+    ///   Messages declares "imessage" this way.
+    public static func declaredNames(_ info: [String: Any], appName: String = "") -> [String] {
         var out = ["CFBundleDisplayName", "CFBundleName"].compactMap { info[$0] as? String }
+        let stems = nameStems([appName] + out)
         for type in info["CFBundleURLTypes"] as? [[String: Any]] ?? [] {
             for scheme in type["CFBundleURLSchemes"] as? [String] ?? [] {
                 let s = scheme.lowercased()
                 guard s.count >= 3, s.allSatisfy({ $0.isASCII && $0.isLetter }), !genericSchemes.contains(s),
                       !commandWords.contains(s), !out.contains(where: { Words.normalize($0) == s }) else { continue }
+                // A scheme must share a word with the app's own name. Apps also register schemes of
+                // other products or services, for example a payment scheme.
+                guard stems.contains(where: { s.contains($0) || $0.contains(s) }) else { continue }
                 out.append(s)
+            }
+        }
+        return out
+    }
+
+    /// The words of the names with 4 letters or more, without a plural "s": "Messages" gives "message".
+    static func nameStems(_ names: [String]) -> Set<String> {
+        var out = Set<String>()
+        for name in names {
+            for word in Words.normalize(name).split(separator: " ").map(String.init) where word.count >= 4 {
+                out.insert(word.hasSuffix("s") ? String(word.dropLast()) : word)
+                out.insert(word)
             }
         }
         return out
