@@ -180,3 +180,20 @@ final class Locked<T>: @unchecked Sendable {
     var value: T { lock.lock(); defer { lock.unlock() }; return v }
     func mutate(_ f: (inout T) -> Void) { lock.lock(); f(&v); lock.unlock() }
 }
+
+final class TimingTests: XCTestCase {
+    func testStagesAndSummary() {
+        var t = SpeechTiming(engine: "parakeet", why: "auto: Parakeet model file found")
+        t.tailMs = 0.44; t.waitMs = 12.06; t.decodeMs = 33.33; t.audioMs = 2140; t.idleMs = 61000; t.warmed = true
+        XCTAssertEqual(t.stages, ["speech.tail": 0.4, "speech.wait": 12.1, "speech.decode": 33.3])
+        XCTAssertEqual(t.summary, "parakeet (auto: Parakeet model file found) audio 2140 ms, idle 61000 ms, warmed")
+    }
+
+    func testFactorySetsReason() {
+        var s = EarshotSettings()
+        s.engine = .apple
+        let (e, why) = SpeechEngines.make(s)
+        XCTAssertEqual((e as? SpeechTimingReporting)?.reason, why)
+        XCTAssertNil((e as? SpeechTimingReporting)?.lastTiming)
+    }
+}
