@@ -128,6 +128,30 @@ public enum MenuRules {
         return out
     }
 
+    /// URL schemes that many apps register. They do not name one app.
+    public static let genericSchemes: Set<String> = [
+        "http", "https", "file", "mailto", "ftp", "ftps", "sftp", "ssh", "telnet", "tel", "callto", "webcal", "feed",
+        "feeds", "rss", "data", "about", "javascript", "ws", "wss", "git", "svn", "news", "nntp", "smb", "afp", "vnc",
+        "itms", "itmss", "ical", "calshow", "maps", "help", "applescript", "shortcuts",
+    ]
+
+    /// Spoken names that an app declares in its Info.plist:
+    /// - CFBundleDisplayName and CFBundleName.
+    /// - The URL schemes in CFBundleURLTypes, if a scheme has only letters, at least 3 of them,
+    ///   is not generic and is not a command word. Messages declares "imessage" and "sms" this way.
+    public static func declaredNames(_ info: [String: Any]) -> [String] {
+        var out = ["CFBundleDisplayName", "CFBundleName"].compactMap { info[$0] as? String }
+        for type in info["CFBundleURLTypes"] as? [[String: Any]] ?? [] {
+            for scheme in type["CFBundleURLSchemes"] as? [String] ?? [] {
+                let s = scheme.lowercased()
+                guard s.count >= 3, s.allSatisfy({ $0.isASCII && $0.isLetter }), !genericSchemes.contains(s),
+                      !commandWords.contains(s), !out.contains(where: { Words.normalize($0) == s }) else { continue }
+                out.append(s)
+            }
+        }
+        return out
+    }
+
     /// Makes one catalogue row from what earshot read. A row that opens chats needs the owner's approval
     /// before actions use it (R-MT-2). A row that only opens the app is approved: earshot presses no key in it.
     public static func entry(name: String, bundleID: String, extraNames: [String] = [], shortcuts: [MenuShortcut]?,
@@ -141,6 +165,7 @@ public enum MenuRules {
     }
 
     /// Joins a new scan with the rows that the owner already has.
+    /// - New spoken names from discovery always join the row's names.
     /// - An approved row stays as the owner left it. If it gains chat keys from a new menu read,
     ///   it takes the keys and keeps the approval, the name, the aliases and "enabled".
     /// - A row that is not approved takes the new scan, but keeps the owner's "enabled" choice.
@@ -154,17 +179,21 @@ public enum MenuRules {
         for new in found {
             if let i = index[new.bundleID] {
                 let old = out[i]
-                if old.approved && (old.isChat || !new.isChat) { continue }
-                if !new.isChat && old.isChat { continue }
+                // New spoken names from discovery join the owner's names. The owner's names come first.
+                let aliases = old.aliases + new.aliases.filter { !old.aliases.contains($0) }
+                if (old.approved && (old.isChat || !new.isChat)) || (!new.isChat && old.isChat) {
+                    out[i].aliases = aliases
+                    continue
+                }
                 var row = new
                 row.id = old.id
                 row.enabled = old.enabled
+                row.aliases = aliases
                 if old.approved {
                     // The owner approved this row before earshot could read its menus, for example
-                    // while Accessibility was off. Keep the approval and the owner's names.
+                    // while Accessibility was off. Keep the approval and the owner's name.
                     row.approved = true
                     row.name = old.name
-                    row.aliases = old.aliases + new.aliases.filter { !old.aliases.contains($0) }
                 }
                 out[i] = row
             } else {

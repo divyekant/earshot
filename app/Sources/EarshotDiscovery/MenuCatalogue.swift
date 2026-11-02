@@ -109,10 +109,10 @@ public final class MenuCatalogue: CatalogueBuilder, @unchecked Sendable {
         return FileManager.default.fileExists(atPath: url.appendingPathComponent("Contents/Frameworks/Electron Framework.framework").path)
     }
 
-    /// The display name and the short name in the app's Info.plist.
+    /// The spoken names that the app declares in its Info.plist: bundle names and URL schemes.
     static func bundleNames(_ url: URL?) -> [String] {
         guard let info = url.flatMap({ Bundle(url: $0)?.infoDictionary }) else { return [] }
-        return ["CFBundleDisplayName", "CFBundleName"].compactMap { info[$0] as? String }
+        return MenuRules.declaredNames(info)
     }
 
     /// The apps in the standard app folders. It reads the Info.plist of each app, and leaves out

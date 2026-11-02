@@ -123,6 +123,41 @@ final class CatalogueSafetyTests: XCTestCase {
     }
 }
 
+final class DeclaredNamesTests: XCTestCase {
+    func testSchemesFromInfoPlist() {
+        // A fake Info.plist of a messages app. No real app name is needed for the rule.
+        let info: [String: Any] = [
+            "CFBundleName": "Chatter",
+            "CFBundleURLTypes": [
+                ["CFBundleURLSchemes": ["imessage", "sms", "im"]],
+                ["CFBundleURLSchemes": ["https", "mailto", "x-chatter", "chatter2", "message", "Chatter"]],
+            ],
+        ]
+        XCTAssertEqual(MenuRules.declaredNames(info), ["Chatter", "imessage", "sms"])
+        XCTAssertEqual(MenuRules.declaredNames([:]), [])
+        let row = MenuRules.entry(name: "Messages", bundleID: "x.m", extraNames: MenuRules.declaredNames(info),
+                                  shortcuts: nil, electron: false)
+        XCTAssertEqual(row.aliases, ["messages", "chatter", "imessage", "sms"])
+    }
+
+    func testNewAliasesJoinOwnerRows() {
+        let owner = AppEntry(id: "messages", name: "My Messages", bundleID: "x.m", aliases: ["messages", "texts"],
+                             isChat: true, openChat: .switcher(keys: "cmd+n"), approved: true, enabled: false)
+        let found = AppEntry(id: "messages", name: "Messages", bundleID: "x.m", aliases: ["messages", "imessage"],
+                             isChat: true, openChat: .switcher(keys: "cmd+n"))
+        let row = MenuRules.merge(existing: [owner], found: [found]).first
+        XCTAssertEqual(row?.aliases, ["messages", "texts", "imessage"])
+        XCTAssertEqual(row?.approved, true)
+        XCTAssertEqual(row?.enabled, false)
+        XCTAssertEqual(row?.name, "My Messages")
+        // An installed-only scan (less data) also adds its names, and keeps the chat keys.
+        let installed = AppEntry(id: "messages", name: "Messages", bundleID: "x.m", aliases: ["sms"], approved: true)
+        let row2 = MenuRules.merge(existing: [owner], found: [installed]).first
+        XCTAssertEqual(row2?.aliases, ["messages", "texts", "sms"])
+        XCTAssertEqual(row2?.isChat, true)
+    }
+}
+
 final class NameRulesTests: XCTestCase {
     func testClean() {
         XCTAssertEqual(NameRules.clean("Ravi Kumar (you)")?.name, "Ravi Kumar")
@@ -256,6 +291,7 @@ final class LiveDiscoveryTests: XCTestCase {
         print("LIVE catalogue: \(rows.count) rows, \(catalogue.lastReads.count) running apps read in \(Int(catalogue.lastMs)) ms")
         let times = catalogue.lastReads.map(\.ms).sorted()
         if !times.isEmpty { print("LIVE menu read per app: median \(Int(times[times.count / 2])) ms, max \(Int(times.last!)) ms") }
+        for row in rows where row.isChat { print("LIVE   \(row.name) aliases: \(row.aliases.joined(separator: ", "))") }
         for r in catalogue.lastReads where r.guess != nil {
             print("LIVE   \(r.name): \(r.guess!.rule.rawValue) \(r.guess!.keys) (\(r.guess!.menuPath)), \(r.shortcuts) shortcuts, \(Int(r.ms)) ms")
         }
