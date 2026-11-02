@@ -83,17 +83,20 @@ enum Catalogue {
     ]
 
     /// A title with one of these words is not a way to open a chat.
-    static let excluded = ["next", "previous", "selection", "replace", "spelling", "google", "in page", "tab",
-                           "mailbox", "web", "workspace", "window"]
+    static let excluded = ["next", "previous", "selection", "replace", "spelling", "google", "page", "tab", "tabs",
+                           "mailbox", "web", "workspace", "window", "quit", "force"]
 
-    /// Finds the best menu item that opens a chat.
+    /// Finds the best menu item that opens a chat. It matches whole words only:
+    /// "find" must not match "Finder". It skips the Apple menu.
     static func guess(_ shortcuts: [AX.MenuShortcut]) -> MenuGuess? {
         for (rule, words) in rules {
             for s in shortcuts {
+                let parts = s.path.components(separatedBy: " > ")
+                if parts.first == "Apple" { continue }
                 // Test the item title only, not the menu path: "Edit > Find > Find..." has the title "Find...".
-                let title = (s.path.components(separatedBy: " > ").last ?? s.path).lowercased()
-                guard words.contains(where: { title.contains($0) }) else { continue }
-                guard !excluded.contains(where: { title.contains($0) }) else { continue }
+                let title = " \(Text.normalize(parts.last ?? s.path)) "
+                guard words.contains(where: { title.contains(" \($0) ") }) else { continue }
+                guard !excluded.contains(where: { title.contains(" \($0) ") }) else { continue }
                 // Keys that the probe cannot press, or Return, never open a chat.
                 guard !s.keys.contains("key code"), !s.keys.contains("return"), !s.keys.contains("enter") else { continue }
                 return MenuGuess(keys: s.keys, menuPath: s.path, rule: rule)
@@ -112,8 +115,12 @@ enum Catalogue {
         }
         add(name)
         extra.forEach(add)
+        // The last word of a long name, if it is not a common command word: "Sublime Text" must not give "text".
         let words = Text.normalize(name).split(separator: " ")
-        if words.count >= 2, let last = words.last, last.count >= 4 { add(String(last)) }
+        if words.count >= 2, let last = words.last.map(String.init), last.count >= 4,
+           !E1Router.stopWords.contains(last), !E1Router.textLeads.contains(last) {
+            add(last)
+        }
         return out
     }
 

@@ -57,7 +57,9 @@ struct World {
     let owner: String
 
     init(catalogue: CatalogueFile, index: IndexFile) {
-        var list = catalogue.apps.map { App(id: $0.id, name: $0.name, aliases: $0.aliases, chat: $0.chat) }
+        // The index adds spoken app names that it read on screen, such as "iMessage".
+        let extra = index.aliases ?? [:]
+        var list = catalogue.apps.map { App(id: $0.id, name: $0.name, aliases: $0.aliases + (extra[$0.id] ?? []), chat: $0.chat) }
         list += catalogue.installed.map { App(id: $0.id, name: $0.name, aliases: $0.aliases, chat: false) }
         apps = list
         entries = index.entries

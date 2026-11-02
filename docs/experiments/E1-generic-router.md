@@ -38,7 +38,13 @@ The probe gives each generated row the E0 defaults: pick the top result with Ret
 
 ### 3.2 Index
 
-`earshot-probe index` reads the left part (42 %) of the main window of each chat app. In a list row, it takes the text nearest the top left: chat lists show the name there. It drops times, dates, counts and common screen words such as "Threads" or "Inbox". It adds the owner's own chat: a name with "(you)", else the macOS user name. It logs the read time for each app. The index stays on the Mac in `probe/logs/index.json`. Git ignores it.
+`earshot-probe index` reads the sidebar of the main window of each chat app. The sidebar ends where the message box starts, and at 42 % of the window at most. In a list row, it takes the text nearest the top left: chat lists show the name there. If the sidebar has list rows, it keeps only the row names, because the loose texts and buttons around them are screen labels. It drops times, dates, counts, notes in brackets and common screen words such as "Threads" or "Inbox". It adds the owner's own chat: a name with "(you)", else the macOS user name.
+
+Electron apps such as Slack build their tree late. The probe reads the sidebar again every 300 ms, up to 8 times, until the list stops changing. It logs the time of one read and the time until the list is stable.
+
+A word with a capital letter inside it in the placeholder of the message box becomes an extra spoken name of the app. Messages shows "iMessage" there. The index stays on the Mac in `probe/logs/index.json`. Git ignores it.
+
+`index --dump` prints the sidebar part of the tree with the role, position and length of each text, and the first 20 characters of each text only.
 
 ### 3.3 Test commands
 
@@ -55,6 +61,8 @@ The probe gives each generated row the E0 defaults: pick the top result with Ret
 | spoken-app | "text Ravi on iMessage" | An app name that no menu shows |
 | open-app | "open Notes", "switch to Slack" | Open an app, no chat |
 | none | "the build passed on the second try" | Not a command |
+| free | "can you pull up Ravi on Slack", "get me Ravi's chat" | Phrasings that the rules grammar was not written for |
+| unknown | "message Ishaan on Slack" | A name that is not in the index. Doing nothing, or opening only the app, is correct |
 
 The set comes from the owner's real chat names, but the probe writes the sentences. Later work adds the owner's own spoken commands from the logs.
 
@@ -68,7 +76,7 @@ All routers get the same short list. Step 1 (the probe, on the Mac) makes it: th
 | Jev alone | Cloud | One "choice" question: the words, the owner's name and the option labels |
 | Rules, Jev if unsure | Mac, then cloud | The rules answer when the rules are sure. Else the Jev answer |
 
-`earshot-probe e1-run` sends each command through all three and logs the answers and the times.
+`earshot-probe e1-run` sends each command through all three and logs the answers and the times. It also counts each wrong chat: a chat that is not the correct one. A wrong chat is the unsafe error, because the owner can then type into the wrong chat.
 
 ### 3.5 Generated rows open the chat
 
@@ -83,8 +91,27 @@ All routers get the same short list. Step 1 (the probe, on the Mac) makes it: th
 | Router, correct | "Rules, Jev if unsure" is correct for 90 % or more of the commands | 80 % to 90 % | Under 80 % |
 | Router, time | "Rules, Jev if unsure": median 50 ms or less, slowest 1 in 10 under 400 ms | Slowest 1 in 10 under 1 s | Over 1 s |
 | Rules safety | When the rules are sure, they are correct for 98 % or more | 95 % to 98 % | Under 95 % |
+| Wrong chat | "Rules, Jev if unsure" opens no wrong chat | 1 or 2 wrong chats | 3 or more |
 | Generated rows | `e1-open` opens the own chat 3 of 3 in each app | 2 of 3 | Under 2 of 3 |
 
 ## 5. Results
 
-Not run yet.
+### 5.1 First run (2026-11-02)
+
+The build, the catalogue and the Jev calls worked. The test itself did not measure much, for two reasons:
+
+- The index held screen labels, not chats. The first sidebar edge (42 %) was wider than the Slack sidebar (about 24 %), so the probe also read message text from the open chat. Slack showed "loading…": its tree was not complete when the probe read it. Messages gave 0 names.
+- `e1-make` made the commands from the same index and with the same grammar as the rules. So the rules were correct for 28 of 28, and the score proves little.
+
+Numbers that do count:
+
+| Item | Result |
+| --- | --- |
+| Catalogue, Slack | Command-K ("Go > Switch to Channel"), the same as the E0 row |
+| Catalogue, Messages | Command-N ("File > New Message"), the same as the E0 row |
+| Catalogue, one read | 76 to 721 ms for each app (menu bar) |
+| Jev, warm call | median 87 ms, slowest 1 in 10: 148 ms, about 500 input tokens |
+| Jev, first call | 110 ms |
+| Rules | median 9 ms, slowest 1 in 10: 25 ms |
+
+Changes after the first run: the sidebar ends at the message box, the probe reads again until the list is stable, rows win over loose labels, the menu rules match whole words and skip the Apple menu ("find" matched "Finder"), the last word of an app name is not a spoken name if it is a command word ("Sublime Text" gave "text"), and the test set has free phrasings and unknown names.
