@@ -98,7 +98,8 @@ public struct CommandRouter: Router {
         }
 
         // "On Chrome, click Chat": the screen command is for that app's window, not a chat command.
-        if let (app, rest) = appPrefix(text, apps: context.apps), isScreenCommand(rest) {
+        if let hit = appPrefix(text, apps: context.apps), isScreenCommand(hit.1) {
+            let (app, rest) = hit
             let front = context.screen?.bundleID ?? context.frontBundleID
             if front == app.bundleID { return rules(rest, context: context) }
             // The app is not in front, so the screen is not its screen. Open the app (it can be undone) and do not click.
