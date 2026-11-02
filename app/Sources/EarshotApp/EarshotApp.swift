@@ -135,6 +135,9 @@ final class AppController: ObservableObject {
         runner.options = ActionOptions(settings: new)
         if new.tier2 != old.tier2 || new.tier2BudgetMs != old.tier2BudgetMs { pipeline.router = Self.router(new) }
         if new.engine != old.engine || new.parakeetModelPath != old.parakeetModelPath || new.locale != old.locale {
+            // Close the microphone of the old engine first. The old engine then has no owner, so its deinit frees
+            // the Parakeet model, and two models do not stay loaded.
+            Self.shutdown(pipeline.engine)
             let (engine, why) = SpeechEngines.make(new)
             engineWhy = why
             pipeline.engine = engine
@@ -144,6 +147,13 @@ final class AppController: ObservableObject {
             || new.holdKeyModifiers != old.holdKeyModifiers {
             startInput()
         }
+    }
+
+    /// Stops an engine: the microphone closes and the timers stop (T1).
+    static func shutdown(_ engine: SpeechEngine) {
+        let active = (engine as? FallbackSpeechEngine)?.active ?? engine
+        (active as? AppleSpeechEngine)?.shutdown()
+        (active as? ParakeetEngine)?.shutdown()
     }
 
     /// Start at login: off by default. The state lives in macOS (SMAppService), not in settings.json.
