@@ -303,3 +303,58 @@ final class ParallelContextTests: XCTestCase {
         XCTAssertLessThan(context, names + screen - 30, "names \(names), screen \(screen), context \(context)")
     }
 }
+
+final class StartUpTests: XCTestCase {
+    func testCatalogueRefreshRunsOnceWithAccessibility() async {
+        var refreshes = 0, names = 0
+        await AppController.startUp(trusted: { true }, refreshCatalogue: { refreshes += 1 }, startNames: { names += 1 })
+        XCTAssertEqual(refreshes, 1)
+        XCTAssertEqual(names, 1)
+    }
+
+    func testNoCatalogueRefreshWithoutAccessibility() async {
+        var refreshes = 0, names = 0
+        await AppController.startUp(trusted: { false }, refreshCatalogue: { refreshes += 1 }, startNames: { names += 1 })
+        XCTAssertEqual(refreshes, 0)
+        XCTAssertEqual(names, 1, "the name warmer starts anyway; it waits for Accessibility itself")
+    }
+
+    func testRefreshErrorIsOnlyLogged() async {
+        var names = 0
+        await AppController.startUp(trusted: { true }, refreshCatalogue: { throw DiscoveryError.accessibilityOff },
+                                    startNames: { names += 1 })
+        XCTAssertEqual(names, 1)
+    }
+}
+
+final class ScreenSummaryTests: XCTestCase {
+    func testSummaryHasHostButNoPath() {
+        let s = ScreenSnapshot(bundleID: "com.google.Chrome", windowTitle: "x", url: "https://en.wikipedia.org/wiki/Secret?q=1",
+                               elements: [ScreenElement(id: "e1", role: "AXLink", label: "Log in", risky: false)])
+        let line = CommandPipeline.screenSummary(s, front: "com.google.Chrome")
+        XCTAssertEqual(line, "screen: com.google.Chrome en.wikipedia.org, 1 elements")
+        XCTAssertFalse(line.contains("Secret"))
+    }
+
+    func testSensitivePageShowsOnlySensitive() {
+        let s = ScreenSnapshot(bundleID: "com.google.Chrome", windowTitle: "x", url: "https://account.example.com/signin",
+                               elements: [ScreenElement(id: "e1", role: "AXTextField", label: "Password", risky: false)])
+        XCTAssertEqual(CommandPipeline.screenSummary(s, front: nil), "screen: com.google.Chrome, sensitive")
+    }
+
+    func testMissLogsConfidenceAndAlternatives() async {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let unsure = RouteResult(intent: .openApp(appID: "notes"), confidence: 0.3, tier: .rules, ms: 0, why: "two apps match",
+                                 alternatives: [.openApp(appID: "slack")])
+        let engine = TextEngine()
+        engine.text = "open no"
+        let p = CommandPipeline(engine: engine, router: FixedRouter(result: unsure), actions: DryRunner(), names: FakeNames(),
+                                apps: { Fixture.apps }, allNames: { Fixture.names }, frontBundleID: { "com.apple.Notes" })
+        p.log = ActivityLog(store: Store(folder: folder))
+        let r = await p.finish(mode: .hold)
+        XCTAssertTrue(r.note.contains("screen: none, front com.apple.Notes"), r.note)
+        XCTAssertTrue(r.note.contains("confidence 0.30"), r.note)
+        XCTAssertTrue(r.note.contains("considered:"), r.note)
+    }
+}

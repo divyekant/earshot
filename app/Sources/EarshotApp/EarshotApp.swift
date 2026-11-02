@@ -78,8 +78,24 @@ final class AppController: ObservableObject {
         startInput()
         let warmer = NameWarmer(interval: 480, trusted: { AXIsProcessTrusted() },
                                 refresh: { _ = await names.refresh() })
-        warmer.start()
         self.warmer = warmer
+        let catalogue = self.catalogue
+        Task {
+            await Self.startUp(trusted: { AXIsProcessTrusted() },
+                               refreshCatalogue: { _ = try await catalogue.refresh(store: store) },
+                               startNames: { warmer.start() })
+        }
+    }
+
+    /// At start: read the app catalogue again (read only; T4 keeps the owner's approvals and edits, and adds the
+    /// app's own aliases), then start the name cache. So the owner does not have to press "Discover apps" after an
+    /// update. With Accessibility off, the scan does not run. An error goes to the system log only.
+    nonisolated static func startUp(trusted: () -> Bool, refreshCatalogue: () async throws -> Void,
+                                    startNames: () -> Void) async {
+        if trusted() {
+            do { try await refreshCatalogue() } catch { NSLog("earshot: catalogue refresh at start: \(error)") }
+        }
+        startNames()
     }
 
     var hooks: ManageHooks {
