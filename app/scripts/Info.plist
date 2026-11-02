@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleIdentifier</key>
+	<string>com.divyekant.earshot</string>
+	<key>CFBundleName</key>
+	<string>earshot</string>
+	<key>CFBundleDisplayName</key>
+	<string>earshot</string>
+	<key>CFBundleExecutable</key>
+	<string>earshot</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>26.0</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>earshot listens to your voice commands. The audio stays on this Mac. earshot saves no audio.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>earshot turns your voice commands into text on this Mac. The audio does not go to a server.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>earshot reads the names of your contacts, so that it can find the chat that you name. The names stay on this Mac. This is off until you turn it on.</string>
+</dict>
+</plist>
