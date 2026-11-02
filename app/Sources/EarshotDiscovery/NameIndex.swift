@@ -85,6 +85,11 @@ public actor NameIndex: NameFinder {
         var found: [NameEntry] = []
         if let scan = await SidebarReader.scan(app, front: front) {
             lastScans[appID] = scan
+            if scan.searchOpen {
+                // Keep the sidebar names of the last good read, and read again on the next call.
+                let kept = (cache[appID]?.names ?? []).filter { $0.source == .sidebar }
+                return NameMerge.merge([manual, kept] + (cache[appID].map { [$0.names] } ?? []))
+            }
             found = scan.names.map { NameEntry(appID: appID, name: $0.name, isSelf: $0.isSelf, source: .sidebar) }
         }
         let ownerKey = Words.key(owner)

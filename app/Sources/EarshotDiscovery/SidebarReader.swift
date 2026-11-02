@@ -30,6 +30,9 @@ public struct SidebarScan: Sendable {
     public var windows: Int
     /// The accessibility nodes of the last read.
     public var nodes: Int
+    /// True if a search field had the focus. The screen then shows search results, not the chat list,
+    /// so earshot did not read it. The caller keeps the names that it had.
+    public var searchOpen: Bool = false
 }
 
 /// Reads the chat names in the sidebar of a chat app through Accessibility (E1, section 3.2).
@@ -52,6 +55,11 @@ enum SidebarReader {
         let t0 = Clock.nowNs()
         let el = AX.appElement(running.processIdentifier)
         if app.electron { AX.askForTree(el) }
+        // An open search covers the chat list with results and the typed text (seen live in Slack).
+        if SearchReader.searchOpen(el) || AX.window(el).map(searchHasText) == true {
+            return SidebarScan(appID: app.id, names: [], appAliases: [], readMs: 0, settleMs: Clock.round1(Clock.ms(since: t0)),
+                               reads: 0, stillLoading: false, windows: 0, nodes: 0, searchOpen: true)
+        }
         var windows = Array(AX.elements(el, "AXWindows").filter { AX.subrole($0) != "AXSystemDialog" }.prefix(2))
         if windows.isEmpty, let main = AX.window(el) { windows = [main] }
         var check = SettleCheck()
@@ -64,7 +72,7 @@ enum SidebarReader {
             oneRead = 0
             nodes = 0
             for win in windows {
-                let r = read(window: win)
+                let r = read(window: win, appName: app.name)
                 oneRead += r.ms
                 nodes += r.nodes
                 loading = loading || r.loading
@@ -78,6 +86,44 @@ enum SidebarReader {
         return SidebarScan(appID: app.id, names: check.kept, appAliases: extra, readMs: Clock.round1(oneRead),
                            settleMs: Clock.round1(Clock.ms(since: t0)), reads: check.reads, stillLoading: check.stillLoading,
                            windows: windows.count, nodes: nodes)
+    }
+
+    /// True if the window has a search field with text in it. An app in the background can keep its
+    /// search open without the focus in the field (seen live in Slack).
+    static func searchHasText(_ window: AXUIElement) -> Bool {
+        guard let field = AX.findSearchField(in: window, budgetMs: 100) else { return false }
+        return !(AX.value(field) ?? "").trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    /// True if the element opens and closes a group of rows: it has a disclosure state, disclosed rows,
+    /// or a heading or a disclosure triangle among its first descendants.
+    static func isSectionHeader(_ el: AXUIElement) -> Bool {
+        // Slack gives every row AXExpanded, also a chat row (false). Only an open section says true.
+        if AX.bool(el, "AXExpanded") == true || AX.bool(el, "AXDisclosing") == true { return true }
+        if !AX.elements(el, "AXDisclosedRows").isEmpty { return true }
+        var stack = AX.elements(el, "AXChildren")
+        var count = 0
+        while let child = stack.popLast(), count < 40 {
+            count += 1
+            let r = AX.role(child)
+            if r == "AXHeading" || r == "AXDisclosureTriangle" { return true }
+            if AX.bool(child, "AXExpanded") == true { return true }
+            stack.append(contentsOf: AX.elements(child, "AXChildren"))
+        }
+        return false
+    }
+
+    /// The rows inside a section row. It does not look inside a row that it found.
+    static func innerRows(_ section: AXUIElement, maxNodes: Int = 2000) -> [AXUIElement] {
+        var stack = AX.elements(section, "AXChildren")
+        var rows: [AXUIElement] = []
+        var count = 0
+        while let el = stack.popLast(), count < maxNodes {
+            count += 1
+            if AX.role(el) == "AXRow" { rows.append(el); continue }
+            stack.append(contentsOf: AX.elements(el, "AXChildren"))
+        }
+        return rows.reversed()
     }
 
     /// The texts of a list row, from the top left. Chat lists put the name there, and the last message after it.
@@ -111,7 +157,7 @@ enum SidebarReader {
     }
 
     /// Reads the sidebar of one window. It skips the main pane, the title bar, menus, images and live regions.
-    static func read(window: AXUIElement, budgetMs: Int = 1500, maxNodes: Int = 20000) -> SidebarRead {
+    static func read(window: AXUIElement, appName: String = "", budgetMs: Int = 1500, maxNodes: Int = 20000) -> SidebarRead {
         var result = SidebarRead()
         guard let w = AX.frame(window) else { return result }
         let t0 = Clock.nowNs()
@@ -131,7 +177,7 @@ enum SidebarReader {
             if let f = frame, f.w == 0 || f.h == 0 { return false }
             if NameRules.isLoading(raw) { result.loading = true }
             if !placeholderKey.isEmpty, Words.key(raw) == placeholderKey { return false }
-            guard let c = NameRules.clean(raw) else { return false }
+            guard let c = NameRules.sidebarName(raw, appName: appName) else { return false }
             if seen.insert(Words.key(c.name)).inserted {
                 result.names.append(SidebarName(name: c.name, isSelf: c.isSelf, fromRow: fromRow))
             }
@@ -148,6 +194,9 @@ enum SidebarReader {
                 if f.x >= right || f.maxY <= top { continue }
             }
             if r == "AXRow" || r == "AXCell" {
+                // A section header ("Channels", a custom section) is a row too. It is not a chat.
+                // Its chat rows are inside it (Slack). Read them, but not the title of the section.
+                if isSectionHeader(el) { queue.append(contentsOf: innerRows(el)); continue }
                 for text in rowTexts(el) {
                     // The first part of a row name: "Ravi, 2 unread" gives "Ravi".
                     let part = text.split(separator: ",").first.map(String.init) ?? text
@@ -162,8 +211,9 @@ enum SidebarReader {
                 _ = add(text, fromRow: false, frame: frame)
             }
             if r == "AXLink" || r == "AXButton" {
-                _ = add(AX.string(el, "AXTitle") ?? AX.string(el, "AXDescription"), fromRow: false, frame: frame)
+                if !isSectionHeader(el) { _ = add(AX.string(el, "AXTitle") ?? AX.string(el, "AXDescription"), fromRow: false, frame: frame) }
             }
+            if r == "AXHeading" || r == "AXDisclosureTriangle" { continue }
             queue.append(contentsOf: AX.elements(el, "AXChildren"))
         }
         result.nodes = index
