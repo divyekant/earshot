@@ -1,0 +1,33 @@
+name: Feature request
+description: Propose a new command, a new target source, or a change.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Read docs/DECISIONS.md first. Do not propose a rejected option again without new evidence.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What do you want to do with your voice that earshot cannot do now?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+  - type: input
+    id: requirements
+    attributes:
+      label: Related requirement IDs
+      placeholder: "R-NV-2"
+  - type: checkboxes
+    id: rules
+    attributes:
+      label: Rules
+      options:
+        - label: The proposal keeps all audio on the Mac.
+          required: true
+        - label: The proposal does not need a script for one app.
+          required: true
