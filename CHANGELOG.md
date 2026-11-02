@@ -18,6 +18,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Fixed
 
+- "Type X" with no box name now types into the focused text field. "Focus on <box>" clicks the box. "Type X into <box>", "in <box> type X" and "click <box> and type X" type into that box, if the box words match a text field on the screen. A command in a later sentence now works when the first sentence has no command word. Typing never presses Return (R-SP-1, R-NV-5).
 - A tab or window title with a word such as "transfer" no longer blocks a switch to that tab. Bookmarks and History menu items are no longer click targets (R-NV-5, R-MT-1).
 
 ## [0.1.0] - 2026-11-02
