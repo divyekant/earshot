@@ -64,6 +64,8 @@ earshot uses one model for all apps. A command is one verb and one target.
 3. Every target goes through the same matcher and the same safety rules (`SafetyPolicy`), from any source.
 4. Facts about one app are data (`apps.json`, `names.json`, `focus-methods.json`). They are never code.
 
+Plain words with no command word are dictation: with the hold key, the pipeline types them into the focused text field (`typeText`), if `ScreenSnapshot.focusedID` names an editable field that is not a password field and the page is not a sign-in, code or payment page. Dictation never presses Return, and always-on mode never dictates. If earshot's own window is in front, the pipeline first brings back the app that was in front before it; earshot's own window is never a target.
+
 ### 3.1 Wake gate (R-ON-1, R-ON-2, R-ON-3, D-11)
 
 | Part | Component | Notes |

@@ -156,6 +156,18 @@ final class CommandPipeline {
             let top = result.alternatives.prefix(3).map { IntentText.describe($0, apps: rows, screen: context.screen) }
             why += String(format: " · confidence %.2f", result.confidence) + (top.isEmpty ? "" : " · considered: " + top.joined(separator: " | "))
         }
+        // Dictation (the owner's choice): plain words with no command word go into the focused text field.
+        // Only with the hold key. Never into a password field or on a sign-in, code or payment page. Never Return.
+        if mode == .hold, result.intent == .none, !sensitive, Self.dictationField(context.screen) != nil,
+           !CommandRouter.hasCommandWord(text, context: context) {
+            why += " · dictation into the focused field"
+            pauseAlwaysOn(true)
+            let outcome = await actions.run(.typeText(text), context: context, command: CommandInfo(mode: .hold, tier: .rules))
+            pauseAlwaysOn(false)
+            for (k, ms) in outcome.stages { stages["action." + k] = ms }
+            return done(heard: text, intent: IntentText.describe(.typeText(text), apps: rows, screen: context.screen),
+                        tier: .rules, ok: outcome.ok, note: outcome.note, stages: stages, clock, why: why)
+        }
         // The screenshot fallback (D-10): one picture to Jev, only for a hold-key press with no sure target that the
         // rules did not block. The click path checks the label again at the tier .jev, so a risky label stays blocked.
         if let picker, mode == .hold, !sensitive, Self.mayAskScreen(text, result) {
@@ -211,6 +223,14 @@ final class CommandPipeline {
         let record = ActivityRecord(heard: "", intent: "none", tier: .none, ok: false, note: note, stages: [:])
         try? log?.append(record)
         return record
+    }
+
+    /// The focused text field for dictation: ScreenSnapshot.focusedID (set only for an editable field), and not a
+    /// password field.
+    static func dictationField(_ screen: ScreenSnapshot?) -> ScreenElement? {
+        guard let s = screen, let id = s.focusedID, let e = s.elements.first(where: { $0.id == id }),
+              e.subrole != "AXSecureTextField" else { return nil }
+        return e
     }
 
     /// True if the screenshot fallback may run for this route: a press by the router's verb parse, no sure target
