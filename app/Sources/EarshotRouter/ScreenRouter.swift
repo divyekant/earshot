@@ -1,4 +1,5 @@
 import EarshotCore
+import Foundation
 
 /// What the words ask for on the screen.
 struct ScreenParse {
@@ -23,7 +24,9 @@ enum ScreenRouter {
     static let fillers: Set<String> = Set(["hey", "ok", "okay", "earshot", "please", "can", "could", "you", "would", "now", "then",
                                            "just", "lets", "let", "us", "i", "want", "to", "need"]).union(TextKit.hesitations)
     static let pressVerbs: Set<String> = ["click", "press", "tap", "open", "select", "choose", "hit", "follow", "visit", "go",
-                                          "show", "check", "toggle", "expand", "view", "take", "jump", "pick"]
+                                          "show", "check", "toggle", "expand", "view", "take", "jump", "pick", "switch"]
+    /// Words before a window word at the end of a command: "on open Chrome window", "in this window".
+    static let windowWords: Set<String> = ["window", "app", "application"]
     static let typeVerbs: Set<String> = ["search", "find", "look", "type", "enter"]
     /// Words at the start of the target that are not part of a label.
     static let leadWords: Set<String> = ["to", "the", "a", "an", "on", "my", "this", "that", "me", "into", "at", "up", "over",
@@ -138,14 +141,27 @@ enum ScreenRouter {
         }
 
         // Press.
+        var verb: String?
         if let v = t.prefix(3).firstIndex(where: { pressVerbs.contains($0) }) {
             p.isCommand = true
-            p.target = strip(TextKit.digitize(Array(t[(v + 1)...])))
+            verb = t[v]
+            p.target = strip(TextKit.digitize(dropWindow(Array(t[(v + 1)...]))))
         } else {
-            p.target = strip(TextKit.digitize(t))
+            p.target = strip(TextKit.digitize(dropWindow(t)))
         }
         if let hint = t.reversed().first(where: { roleWords[$0] != nil }) { p.roleHint = roleWords[hint] }
+        // "switch to <title>" asks for a tab.
+        if verb == "switch", p.roleHint == nil { p.roleHint = "tab" }
         return p
+    }
+
+    /// Removes a trailing "on <words> window": "home on open Chrome window" gives "home".
+    /// The app part is not known here. The command router removes "on <app>" for the apps in the app table.
+    static func dropWindow(_ words: [String]) -> [String] {
+        guard let last = words.last, windowWords.contains(last), words.count >= 3 else { return words }
+        let from = max(1, words.count - 5)
+        guard let on = words[from..<(words.count - 1)].lastIndex(where: { $0 == "on" || $0 == "in" }) else { return words }
+        return Array(words[..<on])
     }
 
     /// Removes the lead and tail words: "to the issues page" gives "issues".
@@ -169,10 +185,61 @@ enum ScreenRouter {
         return digits * 2 >= k.count
     }
 
-    /// 1.0 is a full match. The larger of the whole-phrase similarity and the word cover.
-    /// Numbers must match exactly: "382 comments" never matches "384 comments" (E2, section 5.6).
+    /// The label without a status part at the end: "Home (New unread posts)" gives "Home",
+    /// "Pull requests (1)" gives "Pull requests", "Chats, 44" gives "Chats". Nil if the label has no status part.
+    static func statusFree(_ label: String) -> String? {
+        var s = label.trimmingCharacters(in: .whitespaces)
+        var changed = false
+        while true {
+            if let r = s.range(of: #"\s*\([^()]*\)$"#, options: .regularExpression) { s.removeSubrange(r) }
+            else if let r = s.range(of: #"\s*[,·]\s*\d+$"#, options: .regularExpression) { s.removeSubrange(r) }
+            else { break }
+            changed = true
+            s = s.trimmingCharacters(in: .whitespaces)
+        }
+        return changed && !TextKit.key(s).isEmpty ? s : nil
+    }
+
+    /// The match keys of a label: letters and digits only, for the label and for the label with no status part.
+    static func keys(_ label: String) -> [String] {
+        [label, statusFree(label)].compactMap { $0 }.map { TextKit.key(TextKit.digitize(TextKit.words($0)).joined()) }
+    }
+
+    /// 1.0 is a full match. The largest of: the score for the label, the score for the label with no status part
+    /// ("Home (New unread posts)" for "home"), and a sound match.
     static func score(_ target: [String], _ label: String) -> Double {
         guard !target.isEmpty else { return 0 }
+        var s = wordScore(target, label)
+        if s < 1, let bare = statusFree(label) { s = max(s, wordScore(target, bare)) }
+        // Letters and digits only: "shad CN/UI" is "shadcn/ui".
+        if s < 1, keys(label).contains(TextKit.key(target.joined())), numbersMatch(target, label) { s = 1 }
+        // A sound match: speech to text writes "clawed" for "Claude". It is never an exact match (R-NV-5).
+        if s < soundMatch, numbersMatch(target, label) {
+            let said = TextKit.key(target.joined())
+            for k in keys(label) where SoundCode.similarity(said, k) >= 1 { s = max(s, soundMatch) }
+        }
+        return s
+    }
+
+    /// The score of a label that only a sound match gives.
+    static let soundMatch = 0.82
+
+    static func numbersMatch(_ target: [String], _ label: String) -> Bool {
+        numbers(target).isSubset(of: Set(TextKit.digitize(TextKit.words(label)).filter(TextKit.isNumber)))
+    }
+
+    /// True if a word of the label is close to a word that the owner said: the same word, a near spelling,
+    /// or a near sound ("chart" for "chat"). A "maybe" for the owner when no label matches well.
+    static func near(_ target: [String], _ label: String) -> Bool {
+        let said = target.filter { $0.count >= 3 && !smallWords.contains($0) && !TextKit.isNumber($0) }
+        let words = TextKit.words(statusFree(label) ?? label)
+        return said.contains { t in
+            words.contains { w in w == t || TextKit.similarity(t, w) >= 0.75 || SoundCode.similarity(t, w) >= 0.75 }
+        }
+    }
+
+    /// Numbers must match exactly: "382 comments" never matches "384 comments" (E2, section 5.6).
+    static func wordScore(_ target: [String], _ label: String) -> Double {
         let labelWords = TextKit.digitize(TextKit.words(label))
         let want = numbers(target)
         let have = Set(labelWords.filter(TextKit.isNumber))
@@ -286,7 +353,7 @@ enum ScreenRouter {
                 let whole = score(p.words, e.label)
                 if whole >= 1 { s = max(s, 1 + margin) } else { s = max(s, whole) }
             }
-            if let hint = p.roleHint, hint == kind(e) { s += 0.05 }
+            if let hint = p.roleHint, hint == kind(e) || (hint == "tab" && e.role == "AXRadioButton") { s += 0.05 }
             if s >= 0.3 { scored.append((e, s)) }
         }
         // Same score: "click copy" prefers the element on the screen to the menu item.
@@ -308,6 +375,15 @@ enum ScreenRouter {
         options.append(RouteOption(intent: .back, label: "Go back to the previous page", score: 0))
 
         guard let first = scored.first, first.1 >= noMatch else {
+            // No label matches well. If a label holds a word near a spoken word, the owner can see it: not a sure "none".
+            if p.isCommand, let maybe = elements.filter({ !$0.label.isEmpty && !($0.risky || SafetyPolicy.isRisky($0)) && near(p.target, $0.label) })
+                .max(by: { score(p.target, $0.label) < score(p.target, $1.label) }) {
+                if !options.contains(where: { $0.intent == .click(elementID: maybe.id) }) {
+                    options.insert(RouteOption(intent: .click(elementID: maybe.id), label: "Click the \(kind(maybe) ?? "element") \"\(maybe.label)\"",
+                                               score: score(p.target, maybe.label)), at: 0)
+                }
+                return done(.none, false, false, "no label matches; maybe \"\(maybe.label)\"")
+            }
             return done(.none, true, true, p.isCommand ? "no label matches" : "no command word")
         }
         // With no verb, only a menu item can match, and only a strong match: "copy", "export", "mute".
@@ -315,8 +391,9 @@ enum ScreenRouter {
         guard let top = pool.first, p.isCommand || top.1 >= strongMatch else {
             return done(.none, first.1 < strongMatch, false, "a label matches, but no command word")
         }
-        let labelKey = TextKit.key(TextKit.digitize(TextKit.words(top.0.label)).joined())
-        let exact = TextKit.key(p.target.joined()) == labelKey || (isMenu(top.0) && TextKit.key(p.words.joined()) == labelKey)
+        // Exact: the spoken words are the label, or the label with no status part, on letters and digits only.
+        let labelKeys = keys(top.0.label)
+        let exact = labelKeys.contains(TextKit.key(p.target.joined())) || (isMenu(top.0) && labelKeys.contains(TextKit.key(p.words.joined())))
         // A risky label needs the exact label from the owner (R-NV-5). A fuzzy match on a risky label does nothing.
         if top.0.risky || SafetyPolicy.isRisky(top.0) {
             if !exact { return done(.none, true, false, "blocked: risky label \"\(top.0.label)\"") }
