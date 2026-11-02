@@ -8,9 +8,10 @@ import PackageDescription
 let modules = ["EarshotSpeech", "EarshotRouter", "EarshotActions", "EarshotDiscovery", "EarshotInput", "EarshotUI"]
 
 // T1: transcribe.cpp runs the Parakeet model (E2). Only EarshotSpeech uses it.
-// CTranscribe is a dynamic framework. SwiftPM copies it next to the product, but adds no search path for it (E2).
-// The paths: next to the tool, three levels up from a test bundle binary, and Contents/Frameworks of an app bundle.
-let transcribeSearchPaths = ["@loader_path", "@loader_path/../../..", "@executable_path/../Frameworks"]
+// CTranscribe is a dynamic framework. SwiftPM copies it next to the product.
+// SwiftPM adds "@loader_path" (the tool) and "@loader_path/../../.." (test bundles) itself. Adding them again makes the linker warn.
+// This list adds only Contents/Frameworks of the app bundle.
+let transcribeSearchPaths = ["@executable_path/../Frameworks"]
 let extraDependencies: [String: [Target.Dependency]] = ["EarshotSpeech": ["TranscribeCpp"]]
 let extraLinker: [String: [LinkerSetting]] = [
     "EarshotSpeech": [
