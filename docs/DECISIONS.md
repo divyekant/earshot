@@ -51,3 +51,24 @@ The best components for the Mac are Swift libraries:
 A native menu-bar app also uses less memory than Electron.
 
 **Decision:** Build earshot as a Swift menu-bar app. A Hammerspoon or Python prototype is acceptable for Phase 0 measurements only. Change this decision if Phase 0 shows a better option.
+
+## D-7. Do not use computer-use agents or Cua Driver
+
+The owner asked about "CUA" on 2026-11-02. The facts below come from the trycua/cua README and the cua.ai documentation. Nobody ran Cua Driver on this Mac.
+
+| Option | Result | Reason |
+|---|---|---|
+| Computer-use agent (CUA) loop, for example Claude computer use or the OpenAI CUA model | Rejected | This is the agent loop of D-2. A large model reads a screenshot and selects one action for each step. Each step takes 1–5 s. |
+| trycua/cua: Lume, Cua Spaces, SDKs, Cua Bench | Rejected | These parts run agents in virtual machines, or they test agents. earshot must operate the real desktop of the owner. |
+| Cua Driver (MIT, pre-release) | Rejected | See the list below. |
+| CUA-S1 models (trycua) | Not needed now | These are small "System 1" models. The first model only makes decisions about form fields. It does not select a chat or a text box. |
+
+Cua Driver is the only part of trycua/cua that operates the real Mac. These are the reasons not to use it:
+
+- It uses the same Accessibility API as earshot, through one more process. It does not make earshot faster. The project publishes no latency numbers.
+- By default, it does not raise the window or change the frontmost app. Its foreground mode does one action and then restores the previous app. earshot must leave the owner in the chat, with the cursor in the text box (R-NV-3).
+- Its main interface is an MCP server (R-MD-6). It has no Swift bindings.
+- Its setup needs an install script, a background service, and two permissions: Accessibility and Screen Recording.
+- If a model controls it, the model can press Return. Return sends the message in Slack, WhatsApp and Messages (R-NV-5).
+
+**Decision:** Keep the direct Accessibility approach (DESIGN.md, section 3.5). The E0 probe uses it, and it reached the Slack text box in a median of 466 ms (docs/experiments/E0-viability.md). Cua Driver reads the accessibility state again after each action to make sure that the change occurred. E0 already does a similar check: it types text only when the chat name on the screen is correct. Keep this check in the final design.
