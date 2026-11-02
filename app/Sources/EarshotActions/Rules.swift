@@ -76,7 +76,14 @@ enum SwitcherTiming {
     /// From the switcher keys to a focused search field.
     static let fieldMs = 1200
     /// The time between two searches for a switcher field that has no focus.
-    static let scanMs = 90
+    static let scanMs = 60
+    /// For an app with no learned switcher behaviour: the time before the first search for a field without focus.
+    /// The focused-element check alone finds a field that takes the focus by itself (Slack Cmd-K).
+    static let scanDelayMs = 150
+    /// From the opened chat to a focused message box, when earshot finds and focuses the box itself.
+    static let boxMs = 700
+    /// The longest extra wait for the chat name, after the box has the focus.
+    static let nameMs = 400
     /// From the typed name to the name in the field.
     static let typedMs = 1000
     /// From the name in the field to a result that shows the name. It replaces the fixed 250 ms sleep of E0.

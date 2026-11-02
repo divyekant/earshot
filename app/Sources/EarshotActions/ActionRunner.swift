@@ -120,6 +120,11 @@ public final class EarshotActionRunner: ActionRunner {
         guard front, let pid = running(e.bundleID)?.processIdentifier else { return (nil, "\(e.name) did not come to the front") }
         watch.mark("front")
         let app = AX.appElement(pid)
+        // Keys go to the key window. Wait until the app is active and has a focused window, then press at once.
+        _ = await waitUntil(timeoutMs: 500, intervalMs: SwitcherTiming.pollMs) {
+            (self.running(e.bundleID)?.isActive ?? false) && AX.element(app, "AXFocusedWindow") != nil
+        }
+        watch.mark("active")
         if e.electron { AX.set(app, "AXManualAccessibility", kCFBooleanTrue) }
         return (Fronted(app: app, pid: pid), nil)
     }
@@ -172,16 +177,24 @@ public final class EarshotActionRunner: ActionRunner {
 
         // 1. Open the chat through the app's own search.
         if case .switcher(let keys) = e.openChat {
-            if let failure = await openWithSwitcher(app: f.app, keys: keys, name: shown, watch: watch) { return fail(failure) }
+            if let failure = await openWithSwitcher(app: f.app, appID: e.id, keys: keys, name: shown, watch: watch) { return fail(failure) }
             watch.mark("chat")
         }
         // 2. Focus the message box.
-        guard let box = await focusComposer(app: f.app, appID: e.id, waitForAppMs: link != nil ? 900 : 500) else {
+        guard let box = await focusComposer(app: f.app, appID: e.id, waitForAppMs: link != nil ? 900 : 500, watch: watch) else {
             return fail("no message box found in \(e.name)")
         }
         watch.mark("focus")
         // 3. Check that the chat on screen has the name.
-        let check = checkChat(app: f.app, names: [shown, target] + (entry?.aliases ?? []))
+        // The box can take the focus before the header shows the new chat name. Read again for a short time.
+        let names = [shown, target] + (entry?.aliases ?? [])
+        var check = checkChat(app: f.app, names: names)
+        if check == .none {
+            _ = await waitUntil(timeoutMs: SwitcherTiming.nameMs, intervalMs: 40) {
+                check = self.checkChat(app: f.app, names: names)
+                return check != .none
+            }
+        }
         watch.mark("checked")
         let head = "→ \(e.name) · \(shown)"
         guard check != .none else { return fail("\(head): the chat name is not on screen") }
@@ -200,30 +213,43 @@ public final class EarshotActionRunner: ActionRunner {
     }
 
     /// Opens the chat through the app's own search. Returns nil on success, else the reason for the failure.
-    private func openWithSwitcher(app: AXUIElement, keys: String, name: String, watch: Stopwatch) async -> String? {
+    private func openWithSwitcher(app: AXUIElement, appID: String, keys: String, name: String, watch: Stopwatch) async -> String? {
         // The search keys must move the focus. If the focus stays where it was, for example in a reply box,
         // earshot stops, so that it never types the name into a message box.
         let before = AX.focused(app)
+        // What happened last time in this app: "own" (the field took the focus by itself) or "set" (earshot set it).
+        let learnedSwitcher = learnedFocus[Self.switcherKey(appID)]
         // The switcher-shaped fields that exist before the keys. A field that shows after the keys is the switcher.
-        let oldFields = AX.window(app).map { AX.switcherFields(in: $0) } ?? []
+        // This scan costs a tree walk, so earshot skips it for an app whose field took the focus by itself last time.
+        let tb = Clock.nowNs()
+        let oldFields: [AXUIElement]? = learnedSwitcher == "own" ? nil : (AX.window(app).map { AX.switcherFields(in: $0) } ?? [])
+        watch.note("baseline_ms", Clock.ms(since: tb))
         if keys.isEmpty {
             guard focusSearchField(app) else { return "no search field found" }
         } else {
             guard let combo = Keys.parse(keys) else { return "bad switcher keys: \(keys)" }
             Keys.press(combo)
         }
-        // Wait until the switcher field has focus. If it shows without focus (Messages "To:"), set the focus through AX.
-        let (found, failure) = await waitForSwitcherField(
+        watch.mark("key")
+        // Wait until the switcher field has focus. Check the focused element first (cheap). Scan for a new field
+        // without focus (Messages "To:") only when the app needed it last time, or after scanDelayMs.
+        let (found, failure, stats) = await waitForSwitcherField(
+            scanDelayMs: learnedSwitcher == "set" ? 0 : SwitcherTiming.scanDelayMs,
             focused: { () -> (AXUIElement?, Bool, Bool) in
                 guard let el = AX.focused(app), let win = AX.window(app) else { return (nil, false, false) }
                 let isNew = keys.isEmpty || !AX.same(el, before)
                 return (el, isNew && AX.isSwitcherField(el, in: win), AX.isComposer(el, in: win) || AX.looksLikeComposer(el))
             },
             newField: { () -> AXUIElement? in
-                guard let win = AX.window(app) else { return nil }
-                return AX.switcherFields(in: win).first { f in !oldFields.contains { CFEqual($0, f) } }
+                guard let oldFields, let win = AX.window(app) else { return nil }
+                return AX.switcherFields(in: win, budgetMs: 30).first { f in !oldFields.contains { CFEqual($0, f) } }
             },
             setFocus: { AX.set($0, "AXFocused", kCFBooleanTrue) })
+        watch.note("field_polls", Double(stats.polls))
+        watch.note("field_poll_ms", stats.pollMs)
+        watch.note("field_scan_ms", stats.scanMs)
+        if found == nil, learnedSwitcher == "own" { forget(Self.switcherKey(appID)) }
+        if found != nil { learn(Self.switcherKey(appID), stats.setFocus ? "set" : "own") }
         guard let field = found else { return "\(failure ?? "no search field") (\(AX.describeFocus(app)))" }
         // Never type the name while the focus is in a message box.
         guard let now = AX.focused(app), AX.same(now, field), let win = AX.window(app),
@@ -272,24 +298,43 @@ public final class EarshotActionRunner: ActionRunner {
         return nil
     }
 
+    /// The cost of a field wait, for the stages of the outcome.
+    struct FieldWaitStats {
+        var polls = 0
+        var pollMs = 0.0
+        var scanMs = 0.0
+        /// True if earshot set the focus on a new field.
+        var setFocus = false
+    }
+
     /// Waits until the focus is in a new switcher field. `focused` gives the focused element, whether it is a new
-    /// switcher field, and whether it is a message box. If a new switcher field shows without focus, `setFocus` focuses it.
+    /// switcher field, and whether it is a message box. After `scanDelayMs`, every scanMs, `newField` looks for a new
+    /// switcher field; if one shows without focus, `setFocus` focuses it.
     /// It returns the field, or the reason for the time-out. The caller types nothing on a time-out.
-    func waitForSwitcherField<T>(timeoutMs: Int = SwitcherTiming.fieldMs, focused: () -> (T?, Bool, Bool),
-                                 newField: () -> T?, setFocus: (T) -> Void) async -> (T?, String?) {
+    func waitForSwitcherField<T>(timeoutMs: Int = SwitcherTiming.fieldMs, scanDelayMs: Int = SwitcherTiming.scanDelayMs,
+                                 focused: () -> (T?, Bool, Bool), newField: () -> T?,
+                                 setFocus: (T) -> Void) async -> (T?, String?, FieldWaitStats) {
         let t0 = Clock.nowNs()
+        var stats = FieldWaitStats()
         var lastScan = -Double(SwitcherTiming.scanMs)
         var inBox = false
         var sawField = false
         while true {
+            let tp = Clock.nowNs()
             let (el, isSwitcher, isComposer) = focused()
-            if isSwitcher, let el { return (el, nil) }
+            stats.polls += 1
+            stats.pollMs += Clock.ms(since: tp)
+            if isSwitcher, let el { return (el, nil, stats) }
             inBox = isComposer
             let now = Clock.ms(since: t0)
-            if now - lastScan >= Double(SwitcherTiming.scanMs) {
+            if now >= Double(scanDelayMs), now - lastScan >= Double(SwitcherTiming.scanMs) {
                 lastScan = now
-                if let f = newField() {
+                let ts = Clock.nowNs()
+                let f = newField()
+                stats.scanMs += Clock.ms(since: ts)
+                if let f {
                     sawField = true
+                    stats.setFocus = true
                     setFocus(f)
                     continue
                 }
@@ -297,9 +342,9 @@ public final class EarshotActionRunner: ActionRunner {
             if now >= Double(timeoutMs) { break }
             await sleepMs(SwitcherTiming.pollMs)
         }
-        if sawField { return (nil, "the search field showed, but did not take the focus in \(timeoutMs) ms: nothing typed") }
-        if inBox { return (nil, "the focus stayed in the message box for \(timeoutMs) ms: nothing typed") }
-        return (nil, "the search field did not show in \(timeoutMs) ms: nothing typed")
+        if sawField { return (nil, "the search field showed, but did not take the focus in \(timeoutMs) ms: nothing typed", stats) }
+        if inBox { return (nil, "the focus stayed in the message box for \(timeoutMs) ms: nothing typed", stats) }
+        return (nil, "the search field did not show in \(timeoutMs) ms: nothing typed", stats)
     }
 
     /// Polls `read` until a text that matches the name and is not in `baseline` shows on screen.
@@ -330,40 +375,53 @@ public final class EarshotActionRunner: ActionRunner {
 
     /// Focuses the message box. earshot remembers, for each app, which method worked last time:
     /// "app" (the app focuses the box by itself), "set" (accessibility) or "click" (E0).
-    private func focusComposer(app: AXUIElement, appID: String, waitForAppMs: Int) async -> AXUIElement? {
+    private func focusComposer(app: AXUIElement, appID: String, waitForAppMs: Int, watch: Stopwatch) async -> AXUIElement? {
         func focusedBox() -> AXUIElement? {
             guard let el = AX.focused(app), let win = AX.window(app), AX.isComposer(el, in: win) else { return nil }
             return el
         }
         let learned = learnedFocus[appID]
-        let wait = (learned == nil || learned == "app") ? waitForAppMs : 60
-        if await waitUntil(timeoutMs: wait, { focusedBox() != nil }), let box = focusedBox() {
-            learn(appID, "app")
+        if learned == nil || learned == "app" {
+            // The app focuses the box by itself: poll the focused element (cheap).
+            if await waitUntil(timeoutMs: waitForAppMs, intervalMs: SwitcherTiming.pollMs, { focusedBox() != nil }), let box = focusedBox() {
+                learn(appID, "app")
+                return box
+            }
+        } else if let box = focusedBox() {
             return box
         }
-        guard let win = AX.window(app) else { return nil }
-        // The new chat can take a moment to show its box.
+        // Find the box and set the focus at once. Repeat until the box takes it: the new chat can take a moment (E0).
+        let t0 = Clock.nowNs()
         var found: AXUIElement?
-        _ = await waitUntil(timeoutMs: 500, intervalMs: 30) {
-            found = AX.findComposer(in: win, budgetMs: 150).0
-            return found != nil
-        }
-        guard let box = found else { return nil }
-        if learned != "click" {
-            AX.set(box, "AXFocused", kCFBooleanTrue)
-            if await waitUntil(timeoutMs: 150, { focusedBox() != nil }), let b = focusedBox() {
-                learn(appID, "set")
-                return b
+        while Clock.ms(since: t0) < Double(SwitcherTiming.boxMs) {
+            if let win = AX.window(app), let box = AX.findComposer(in: win, budgetMs: 100).0 {
+                if found == nil { watch.mark("box_found") }
+                found = box
+                if learned == "click" { break }
+                AX.set(box, "AXFocused", kCFBooleanTrue)
+                if await waitUntil(timeoutMs: 60, intervalMs: SwitcherTiming.pollMs, { focusedBox() != nil }), let b = focusedBox() {
+                    learn(appID, "set")
+                    return b
+                }
+            } else {
+                await sleepMs(SwitcherTiming.pollMs)
             }
         }
-        if let f = AX.frame(box), let p = safePoint(box, f) {
+        if let box = found, let f = AX.frame(box), let p = safePoint(box, f) {
             Mouse.click(p)
-            if await waitUntil(timeoutMs: 300, { focusedBox() != nil }), let b = focusedBox() {
+            if await waitUntil(timeoutMs: 300, intervalMs: SwitcherTiming.pollMs, { focusedBox() != nil }), let b = focusedBox() {
                 learn(appID, "click")
                 return b
             }
         }
         return nil
+    }
+
+    static func switcherKey(_ appID: String) -> String { "switcher:\(appID)" }
+
+    private func forget(_ key: String) {
+        guard learnedFocus.removeValue(forKey: key) != nil else { return }
+        try? store?.save(learnedFocus, Self.learnedFile)
     }
 
     private func learn(_ appID: String, _ method: String) {
