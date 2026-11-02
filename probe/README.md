@@ -88,6 +88,7 @@ E1 tests a router with no hand-written app rows and no hand-written names. See [
 | `swift run earshot-probe e1-make` | Makes `logs/e1-commands.json`: about 50 test commands with their correct answers. |
 | `swift run earshot-probe e1-try "message Ravi on Slack"` | Shows the short list, the rules answer and the Jev answer for one command. Put `--no-jev` after the words to leave out Jev. |
 | `swift run earshot-probe e1-run` | Routes all test commands with the rules, with Jev, and with the rules first and Jev only when the rules are unsure. Add `--no-jev` to use the rules only. |
+| `swift run earshot-probe e1-search [app...]` | Types names into each chat app's own search, reads the result names, then clears the field and presses Escape. It never presses Return. Do not touch the keyboard or the mouse while it runs. |
 | `swift run earshot-probe e1-open [app] [runs]` | Opens your own chat with the generated rows and focuses the box. It types nothing. Do not touch the keyboard or the mouse while it runs. |
 
 The Jev key comes from `TYPESAFE_API_KEY`, else from `~/.config/jev-qa/env`. The probe never prints or saves the key.

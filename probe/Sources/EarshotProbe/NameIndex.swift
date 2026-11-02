@@ -80,6 +80,9 @@ enum NameIndex {
 
     static func isLoading(_ raw: String) -> Bool { raw.lowercased().contains("loading") }
 
+    static let liveRegions: Set<String> = ["AXApplicationAlert", "AXApplicationLog", "AXApplicationStatus",
+                                           "AXApplicationTimer", "AXApplicationMarquee"]
+
     /// Removes the owner mark, notes in brackets and invisible characters.
     /// Returns nil if the text is not a chat name.
     static func clean(_ raw: String) -> (name: String, isSelf: Bool)? {
@@ -93,9 +96,13 @@ enum NameIndex {
         s = s.replacingOccurrences(of: #"\s*\([^)]*\)"#, with: "", options: .regularExpression)
             .trimmingCharacters(in: .whitespaces)
         guard !isLoading(s), (2...48).contains(s.count), s.contains(where: \.isLetter) else { return nil }
+        // A name with a phone number in it ("Manel & +1 (415) ...") stays out. It must not go to Jev.
+        guard s.filter(\.isNumber).count < 6 else { return nil }
         let key = Text.key(s)
         guard !uiWords.contains(key), !weekdays.contains(key) else { return nil }
         let lower = s.lowercased()
+        // A draft row such as "New Message to Ravi" is not a chat.
+        if ["new message", "new chat", "new conversation"].contains(where: { lower.hasPrefix($0) }) { return nil }
         // Section titles such as "Channel alerts" or "Direct message with ...".
         if lower.hasPrefix("channel ") || lower.hasPrefix("direct message") { return nil }
         // Times, dates and counts: "10:42", "9.30 PM", "12/10/26", "3m", "2 new".
@@ -153,13 +160,18 @@ enum NameIndex {
         let t0 = Clock.nowNs()
         let (right, box) = sidebarEdge(window, w)
         result.placeholder = box.flatMap { AX.string($0, "AXPlaceholderValue") }
+        // Messages shows the placeholder as a text next to the box ("Text Message • SMS").
+        let placeholderKey = result.placeholder.map { Text.key($0) } ?? ""
         let top = w.y + 0.03 * w.h
         var queue: [AXUIElement] = [window]
         var index = 0
         var seen = Set<String>()
-        func add(_ raw: String?, fromRow: Bool, _ how: String) -> Bool {
+        func add(_ raw: String?, fromRow: Bool, _ how: String, frame: Frame? = nil) -> Bool {
             guard let raw else { return false }
+            // A text with no size is not on screen, for example a live region that says "loading…".
+            if let f = frame, f.w == 0 || f.h == 0 { return false }
             if isLoading(raw) { result.loading = true }
+            if !placeholderKey.isEmpty, Text.key(raw) == placeholderKey { return false }
             guard let c = clean(raw) else { return false }
             if seen.insert(Text.key(c.name)).inserted {
                 result.names.append(SidebarName(name: c.name, isSelf: c.isSelf, fromRow: fromRow, how: how))
@@ -171,7 +183,10 @@ enum NameIndex {
             index += 1
             let r = AX.role(el)
             if ["AXMenuBar", "AXMenu", "AXImage", "AXScrollBar", "AXToolbar"].contains(r) { continue }
-            if let f = AX.frame(el), f.w > 0, f.h > 0, !CFEqual(el, window) {
+            // Live regions announce changes ("loading…", new messages). They are not the chat list.
+            if liveRegions.contains(AX.subrole(el)) { continue }
+            let frame = AX.frame(el)
+            if let f = frame, f.w > 0, f.h > 0, !CFEqual(el, window) {
                 // Leave out the main pane and the title bar, with all their children.
                 if f.x >= right || f.maxY <= top { continue }
             }
@@ -183,9 +198,16 @@ enum NameIndex {
                 }
                 continue
             }
-            if r == "AXStaticText" { _ = add(AX.string(el, "AXValue"), fromRow: false, r) }
+            if r == "AXStaticText" {
+                // Messages (Catalyst) shows each chat as a text with an empty value. Its description
+                // holds "Name, Unread, last message", so the name is the part before the first comma.
+                let value = AX.string(el, "AXValue") ?? ""
+                let text = value.isEmpty
+                    ? AX.string(el, "AXDescription")?.split(separator: ",").first.map(String.init) : value
+                _ = add(text, fromRow: false, r, frame: frame)
+            }
             if r == "AXLink" || r == "AXButton" {
-                _ = add(AX.string(el, "AXTitle") ?? AX.string(el, "AXDescription"), fromRow: false, r)
+                _ = add(AX.string(el, "AXTitle") ?? AX.string(el, "AXDescription"), fromRow: false, r, frame: frame)
             }
             queue.append(contentsOf: AX.elements(el, "AXChildren"))
         }

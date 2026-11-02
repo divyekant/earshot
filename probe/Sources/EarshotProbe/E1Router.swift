@@ -87,7 +87,8 @@ struct RulesResult {
 enum E1Router {
     static let leadFillers: Set<String> = ["hey", "ok", "okay", "earshot", "please", "can", "could", "you", "would"]
     static let commandVerbs: Set<String> = ["message", "text", "ping", "dm", "tell", "write", "chat", "open", "go",
-                                            "switch", "launch", "show", "reply", "jump", "start", "send", "bring"]
+                                            "switch", "launch", "show", "reply", "jump", "start", "send", "bring",
+                                            "pull", "talk", "find", "reach"]
     /// Words that end the name part. The message text comes after them.
     static let textLeads: Set<String> = ["saying", "say", "that"]
     static let selfWords: Set<String> = ["me", "myself", "self"]
@@ -103,22 +104,21 @@ enum E1Router {
 
     // MARK: - Step 1: the short list
 
-    static func retrieve(_ words: String, world: World) -> Retrieval {
+    static func retrieve(_ spoken: String, world: World) -> Retrieval {
         let t0 = Clock.nowNs()
-        var tokens = Text.normalize(words).split(separator: " ").map(String.init)
-        while let first = tokens.first, leadFillers.contains(first) { tokens.removeFirst() }
-
-        // The name part ends at a comma or at a text lead word ("tell Ravi that ...").
-        var nameEnd = tokens.count
-        let rawPieces = words.split(separator: ",", maxSplits: 1)
-        if rawPieces.count == 2 {
-            let headCount = Text.normalize(String(rawPieces[0])).split(separator: " ").count
-            let dropped = Text.normalize(words).split(separator: " ").count - tokens.count
-            nameEnd = max(1, min(nameEnd, headCount - dropped))
+        // "Felix's chat" names Felix. Remove the possessive before the words are split.
+        let words = spoken.replacingOccurrences(of: #"['\u2019]s\b"#, with: "", options: .regularExpression)
+        // Each comma-separated piece gives its own tokens, so that the probe knows where each comma is.
+        var tokens: [String] = []
+        var commaAfter: [Int] = []
+        for piece in words.split(separator: ",", omittingEmptySubsequences: false) {
+            tokens += Text.normalize(String(piece)).split(separator: " ").map(String.init)
+            commaAfter.append(tokens.count)
         }
-        if let lead = tokens.indices.dropFirst().first(where: { textLeads.contains(tokens[$0]) }) {
-            nameEnd = min(nameEnd, lead)
-        }
+        commaAfter.removeLast()
+        var dropped = 0
+        while let first = tokens.first, leadFillers.contains(first) { tokens.removeFirst(); dropped += 1 }
+        let commas = commaAfter.map { $0 - dropped }.filter { $0 > 0 && $0 < tokens.count }
 
         // App names, anywhere in the words. One word or more, almost exact (0.9):
         // "message" must not match the app "Messages".
@@ -142,8 +142,18 @@ enum E1Router {
             }
         }
 
-        let first = tokens.first ?? ""
-        let isCommand = commandVerbs.contains(first) || appAtStart || onApp
+        // The name part ends at a comma or at a text lead word ("tell Ravi that ...").
+        // A comma right after the app name does not end it: "Slack, Ravi" names Ravi.
+        func hasNameWord(_ range: Range<Int>) -> Bool {
+            range.contains { i in !appTokens.contains(i) && !stopWords.contains(tokens[i]) }
+        }
+        var nameEnd = commas.first(where: { hasNameWord(0..<$0) }) ?? tokens.count
+        if let lead = tokens.indices.dropFirst().first(where: { textLeads.contains(tokens[$0]) }) {
+            nameEnd = min(nameEnd, lead)
+        }
+
+        // A command word in the first three words: "let's write to Ravi", "can you pull up Ravi".
+        let isCommand = tokens.prefix(3).contains { commandVerbs.contains($0) } || appAtStart || onApp
         let head = tokens.prefix(nameEnd)
         let wantsSelf = head.contains { selfWords.contains($0) } || (head.contains("my") && head.contains("own"))
 
@@ -208,8 +218,14 @@ enum E1Router {
     // MARK: - Step 2a: local rules
 
     static func rules(_ r: Retrieval) -> RulesResult {
-        guard r.isCommand else { return RulesResult(choice: Choice.noAction, confident: true, why: "no command word or app name") }
         let chats = r.options.filter { $0.choice.action == "open_chat" }
+        guard r.isCommand else {
+            // A known name with no command word: the rules cannot tell, so Jev decides ("get me Ravi's chat").
+            if let c = chats.first, c.score >= strongMatch {
+                return RulesResult(choice: Choice.noAction, confident: false, why: "a known name, but no command word")
+            }
+            return RulesResult(choice: Choice.noAction, confident: true, why: "no command word or app name")
+        }
         let apps = r.options.filter { $0.choice.action == "open_app" }
         let c1 = chats.first
         let c2 = chats.dropFirst().first

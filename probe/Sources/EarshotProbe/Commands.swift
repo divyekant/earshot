@@ -25,6 +25,7 @@ enum Commands {
     swift run earshot-probe e1-try "<words>"      Show the short list, the rules answer and the Jev answer
     swift run earshot-probe e1-run [--no-jev]     Route all test commands with rules, Jev, and rules then Jev
     swift run earshot-probe e1-open [app] [runs]  Open your own chat with the generated rows (types nothing)
+    swift run earshot-probe e1-search [app...]    Type names into each app's own search and read the results (no Return)
 
     Options: --engine transcriber|dictation   --locale en-IN
     """
@@ -77,6 +78,7 @@ enum Commands {
             case "e1-try": return try await E1.tryOne(args)
             case "e1-run": return try await E1.runAll(args)
             case "e1-open": return try await E1.open(args)
+            case "e1-search": return try await E1.search(args)
             default:
                 print(usage)
                 return 2
