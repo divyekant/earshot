@@ -36,10 +36,12 @@ enum WindowShot {
 
     /// The picture for Jev: scaled so that its longest side is at most VisionRules.maxSide pixels, with a numbered
     /// badge at the top left of each element (set-of-marks, the same numbers as "show numbers"), as JPEG.
-    /// Risky elements get no number, so Jev cannot pick them (R-NV-5).
+    /// Risky elements get a number too, so that Jev can point at them, and earshot then refuses the pick (R-NV-5).
+    /// E3 step 2: with no number on "Star", Jev picked the link next to it.
     static func marked(_ image: CGImage, window: Frame, elements: [ScreenElement]) -> VisionShot? {
         let scale = Double(image.width) / max(window.w, 1)
         let (pw, ph) = VisionRules.pictureSize(width: window.w, height: window.h, scale: scale)
+        // The picture can be larger than the capture (a small window). Then the drawing scales it up.
         guard VisionRules.sizeOK(pw, ph) else { return nil }
         let k = Double(pw) / max(window.w, 1)  // picture pixels for each screen point
         guard let ctx = CGContext(data: nil, width: pw, height: ph, bitsPerComponent: 8, bytesPerRow: 0,
@@ -96,11 +98,11 @@ enum VisionMarks {
         let y: Double
     }
 
-    /// One badge for each numbered element ("e<n>") that is not risky and that is inside the window.
+    /// One badge for each numbered element ("e<n>") that is inside the window. Risky elements get one too.
     /// `k` is picture pixels for each screen point.
     static func place(_ elements: [ScreenElement], window w: Frame, k: Double, pictureHeight ph: Double) -> [Mark] {
         elements.compactMap { e in
-            guard e.id.hasPrefix("e"), let n = Int(e.id.dropFirst()), !SafetyPolicy.isRisky(e) else { return nil }
+            guard e.id.hasPrefix("e"), let n = Int(e.id.dropFirst()) else { return nil }
             let left = (e.x - w.x) * k, top = (e.y - w.y) * k
             guard left >= 0, top >= 0, left < w.w * k, top < w.h * k else { return nil }
             // Top left of the element, inside the picture.

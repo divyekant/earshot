@@ -23,6 +23,8 @@ struct E3Case: Codable {
     var command: String
     var expect: [String]
     var waitMs: Int?
+    /// The bundle id that must be in front, for example "com.google.Chrome". Else the row is "skipped".
+    var front: String?
 }
 
 final class E3Screens: XCTestCase {
@@ -43,6 +45,15 @@ final class E3Screens: XCTestCase {
         for c in cases {
             if let target = c.open { Self.open(target) }
             try? await Task.sleep(nanoseconds: UInt64(c.waitMs ?? 2500) * 1_000_000)
+            if let want = c.front, NSWorkspace.shared.frontmostApplication?.bundleIdentifier != want {
+                // E3 step 2: a notification banner was in front for 3 cases. Do not count them.
+                let row: [String: Any] = ["name": c.name, "command": c.command, "skipped": true,
+                                          "front": NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? ""]
+                let line = String(data: try JSONSerialization.data(withJSONObject: row, options: [.sortedKeys]), encoding: .utf8) ?? ""
+                print("E3 \(line)")
+                lines.append(line)
+                continue
+            }
             let screen = await runner.screen()
             let context = RouteContext(apps: [], names: [], frontBundleID: NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
                                        screen: screen)

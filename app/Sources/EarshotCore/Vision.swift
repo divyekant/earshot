@@ -56,10 +56,17 @@ public enum VisionRules {
     /// A box smaller than this, in points on each side, is noise.
     public static let minBoxSide = 4.0
 
-    /// The size of the picture for a window of `w` x `h` points: the longest side at most `maxSide` pixels.
+    /// Jev's box is used only if the picture has fewer numbers than this: an app with poor labels.
+    /// E3 step 2: on pages with many numbers, the box gave no element (4 times) or a wrong element (1 time).
+    public static let boxBelowMarks = 3
+
+    /// The size of the picture for a window of `w` x `h` points: the longest side at most `maxSide` pixels,
+    /// and the shortest side at least `minSide` pixels if the longest side permits it.
+    /// E3 step 2: Calculator (230 x 408 points at scale 1) was too small, so earshot scales a small window up.
     public static func pictureSize(width w: Double, height h: Double, scale: Double) -> (Int, Int) {
-        let pw = w * scale, ph = h * scale
-        let k = min(1, Double(maxSide) / max(pw, ph, 1))
+        let pw = max(w * scale, 1), ph = max(h * scale, 1)
+        var k = min(1, Double(maxSide) / max(pw, ph))
+        if min(pw, ph) * k < Double(minSide) { k = min(Double(minSide) / min(pw, ph), Double(maxSide) / max(pw, ph)) }
         return (max(1, Int((pw * k).rounded())), max(1, Int((ph * k).rounded())))
     }
 

@@ -5,8 +5,8 @@ import Foundation
 ///
 /// The owner turns it on with its own setting ("Jev sees the screen"). It is off by default, separate from tier 2.
 /// It sends the command words and one JPEG of the front window with the "show numbers" numbers drawn on it.
-/// It asks two questions in one request: which number marks the target (choice), and where the target is (box).
-/// The box is used only if Jev picks no number. It sends no audio. It returns `.none` after the budget or on an error.
+/// It asks which number marks the target (choice). For a window with few numbers, the same request also asks
+/// where the target is (box). The box is used only if Jev picks no number. It sends no audio. It returns `.none` after the budget or on an error.
 /// The key comes from the caller (the Keychain). This type never logs the key or the picture.
 public final class JevScreenPicker: ScreenPicker, @unchecked Sendable {
     public static let endpoint = JevChooser.endpoint
@@ -20,7 +20,7 @@ public final class JevScreenPicker: ScreenPicker, @unchecked Sendable {
     static let goal = "Pick the number on the screenshot that marks the element that the owner's voice command asks for."
     static let rules = """
     The screenshot shows the front window of the owner's Mac. Yellow badges with numbers are drawn at the top left \
-    of the elements that earshot can click. The command comes from speech to text, so words can be heard wrong. \
+    of the elements of the window. The command comes from speech to text, so words can be heard wrong. \
     A command can name only part of a label, or describe the element by its look or its place. \
     Pick the number whose element the command asks for. If no number marks that element, pick none.
     """
@@ -61,13 +61,17 @@ public final class JevScreenPicker: ScreenPicker, @unchecked Sendable {
         var criteria: [String: Any] = [:]
         for n in shot.marks { criteria["n\(n)"] = ["label": "number \(n)"] }
         criteria[Self.noneID] = ["label": Self.noneLabel]
+        var questions: [String: Any] = [
+            "mark": ["type": "choice", "criteria": criteria, "instructions": ["goal": Self.goal, "rules": Self.rules]],
+        ]
+        // The box only for a window with few numbers (VisionRules.boxBelowMarks, E3 step 2).
+        if shot.marks.count < VisionRules.boxBelowMarks {
+            questions["where"] = ["type": "box", "instructions": Self.boxRule + "\"\(command)\""]
+        }
         let body: [String: Any] = [
             "model": model,
             "state": ["command": command, "screenshot": Self.asset],
-            "questions": [
-                "mark": ["type": "choice", "criteria": criteria, "instructions": ["goal": Self.goal, "rules": Self.rules]],
-                "where": ["type": "box", "instructions": Self.boxRule + "\"\(command)\""],
-            ],
+            "questions": questions,
             "assets": [Self.asset: ["type": "image", "format": "jpeg", "data_base64": shot.jpeg.base64EncodedString()]],
         ]
         var request = URLRequest(url: Self.endpoint)

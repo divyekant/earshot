@@ -19,6 +19,13 @@ final class VisionRulesTests: XCTestCase {
         XCTAssertTrue(VisionRules.sizeOK(w, h))
         // A small window keeps its size. Too small for the API: no picture.
         XCTAssertEqual(VisionRules.pictureSize(width: 400, height: 300, scale: 1).0, 400)
+        // E3 step 2: Calculator, 230 x 408 points at scale 1, is scaled up to the API minimum.
+        let (cw, ch) = VisionRules.pictureSize(width: 230, height: 408, scale: 1)
+        XCTAssertEqual(cw, 280)
+        XCTAssertEqual(ch, 497)
+        XCTAssertTrue(VisionRules.sizeOK(cw, ch))
+        // A very long thin window: the longest side wins.
+        XCTAssertLessThanOrEqual(VisionRules.pictureSize(width: 100, height: 3000, scale: 1).1, VisionRules.maxSide)
         XCTAssertFalse(VisionRules.sizeOK(400, 200))
         XCTAssertFalse(VisionRules.sizeOK(1600, 900))
     }

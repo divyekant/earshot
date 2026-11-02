@@ -42,9 +42,16 @@ final class JevVisionTests: XCTestCase {
         XCTAssertEqual(mark["type"] as? String, "choice")
         let criteria = try XCTUnwrap(mark["criteria"] as? [String: Any])
         XCTAssertEqual(Set(criteria.keys), ["n1", "n2", "n5", "none"])
+        // 3 numbers: no box question (VisionRules.boxBelowMarks, E3 step 2).
+        XCTAssertNil(q["where"])
+    }
+
+    func testBoxQuestionOnlyForFewNumbers() throws {
+        let few = VisionShot(jpeg: shot.jpeg, marks: [1], width: 400, height: 300)
+        let q = try XCTUnwrap(body(JevScreenPicker(apiKey: "k").makeRequest("click the card", shot: few))["questions"] as? [String: Any])
         let box = try XCTUnwrap(q["where"] as? [String: Any])
         XCTAssertEqual(box["type"] as? String, "box")
-        XCTAssertTrue((box["instructions"] as? String)?.contains("click settings") == true)
+        XCTAssertTrue((box["instructions"] as? String)?.contains("click the card") == true)
     }
 
     func answer(choice: String, probs: [String: Double], box: [String: Double]? = nil) -> Data {

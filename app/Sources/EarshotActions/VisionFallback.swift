@@ -51,7 +51,8 @@ extension EarshotActionRunner {
         if overlay.shown { overlay.hide() }
 
         guard let capture = await WindowShot.capture(pid: read.pid, window: read.window),
-              let shot = WindowShot.marked(capture.0, window: capture.1, elements: read.snapshot.elements) else {
+              // On a web page, only the page gets numbers. E3 step 2: Jev picked the address field for "the shopping bag".
+              let shot = WindowShot.marked(capture.0, window: capture.1, elements: read.web ? pageElements(read) : read.snapshot.elements) else {
             return none("earshot could not take the picture of the window")
         }
         let shotWindow = capture.1
@@ -76,6 +77,7 @@ extension EarshotActionRunner {
             if SafetyPolicy.isRisky(item.element) { return none("blocked: risky label \"\(item.element.label)\"") }
             return VisionTarget(elementID: id, label: item.element.label, note: "mark \(n)", stages: stages)
         case let .box(top, left, bottom, right):
+            guard shot.marks.count < VisionRules.boxBelowMarks else { return none("Jev found no numbered target") }
             let w = (x: shotWindow.x, y: shotWindow.y, w: shotWindow.w, h: shotWindow.h)
             guard let p = VisionRules.point(top: top, left: left, bottom: bottom, right: right, window: w) else {
                 return none("Jev's box does not mark one element")
