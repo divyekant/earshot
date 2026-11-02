@@ -24,11 +24,18 @@ extension Pipeline {
         }
         let app = AX.appElement(pid)
         if row.electron == true { AX.set(app, "AXManualAccessibility", kCFBooleanTrue) }
+        // A search that an earlier step left open would stop the focus check. Close it first.
+        if searchOpen(app) { _ = await closeSearch(app) }
         let t0 = Clock.nowNs()
         let (found, failure) = await typeIntoSwitcher(app: app, row: row, name: name)
         out.typedMs = Clock.ms(since: t0)
         guard let field = found else {
             out.failure = failure
+            // A failed search can stay open with the focus on one of its buttons. Escape closes it.
+            // Escape never sends a message.
+            Keys.press(Keys.escape)
+            await sleepMs(150)
+            out.closed = await closeSearch(app)
             return out
         }
         // Read the list until it stops changing: 3 equal reads, 60 ms apart, 1.5 s at most.
@@ -58,12 +65,31 @@ extension Pipeline {
         }
         Keys.press(Keys.escape)
         await sleepMs(150)
-        if let el = AX.focused(app), let win = AX.window(app) {
-            out.closed = !AX.isSwitcherField(el, in: win) || (AX.value(el) ?? "").isEmpty
-        } else {
-            out.closed = true
-        }
+        // Messages needs a second Escape: the first closes the suggestions, the second the new message.
+        out.closed = await closeSearch(app, field: field)
         return out
+    }
+
+    /// True if a search field has the focus: a switcher field that is not a message box.
+    func searchOpen(_ app: AXUIElement) -> Bool {
+        guard let el = AX.focused(app), let win = AX.window(app) else { return false }
+        return AX.isSwitcherField(el, in: win) && !AX.isComposer(el, in: win)
+    }
+
+    /// Presses Escape while a search field has the focus, or while the field that the probe
+    /// typed into is still on screen, 3 times at most. Returns true if the search closed.
+    func closeSearch(_ app: AXUIElement, field: AXUIElement? = nil) async -> Bool {
+        func open() -> Bool {
+            if searchOpen(app) { return true }
+            guard let field, let f = AX.frame(field) else { return false }
+            return f.w > 0 && f.h > 0
+        }
+        for _ in 0..<3 {
+            if !open() { return true }
+            Keys.press(Keys.escape)
+            await sleepMs(200)
+        }
+        return !open()
     }
 
     /// Reads the result list: the names below the search field, in the same column.
@@ -176,15 +202,15 @@ extension E1 {
         let rows = apps.compactMap { $0.appRow() }
         let pipeline = Pipeline(apps: rows)
         pipeline.prime()
-        let before = NSWorkspace.shared.frontmostApplication
-        defer { before?.activate() }
+        let before = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
         let log = try RunLog(kind: "search", experiment: "e1")
         let people = (try? Config.loadPeople())?.filter { !$0.me }.map(\.name) ?? []
         print("E1: names typed into each app's own search. No Return, no chat opens. Do not touch the keyboard or mouse.")
         print("Log: \(log.url.path)\n")
 
         var summary: [String] = []
-        for row in rows {
+        var stopped = false
+        for row in rows where !stopped {
             var terms: [String] = []
             func addTerm(_ t: String) {
                 let k = Text.key(t)
@@ -209,8 +235,10 @@ extension E1 {
 
             var found = 0, top = 0
             var times: [Double] = []
+            var failures = 0
             for term in terms {
                 let r = await pipeline.readSearch(row: row, name: term)
+                if r.failure != nil { failures += 1 } else { failures = 0 }
                 let scored = r.results.enumerated().map { ($0.offset, $0.element, nameScore(term, $0.element)) }
                 let best = scored.max { $0.2 < $1.2 }
                 let match = best.map { $0.2 >= 0.8 } ?? false
@@ -233,13 +261,26 @@ extension E1 {
                 if let b = best { entry["best"] = b.1; entry["best_place"] = b.0 + 1; entry["best_score"] = b.2 }
                 if let f = r.failure { entry["failure"] = f }
                 log.write(entry)
+                // SAFETY: stop at once if a search stays open, or after 2 failures in a row.
+                if !r.closed {
+                    print("STOP: the search did not close in \(row.name). Check the app.")
+                    stopped = true
+                    break
+                }
+                if failures >= 2 {
+                    print("STOP: 2 failures in a row in \(row.name). The probe leaves this app.")
+                    break
+                }
                 await sleepMs(400)
             }
             summary.append("\(row.name): a matching chat for \(found) of \(terms.count) names (top result for \(top)); "
                            + "results after median \(Stats.ms(Stats.median(times))), slowest 1 in 10 \(Stats.ms(Stats.percentile(times, 0.9)))")
         }
+        // Bring back the app that was in front before the run.
+        if let id = before { _ = await pipeline.bringToFront(bundleID: id) }
         print("\nSummary")
         summary.forEach { print("  " + $0) }
+        if stopped { print("  The run STOPPED early. See the STOP line above.") }
         print("  The last two names of each app are your own name and a name that is not in your chats.")
         return 0
     }
