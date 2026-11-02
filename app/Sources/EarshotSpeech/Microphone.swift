@@ -3,19 +3,31 @@ import Foundation
 
 /// Reads the microphone, converts the audio to the format of one engine, and passes it on
 /// only between `begin` and `end`. No audio is saved, and no audio leaves the Mac (R-MD-1).
-/// It keeps the last 250 ms before `begin`, so that the first word is not lost (E0).
+/// It gives the last 250 ms before `begin`, so that the first word is not lost (E0).
+/// It keeps the last 3 s in memory, for a turn that the wake phrase opens: that turn starts at the phrase (D-11).
 final class MicrophoneFeed: @unchecked Sendable {
     let format: AVAudioFormat
+    /// The usual audio before `begin`.
+    let prerollSeconds: Double
+    /// The audio that the feed keeps in memory, and the longest preroll.
+    static let keepSeconds = 3.0
     private let engine = AVAudioEngine()
     private let lock = NSLock()
     private var converter: AVAudioConverter?
     private var deliver: ((AVAudioPCMBuffer) -> Void)?
     private var preroll: Preroll<AVAudioPCMBuffer>
+    private var nextPreroll: Double?
     private var running = false
 
     init(format: AVAudioFormat, prerollSeconds: Double = 0.25) {
         self.format = format
-        preroll = Preroll(limitFrames: Int64(format.sampleRate * prerollSeconds))
+        self.prerollSeconds = prerollSeconds
+        preroll = Preroll(limitFrames: Int64(format.sampleRate * max(prerollSeconds, Self.keepSeconds)))
+    }
+
+    /// The next `begin` gives this much audio from before it (at most `keepSeconds`). Then the usual preroll again.
+    func setNextPreroll(seconds: Double) {
+        lock.withLock { nextPreroll = min(max(seconds, prerollSeconds), Self.keepSeconds) }
     }
 
     /// Opens the microphone. macOS shows the microphone indicator while it is open.
@@ -53,7 +65,9 @@ final class MicrophoneFeed: @unchecked Sendable {
     /// Starts to pass audio to `sink`, first the preroll.
     func begin(_ sink: @escaping (AVAudioPCMBuffer) -> Void) {
         lock.lock(); defer { lock.unlock() }
-        for b in preroll.drain() { sink(b) }
+        let seconds = nextPreroll ?? prerollSeconds
+        nextPreroll = nil
+        for b in preroll.drainLast(frames: Int64(format.sampleRate * seconds)) { sink(b) }
         deliver = sink
     }
 

@@ -31,6 +31,28 @@ final class PiecesTests: XCTestCase {
         XCTAssertTrue(p.drain().isEmpty)
     }
 
+    // D-11: the feed keeps 3 s, and a normal turn still gets only the last 250 ms.
+    func testPrerollDrainLastTakesTheNewestChunks() {
+        var p = Preroll<Int>(limitFrames: 3000)
+        for i in 0..<40 { p.add(i, frames: 100) }
+        XCTAssertEqual(p.drainLast(frames: 250), [37, 38, 39])
+        XCTAssertEqual(p.frames, 0)
+        XCTAssertTrue(p.drain().isEmpty, "the older chunks are dropped")
+    }
+
+    func testPrerollDrainLastLongWakePreroll() {
+        var p = Preroll<Int>(limitFrames: 3000)
+        for i in 0..<40 { p.add(i, frames: 100) }
+        // A wake turn: start 1.4 s back (frames of 100 here), to hear the whole phrase.
+        XCTAssertEqual(p.drainLast(frames: 1400), Array(26...39))
+    }
+
+    func testPrerollDrainLastWithLessAudio() {
+        var p = Preroll<Int>(limitFrames: 3000)
+        p.add(1, frames: 100)
+        XCTAssertEqual(p.drainLast(frames: 2000), [1], "it gives what it has")
+    }
+
     func testTailPadFrames() {
         XCTAssertEqual(TailPad.frames(sampleRate: 16000), 4800)
         XCTAssertEqual(TailPad.frames(sampleRate: 48000, seconds: 0.25), 12000)
@@ -116,13 +138,38 @@ final class ResolverTests: XCTestCase {
     func testFactoryTypes() {
         var s = EarshotSettings()
         s.engine = .apple
-        XCTAssertTrue(SpeechEngines.make(s, locator: locator(["parakeet-a.gguf"])).engine is AppleSpeechEngine)
+        XCTAssertEqual(SpeechEngines.make(s, locator: locator(["parakeet-a.gguf"])).engine.id.hasPrefix("apple"), true)
         s.engine = .auto
-        XCTAssertTrue(SpeechEngines.make(s, locator: locator(["parakeet-a.gguf"])).engine is AppleSpeechEngine)
+        XCTAssertEqual(SpeechEngines.make(s, locator: locator(["parakeet-a.gguf"])).engine.id.hasPrefix("apple"), true)
         s.engine = .parakeet
         let (e, _) = SpeechEngines.make(s, locator: locator(["parakeet-a.gguf"]))
         XCTAssertEqual(e.id, "apple", "the guarded Parakeet engine reports Apple until Parakeet is loaded")
         XCTAssertTrue(e is AutoSpeechEngine)
+    }
+
+    func testAppleEngineForThisMac() {
+        let e = AppleSpeech.make(locale: Locale(identifier: "en_US"))
+        if #available(macOS 26, *) {
+            #if compiler(>=6.2)
+            XCTAssertTrue(e is FallbackSpeechEngine, "macOS 26: SpeechTranscriber with dictation as the fallback")
+            #else
+            XCTAssertTrue(e is DictationEngine)
+            #endif
+        } else {
+            XCTAssertTrue(e is DictationEngine, "before macOS 26: on-device dictation")
+        }
+    }
+
+    func testDictationOutcome() {
+        XCTAssertEqual(try DictationTurn.outcome("hi", NSError(domain: "x", code: 1)).get(), "hi")
+        XCTAssertEqual(try DictationTurn.outcome("", NSError(domain: "kAFAssistantErrorDomain", code: 1110)).get(), "")
+        XCTAssertThrowsError(try DictationTurn.outcome("", NSError(domain: "x", code: 1)).get())
+        XCTAssertEqual(try DictationTurn.outcome("", nil).get(), "")
+        let off = NSError(domain: "kAFAssistantErrorDomain", code: 1101,
+                          userInfo: [NSLocalizedDescriptionKey: "Siri and Dictation are disabled"])
+        XCTAssertThrowsError(try DictationTurn.outcome("", off).get()) { e in
+            XCTAssertTrue("\(e)".contains("System Settings > Keyboard"))
+        }
     }
 }
 

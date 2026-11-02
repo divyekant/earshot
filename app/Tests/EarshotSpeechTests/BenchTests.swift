@@ -62,8 +62,10 @@ final class BenchTests: XCTestCase {
         XCTAssertGreaterThan(rows.filter { !$0.1.text.isEmpty }.count, files.count / 2)
     }
 
+    #if compiler(>=6.2)
     func testAppleBench() async throws {
         try XCTSkipUnless(enabled, "set EARSHOT_SPEECH_BENCH=1")
+        guard #available(macOS 26, *) else { throw XCTSkip("SpeechTranscriber needs macOS 26") }
         let files = try makeAudio()
         let engine = AppleSpeechEngine()
         let t0 = SpeechClock.nowNs()
@@ -72,6 +74,21 @@ final class BenchTests: XCTestCase {
         var rows: [(String, Utterance)] = []
         for (phrase, url) in files { rows.append((phrase, try await engine.transcribe(file: url))) }
         report("apple", rows)
+        XCTAssertGreaterThan(rows.filter { !$0.1.text.isEmpty }.count, files.count / 2)
+    }
+    #endif
+
+    /// On-device dictation (SFSpeechRecognizer): the Apple engine on Intel Macs and on macOS before 26.
+    func testDictationBench() async throws {
+        try XCTSkipUnless(enabled, "set EARSHOT_SPEECH_BENCH=1")
+        let files = try makeAudio()
+        let engine = DictationEngine()
+        let t0 = SpeechClock.nowNs()
+        try await engine.prepareRecognizer()
+        print("BENCH dictation: recognizer check \(fmt(SpeechClock.ms(since: t0))) ms")
+        var rows: [(String, Utterance)] = []
+        for (phrase, url) in files { rows.append((phrase, try await engine.transcribe(file: url))) }
+        report("dictation", rows)
         XCTAssertGreaterThan(rows.filter { !$0.1.text.isEmpty }.count, files.count / 2)
     }
 }

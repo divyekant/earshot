@@ -8,7 +8,13 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Added
 
+- earshot runs on Intel Macs and on macOS 14 and 15. On these Macs, it uses Apple on-device dictation for speech. No audio leaves the Mac (R-MD-1).
 - "Jev sees the screen" now works in the app: an unsure hold-key click that was not blocked can ask Jev with one picture of the front window. It is off by default (R-MD-1, R-NV-5, D-10).
+- Always-on mode starts on a wake phrase (default "hey jarvis") and checks the owner's voice. Teach earshot your voice with 5 phrases in Manage > General. The models download one time (about 18 MB). No audio leaves the Mac (R-ON-1, R-ON-2, R-ON-3, R-MD-1, D-11).
+
+### Changed
+
+- Always-on mode no longer acts on speech with no wake phrase. The "for me?" text gate is removed (R-ON-1, R-ON-2, D-11).
 
 ### Fixed
 

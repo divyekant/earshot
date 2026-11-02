@@ -1,0 +1,157 @@
+import Foundation
+
+// The wake phrase and the owner's voice for always-on mode (R-ON-1, R-ON-2, R-ON-3, D-11).
+// EarshotWake listens for the phrase and checks the voice. EarshotInput uses it through `WakeListener`.
+
+/// What the wake listener found when the phrase ended.
+public struct WakeHit: Sendable, Equatable {
+    /// The phrase as the owner set it, for example "hey jarvis".
+    public var phrase: String
+    /// The audio from the start of the phrase to now, in seconds, with a small margin.
+    /// The speech engine starts this far back, so that it hears the whole phrase and every word after it.
+    public var prerollSeconds: Double
+    /// The time from the end of the phrase to now, in seconds. The spotter fires about 0.3 to 0.5 s after the phrase.
+    /// The trigger uses it to see if the owner already said more words after the phrase.
+    public var phraseEndSeconds: Double
+    /// The voice score (cosine similarity to the enrolled voice, -1 to 1). Nil if no voice is enrolled.
+    public var voiceScore: Double?
+    /// True if the voice matches the enrolled voice, or if no voice is enrolled.
+    public var isOwner: Bool
+
+    public init(phrase: String, prerollSeconds: Double, phraseEndSeconds: Double = 0, voiceScore: Double?, isOwner: Bool) {
+        self.phrase = phrase; self.prerollSeconds = prerollSeconds; self.phraseEndSeconds = phraseEndSeconds
+        self.voiceScore = voiceScore; self.isOwner = isOwner
+    }
+}
+
+/// Listens for the wake phrase in 16 kHz mono audio, and checks the voice.
+/// One queue calls it. It is not thread-safe.
+public protocol WakeListener: AnyObject {
+    /// Feeds 16 kHz mono samples, in order. Returns a hit when the phrase ends.
+    func feed(_ samples: [Float]) -> WakeHit?
+    /// The voice score of a whole turn, for a turn in the follow-up window. Nil if no voice is enrolled.
+    func voiceScore(_ samples: [Float]) -> Double?
+    /// The lowest score that counts as the owner's voice.
+    var voiceThreshold: Double { get }
+    /// Starts again with no audio, for example after a turn.
+    func reset()
+}
+
+/// A speech engine that can start the next turn further back than its usual 250 ms preroll (D-11).
+/// The wake phrase fires about 0.3 to 0.5 s after the phrase ends, so the engine must reach back to the start of
+/// the phrase. Else it loses the first words of the command.
+public protocol PrerollControl: AnyObject {
+    /// The next `begin` gives the engine this much audio from before it, up to the audio that the engine keeps
+    /// (3 s). Later turns use the usual preroll again.
+    func setNextPreroll(seconds: Double)
+}
+
+/// The owner's voice and the tokens of the wake phrase, from the enrolment in the management window.
+/// It holds no audio. It stays on the Mac in `voice.json` in the store folder (R-MD-1).
+/// The voice counts for any phrase. The learned tokens count only for the phrase of the enrolment.
+public struct VoiceProfile: Codable, Equatable, Sendable {
+    /// The wake phrase that the owner said in the enrolment.
+    public var phrase: String
+    /// The speaker embedding: the normalized mean of the enrolment embeddings.
+    public var embedding: [Float]
+    /// The word pieces that the spotter heard for each enrolment phrase. The spotter listens for each of them.
+    /// The model hears a made-up name such as "earshot" as other words ("your shot"), so the spelled pieces alone
+    /// almost never fire. Empty if the spelled phrase fired on the enrolment: then extra forms only add false wakes.
+    public var keywordTokens: [[String]]
+    /// The number of enrolment phrases.
+    public var samples: Int
+    /// The lowest score of one enrolment phrase against the mean. A low value means a noisy enrolment.
+    public var selfScore: Double
+    public var createdAt: Date
+
+    public init(phrase: String, embedding: [Float], keywordTokens: [[String]], samples: Int, selfScore: Double,
+                createdAt: Date = Date()) {
+        self.phrase = phrase; self.embedding = embedding; self.keywordTokens = keywordTokens
+        self.samples = samples; self.selfScore = selfScore; self.createdAt = createdAt
+    }
+
+    /// The file name in the store folder.
+    public static let fileName = "voice.json"
+
+    /// True if the profile belongs to this phrase. A new phrase keeps the voice, but loses the learned tokens.
+    public func matches(phrase other: String) -> Bool { WakePhrase.words(phrase) == WakePhrase.words(other) }
+}
+
+/// The wake phrase text rules.
+public enum WakePhrase {
+    /// The default phrase. Two words fire less often by mistake than one word. Known words work best: the spotter
+    /// hears the made-up name "earshot" as "your shot" (Test 3, 2026-11-02: "hey jarvis" woke on 86 % of the owner
+    /// phrases and on none of 800 other phrases).
+    public static let defaultPhrase = "hey jarvis"
+    /// The number of enrolment phrases.
+    public static let enrolmentSamples = 5
+
+    /// The words of a phrase: lower case, letters and digits only.
+    public static func words(_ text: String) -> [String] {
+        text.lowercased().split(whereSeparator: { !$0.isLetter && !$0.isNumber && $0 != "'" })
+            .map { $0.replacingOccurrences(of: "'", with: "") }
+            .filter { !$0.isEmpty }
+    }
+
+    /// Removes the wake phrase, and any words before it, from the start of a transcript.
+    /// The speech engine starts before the phrase, so the text can begin with the phrase, a part of the word
+    /// before it, or a misheard form ("Hey, ear shot.", "hey Ershot"). If no form of the phrase is in the first
+    /// words, the text stays as it is.
+    public static func strip(_ text: String, phrase: String) -> String {
+        let target = words(phrase).joined()
+        guard !target.isEmpty else { return text }
+        let tokens = text.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+        let normal = tokens.map { words($0).joined() }
+        // The last word of the phrase alone, for a transcript that lost the first word ("earshot, open Slack").
+        let lastWord = words(phrase).last ?? target
+        var best: (end: Int, cost: Double)?
+        for start in 0..<min(3, normal.count) {
+            for end in start..<min(start + 4, normal.count) {
+                let joined = normal[start...end].joined()
+                guard !joined.isEmpty else { continue }
+                for candidate in Set([target, lastWord]) where candidate.count >= 4 || candidate == target {
+                    let distance = editDistance(joined, candidate)
+                    let allowed = max(1, candidate.count / 4)
+                    guard distance <= allowed else { continue }
+                    // Prefer the full phrase, then fewer skipped words, then a closer match.
+                    let cost = Double(distance) / Double(candidate.count) + Double(start) * 0.2
+                        + (candidate == target ? 0 : 0.3)
+                    if best == nil || cost < best!.cost { best = (end, cost) }
+                }
+            }
+        }
+        guard let best else { return text }
+        let rest = tokens.dropFirst(best.end + 1).joined(separator: " ")
+        return rest.trimmingCharacters(in: CharacterSet.punctuationCharacters.union(.whitespaces))
+            .isEmpty ? "" : String(rest.drop(while: { $0.isPunctuation || $0.isWhitespace }))
+    }
+
+    /// The Levenshtein distance of two short strings.
+    static func editDistance(_ a: String, _ b: String) -> Int {
+        let a = Array(a), b = Array(b)
+        if a.isEmpty { return b.count }
+        if b.isEmpty { return a.count }
+        var previous = Array(0...b.count)
+        var current = [Int](repeating: 0, count: b.count + 1)
+        for i in 1...a.count {
+            current[0] = i
+            for j in 1...b.count {
+                current[j] = min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + (a[i - 1] == b[j - 1] ? 0 : 1))
+            }
+            swap(&previous, &current)
+        }
+        return previous[b.count]
+    }
+}
+
+extension Store {
+    /// The owner's voice profile, or nil if the owner did not teach earshot the voice.
+    public var voiceProfile: VoiceProfile? { load(VoiceProfile.self, VoiceProfile.fileName) }
+
+    /// Saves the profile. Nil deletes the file.
+    public func saveVoiceProfile(_ profile: VoiceProfile?) throws {
+        if let profile { try save(profile, VoiceProfile.fileName); return }
+        let url = folder.appendingPathComponent(VoiceProfile.fileName)
+        if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
+    }
+}

@@ -46,8 +46,18 @@ jobs:
       - name: Build
         run: swift build
 
+      # D-11: the wake model tests download about 18 MB from Hugging Face one time (pinned revisions,
+      # SHA-256 checked) and run the models on speech from the say command. The cache keeps the files.
+      - name: Cache the wake phrase models
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/earshot-wake-models
+          key: wake-models-${{ hashFiles('app/Sources/EarshotWake/ModelFiles.swift') }}
+
       # The tests run on the release build, the same build as the app bundle (build-app.sh).
       # The latency benches (OfflineBench, MenuBench) assert release limits there. A debug build
       # on a shared runner is about 15 times slower and does not show the latency of the app.
       - name: Test (release build)
+        env:
+          EARSHOT_WAKE_MODELS: ${{ runner.temp }}/earshot-wake-models
         run: swift test -c release -Xswiftc -enable-testing

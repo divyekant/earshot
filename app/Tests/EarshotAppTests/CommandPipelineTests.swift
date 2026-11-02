@@ -87,11 +87,49 @@ final class CommandPipelineTests: XCTestCase {
         for stage in ["speech", "screen", "route", "total"] { XCTAssertNotNil(r.stages[stage], stage) }
     }
 
-    func testAlwaysOnDropsTalkThatIsNotForEarshot() async {
-        let (p, _, runner) = make("I think the meeting moved to Thursday")
+    // D-11: the speech engine starts before the wake phrase, so the pipeline removes it.
+    func testAlwaysOnRemovesTheWakePhrase() async {
+        let (p, _, runner) = make("Hey Jarvis, open notes")
+        p.wakePhrase = "hey jarvis"
+        let r = await p.finish(mode: .alwaysOn)
+        XCTAssertTrue(r.ok, r.note)
+        XCTAssertEqual(r.heard, "open notes")
+        XCTAssertEqual(runner.runs.first?.0, .openApp(appID: "notes"))
+        XCTAssertEqual(runner.runs.first?.1.mode, .alwaysOn)
+    }
+
+    func testAlwaysOnPhraseAloneDoesNothing() async {
+        let (p, _, runner) = make("Hey, Jarvis.")
+        p.wakePhrase = "hey jarvis"
         let r = await p.finish(mode: .alwaysOn)
         XCTAssertFalse(r.ok)
-        XCTAssertTrue(r.note.hasPrefix("not for earshot"), r.note)
+        XCTAssertEqual(r.note, "no words")
+        XCTAssertTrue(runner.runs.isEmpty)
+    }
+
+    func testHoldKeyKeepsTheWords() async {
+        let (p, _, _) = make("hey jarvis open notes")
+        p.wakePhrase = "hey jarvis"
+        let r = await p.finish(mode: .hold)
+        XCTAssertEqual(r.heard, "hey jarvis open notes", "the hold key has no wake phrase to remove")
+    }
+
+    func testWakeGoesToTheLog() async {
+        let (p, _, _) = make("hey jarvis open notes")
+        p.wakePhrase = "hey jarvis"
+        p.pendingWake = WakeHit(phrase: "hey jarvis", prerollSeconds: 1.4, voiceScore: 0.71, isOwner: true)
+        let r = await p.finish(mode: .alwaysOn)
+        XCTAssertTrue(r.note.contains("wake \"hey jarvis\", voice 0.71"), r.note)
+        XCTAssertNil(p.pendingWake, "one wake is for one turn")
+    }
+
+    func testRejectedWakeIsLoggedWithNoText() {
+        let (p, _, runner) = make("")
+        let hit = WakeHit(phrase: "hey jarvis", prerollSeconds: 1, voiceScore: 0.21, isOwner: false)
+        let r = p.rejectedWake(hit, threshold: 0.45)
+        XCTAssertEqual(r.heard, "", "the speech engine did not run, so there is no text (R-MD-1)")
+        XCTAssertTrue(r.note.contains("0.21"), r.note)
+        XCTAssertFalse(r.ok)
         XCTAssertTrue(runner.runs.isEmpty)
     }
 

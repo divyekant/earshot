@@ -6,6 +6,7 @@ import EarshotInput
 import EarshotRouter
 import EarshotSpeech
 import EarshotUI
+import EarshotWake
 import ServiceManagement
 import SwiftUI
 
@@ -57,6 +58,13 @@ final class AppController: ObservableObject {
     let pipeline: CommandPipeline
     private var input: InputSwitch?
     private var engineWhy = ""
+    /// The wake phrase models (D-11). They load when always-on mode is on, and stay loaded.
+    private var wake: WakeModels?
+    private var wakeLoad: Task<Void, Never>?
+    /// The state of the wake phrase models, for the management window.
+    private var wakeState = "The wake phrase models load when you turn on always-on mode."
+    /// The download part, 0 to 1, while the models download.
+    private let wakeProgress = Counter()
     /// Reads the name cache at start and every 8 minutes (NameIndex.maxAge is 10 minutes). Read only.
     private var warmer: NameWarmer?
     /// The menu items of the front app. Read when an app comes to the front and after each command, never in a command.
@@ -99,6 +107,7 @@ final class AppController: ObservableObject {
         pipeline.feedback = feedback
         pipeline.log = ActivityLog(store: store)
         pipeline.showFeedback = settings.showFeedback
+        pipeline.wakePhrase = settings.wakePhrase
         prepareEngine()
         startInput()
         let appsFile = store.folder.appendingPathComponent("apps.json")
@@ -134,7 +143,15 @@ final class AppController: ObservableObject {
             },
             refreshNames: { appID in await names.refresh(appIDs: [appID]) },
             feedback: feedback,
-            settingsChanged: { [weak self] new in self?.apply(new) })
+            settingsChanged: { [weak self] new in self?.apply(new) },
+            voice: VoiceHooks(
+                status: { [weak self] in await self?.voiceStatus() ?? "" },
+                record: { [weak self] in try await self?.recordPhrase() ?? [] },
+                teach: { [weak self] phrase, clips in
+                    guard let self else { throw WakeError("earshot is closing.") }
+                    return try await self.teachVoice(phrase: phrase, clips: clips)
+                },
+                forget: { [weak self] in await self?.forgetVoice() }))
     }
 
     /// Runs the catalogue scan. On an error, for example DiscoveryError.accessibilityOff (first live test: the scan
@@ -197,22 +214,38 @@ final class AppController: ObservableObject {
 
     private func startInput() {
         input?.stop()
-        let input = InputTriggers.make(settings)
-        let pipeline = self.pipeline, menus = self.menus
+        let listener = makeWakeListener()
+        let input = InputTriggers.make(settings, wake: listener)
+        let pipeline = self.pipeline, menus = self.menus, feedback = self.feedback
+        let threshold = settings.voiceThreshold
         input.onStart = { [weak self] in
             if let problem = pipeline.begin() { self?.feedback.show(problem, ok: false) }
         }
-        input.onCancel = { _ in Task { await pipeline.cancel() } }
+        input.onCancel = { _ in
+            pipeline.pendingWake = nil
+            Task { await pipeline.cancel() }
+        }
         input.onStop = { [weak input] in
             let mode = input?.current ?? .hold
-            Task {
-                await pipeline.finish(mode: mode)
+            Task { @MainActor in
+                let record = await pipeline.finish(mode: mode)
+                // After an always-on command, the owner's voice can give the next one with no wake phrase.
+                if mode == .alwaysOn, !record.heard.isEmpty { input?.commandFinished() }
                 // A command can change which items are enabled ("Copy" after "select all"). Read again for the next one.
                 if let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier { menus.refresh(front) }
             }
         }
+        if let trigger = input.alwaysOn as? WakeTrigger {
+            trigger.onWake = { [weak self] hit in
+                // The speech engine must start at the phrase: the spotter fires after the phrase ends.
+                (pipeline.engine as? PrerollControl)?.setNextPreroll(seconds: hit.prerollSeconds)
+                pipeline.pendingWake = hit
+                if self?.settings.showFeedback == true { feedback.show("Listening…", ok: true) }
+            }
+            trigger.onRejected = { hit in pipeline.rejectedWake(hit, threshold: threshold) }
+        }
         pipeline.pauseAlwaysOn = { [weak input] paused in
-            DispatchQueue.main.async { (input?.alwaysOn as? AlwaysOnTrigger)?.setPaused(paused) }
+            DispatchQueue.main.async { input?.setAlwaysOnPaused(paused) }
         }
         do {
             try input.start()
@@ -222,11 +255,99 @@ final class AppController: ObservableObject {
         self.input = input
     }
 
+    /// The wake phrase listener for always-on mode, or nil. If the models are not loaded yet, it starts the load,
+    /// and the input starts again when they are ready. Until then, always-on mode has the hold key only.
+    private func makeWakeListener() -> WakeListener? {
+        guard settings.mode == .alwaysOn else { return nil }
+        guard let wake else { loadWakeModels(); return nil }
+        do {
+            return try wake.listener(phrase: settings.wakePhrase, profile: store.voiceProfile,
+                                     voiceThreshold: settings.voiceThreshold)
+        } catch {
+            wakeState = "The wake phrase did not start: \(error.localizedDescription)"
+            status = wakeState
+            return nil
+        }
+    }
+
+    /// Downloads (one time, about 18 MB) and loads the wake phrase models in the background (D-11).
+    private func loadWakeModels() {
+        guard wake == nil, wakeLoad == nil else { return }
+        let folder = store.folder, progress = wakeProgress
+        let downloaded = WakeModels.isDownloaded(store: folder)
+        wakeState = downloaded ? "Loading the wake phrase models…" : "Downloading the wake phrase models (about 18 MB, one time)…"
+        status = wakeState
+        wakeLoad = Task { [weak self] in
+            let result: Result<WakeModels, Error>
+            do {
+                result = .success(try await Task.detached(priority: .utility) {
+                    try await WakeModels.load(store: folder) { part in progress.value = Int(part * 100) }
+                }.value)
+            } catch {
+                result = .failure(error)
+            }
+            guard let self else { return }
+            self.wakeLoad = nil
+            switch result {
+            case .success(let models):
+                self.wake = models
+                self.wakeState = String(format: "The wake phrase models are ready (load %.0f ms).", models.loadMs)
+                if self.settings.mode == .alwaysOn {
+                    self.startInput()
+                    self.status = "Ready · \(self.pipeline.engine.id) · always on (\"\(self.settings.wakePhrase)\")"
+                }
+            case .failure(let error):
+                self.wakeState = "The wake phrase models did not load: \(error.localizedDescription)"
+                self.status = self.wakeState
+            }
+        }
+    }
+
+    /// One line for the management window: the models and the owner's voice.
+    private func voiceStatus() -> String {
+        var line = wakeLoad != nil && !WakeModels.isDownloaded(store: store.folder)
+            ? "Downloading the wake phrase models: \(wakeProgress.value) %." : wakeState
+        if let profile = store.voiceProfile {
+            let date = profile.createdAt.formatted(date: .abbreviated, time: .omitted)
+            line += " Your voice: taught on \(date), \(profile.samples) phrases."
+            if !profile.matches(phrase: settings.wakePhrase) {
+                line += " You taught it with \"\(profile.phrase)\". Teach it again with the new phrase for the best match."
+            }
+        } else {
+            line += " Your voice: not taught. Until you teach it, any voice can wake earshot."
+        }
+        return line
+    }
+
+    /// Records one enrolment phrase. Always-on pauses, so that the phrase does not wake earshot.
+    private func recordPhrase() async throws -> [Float] {
+        input?.setAlwaysOnPaused(true)
+        defer { input?.setAlwaysOnPaused(false) }
+        return try await PhraseRecorder.record()
+    }
+
+    /// Makes and saves the voice profile, then starts always-on again with it.
+    private func teachVoice(phrase: String, clips: [[Float]]) async throws -> String {
+        guard let wake else { throw WakeError("The wake phrase models are not ready yet. Turn on always-on mode and wait.") }
+        let enrolment = try await Task.detached(priority: .userInitiated) { try wake.enrol(phrase: phrase, clips: clips) }.value
+        try store.saveVoiceProfile(enrolment.profile)
+        NSLog("earshot wake: enrolment for \"%@\": spelled phrase fired in %ld of %ld, heard forms %@", phrase,
+              enrolment.spelledHits, enrolment.profile.samples, "\(enrolment.heardPieces)")
+        if settings.mode == .alwaysOn { startInput() }
+        return enrolment.summary
+    }
+
+    private func forgetVoice() {
+        try? store.saveVoiceProfile(nil)
+        if settings.mode == .alwaysOn { startInput() }
+    }
+
     /// The management window changed the settings (it saved them already).
     private func apply(_ new: EarshotSettings) {
         let old = settings
         settings = new
         pipeline.showFeedback = new.showFeedback
+        pipeline.wakePhrase = new.wakePhrase
         runner.options = ActionOptions(settings: new)
         if new.tier2 != old.tier2 || new.tier2BudgetMs != old.tier2BudgetMs || new.jevSeesScreen != old.jevSeesScreen
             || new.jevScreenBudgetMs != old.jevScreenBudgetMs { applyJev() }
@@ -240,7 +361,8 @@ final class AppController: ObservableObject {
             prepareEngine()
         }
         if new.mode != old.mode || new.holdKeyCode != old.holdKeyCode || new.holdKeyIsModifierOnly != old.holdKeyIsModifierOnly
-            || new.holdKeyModifiers != old.holdKeyModifiers {
+            || new.holdKeyModifiers != old.holdKeyModifiers || new.wakePhrase != old.wakePhrase
+            || new.voiceThreshold != old.voiceThreshold {
             startInput()
         }
     }
@@ -248,9 +370,7 @@ final class AppController: ObservableObject {
     /// Stops an engine: the microphone closes and the timers stop (T1).
     static func shutdown(_ engine: SpeechEngine) {
         let active = (engine as? FallbackSpeechEngine)?.active ?? engine
-        (active as? AutoSpeechEngine)?.shutdown()
-        (active as? AppleSpeechEngine)?.shutdown()
-        (active as? ParakeetEngine)?.shutdown()
+        (active as? TurnSpeechEngine)?.shutdown()
     }
 
     /// Start at login: off by default. The state lives in macOS (SMAppService), not in settings.json.

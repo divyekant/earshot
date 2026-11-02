@@ -17,14 +17,35 @@ public struct ManageHooks {
     public var feedback: FeedbackSink?
     /// Tells EarshotApp that the settings changed, for example to restart the input trigger.
     public var settingsChanged: ((EarshotSettings) -> Void)?
+    /// The wake phrase models and the owner's voice (R-ON-3, D-11).
+    public var voice: VoiceHooks?
 
     public init(test: ((String, Bool) async -> TestReport)? = nil,
                 discoverApps: (() async -> [AppEntry])? = nil,
                 refreshNames: ((String) async -> [NameEntry])? = nil,
                 feedback: FeedbackSink? = nil,
-                settingsChanged: ((EarshotSettings) -> Void)? = nil) {
+                settingsChanged: ((EarshotSettings) -> Void)? = nil,
+                voice: VoiceHooks? = nil) {
         self.test = test; self.discoverApps = discoverApps; self.refreshNames = refreshNames
-        self.feedback = feedback; self.settingsChanged = settingsChanged
+        self.feedback = feedback; self.settingsChanged = settingsChanged; self.voice = voice
+    }
+}
+
+/// The voice enrolment of always-on mode, as EarshotApp gives it to the management window (R-ON-3, D-11).
+/// The audio of the phrases stays in memory. EarshotApp makes the profile from it and drops it.
+public struct VoiceHooks {
+    /// One line about the wake phrase models and the owner's voice.
+    public var status: () async -> String
+    /// Records one phrase from the microphone (16 kHz). Always-on pauses while it records.
+    public var record: () async throws -> [Float]
+    /// Makes and saves the voice profile from the phrases, and restarts always-on. Returns a line for the window.
+    public var teach: (_ phrase: String, _ clips: [[Float]]) async throws -> String
+    /// Deletes the voice profile.
+    public var forget: () async -> Void
+
+    public init(status: @escaping () async -> String, record: @escaping () async throws -> [Float],
+                teach: @escaping (String, [[Float]]) async throws -> String, forget: @escaping () async -> Void) {
+        self.status = status; self.record = record; self.teach = teach; self.forget = forget
     }
 }
 

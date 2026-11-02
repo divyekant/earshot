@@ -134,3 +134,37 @@ The TypeSafe API takes images (an `assets` map and the header `TypeSafe-Danger-Z
 
 **How it differs from D-2.** D-2 rejected agents that take a screenshot, ask a large model, act, and repeat, in 3 to 4 steps of 1 to 5 s each. This fallback asks once for each command, only after the rules fail, and never loops (R-SP-2). The rules still decide most commands in a few ms.
 
+## D-11. Wake phrase and owner voice for always-on
+
+Date: 2026-11-02.
+
+The owner asked: always-on mode must start only on a wake phrase or a name, as "Hey Siri" does, and react only to the owner's voice. Use a light version of an open project that solves this. This replaces "no wake word" in R-ON-1 and the "is this for me?" text gate in always-on mode. The full search is in [research/wake-phrase-options.md](research/wake-phrase-options.md).
+
+| Option | Result | Reason |
+|---|---|---|
+| Keyword spotter + speaker check, files copied from soniqo/speech-swift (Apache-2.0) | Chosen | The phrase is text, so no training. Core ML, macOS 14, Intel Macs. About 18 MB of models. |
+| The speech-swift package | Rejected | It needs macOS 15, and its speaker code pulls in MLX. That breaks the macOS 14 and Intel build. |
+| k2-fsa/sherpa-onnx | Rejected | Same models, but a C++ static framework, ONNX Runtime and a fetch script. |
+| livekit/livekit-wakeword, openWakeWord | Not now | Fewer false wakes, but each phrase needs a trained model. The openWakeWord ready models are non-commercial. Keep livekit-wakeword as the upgrade if the spotter fires too often. |
+| Picovoice Porcupine + Eagle | Rejected | Closed engine and an online access key (R-MD-4). |
+| A text match on the transcript (Swabble) | Rejected | Speech to text runs on all speech, and there is no voice check. |
+
+Tests on 10 synthetic voices (Piper text to speech, 800 phrases of other talk, the ONNX version of the same spotter):
+
+| Phrase | Owner phrases that woke it | Other talk that woke it | Delay after the phrase |
+|---|---|---|---|
+| "hey earshot", spelled | 7 of 168 | 0 of 600 | 476 ms |
+| "hey earshot", learned from 5 owner phrases | 64 of 80 | 53 of 800, all sound-alikes ("hey, your shot") | 470 ms |
+| "hey jarvis", spelled | 69 of 80 | 0 of 800 | 325 ms |
+
+The spotter does not know the made-up word "earshot". It hears "your shot" or "here shut".
+
+**Decision:**
+- The keyword spotter (icefall KWS Zipformer, 3.49M parameters) listens for the phrase. The phrase is a setting. The default is "hey jarvis", because real words work best.
+- If the spelled phrase does not fire on the owner's enrolment phrases (a made-up name), the spotter also listens for the word pieces that it heard in them.
+- At each wake, the voice model (WeSpeaker ResNet34-LM) compares the voice of the phrase with the mean of the 5 enrolment phrases. The start threshold is 0.45 (cosine). Tune it from the log.
+- Speech without the phrase never reaches the speech engine. So earshot keeps no text of talk that is not for it. A wake in another voice is logged with no text.
+- The speech engine starts at the phrase (a longer preroll), and the pipeline removes the phrase from the text.
+- For 5 s after a command, the owner's voice can give the next command with no phrase. The voice is checked at the end of that turn.
+- The safety rules do not change. Always-on never presses Send or a risky button (R-ON-5, `ActionRules.sendBlock`). The hold key stays (R-ON-4).
+- The models download one time from Hugging Face, at pinned revisions, with a SHA-256 check. No audio leaves the Mac (R-MD-1).
