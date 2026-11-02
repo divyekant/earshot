@@ -102,6 +102,15 @@ public struct CommandRouter: Router {
             if let hit, let d = screenFor(hit.0, hit.1, context: context) { return d }
         }
 
+        // "open the shadcn/ui tab", "go to the FPL Guru tab": a press on a tab of the front window.
+        // "switch to <title>" with no word "tab" goes to the chat rules first, so "switch to Slack" opens the app.
+        let tabParse = ScreenRouter.parse(text)
+        if let screen = context.screen, words.contains("tab"), tabParse.isCommand,
+           ["open", "go", "switch"].contains(words.first ?? "") {
+            let d = ScreenRouter.decide(text, screen: screen)
+            if d.intent != .none { return d }
+        }
+
         // "open hn.com", "go to news dot ycombinator dot com", "Openhn.com" (R-NV-7).
         if let address = WebAddress.parse(text) {
             return RulesDecision(intent: .openURL(address), sure: true, exact: true, why: "web address", options: [])
@@ -156,16 +165,27 @@ public struct CommandRouter: Router {
         return nil
     }
 
-    /// A trailing "on <app>" or "in <app>": the app, and the raw words before it. "open notifications on Chrome".
+    /// Words between "on" and the app name, and after the app name, that are not part of the name:
+    /// "on the open Chrome window", "in this Chrome tab".
+    static let appBefore: Set<String> = ["the", "open", "this", "my", "current"]
+    static let appAfter: Set<String> = ["window", "tab", "page", "app", "application"]
+
+    /// A trailing "on <app>" or "in <app>": the app, and the raw words before it. "open notifications on Chrome",
+    /// "click home on open Chrome window".
     static func appSuffix(_ text: String, apps: [AppEntry]) -> (AppEntry, String)? {
         var tokens = Tokens(text)
         var lead = 0
         while lead < tokens.count, fillers.contains(tokens.words[lead]) { lead += 1 }
         tokens.dropFirst(lead)
-        let w = tokens.words, n = w.count
+        let w = tokens.words
+        var n = w.count
+        if n >= 4, appAfter.contains(w[n - 1]) { n -= 1 }
         guard n >= 3 else { return nil }
-        for span in stride(from: min(3, n - 2), through: 1, by: -1) where ["on", "in"].contains(w[n - span - 1]) {
-            if let app = exactApp(w[(n - span)...].joined(), apps) { return (app, tokens.raw(0..<(n - span - 1))) }
+        for span in stride(from: min(3, n - 2), through: 1, by: -1) {
+            guard let app = exactApp(w[(n - span)..<n].joined(), apps) else { continue }
+            var on = n - span - 1
+            while on >= 2, appBefore.contains(w[on]) { on -= 1 }
+            if on >= 1, ["on", "in"].contains(w[on]) { return (app, tokens.raw(0..<on)) }
         }
         return nil
     }

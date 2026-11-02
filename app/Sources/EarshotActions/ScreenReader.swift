@@ -200,7 +200,7 @@ enum ScreenReader {
     }
 
     static let attributes = ["AXRole", "AXSubrole", "AXTitle", "AXDescription", "AXValue", "AXPlaceholderValue",
-                             "AXPosition", "AXSize", "AXURL"]
+                             "AXPosition", "AXSize", "AXURL", "AXHelp"]
 
     struct Draft: Equatable {
         let role: String, subrole: String, kind: String, label: String, url: String?
@@ -223,6 +223,8 @@ enum ScreenReader {
             label = [AX.text(a["AXTitle"]), AX.text(a["AXDescription"])]
                 .compactMap { $0 }.first(where: { !$0.trimmingCharacters(in: .whitespaces).isEmpty }) ?? ""
             if label.isEmpty { label = innerText(el) }
+            // An icon-only link or button can have its name only in its help text (a collapsed side bar).
+            if label.isEmpty { label = AX.text(a["AXHelp"])?.trimmingCharacters(in: .whitespaces) ?? "" }
             // A link can give its address as its value, so only a button uses the value.
             if label.isEmpty, kind == "button" { label = AX.text(a["AXValue"]) ?? "" }
         }
