@@ -10,7 +10,7 @@ import Speech
 /// macOS downloads the speech model for the locale one time.
 /// It needs macOS 26. On older macOS, and if it does not load, `AppleSpeech.make` uses DictationEngine.
 @available(macOS 26, *)
-public final class AppleSpeechEngine: TurnSpeechEngine, PrerollControl, PhraseHintControl, @unchecked Sendable {
+public final class AppleSpeechEngine: TurnSpeechEngine, PrerollControl, CaptureControl, PhraseHintControl, @unchecked Sendable {
     public static let engineID = AppleSpeech.engineID
     public let id = AppleSpeechEngine.engineID
     public let locale: Locale
@@ -76,6 +76,7 @@ public final class AppleSpeechEngine: TurnSpeechEngine, PrerollControl, PhraseHi
     }
 
     public func setNextPreroll(seconds: Double) { lock.withLock { mic }?.setNextPreroll(seconds: seconds) }
+    public func setNextCapture(seconds: Double) { lock.withLock { mic }?.setNextCapture(seconds: seconds) }
 
     public func setPhraseHints(_ phrases: [String]) { lock.withLock { hints = phrases.filter { !$0.isEmpty } } }
 

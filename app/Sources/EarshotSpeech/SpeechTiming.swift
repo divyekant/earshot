@@ -13,7 +13,7 @@ public struct SpeechTiming: Codable, Equatable, Sendable {
     public var idleMs: Double = 0
     /// True if the engine started a warm-up run at the key press, because the model was idle.
     public var warmed: Bool = false
-    /// Key release to closed audio: 100 ms more of real audio (`TailPad.captureSeconds`), stop the audio feed,
+    /// Key release to closed audio: 200 ms more of real audio (`TailPad.captureSeconds`, 0 in always-on), stop the audio feed,
     /// add the tail silence, collect the samples.
     /// The audio conversion runs in the microphone callback while the owner speaks, so it adds no time here.
     public var tailMs: Double = 0
