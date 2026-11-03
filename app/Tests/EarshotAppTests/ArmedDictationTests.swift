@@ -164,4 +164,23 @@ final class ArmedDictationTests: XCTestCase {
         _ = await say(p, e, "over the lazy dog", .alwaysOn)
         XCTAssertEqual(runner.runs.count, 1, "a hold-key typing does not open the go-on window")
     }
+
+    /// Review of #86: a typing plays no result sound, so nothing mutes the detector, and the owner can go on at once.
+    func testTypingPlaysNoSoundAndTheNextTurnGoesOn() async {
+        let (p, e, runner) = make()
+        var sounds: [FeedbackSound] = []
+        p.playSound = { sounds.append($0) }
+        _ = await say(p, e, "type", .alwaysOn)
+        XCTAssertEqual(sounds, [.done], "the arming is a command: it plays its sound")
+        clock += 1
+        _ = await say(p, e, "the blue fox jumps", .alwaysOn)
+        XCTAssertNil(p.lastSound, "a typing plays no sound, so the app mutes nothing")
+        XCTAssertEqual(sounds, [.done])
+        clock += 0.2
+        _ = p.begin()
+        clock += 2
+        _ = await say(p, e, "over the lazy dog", .alwaysOn)
+        XCTAssertEqual(runner.runs.map(\.0), [.typeText("the blue fox jumps"), .typeText(" over the lazy dog")])
+        XCTAssertEqual(sounds, [.done], "the go-on typing plays no sound either")
+    }
 }

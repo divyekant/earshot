@@ -69,6 +69,9 @@ final class CommandPipeline {
     var playSounds = true
     /// The result sound of the last record, if one played. The app mutes the always-on detector for its length.
     private(set) var lastSound: FeedbackSound?
+    /// True if typing worked in this turn. A typing plays no result sound and mutes nothing: the text on screen is
+    /// the feedback, and the owner may go on talking at once (go-on typing, or "send").
+    private var typedThisTurn = false
     /// True if a send worked in this turn, for the "sent" sound.
     private var sentThisTurn = false
     /// The start of the open turn (begin()). The armed window and the send window test the start of the next turn,
@@ -124,6 +127,7 @@ final class CommandPipeline {
         turnStartedAt = nil
         expectsText = false
         sentThisTurn = false
+        typedThisTurn = false
         speechSummary = ""  // a speech error must not show the line of the last command
         var stages: [String: Double] = [:]
         let wake = mode == .alwaysOn ? pendingWake : nil
@@ -387,6 +391,7 @@ final class CommandPipeline {
     private func noteTyped(mode: InputMode) {
         lastTyped = (now(), frontBundleID().flatMap { $0 == ownBundleID ? nil : $0 })
         lastTypedAlwaysOn = mode == .alwaysOn
+        typedThisTurn = true
         if mode == .alwaysOn { expectsText = true }
     }
 
@@ -477,7 +482,7 @@ final class CommandPipeline {
             feedback?.show(ok ? "→ \(intent)" : "✗ \(note)", ok: ok)
         }
         lastSound = nil
-        if playSounds, !quiet {
+        if playSounds, !quiet, !(ok && typedThisTurn && !sentThisTurn) {
             let sound: FeedbackSound = ok ? (sentThisTurn ? .sent : .done) : .failed
             playSound?(sound)
             lastSound = sound
