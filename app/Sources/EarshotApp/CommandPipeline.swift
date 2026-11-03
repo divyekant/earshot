@@ -51,8 +51,9 @@ final class CommandPipeline {
     /// The wake of the open always-on turn, for the log and to remove the phrase by time (D-11). Nil for a hold-key
     /// turn, and for a follow-up turn in which the owner did not say the phrase again.
     var pendingWake: WakeHit?
-    /// The voice score of the follow-up turn that ends now (WakeTrigger.lastFollowUpVoiceScore). Nil if no check ran.
-    var followUpVoiceScore: Double?
+    /// The voice check of the always-on turn that ends now (WakeTrigger.onTurnVoice), for the log and for an
+    /// always-on "send" (D-12). Nil if no check ran: no voice is enrolled, or the turn was too short.
+    var turnVoice: TurnVoice?
     /// The last typing that worked: the time and the front app. In always-on mode, "send" alone may follow it
     /// within `sendAfterTypingSeconds`, in the same app (the owner's choice, D-12, R-ON-5).
     private(set) var lastTyped: (at: Date, app: String?)?
@@ -113,6 +114,8 @@ final class CommandPipeline {
     func begin() -> String? {
         turnStartedAt = now()
         turnChecks = []
+        // The voice check of a turn comes at its end. A check that is still here belongs to an older turn.
+        turnVoice = nil
         do { try engine.begin(); return nil } catch { return "speech did not start: \(error)" }
     }
 
@@ -137,12 +140,14 @@ final class CommandPipeline {
         var stages: [String: Double] = [:]
         let wake = mode == .alwaysOn ? pendingWake : nil
         pendingWake = nil
-        let followScore = followUpVoiceScore
-        followUpVoiceScore = nil
+        let voice = mode == .alwaysOn ? turnVoice : nil
+        turnVoice = nil
         let checks = turnChecks
         turnChecks = []
-        // The voice of an always-on turn was checked: a wake in the owner's voice, or a follow-up with a score.
-        let ownerVoice = mode == .alwaysOn && (wake.map { $0.voiceScore != nil && $0.isOwner } ?? (followScore != nil))
+        // The voice of the always-on turn passed the check (E6). A turn that failed it does not reach here.
+        let ownerVoice = voice?.passed == true
+        // The check ran before the turn ended, so its time is part of the command path (E6).
+        if let voice, voice.byTurn { stages["voice.turn"] = (voice.ms * 10).rounded() / 10 }
         var text: String
         var words: [TimedWord] = []
         // An always-on turn ended on a pause that the detector heard: no more audio to wait for (R-ON-1, R-SP-1).
@@ -167,13 +172,12 @@ final class CommandPipeline {
             // voice (D-11). So the text is for earshot. The speech engine starts before the phrase: remove it.
             let removed = Self.removePhrase(text, words: words, wake: wake, phrase: wakePhrase)
             text = removed.text
-            if let wake {
-                speechSummary = Self.wakeSummary(wake) + ", phrase removed " + removed.how
-                    + (speechSummary.isEmpty ? "" : " · " + speechSummary)
-            }
-            if !checks.isEmpty {
-                speechSummary += (speechSummary.isEmpty ? "" : " · ") + "turn: " + checks.joined(separator: "; ")
-            }
+            var parts: [String] = []
+            if let wake { parts.append(Self.wakeSummary(wake) + ", phrase removed " + removed.how) }
+            parts.append(voice?.summary ?? "voice not checked")
+            if !speechSummary.isEmpty { parts.append(speechSummary) }
+            if !checks.isEmpty { parts.append("turn: " + checks.joined(separator: "; ")) }
+            speechSummary = parts.joined(separator: " · ")
         }
         guard !text.isEmpty else { return done(heard: "", intent: "none", tier: .none, ok: false, note: "no words", stages: stages, clock, quiet: true) }
 
@@ -331,6 +335,20 @@ final class CommandPipeline {
         return (WakePhrase.strip(text, phrase: phrase, afterWake: wake != nil), "by text")
     }
 
+    /// Logs a teach step of the owner's voice (R-ON-3, E6): the phrase, the microphone, and the scores of the takes.
+    /// No audio and no text of speech.
+    @discardableResult
+    func voiceTaught(phrase: String, mic: String?, takeScores: [Double], templatesKept: Int, selfScore: Double,
+                     profiles: Int) -> ActivityRecord {
+        let takes = takeScores.map { String(format: "%.2f", $0) }.joined(separator: ", ")
+        let note = String(format: "voice taught: \"%@\" on %@, %ld of %ld phrases give a template, take scores %@, "
+                          + "voice self score %.2f, %ld voice profile%@", phrase, mic.map { "\"\($0)\"" } ?? "an unknown microphone",
+                          templatesKept, takeScores.count, takes, selfScore, profiles, profiles == 1 ? "" : "s")
+        let record = ActivityRecord(heard: "", intent: "none", tier: .none, ok: true, note: note, stages: [:])
+        try? log?.append(record)
+        return record
+    }
+
     /// Logs the partial matches of the wake phrase that did not fire (D-11), for the next test of the phrase.
     /// The record has only a count and the best part of the phrase: no audio and no text.
     @discardableResult
@@ -372,13 +390,16 @@ final class CommandPipeline {
         return String(format: "wake \"%@\", %@, preroll %.2f s", wake.phrase, voice, wake.prerollSeconds)
     }
 
-    /// Logs a wake phrase in a voice that is not the owner's (R-ON-3). Nothing ran. The record has no text,
-    /// because the speech engine did not run. It shows no note and plays no sound: other voices and room sounds
-    /// set it off too often (live test, 2026-11-03). The log keeps the score.
+    /// Logs a wake phrase in a voice that is not the owner's (R-ON-3): the voice of the phrase did not reach the gate.
+    /// Nothing ran. The record has no text, because the speech engine did not run. It shows no note and plays no
+    /// sound: other voices and room sounds set it off too often (live test, 2026-11-03). The log keeps the scores.
     @discardableResult
     func rejectedWake(_ wake: WakeHit, threshold: Double) -> ActivityRecord {
         let score = wake.voiceScore.map { String(format: "%.2f", $0) } ?? "none"
-        let note = String(format: "wake phrase in another voice (score %@, needs %.2f)", score, threshold)
+        var note = String(format: "wake phrase in another voice (score %@, needs %.2f)", score, threshold)
+        if let match = wake.matchScore {
+            note += String(format: ", match %.2f, worst part %.2f", match, wake.matchWorst ?? -1)
+        }
         let record = ActivityRecord(heard: "", intent: "none", tier: .none, ok: false, note: note, stages: [:])
         try? log?.append(record)
         return record
@@ -451,14 +472,20 @@ final class CommandPipeline {
         return e
     }
 
-    /// Logs a follow-up turn that earshot dropped because the voice is not the owner's (R-ON-3). Nothing ran.
-    /// The record has no text: the words were not the owner's. It shows no note and plays no sound: other voices,
-    /// a TV and room sounds set it off too often (live test, 2026-11-03). The log keeps the score and the length.
+    /// Logs an always-on turn that earshot dropped because the voice of the turn is not the owner's, or because a
+    /// follow-up turn was too short for the check (R-ON-3, E6). Nothing ran. The record has no text: the words were
+    /// not the owner's. It uses and clears `turnVoice` and `pendingWake`.
+    /// It shows no note and plays no sound: other voices, a TV and room sounds set it off too often (live test,
+    /// 2026-11-03). The log keeps the scores and the lengths.
     @discardableResult
-    func droppedFollowUp(_ why: String, seconds: Double? = nil) -> ActivityRecord {
-        let length = seconds.map { String(format: ", audio %.2f s", $0) } ?? ""
-        let record = ActivityRecord(heard: "", intent: "none", tier: .none, ok: false, note: "follow-up dropped: \(why)\(length)",
-                                    stages: [:])
+    func droppedTurn(_ why: String) -> ActivityRecord {
+        let voice = turnVoice, wake = pendingWake
+        turnVoice = nil
+        pendingWake = nil
+        var note = (voice?.kind == .wake || wake != nil ? "wake turn" : "follow-up") + " dropped: " + why
+        if let wake { note += " · " + Self.wakeSummary(wake) }
+        if let voice { note += " · " + voice.summary }
+        let record = ActivityRecord(heard: "", intent: "none", tier: .none, ok: false, note: note, stages: [:])
         try? log?.append(record)
         return record
     }

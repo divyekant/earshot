@@ -107,7 +107,7 @@ final class CommandPipelineTests: XCTestCase {
         p.wakePhrase = "hey jarvis"
         let r = await p.finish(mode: .alwaysOn)
         XCTAssertFalse(r.ok)
-        XCTAssertEqual(r.note, "no words")
+        XCTAssertEqual(r.note, "no words · speech: voice not checked")
         XCTAssertTrue(runner.runs.isEmpty)
     }
 
@@ -220,6 +220,25 @@ final class CommandPipelineTests: XCTestCase {
         XCTAssertTrue(r.note.contains("0.21"), r.note)
         XCTAssertFalse(r.ok)
         XCTAssertTrue(runner.runs.isEmpty)
+        // Live run 2026-11-03: room sounds matched the templates every 5 s. The match score shows which ones.
+        let matched = WakeHit(phrase: "hey atlas", prerollSeconds: 1, voiceScore: 0.24, isOwner: false,
+                              matchScore: 0.318, matchWorst: 0.92)
+        XCTAssertEqual(p.rejectedWake(matched, threshold: 0.35).note,
+                       "wake phrase in another voice (score 0.24, needs 0.35), match 0.32, worst part 0.92")
+    }
+
+    // E6: the voice of the whole turn decides, and the log keeps its numbers.
+    func testTurnVoiceGoesToTheLogAndCountsForTheOwner() async {
+        let (p, _, _) = make("hey atlas open notes")
+        p.wakePhrase = "hey atlas"
+        p.pendingWake = WakeHit(phrase: "hey atlas", prerollSeconds: 1.4, voiceScore: 0.66, isOwner: true)
+        p.turnVoice = TurnVoice(kind: .wake, score: 0.71, seconds: 1.62, audioSeconds: 2.4, limit: 0.4, passed: true, ms: 8)
+        let r = await p.finish(mode: .alwaysOn)
+        XCTAssertTrue(r.note.contains("turn voice 0.71 (speech 1.62 s, audio 2.40 s, needs 0.40, 8 ms)"), r.note)
+        XCTAssertEqual(r.stages["voice.turn"], 8, "the time of the check is a stage of the command path")
+        XCTAssertNil(p.turnVoice, "one check is for one turn")
+        let next = await p.finish(mode: .alwaysOn)
+        XCTAssertTrue(next.note.contains("voice not checked"), next.note)
     }
 
     func testDroppedFollowUpIsLoggedWithNoText() {
@@ -229,15 +248,44 @@ final class CommandPipelineTests: XCTestCase {
         var sounds: [FeedbackSound] = []
         p.playSound = { sounds.append($0) }
         p.wakePhrase = "hey atlas"
-        let r = p.droppedFollowUp("not the owner's voice (0.31)", seconds: 0.92)
+        p.turnVoice = TurnVoice(kind: .followUp, score: 0.31, seconds: 0.62, audioSeconds: 0.92, limit: 0.35, passed: false)
+        let r = p.droppedTurn("not the owner's voice (0.31)")
         XCTAssertEqual(r.heard, "", "the words were not the owner's, so the record has no text")
-        XCTAssertTrue(r.note.contains("0.31"), r.note)
+        XCTAssertTrue(r.note.hasPrefix("follow-up dropped: not the owner's voice (0.31)"), r.note)
         XCTAssertTrue(r.note.contains("audio 0.92 s"), r.note)
         XCTAssertFalse(r.ok)
         XCTAssertTrue(runner.runs.isEmpty)
+        XCTAssertNil(p.turnVoice)
+        let short = p.droppedTurn("follow-up too short for a voice check (0.42 s)")
+        XCTAssertEqual(short.note, "follow-up dropped: follow-up too short for a voice check (0.42 s)")
         // Live test 2026-11-03: other voices and room sounds set off the note too often. The log alone keeps it.
         XCTAssertTrue(note.shown.isEmpty, "\(note.shown)")
         XCTAssertEqual(sounds, [])
+    }
+
+    /// E6: a wake turn whose whole voice fails the check is dropped at its end, with the scores of the phrase and the turn.
+    func testDroppedWakeTurnIsLoggedWithBothScores() {
+        let (p, _, runner) = make("")
+        p.pendingWake = WakeHit(phrase: "hey atlas", prerollSeconds: 1.4, voiceScore: 0.37, isOwner: true,
+                                matchScore: 0.3, matchWorst: 0.8)
+        p.turnVoice = TurnVoice(kind: .wake, score: 0.22, seconds: 2.1, audioSeconds: 3.0, limit: 0.42, passed: false, ms: 11)
+        let r = p.droppedTurn("not the owner's voice (0.22)")
+        XCTAssertTrue(r.note.hasPrefix("wake turn dropped: not the owner's voice (0.22) · wake \"hey atlas\", voice 0.37"), r.note)
+        XCTAssertTrue(r.note.contains("turn voice 0.22 (speech 2.10 s, audio 3.00 s, needs 0.42, 11 ms)"), r.note)
+        XCTAssertEqual(r.heard, "")
+        XCTAssertTrue(runner.runs.isEmpty)
+        XCTAssertNil(p.pendingWake)
+        XCTAssertNil(p.turnVoice)
+    }
+
+    func testTeachStepGoesToTheLog() {
+        let (p, _, _) = make("")
+        let r = p.voiceTaught(phrase: "hey atlas", mic: "USB Mic", takeScores: [0.21, 0.25, 0.3], templatesKept: 3,
+                              selfScore: 0.859, profiles: 2)
+        XCTAssertEqual(r.note, "voice taught: \"hey atlas\" on \"USB Mic\", 3 of 3 phrases give a template, "
+                       + "take scores 0.21, 0.25, 0.30, voice self score 0.86, 2 voice profiles")
+        XCTAssertTrue(r.ok)
+        XCTAssertEqual(r.heard, "")
     }
 
     /// Live test 2026-11-03: the note "not sure it was your voice" showed for all sounds, not only the owner's voice.

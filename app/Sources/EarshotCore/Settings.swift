@@ -41,12 +41,24 @@ public struct EarshotSettings: Codable, Equatable, Sendable {
     public var playSounds: Bool = true
     /// The phrase that starts a command in always-on mode (R-ON-1, D-11). Known words work best.
     public var wakePhrase: String = WakePhrase.defaultPhrase
-    /// The lowest voice score (cosine similarity to the owner's enrolled voice) that counts as the owner (R-ON-3).
-    /// The live trial of 2026-11-02 gave 0.50 to 0.73 for the owner and 0.06 for another voice. Tune it from the
-    /// voice scores in the activity log.
+    /// The lowest voice score (cosine similarity to the owner's enrolled voice) of a turn with 1 s of speech or less,
+    /// for example "send" alone (R-ON-3, E6). The live trial of 2026-11-02 gave 0.50 to 0.73 for the owner and 0.06
+    /// for another voice. Tune it from the voice scores in the activity log.
     public var voiceThreshold: Double = 0.35
+    /// The lowest voice score of the wake phrase alone that starts an always-on turn (E6). At the end of the turn,
+    /// the voice of the whole turn decides. A lower score is another voice, and nothing starts. The E6 bench found
+    /// 0.10 best, but in the live run of 2026-11-03 room sounds matched the phrase every 4 to 6 s with scores up to
+    /// 0.29. Lower it only if such matches stop.
+    public var voiceGate: Double = 0.35
+    /// The lowest voice score of a whole turn with 2 s of speech or more (E6). A longer clip gives a surer score,
+    /// so this limit is higher than `voiceThreshold`, which is the limit for 1 s of speech or less. Between 1 s and
+    /// 2 s, the limit goes up in a line. An always-on "send" needs a turn that passed (D-12).
+    public var turnVoiceThreshold: Double = 0.42
 
     public init() {}
+
+    /// The limits of the owner voice check, from these settings.
+    public var voiceRule: VoiceRule { VoiceRule(gate: voiceGate, short: voiceThreshold, turn: turnVoiceThreshold) }
 
     /// Reads each setting if it is in the file, else keeps the default. So a new setting does not reset the old ones.
     public init(from decoder: Decoder) throws {
@@ -70,6 +82,8 @@ public struct EarshotSettings: Codable, Equatable, Sendable {
         read(.playSounds, &playSounds)
         read(.wakePhrase, &wakePhrase)
         read(.voiceThreshold, &voiceThreshold)
+        read(.voiceGate, &voiceGate)
+        read(.turnVoiceThreshold, &turnVoiceThreshold)
     }
 }
 
