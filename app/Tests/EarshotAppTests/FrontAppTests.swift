@@ -57,10 +57,27 @@ final class FrontAppTests: XCTestCase {
         XCTAssertEqual(open.runs.first, .openApp(appID: "notes"))
     }
 
-    func testTrackerSkipsEarshotItself() async {
-        let t = FrontTracker(own: "com.divyekant.earshot", current: nil)
-        if let me = NSRunningApplication.runningApplications(withBundleIdentifier: "com.divyekant.earshot").first { t.activated(me) }
-        let ms = await t.restore()
-        XCTAssertNil(ms, "earshot is not in front in the test, so there is nothing to restore")
+    /// The tracker skips its own app, whatever app is in front on the Mac. A failed run of the old test: the
+    /// owner's earshot window was in front during `swift test`.
+    func testTrackerSkipsItsOwnApp() async throws {
+        let apps = NSWorkspace.shared.runningApplications.filter { $0.bundleIdentifier != nil }
+        guard let own = apps.first, let other = apps.first(where: { $0.bundleIdentifier != own.bundleIdentifier }) else {
+            throw XCTSkip("needs two running apps with a bundle id")
+        }
+        let t = FrontTracker(own: own.bundleIdentifier, current: nil, frontBundleID: { "com.example.other-front" })
+        t.activated(own)
+        XCTAssertNil(t.lastBundleID, "the tracker skips its own app")
+        t.activated(other)
+        XCTAssertEqual(t.lastBundleID, other.bundleIdentifier)
+        let notInFront = await t.restore()
+        XCTAssertNil(notInFront, "its own app is not in front, so there is nothing to restore")
+
+        // Its own app in front, and no other app known: nothing to activate, and it returns at once.
+        let alone = FrontTracker(own: own.bundleIdentifier, current: nil, frontBundleID: { own.bundleIdentifier })
+        alone.activated(own)
+        XCTAssertNil(alone.lastBundleID)
+        let waited = await alone.restore()
+        XCTAssertNotNil(waited)
+        XCTAssertLessThan(waited ?? 1e9, 100)
     }
 }
