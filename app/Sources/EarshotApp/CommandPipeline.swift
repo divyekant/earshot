@@ -163,11 +163,12 @@ final class CommandPipeline {
         let front = frontBundleID().flatMap { $0 == ownBundleID ? nil : $0 }
         var context = RouteContext(apps: rows, names: known, frontBundleID: front, screen: withMenus(screen, front: front))
 
-        // A bare "type" armed this turn: its words go into the focused field, unless they hold a command word.
-        // One turn only. A voice that the wake check dropped never reaches this point, so it does not disarm.
+        // A bare "type" armed this turn: its words go into the focused field, unless its first sentence is a command.
+        // A command word later in the text is text. One turn only. A voice that the wake check dropped never
+        // reaches this point, so it does not disarm.
         if let until = armedUntil {
             armedUntil = nil
-            if started <= until, !CommandRouter.hasCommandWord(text, context: context) {
+            if started <= until, !CommandRouter.startsWithCommand(text, context: context) {
                 return await typeArmed(text, mode: mode, context: context, rows: rows, stages: stages, clock)
             }
         }

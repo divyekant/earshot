@@ -23,6 +23,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Fixed
 
+- After "type", a command word later in the dictated text (for example an app name) is typed as text. Only a first sentence that starts with a command runs as a command (R-NV-4).
 - After "type" or after typing, a long sentence that starts within the 5 s window now counts, even if it ends later. Before, a 10 s sentence after "type" was not typed (R-NV-4, R-ON-5, D-12).
 - With the Parakeet engine, earshot uses about 700 MB less memory. transcribe.cpp 0.4.1 maps the model file instead of a copy in app memory, so macOS can drop the pages under pressure, and Hex and earshot share them (R-MD-3, E2).
 - "Type <text> and send" no longer types the words "and send". The router removes a trailing send phrase from the text and tells the app with `sendAfter`. Only an explicit send can press Send (R-NV-5).

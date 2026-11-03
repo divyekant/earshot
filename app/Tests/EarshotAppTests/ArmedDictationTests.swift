@@ -125,4 +125,14 @@ final class ArmedDictationTests: XCTestCase {
         _ = await say(p, e, "the blue fox jumps", .alwaysOn)
         XCTAssertTrue(runner.runs.isEmpty)
     }
+
+    /// Live test: a dictated sentence that named "earshot" opened a Slack channel. Only the FIRST sentence counts.
+    func testCommandWordLaterInTheTextIsTyped() async {
+        let (p, e, runner) = make()
+        _ = await say(p, e, "type", .alwaysOn)
+        clock += 1
+        _ = await say(p, e, "the build looks fine. Then open Slack later and tell the team", .alwaysOn)
+        XCTAssertEqual(runner.runs.count, 1)
+        if case .typeText = runner.runs.first?.0 {} else { XCTFail("typed text expected, got \(String(describing: runner.runs.first?.0))") }
+    }
 }
