@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>earshot: talk to any app on your Mac</title>
+<meta name="description" content="earshot is voice control for macOS. Say what you want and it opens the chat, clicks the link, picks the menu item or types your words, in under a second. Nothing you say leaves the Mac. Open source.">
+<meta name="theme-color" content="#0C0C0B">
+<meta property="og:title" content="earshot: talk to any app on your Mac">
+<meta property="og:description" content="Voice control for macOS that acts in under a second. Nothing you say leaves the Mac. Open source, MIT License.">
+<meta property="og:image" content="https://earshot.divyekant.com/assets/og.png">
+<meta property="og:url" content="https://earshot.divyekant.com/">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" href="assets/ear.svg">
+<link rel="icon" type="image/png" href="assets/ear.png">
+<link rel="apple-touch-icon" href="assets/ear.png">
+<link rel="preload" href="fonts/schibsted-grotesk-wght.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<canvas class="field" id="field" aria-hidden="true"></canvas>
+
+<svg class="sprite" aria-hidden="true">
+  <symbol id="glyph" viewBox="0 0 24 24">
+    <path d="M6.5 9.6C6.5 5.9 9.3 3 12.9 3C16.6 3 19.4 5.9 19.4 9.5C19.4 12.3 17.9 13.7 16.5 15C15.3 16.1 14.7 16.9 14.5 18.5C14.2 20.5 12.8 21.6 11.1 21.6C9.6 21.6 8.4 20.7 7.9 19.3"/>
+    <path d="M9.9 9.7C9.9 7.8 11.3 6.3 13 6.3C14.8 6.3 16.1 7.7 16.1 9.4C16.1 10.7 15.3 11.4 14.4 11.8C13.4 12.2 12.9 13 12.9 14"/>
+  </symbol>
+</svg>
+
+<header class="menubar">
+  <div class="menubar-row">
+    <a class="wordmark" href="#top"><svg class="glyph" aria-hidden="true"><use href="#glyph"/></svg>earshot</a>
+    <nav aria-label="Sections">
+      <a href="#different">Why it is different</a>
+      <a href="#say">What to say</a>
+      <a href="#numbers">Test results</a>
+      <a href="#privacy">Privacy</a>
+      <a href="#start">Build</a>
+    </nav>
+    <a class="menubar-gh" href="https://github.com/divyekant/earshot">GitHub</a>
+  </div>
+</header>
+
+<main id="top">
+
+<section class="hero" aria-labelledby="hero-title">
+  <div class="wrap">
+    <div class="hero-head">
+      <h1 id="hero-title">Talk to any app on your&nbsp;Mac.</h1>
+      <div class="hero-side">
+        <p class="promise">Say what you want. earshot opens the chat, clicks the link, picks the menu item or types your words. It acts in under a second, and nothing you say leaves the Mac.</p>
+        <div class="actions">
+          <a class="btn btn-ink" href="https://github.com/divyekant/earshot">Get the source</a>
+          <a class="btn btn-line" href="#different">Why it is different</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="film-wrap">
+    <figure class="film" id="film" aria-label="Animation: spoken commands and what earshot does on a Mac screen. A simulation.">
+      <div class="voice">
+        <button class="key" id="talk" type="button" aria-label="Play the next command">
+          <span aria-hidden="true">⌥</span>
+        </button>
+        <div class="voice-text">
+          <div class="wave" id="wave" aria-hidden="true"></div>
+          <p class="caption" id="caption" aria-live="polite">“Slack Ravi, running late”</p>
+        </div>
+        <ol class="chapters" id="chapters" aria-label="Commands in the film"></ol>
+      </div>
+
+      <div class="screen" id="screen">
+        <div class="stage-inner" id="stage">
+          <div class="mbar">
+            <span class="mbar-app" id="mbar-app">Chat</span>
+            <span class="mbar-item">File</span>
+            <span class="mbar-item" id="m-edit">Edit</span>
+            <span class="mbar-item">View</span>
+            <span class="mbar-item">Window</span>
+            <span class="mbar-right"><svg class="mbar-glyph" id="mbar-glyph" aria-hidden="true"><use href="#glyph"/></svg><span>9:41</span></span>
+            <div class="menu" id="menu-edit">
+              <span>Undo</span><span>Redo</span><hr><span>Cut</span><span>Copy</span><span>Paste</span><span id="m-selectall">Select All</span>
+            </div>
+          </div>
+
+          <!-- Scene: chat -->
+          <div class="win w-chat" data-scene="chat">
+            <div class="win-top"><i></i><i></i><i></i><span>Slack</span></div>
+            <div class="chat">
+              <ul class="side">
+                <li># general</li><li># design</li><li class="gap"></li>
+                <li id="c-ravi">Ravi</li><li>Priya</li><li>Sam</li><li>Design team</li>
+              </ul>
+              <div class="pane">
+                <div class="pane-head" id="c-head">General</div>
+                <div class="msgs" id="c-msgs">
+                  <p class="msg"><b>Priya</b>Standup moved to 10:30.</p>
+                  <p class="msg"><b>Sam</b>Deck is in the shared folder.</p>
+                </div>
+                <div class="box" id="c-box"><span class="ph" id="c-ph">Message #general</span><span class="typed" id="c-typed"></span></div>
+                <span class="chip" id="c-chip">Not sent. Say “send”.</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Scene: web -->
+          <div class="win w-web" data-scene="web">
+            <div class="win-top"><i></i><i></i><i></i><span class="url" id="w-url">New Tab</span></div>
+            <div class="web" id="w-results">
+              <div class="search" id="w-search"><span class="ph" id="w-ph">Search Wikipedia</span><span class="typed" id="w-typed"></span></div>
+              <ol class="results" id="w-list">
+                <li><b>Lisbon</b><i></i><i class="s"></i></li>
+                <li id="w-two"><b>Lisbon Metro</b><i></i><i class="s"></i></li>
+                <li><b>History of Lisbon</b><i></i><i class="s"></i></li>
+                <li><b>1755 Lisbon earthquake</b><i></i><i class="s"></i></li>
+              </ol>
+            </div>
+            <div class="web article" id="w-article">
+              <h4>Lisbon Metro</h4>
+              <i></i><i></i><i class="s"></i><i></i><i class="s"></i>
+            </div>
+          </div>
+
+          <!-- Scene: menu -->
+          <div class="win w-doc" data-scene="menu">
+            <div class="win-top"><i></i><i></i><i></i><span>Notes</span></div>
+            <div class="doc" id="d-doc">
+              <p><span class="sel">Trip plan</span></p>
+              <p><span class="sel">Book the 08:39 train from Porto. Hotel near the river, two nights. Dinner with Sam on Friday.</span></p>
+              <p><span class="sel">Pack the charger for the demo laptop.</span></p>
+            </div>
+          </div>
+
+          <!-- Scene: numbers -->
+          <div class="win w-app" data-scene="numbers">
+            <div class="win-top"><i></i><i></i><i></i><span>Photos</span></div>
+            <div class="tools" id="n-tools">
+              <span class="tb">Back</span><span class="tb">Forward</span><span class="tb">Rotate</span><span class="tb">Crop</span><span class="tb">Share</span>
+            </div>
+            <div class="grid" id="n-grid">
+              <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+            </div>
+          </div>
+
+          <!-- Scene: dictation -->
+          <div class="win w-mail" data-scene="dictate">
+            <div class="win-top"><i></i><i></i><i></i><span>New message</span></div>
+            <div class="mail">
+              <p class="field"><span>To</span>Sam</p>
+              <p class="field"><span>Subject</span>Thursday</p>
+              <div class="body" id="m-body"><span class="typed" id="m-typed"></span></div>
+            </div>
+          </div>
+
+          <div class="ring" id="ring" aria-hidden="true"></div>
+          <div class="ripple" id="ripple" aria-hidden="true"></div>
+          <svg class="pointer" id="pointer" viewBox="0 0 20 28" aria-hidden="true"><path d="M2 2 L2 22 L7.5 17 L11 25.5 L14.2 24.1 L10.8 15.8 L18 15.6 Z"/></svg>
+          <div class="note" id="note" aria-hidden="true"><svg class="note-glyph"><use href="#glyph"/></svg><span id="note-text"></span></div>
+        </div>
+      </div>
+      <figcaption class="film-cap">A simulation of earshot on a Mac. Hold the key, or click it, to go to the next command. The page uses no microphone.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section id="different" class="different" aria-labelledby="different-title">
+  <div class="wrap">
+    <h2 id="different-title">Not a voice assistant. A faster hand.</h2>
+    <p class="section-lede">Voice assistants answer questions. Dictation types words. earshot does the clicks and keystrokes between them, in the apps you already use.</p>
+
+    <ol class="shifts">
+      <li>
+        <h3>No AI model to wait for</h3>
+        <p>Small rules on your Mac decide each command in about 20&nbsp;ms. There is no AI model to wait for. A spoken web click lands 70 to 90&nbsp;ms after you stop talking.</p>
+      </li>
+      <li>
+        <h3>Works in apps it has never seen</h3>
+        <p>earshot reads the buttons, links, menus and sidebars of the front app through macOS accessibility. There is no plugin and no script for each app. If you can see the label, you can say it.</p>
+      </li>
+      <li>
+        <h3>Every menu item is a voice command</h3>
+        <p>Say “select all”, “export as PDF” or “new window” in any app. earshot finds the item in the app’s own menus and presses it.</p>
+      </li>
+      <li>
+        <h3>The web by name</h3>
+        <p>“Open the second result.” “Click Pull requests.” “Search for train times.” earshot reads the page in Chrome and acts on the link you name.</p>
+      </li>
+      <li>
+        <h3>Your words in any text box</h3>
+        <p>Hold the key and talk. Plain words go into the field that has the focus: a mail, a doc, a search box. Pause to think; earshot waits.</p>
+      </li>
+      <li>
+        <h3>Only your voice, only your phrase</h3>
+        <p>In always-on mode, earshot wakes on a phrase that you pick, in any language. It checks that the voice is yours, so the TV and other people cannot start a command.</p>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<section id="say" class="say" aria-labelledby="say-title">
+  <div class="wrap">
+    <h2 id="say-title">What to say</h2>
+    <p class="section-lede">Short, plain commands. Each clip shows earshot doing one of them.</p>
+
+    <div class="uses">
+      <article class="use">
+        <video class="clip" src="clips/chat.mp4" poster="clips/chat.jpg" muted loop playsinline preload="none" aria-label="Clip: Slack Ravi, running late, then send."></video>
+        <div class="use-text">
+          <h3>Message anyone, in any chat app</h3>
+          <ul class="phrases">
+            <li><q>Slack Ravi, running late</q><span>Opens the chat with Ravi and types the message. It does not send.</span></li>
+            <li><q>WhatsApp Mom</q><span>Opens the chat and puts the cursor in the box. Then you talk.</span></li>
+            <li><q>iMessage Sam, landed safely</q><span>The same command works in Messages.</span></li>
+            <li><q>Send</q><span>Sends what earshot just typed, only because you said it.</span></li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="use">
+        <video class="clip" src="clips/web.mp4" poster="clips/web.jpg" muted loop playsinline preload="none" aria-label="Clip: open wikipedia.org, search for Lisbon, then open the second result."></video>
+        <div class="use-text">
+          <h3>Use the web without the mouse</h3>
+          <ul class="phrases">
+            <li><q>Open wikipedia.org</q><span>Opens the site in your default browser. “Go to news dot ycombinator dot com” works too.</span></li>
+            <li><q>Search for Lisbon</q><span>Types into the search field of the page.</span></li>
+            <li><q>Open the second result</q><span>Clicks the result by its position.</span></li>
+            <li><q>Click Pull requests</q><span>Clicks the link by its label, even if you say it a little wrong.</span></li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="use">
+        <video class="clip" src="clips/menu.mp4" poster="clips/menu.jpg" muted loop playsinline preload="none" aria-label="Clip: select all in Notes, through the Edit menu."></video>
+        <div class="use-text">
+          <h3>Say any menu item, in any app</h3>
+          <ul class="phrases">
+            <li><q>Select all</q><span>Finds Select All in the Edit menu and presses it.</span></li>
+            <li><q>Export as PDF</q><span>Works for the items in the app’s own menus.</span></li>
+            <li><q>Open Zoom</q><span>Opens or brings up any app that you approved.</span></li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="use">
+        <video class="clip" src="clips/numbers.mp4" poster="clips/numbers.jpg" muted loop playsinline preload="none" aria-label="Clip: show numbers, then click 7."></video>
+        <div class="use-text">
+          <h3>Click things that have no name</h3>
+          <ul class="phrases">
+            <li><q>Show numbers</q><span>Puts a number on each item that you can click.</span></li>
+            <li><q>Click 7</q><span>Clicks item 7.</span></li>
+            <li><q>Click Share</q><span>Or name the button, if it has a label.</span></li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="use">
+        <video class="clip" src="clips/dictate.mp4" poster="clips/dictate.jpg" muted loop playsinline preload="none" aria-label="Clip: dictation into a new mail."></video>
+        <div class="use-text">
+          <h3>Write by talking</h3>
+          <ul class="phrases">
+            <li><q>Hi Sam, the deck is ready</q><span>Hold the key and talk. Plain words go into the text field that has the focus.</span></li>
+            <li><q>Type</q><span>Then say a long sentence, with pauses. earshot waits and types all of it, also in always-on mode.</span></li>
+          </ul>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section id="numbers" class="numbers" aria-labelledby="numbers-title">
+  <div class="wrap">
+    <h2 id="numbers-title">Measured, not promised</h2>
+    <p class="section-lede">These results come from live tests on an Apple M4 Pro Mac mini. Each test is written up in the repository, with the method and every miss.</p>
+    <figure class="race" id="race" aria-label="Timing chart. From key release: final text at 52 ms, app in front at 75 ms, chat open at 470 ms, cursor in the message box at 571 ms. A web click lands 70 to 90 ms after speech ends.">
+      <div class="race-scale" aria-hidden="true"><span>0</span><span>250 ms</span><span>500 ms</span><span>750 ms</span><span>1 s</span></div>
+      <div class="race-row r1">
+        <p class="race-name">“Slack Ravi, running late”</p>
+        <div class="track">
+          <div class="bar" data-to="57.1"></div>
+          <span class="stop" data-at="5.2"><b>52 ms</b> text</span>
+          <span class="stop low" data-at="7.5"><b>75 ms</b> app</span>
+          <span class="stop left" data-at="47"><b>470 ms</b> chat open</span>
+          <span class="stop end" data-at="57.1"><b>571 ms</b> cursor in the box</span>
+        </div>
+      </div>
+      <div class="race-row">
+        <p class="race-name">“Click Pull requests”</p>
+        <div class="track">
+          <div class="bar" data-to="9"></div>
+          <span class="stop end" data-at="9"><b>70–90 ms</b> clicked, after you stop talking</span>
+        </div>
+      </div>
+      <figcaption>Medians from live tests on an Apple M4 Pro Mac mini.</figcaption>
+    </figure>
+    <div class="table-wrap">
+      <table class="lab">
+        <thead>
+          <tr><th scope="col">Test</th><th scope="col">Result</th><th scope="col">Details</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Voice to the cursor in the right Slack chat</td><td><b>571 ms</b> median, 11 of 11 reached</td><td><a href="https://github.com/divyekant/earshot/blob/main/docs/experiments/E0-viability.md">How we tested</a></td></tr>
+          <tr><td>Speech to final text, on the Mac</td><td><b>52 ms</b> median</td><td><a href="https://github.com/divyekant/earshot/blob/main/docs/experiments/E0-viability.md">How we tested</a></td></tr>
+          <tr><td>Commands routed to the right chat, from apps it read by itself</td><td><b>42 of 42</b>, no wrong chat, 20 ms median</td><td><a href="https://github.com/divyekant/earshot/blob/main/docs/experiments/E1-generic-router.md">How we tested</a></td></tr>
+          <tr><td>Voice clicks on four live web pages</td><td><b>45 of 45</b>, no wrong press, 24 ms median</td><td><a href="https://github.com/divyekant/earshot/blob/main/docs/experiments/E2-web-and-speech.md">How we tested</a></td></tr>
+          <tr><td>Read every button and link on a page</td><td><b>26 to 47 ms</b></td><td><a href="https://github.com/divyekant/earshot/blob/main/docs/experiments/E2-web-and-speech.md">How we tested</a></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="fine">The results with no miss use the optional cloud helper for the commands that the rules were not sure of. With the rules alone, on the Mac: 40 of 42 chats and 42 of 45 web clicks.</p>
+  </div>
+</section>
+
+<section id="privacy" class="privacy" aria-labelledby="privacy-title">
+  <div class="wrap">
+    <canvas class="inwave" id="inwave" aria-hidden="true"></canvas>
+    <h2 id="privacy-title">No audio leaves your Mac.</h2>
+    <div class="facts">
+      <p>earshot saves no audio. Speech recognition and every decision run on the Mac by default.</p>
+      <p>One optional cloud helper can answer when the rules are not sure. It is off by default. If you turn it on, earshot sends text only: the command words and a short list of labels on the screen.</p>
+      <p>The code is open source under the MIT License. Read it, build it and change it. Your settings, app list and name list are JSON files in <code>~/Library/Application Support/earshot</code>.</p>
+    </div>
+  </div>
+</section>
+
+<section id="safety" class="safety" aria-labelledby="safety-title">
+  <div class="wrap safety-grid">
+    <h2 id="safety-title">It never presses Send unless you say “send”.</h2>
+    <div>
+      <p class="warning"><strong>Warning:</strong> a Return key press in a message box sends the message. You cannot undo a sent message.</p>
+      <ul class="rules">
+        <li>No Return or Send in a message box without the word “send”.</li>
+        <li>No action on sign-in, code or payment pages.</li>
+        <li>No typing into a password field.</li>
+        <li>Action only in the apps that you approve.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="start" class="start" aria-labelledby="start-title">
+  <div class="wrap start-grid">
+    <div>
+      <h2 id="start-title">Build it</h2>
+      <p>earshot is early software. There is no signed download yet, so you build it from the source.</p>
+      <ul class="needs">
+        <li>A Mac with Apple silicon or an Intel processor</li>
+        <li>macOS 14 or later. macOS 26 has the best speech engine.</li>
+        <li>Xcode 16 or later, or the Command Line Tools with Swift 6</li>
+      </ul>
+    </div>
+    <div class="term">
+      <pre><code><span class="c"># get the source</span>
+git clone https://github.com/divyekant/earshot.git
+cd earshot/app
+
+<span class="c"># test, then build the app bundle</span>
+swift test
+scripts/build-app.sh
+open build/Earshot.app</code></pre>
+      <p>Then click the earshot icon in the menu bar, open <b>Manage…</b>, give the permissions and approve your apps. The <a href="https://github.com/divyekant/earshot#set-up">README</a> has each step.</p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="foot">
+  <div class="wrap foot-row">
+    <a class="wordmark" href="#top"><svg class="glyph" aria-hidden="true"><use href="#glyph"/></svg>earshot</a>
+    <p>Open source under the <a href="https://github.com/divyekant/earshot/blob/main/LICENSE">MIT License</a>.</p>
+    <nav aria-label="Project links">
+      <a href="https://github.com/divyekant/earshot">Source</a>
+      <a href="https://github.com/divyekant/earshot/releases">Releases</a>
+      <a href="https://github.com/divyekant/earshot/blob/main/CHANGELOG.md">Changes</a>
+      <a href="https://github.com/divyekant/earshot/blob/main/SECURITY.md">Security</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="demo.js" defer></script>
+<script src="motion.js" defer></script>
+<script src="field.js" defer></script>
+</body>
+</html>

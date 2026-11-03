@@ -46,6 +46,8 @@ earshot uses Apple system frameworks (Speech, AVFoundation, Accessibility, AppKi
 
 The earshot wordmark in `assets/brand/` uses the Inter Display Bold font, converted to outlines. Inter is licensed under the SIL Open Font License 1.1 (https://github.com/rsms/inter). The repository does not include the font file.
 
+The landing page in `site/` includes two font files: Schibsted Grotesk (https://github.com/schibsted/schibsted-grotesk) and JetBrains Mono (https://github.com/JetBrains/JetBrainsMono). Both are licensed under the SIL Open Font License 1.1. The license texts are in `site/fonts/`.
+
 ## Build tools for the brand assets
 
 `assets/brand/render.py` uses Python packages that `uv` installs from `assets/brand/uv.lock`. These tools are not part of the app.

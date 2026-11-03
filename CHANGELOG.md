@@ -23,6 +23,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Added
 
+- A project web page in `site/`, for earshot.divyekant.com. It is a static page with a demo film, example clips and the measured results. It makes no third-party requests (I-36).
 - In always-on mode, a small turn model (Smart Turn v3.2, about 17 MB, one download) listens at the first pause. If it hears that you finished, the turn ends after 300 ms of quiet. If it hears a pause in a sentence, the turn waits up to 2 s (3 s for dictation). No audio leaves the Mac. If the model is not available, the pause rule works as before (R-ON-1, R-MD-1, I-2).
 - Several commands in one sentence, for example "click on Projects, click on New, type hello and send". earshot runs the steps in order and reads the screen again before each step. Each step has its own safety checks. If a step fails or earshot is not sure, earshot stops and asks: say "go on", "stop", or the step again within 10 s. At most 10 steps. In always-on mode, a chain never sends (I-28, R-NV-5, R-SP-2, D-12).
 

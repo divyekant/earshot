@@ -162,6 +162,7 @@ earshot waits at most 1 s for Jev. After that, the rules answer wins.
 | `probe/` | The lab for the experiments E0, E1 and E2. |
 | `docs/` | Requirements, design, decisions, build plan, experiments and research. |
 | `assets/brand/` | The app icon and the logo. |
+| `site/` | The static landing page for earshot.divyekant.com. |
 
 ## Documents
 
