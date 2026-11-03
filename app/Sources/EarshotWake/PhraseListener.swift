@@ -147,7 +147,7 @@ final class PhraseListener: WakeListener {
 
     func turnScore(_ samples: [Float]) -> Double? { models.turnScore(samples) }
 
-    func voiceCheck(_ samples: [Float]) -> (score: Double, seconds: Double)? {
+    func voiceCheck(_ samples: [Float]) -> VoiceCheck? {
         guard let profile else { return nil }
         return try? models.voiceCheck(samples, profile: profile)
     }

@@ -275,7 +275,7 @@ final class WakeModelRunTests: XCTestCase {
         let command = try say("open the notes app and make a new note")
         let turn = phrase + pause + command + [Float](repeating: 0, count: 16000 / 2)
         var times: [Double] = []
-        var last: (score: Double, seconds: Double)?
+        var last: VoiceCheck?
         for _ in 0..<7 {
             let start = DispatchTime.now().uptimeNanoseconds
             last = try models.voiceCheck(turn, profile: profile)
@@ -291,6 +291,15 @@ final class WakeModelRunTests: XCTestCase {
         XCTAssertLessThan(check.seconds, Double(turn.count) / 16000 - 0.9, "the 1 s pause is cut to 300 ms")
         XCTAssertGreaterThan(check.score, VoiceRule().limit(seconds: check.seconds), "the same voice passes the turn limit")
         XCTAssertLessThan(sorted[sorted.count / 2], 100, "a check must be short: it runs before the turn ends")
+
+        // E6, section 8: a go-on part of the same voice, against the voice of the turn before it.
+        let goOn = try models.voiceCheck(try say("and then the brown dog sat down on the mat"), profile: profile)
+        let goOnLast = try XCTUnwrap(goOn.similarity(to: check.embedding))
+        let otherLast = other.flatMap { $0.similarity(to: check.embedding) } ?? -1
+        print(String(format: "last-turn check: same voice %.2f (profile %.2f) on %.2f s, other voice %.2f, level %.0f dB",
+                     goOnLast, goOn.score, goOn.seconds, otherLast, goOn.level ?? 0))
+        XCTAssertEqual(check.embedding.count, 256)
+        XCTAssertGreaterThan(goOnLast, otherLast, "the same voice is nearer to its last turn than another voice")
     }
 
     // R-ON-1, I-2: the turn model gives a probability for a whole sentence and for a sentence cut in the middle, and

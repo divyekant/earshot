@@ -64,6 +64,15 @@ enum SpeechTrim {
         return out
     }
 
+    /// The level of a clip, in dB of full scale (RMS). -120 for silence or an empty clip.
+    static func level(_ samples: [Float]) -> Double {
+        guard !samples.isEmpty else { return -120 }
+        var sum: Double = 0
+        for s in samples { sum += Double(s) * Double(s) }
+        let rms = (sum / Double(samples.count)).squareRoot()
+        return rms > 0 ? max(-120, 20 * log10(rms)) : -120
+    }
+
     /// For each whole 20 ms frame: true if it is loud. A frame is loud if it is 12 dB or more over the quietest
     /// tenth of the frames, and at -50 dB or more. Empty if the clip is shorter than one frame.
     static func loudFrames(_ samples: [Float], rate: Int = 16000) -> [Bool] {

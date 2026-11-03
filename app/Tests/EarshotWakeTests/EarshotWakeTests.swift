@@ -109,6 +109,14 @@ final class WakePartsTests: XCTestCase {
         XCTAssertTrue(SpeechTrim.condensed([]).isEmpty)
     }
 
+    /// E6, section 8: the log gives the level of the scored speech.
+    func testLevelIsTheRMSInDecibels() {
+        let tone = (0..<8000).map { $0 % 2 == 0 ? Float(0.1) : Float(-0.1) }       // RMS 0.1: -20 dB
+        XCTAssertEqual(SpeechTrim.level(tone), -20, accuracy: 1e-6)
+        XCTAssertEqual(SpeechTrim.level([]), -120)
+        XCTAssertEqual(SpeechTrim.level([Float](repeating: 0, count: 100)), -120)
+    }
+
     func testTemplateCutFollowsTheSpeech() {
         // 100 frames of 40 ms. The take has 0.3 s of quiet before it (WakeTemplates.leadSamples).
         let frames = (0..<100).map { [Float](repeating: Float($0), count: 4) }

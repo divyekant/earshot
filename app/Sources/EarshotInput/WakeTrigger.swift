@@ -17,8 +17,9 @@ public struct WakeConfig: Sendable, Equatable {
     public var minimumFollowUpSeconds: Double = 0.5
     /// In a follow-up turn, the spotter keeps on for this long from the start of the turn. If the owner says the
     /// phrase again in this time, the turn becomes a wake turn (D-11). Live test 2026-11-02: 3 follow-up turns started
-    /// with the phrase again, heard as "Yeah, let's".
-    public var followTurnWakeSeconds: Double = 2.5
+    /// with the phrase again, heard as "Yeah, let's". Live test 2026-11-03: the phrase came about 2 s into a follow-up
+    /// turn, after other sound, and the spotter fires 0.3 to 0.5 s after the phrase ends. So 4 s, not 2.5 s.
+    public var followTurnWakeSeconds: Double = 4
     /// The trigger reports the near misses of the spotter after this much audio, at a wake and at stop (D-11).
     public var nearMissReportSeconds: Double = 60
     /// The turn model (Smart Turn v3.2) checks the turn at the first pause (`DetectorConfig.pauseCheckMs`). A
@@ -35,6 +36,9 @@ public struct WakeConfig: Sendable, Equatable {
     public var voice = VoiceRule()
     /// The voice check uses the first this many seconds of a turn. A long dictation does not need more.
     public var voiceCheckMaxSeconds: Double = 8
+    /// The voice of the last turn that passed is kept for a follow-up turn that starts at most this much heard audio
+    /// after it (`VoiceRule.lastTurn`). Audio while the trigger is paused (earshot types) does not count.
+    public var lastTurnKeepSeconds: Double = 30
 
     public init() {}
 }
@@ -49,7 +53,8 @@ public struct WakeConfig: Sendable, Equatable {
 ///    the end, must reach the limit of `config.voice` for its length. Else the turn is dropped (`onCancel` with
 ///    `otherVoice`). A whole turn gives a surer score than the phrase alone.
 /// 4. For `followUpSeconds` after a command (`openFollowUp()`), speech in the owner's voice starts a turn
-///    with no phrase. Its voice is checked at the end of the turn, with the same rule.
+///    with no phrase. Its voice is checked at the end of the turn, with the same rule. If it misses the limit, it
+///    can pass by the voice of the owner's last turn that passed (`VoiceRule.lastTurn`, E6 section 8).
 /// 5. In the first `followTurnWakeSeconds` of a follow-up turn, the spotter still listens. If the owner says the
 ///    phrase again, the turn becomes a wake turn: `onWake` comes with `inTurnAfterSeconds`, and no second `onStart`.
 /// 6. `onTurnVoice` gives the result of each voice check, right before `onStop` or `onCancel`.
@@ -123,6 +128,10 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
     private static let keepTurnSamples = 16000 * 17 / 2
     /// The value of `clock` at the last near-miss report.
     private var nearMissClock = 0
+    /// The voice embedding of the last turn that passed the profile check, and the value of `clock` at its end. Only
+    /// the embedding: no audio. It is dropped when the follow-up window closes, at stop, and after
+    /// `lastTurnKeepSeconds`.
+    private var lastPassed: (embedding: [Float], clock: Int)?
 
     static let rate = 16000
     private var frameSamples: Int { Int(Double(Self.rate) * config.detector.frameMs / 1000) }
@@ -158,6 +167,7 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
         source.stop()
         let event = queue.sync { () -> SpeechEvent? in
             running = false
+            lastPassed = nil
             reportNearMisses()
             return endTurn()
         }
@@ -250,7 +260,7 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
 
         for event in events { handle(event) }
         if let hit { wake(hit) }
-        if case .followUp(let until) = state, clock >= until { state = .idle; nextTurnLongPause = false }
+        if case .followUp(let until) = state, clock >= until { state = .idle; nextTurnLongPause = false; lastPassed = nil }
         if Double(clock - nearMissClock) >= config.nearMissReportSeconds * Double(Self.rate) { reportNearMisses() }
     }
 
@@ -317,20 +327,31 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
     }
 
     /// The voice check at the end of a turn (E6): the voice of the whole turn, with the limit for its speech length.
-    /// It sets `lastTurnVoice`. If the check does not run (no voice is enrolled, or the model failed), a wake turn
-    /// keeps the score of its phrase, with the short limit. With no score at all, the turn goes on unchecked: an
-    /// always-on "send" then stays blocked (D-12).
+    /// It sets `lastTurnVoice`. A follow-up turn that misses the limit passes if it has `voice.lastTurnMinSeconds` of
+    /// speech or more and its voice is near the voice of the owner's last turn that passed (`voice.lastTurn`).
+    /// If the check does not run (no voice is enrolled, or the model failed), a wake turn keeps the score of its
+    /// phrase, with the short limit. With no score at all, the turn goes on unchecked: an always-on "send" then
+    /// stays blocked (D-12).
     private func verdict(_ kind: TurnVoice.Kind, _ samples: [Float], audioSamples: Int, phrase: WakeHit?) -> SpeechEvent {
         let rule = config.voice
         let audio = Double(audioSamples) / Double(Self.rate)
         let start = DispatchTime.now().uptimeNanoseconds
         let check = samples.isEmpty ? nil : listener.voiceCheck(samples)
-        let ms = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
         if let check {
             let limit = rule.limit(seconds: check.seconds)
+            let byProfile = check.score >= limit
+            // Only a follow-up turn compares with the last turn. A wake turn has the phrase and its gate.
+            let last = kind == .followUp ? keptLastPassed().flatMap { check.similarity(to: $0) } : nil
+            let byLast = !byProfile && check.seconds >= rule.lastTurnMinSeconds && (last ?? -1) >= rule.lastTurn
+            let ms = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
             lastTurnVoice = TurnVoice(kind: kind, score: check.score, seconds: check.seconds, audioSeconds: audio,
-                                      limit: limit, passed: check.score >= limit, ms: ms)
+                                      limit: limit, passed: byProfile || byLast, ms: ms, level: check.level,
+                                      lastTurnScore: last, lastTurnLimit: rule.lastTurn, byLastTurn: byLast)
+            // Only a pass by the profile gives the next reference. A chain of passes by the last turn could drift
+            // away from the owner's voice.
+            if byProfile, !check.embedding.isEmpty { lastPassed = (check.embedding, clock) }
         } else if let score = phrase?.voiceScore {
+            let ms = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
             lastTurnVoice = TurnVoice(kind: kind, score: score, seconds: 0, audioSeconds: audio, limit: rule.short,
                                       passed: score >= rule.short, byTurn: false, ms: ms)
         } else {
@@ -339,6 +360,17 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
         }
         guard let voice = lastTurnVoice, !voice.passed else { return .end }
         return .drop(String(format: "\(Self.otherVoice) (%.2f)", voice.score))
+    }
+
+    /// The voice of the last turn that passed, if the turn now started at most `lastTurnKeepSeconds` of heard audio
+    /// after it. A long follow-up turn still compares.
+    private func keptLastPassed() -> [Float]? {
+        guard let kept = lastPassed else { return nil }
+        guard Double(turnStartClock - kept.clock) <= config.lastTurnKeepSeconds * Double(Self.rate) else {
+            lastPassed = nil
+            return nil
+        }
+        return kept.embedding
     }
 
     /// The start of the cancel reason when the voice of a follow-up turn is not the owner's voice.
@@ -374,12 +406,23 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
     /// pipeline removes the phrase by its time. The voice of the whole turn is checked at the end, as for a wake turn.
     /// If the voice of the phrase does not reach the gate, the turn stays a follow-up turn.
     private func wakeInFollowTurn(_ hit: WakeHit) {
-        guard hit.isOwner else { return }
+        guard hit.isOwner else {
+            // Only a line in the log, as for a rejected wake between turns: no note and no sound.
+            DispatchQueue.main.async { [weak self] in self?.onRejected?(hit) }
+            return
+        }
         var hit = hit
         hit.inTurnAfterSeconds = Double(clock - turnStartClock) / Double(Self.rate)
         openAfterPhrase(hit)
         state = .wakeTurn
-        // The samples of the turn stay: they hold the phrase.
+        // The voice check and the turn model hear the turn from the start of the phrase, as for a wake between turns.
+        // Sound before the phrase in this turn (other talk, the room) must not count for the owner's voice.
+        let back = Int(hit.prerollSeconds * Double(Self.rate))
+        if back < turnSamples.count, turnSamples.count == turnSampleCount {
+            turnSamples = Array(turnSamples.suffix(back))
+            turnSampleCount = back
+        }
+        if back < turnAudio.count { turnAudio = Array(turnAudio.suffix(back)) }
         turnWake = hit
         // The speech engine runs already: no new preroll and no second start.
         DispatchQueue.main.async { [weak self] in self?.onWake?(hit) }

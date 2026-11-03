@@ -14,6 +14,8 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Fixed
 
+- In always-on mode, earshot no longer drops the next part of your dictation after it typed the first part. A follow-up turn with 1 s of speech or more now also passes if its voice is near the voice of your last turn that passed (score 0.45 or more). "send" alone still needs the full voice check (R-ON-3, R-NV-4, D-11, D-12).
+- In always-on mode, the wake phrase said up to about 3 s into a follow-up turn now starts a wake turn (was about 2 s). The voice check of that turn starts at the phrase, so sound before it does not count (R-ON-1, R-ON-3, D-11).
 - In always-on mode, a pause after the wake phrase no longer loses the command, and a sentence end no longer cuts dictated text in two. The turn model now waits for words after the phrase, and it never ends a dictation turn early. The log says why a sentence did not go on with the last typing (R-ON-1, I-2).
 - A result sound no longer starts a follow-up turn in always-on mode: the follow-up window opens when the sound ends, and the detector ignores earshot's own sounds. When earshot waits for your words (after "type", or after a typing), it plays no result sound, so you can go on talking at once (R-ON-1, R-FB-1).
 - In always-on mode, a soft end of a word, or speech from a quieter microphone, no longer counts as the pause that ends your turn. A dictated text longer than 15 s is no longer lost: it ends at 60 s with its words (R-ON-1, I-2, I-26).
