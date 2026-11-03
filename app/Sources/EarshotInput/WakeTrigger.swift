@@ -17,8 +17,9 @@ public struct WakeConfig: Sendable, Equatable {
     public var minimumFollowUpSeconds: Double = 0.5
     /// In a follow-up turn, the spotter keeps on for this long from the start of the turn. If the owner says the
     /// phrase again in this time, the turn becomes a wake turn (D-11). Live test 2026-11-02: 3 follow-up turns started
-    /// with the phrase again, heard as "Yeah, let's".
-    public var followTurnWakeSeconds: Double = 2.5
+    /// with the phrase again, heard as "Yeah, let's". Live test 2026-11-03: the phrase came about 2 s into a follow-up
+    /// turn, after other sound, and the spotter fires 0.3 to 0.5 s after the phrase ends. So 4 s, not 2.5 s.
+    public var followTurnWakeSeconds: Double = 4
     /// The trigger reports the near misses of the spotter after this much audio, at a wake and at stop (D-11).
     public var nearMissReportSeconds: Double = 60
     /// The turn model (Smart Turn v3.2) checks the turn at the first pause (`DetectorConfig.pauseCheckMs`). A
@@ -405,12 +406,23 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
     /// pipeline removes the phrase by its time. The voice of the whole turn is checked at the end, as for a wake turn.
     /// If the voice of the phrase does not reach the gate, the turn stays a follow-up turn.
     private func wakeInFollowTurn(_ hit: WakeHit) {
-        guard hit.isOwner else { return }
+        guard hit.isOwner else {
+            // Only a line in the log, as for a rejected wake between turns: no note and no sound.
+            DispatchQueue.main.async { [weak self] in self?.onRejected?(hit) }
+            return
+        }
         var hit = hit
         hit.inTurnAfterSeconds = Double(clock - turnStartClock) / Double(Self.rate)
         openAfterPhrase(hit)
         state = .wakeTurn
-        // The samples of the turn stay: they hold the phrase.
+        // The voice check and the turn model hear the turn from the start of the phrase, as for a wake between turns.
+        // Sound before the phrase in this turn (other talk, the room) must not count for the owner's voice.
+        let back = Int(hit.prerollSeconds * Double(Self.rate))
+        if back < turnSamples.count, turnSamples.count == turnSampleCount {
+            turnSamples = Array(turnSamples.suffix(back))
+            turnSampleCount = back
+        }
+        if back < turnAudio.count { turnAudio = Array(turnAudio.suffix(back)) }
         turnWake = hit
         // The speech engine runs already: no new preroll and no second start.
         DispatchQueue.main.async { [weak self] in self?.onWake?(hit) }

@@ -842,7 +842,35 @@ final class WakeTriggerTests: XCTestCase {
         mic.emit(speech, ms: 1000)
         mic.emit(quiet, ms: 700)
         wait(for: [dropped], timeout: 2)
-        XCTAssertEqual(rec.log, ["wake", "start", "stop", "start", "cancel: not the owner's voice (0.20)"])
+        XCTAssertEqual(rec.log, ["wake", "start", "stop", "start", "rejected", "cancel: not the owner's voice (0.20)"],
+                       "the phrase in another voice is in the log, and the turn stays a follow-up turn")
+        t.stop()
+    }
+
+    // Live test 2026-11-03: the phrase came about 2 s into a follow-up turn, after other sound.
+    func testPhraseTwoSecondsIntoAFollowUpTurnMakesAWakeTurnFromThePhrase() {
+        let listener = FakeListener()
+        listener.hitAfterSamples = 16000
+        let (t, mic, rec) = make(listener)
+        let first = rec.expect("stop", self)
+        mic.emit(quiet, ms: 1000)
+        mic.emit(speech, ms: 500)
+        mic.emit(quiet, ms: 700)
+        wait(for: [first], timeout: 2)
+
+        listener.hit.prerollSeconds = 1.0
+        listener.hitAfterSamples = 16000 * 3   // the spotter fires 3 s after the window opened
+        t.openFollowUp()
+        let second = rec.expect("stop", self, count: 2)
+        mic.emit(speech, ms: 3500)
+        mic.emit(quiet, ms: 700)
+        wait(for: [second], timeout: 2)
+        XCTAssertEqual(rec.log, ["wake", "start", "stop", "start", "wake", "stop"])
+        XCTAssertEqual(t.lastTurnVoice?.kind, .wake)
+        // From the phrase (1 s before the hit) to the end: about 0.5 s of speech and 0.7 s of quiet more.
+        let audio = t.lastTurnVoice?.audioSeconds ?? 0
+        XCTAssertGreaterThan(audio, 1.5)
+        XCTAssertLessThan(audio, 2.6, "the 2 s of sound before the phrase do not count")
         t.stop()
     }
 
