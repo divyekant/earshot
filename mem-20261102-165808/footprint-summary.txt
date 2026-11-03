@@ -1,0 +1,50 @@
+footprint: WARNING: -y/--summary options are deprecated because summary is the default mode
+======================================================================
+earshot [35776]: 64-bit    Footprint: 865 MB (16384 bytes per page)
+======================================================================
+
+  Dirty      Clean  Reclaimable    Regions    Category
+    ---        ---          ---        ---    ---
+ 733 MB        0 B          0 B         54    untagged (VM_ALLOCATE)
+  80 MB        0 B          0 B         48    MALLOC_SMALL
+  32 MB        0 B          0 B          6    MALLOC_LARGE
+3620 KB      16 KB          0 B        998    __DATA
+3120 KB        0 B          0 B         16    MALLOC metadata
+2742 KB        0 B          0 B        897    __DATA_DIRTY
+1936 KB        0 B          0 B        128    IOSurface
+1760 KB        0 B          0 B         25    CoreUI image data
+1344 KB        0 B          0 B         80    CoreAnimation
+1248 KB        0 B          0 B        428    IOAccelerator (graphics)
+1170 KB        0 B          0 B          1    page table
+ 849 KB        0 B          0 B        657    __AUTH
+ 566 KB        0 B          0 B       2583    unused dyld shared cache area
+ 512 KB        0 B          0 B         11    Owned physical footprint (unmapped) (graphics)
+ 432 KB        0 B          0 B         24    stack
+ 288 KB        0 B          0 B          1    MALLOC_TINY
+ 160 KB      80 KB          0 B       1054    __DATA_CONST
+ 128 KB        0 B          0 B          1    Accelerate image backing stores
+ 112 KB        0 B          0 B          3    IOAccelerator
+ 112 KB        0 B          0 B          5    CG image
+ 112 KB        0 B          0 B       1044    __AUTH_CONST
+ 112 KB        0 B          0 B          2    __TPRO_CONST
+  80 KB        0 B          0 B          5    IOKit
+  48 KB        0 B          0 B          1    Activity Tracing
+  48 KB        0 B          0 B          2    MALLOC_NANO
+  48 KB        0 B          0 B          3    CoreGraphics
+  32 KB        0 B          0 B          1    tag 22
+  32 KB        0 B          0 B          2    ColorSync
+  16 KB        0 B          0 B          1    os_alloc_once
+  16 KB        0 B          0 B          2    Foundation
+    0 B      15 MB          0 B         56    mapped file
+    0 B    3936 KB          0 B       1077    __TEXT
+    0 B      32 KB          0 B          8    __LINKEDIT
+    0 B        0 B          0 B          1    __FONT_DATA
+    0 B        0 B          0 B          1    __CTF
+    0 B        0 B          0 B         15    Owned physical footprint (unmapped)
+    ---        ---          ---        ---    ---
+ 865 MB      19 MB          0 B       9243    TOTAL
+
+Auxiliary data:
+    phys_footprint: 865 MB
+    phys_footprint_peak: 999 MB
+
