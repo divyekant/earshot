@@ -333,6 +333,34 @@ final class SpeechDetectorTests: XCTestCase {
         XCTAssertEqual(m.lastEnd?.silenceMs ?? 0, 300, accuracy: 0.001)
     }
 
+    // Live test 2026-11-03: a short sound after the wake phrase (100 ms) does not start the command. The turn
+    // keeps the 2 s grace, so a pause before the command does not lose it.
+    func testShortSoundAfterThePhraseKeepsTheGrace() {
+        var d = SpeechDetector()
+        d.pauseChecks = true
+        _ = run(&d, -65, ms: 1000)
+        d.open(heardSpeech: false, quietMs: 0, graceMs: 2000)
+        XCTAssertEqual(run(&d, -25, ms: 100), [])
+        XCTAssertTrue(d.awaitingCommand, "100 ms is not a command")
+        XCTAssertEqual(run(&d, -65, ms: 1000), [], "no 550 ms end and no pause check")
+        XCTAssertFalse(d.takePauseCheck())
+        XCTAssertEqual(run(&d, -25, ms: 300), [], "the command")
+        XCTAssertFalse(d.awaitingCommand)
+        _ = run(&d, -65, ms: 300)
+        XCTAssertTrue(d.takePauseCheck(), "the check comes after command speech")
+    }
+
+    // The model never hears the phrase alone: speech before the open does not count for the pause check.
+    func testNoPauseCheckOnThePhraseAlone() {
+        var d = SpeechDetector()
+        d.pauseChecks = true
+        _ = run(&d, -65, ms: 1000)
+        d.open(heardSpeech: true, quietMs: 0, graceMs: 2000)
+        XCTAssertEqual(run(&d, -65, ms: 400), [])
+        XCTAssertFalse(d.takePauseCheck())
+        XCTAssertEqual(run(&d, -65, ms: 160), [.end], "with no new speech, the usual end silence counts")
+    }
+
     // With no turn model, no check is due and the end silence alone ends the turn, as before.
     func testNoPauseCheckWithoutATurnModel() {
         var d = openTurn(checks: false)
@@ -907,6 +935,36 @@ final class WakeTriggerTests: XCTestCase {
         wait(for: [stop], timeout: 2)
         XCTAssertEqual(rec.log, ["wake", "start", "stop"])
         XCTAssertEqual(checks.map(\.decision), [.wait, .wait])
+        t.stop()
+    }
+
+    // Live test 2026-11-03: a sure end at a sentence end cut dictated text (P 0.88 to 0.93). In a dictation turn,
+    // the model only makes the turn wait longer. The 1200 ms dictation silence ends it.
+    func testTurnModelNeverEndsADictationTurnEarly() {
+        let listener = FakeListener()
+        listener.hitAfterSamples = 16000
+        let (t, mic, rec) = make(listener)
+        let first = rec.expect("stop", self)
+        mic.emit(quiet, ms: 1000)
+        mic.emit(speech, ms: 500)
+        mic.emit(quiet, ms: 700)
+        wait(for: [first], timeout: 2)
+        listener.turnProbability = 0.95
+        var checks: [TurnCheck] = []
+        t.onTurnCheck = { checks.append($0) }
+        t.openFollowUp(longPause: true)
+        mic.emit(speech, ms: 1000)
+        mic.emit(quiet, ms: 700)      // a sentence end: the model is sure, but the turn goes on
+        mic.emit(speech, ms: 800)
+        let settled = expectation(description: "settled")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { settled.fulfill() }
+        wait(for: [settled], timeout: 2)
+        XCTAssertEqual(rec.log, ["wake", "start", "stop", "start"], "the sentence end did not end the turn")
+        let second = rec.expect("stop", self, count: 2)
+        mic.emit(quiet, ms: 1300)
+        wait(for: [second], timeout: 3)
+        XCTAssertEqual(checks.map(\.decision), [.none, .none])
+        XCTAssertTrue(checks.allSatisfy(\.dictation))
         t.stop()
     }
 

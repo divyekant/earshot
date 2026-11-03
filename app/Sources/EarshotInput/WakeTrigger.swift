@@ -394,7 +394,8 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
         let quiet = detector.quietDb
         let tail = recentLevels.suffix(after)
         let loud = tail.filter { $0 >= threshold }.count
-        let heard = loud >= config.detector.startFrames
+        // The command must have `commandStartMs` of speech: a few loud frames are often the end of the phrase.
+        let heard = Double(loud) * frameMs >= config.detector.commandStartMs
         // Only quiet frames count toward the end silence, as in the turn (SpeechDetector.quietDb).
         let quietFrames = tail.reversed().prefix(while: { $0 <= quiet }).count
         detector.open(heardSpeech: heard, quietMs: heard ? Double(quietFrames) * frameMs : 0, graceMs: config.graceMs)
@@ -456,19 +457,31 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
     private func pauseCheck() -> SpeechEvent? {
         guard inTurn, detector.takePauseCheck() else { return nil }
         let start = DispatchTime.now().uptimeNanoseconds
+        let dictation = detector.dictationTurn
         let probability = listener.turnScore(turnAudio)
         let runMs = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
         guard let probability else { return nil }
-        let dictation = detector.dictationTurn
         let silenceMs = detector.pauseMs
         let done = probability >= config.turnThreshold
         var event: SpeechEvent?
-        if done {
+        let decision: TurnCheck.Decision
+        if dictation {
+            // A sentence end in dictated text is not the end of the turn (live test 2026-11-03: P 0.88 to 0.93 cut
+            // the text). The model only makes the turn wait longer; it never ends a dictation turn early.
+            if done {
+                decision = .none
+            } else {
+                detector.answerPauseCheck(waitMs: config.dictationTurnWaitMs)
+                decision = .wait
+            }
+        } else if done {
             event = detector.endTurnNow()
+            decision = .end
         } else {
-            detector.answerPauseCheck(waitMs: dictation ? config.dictationTurnWaitMs : config.turnWaitMs)
+            detector.answerPauseCheck(waitMs: config.turnWaitMs)
+            decision = .wait
         }
-        let check = TurnCheck(probability: probability, silenceMs: silenceMs, decision: done ? .end : .wait,
+        let check = TurnCheck(probability: probability, silenceMs: silenceMs, decision: decision,
                               runMs: runMs, dictation: dictation)
         DispatchQueue.main.async { [weak self] in self?.onTurnCheck?(check) }
         return event

@@ -203,7 +203,7 @@ public struct TurnCheck: Sendable, Equatable {
         case end
         /// The model heard a pause inside the turn. The turn waits up to the fallback silence.
         case wait
-        /// No model, or the model failed. The usual end silence counts.
+        /// No model, the model failed, or a sure end in a dictation turn. The usual end silence counts.
         case none
     }
     /// The probability that the turn is done, or nil if no model ran.
