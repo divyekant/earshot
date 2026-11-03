@@ -87,7 +87,8 @@ How a command flows (`EarshotInput/WakeTrigger.swift`):
    - With no word times (Parakeet, on-device dictation), the text match alone runs. Apple speech can write the phrase as other words ("Here, at least" for "hey atlas"). So at the start of the text, the match may differ in up to half of the letters of the phrase.
    - Apple speech and dictation get the phrase as a hint (`contextualStrings`).
 5. For 5 s after a command, speech in the owner's voice starts a turn with no phrase. The voice is checked at the end of the turn. The spotter keeps on for the first 2.5 s of that turn. If the owner says the phrase again, the turn becomes a wake turn: the phrase is cut by time, and the voice of the phrase counts.
-6. The spotter counts near misses: the top guess matched half of the phrase pieces or more, then fell back with no wake, and no wake came in 1 s. The log gets the count and the best part of the phrase, every 60 s of audio and at each wake. It has no audio and no text.
+6. The spotter clears its state every 1.5 s with no wake (the upstream rule). While a guess is inside the phrase, the reset waits up to 1 s more, so a phrase that falls on the reset point can end.
+7. The spotter counts near misses: the top guess matched half of the phrase pieces or more, then fell back with no wake, and no wake came in 1 s. The log gets the count and the best part of the phrase, every 60 s of audio and at each wake. It has no audio and no text.
 
 The enrolment (Manage > General > Teach earshot your voice) records 5 phrases. earshot keeps the mean embedding and, for a made-up name, the word pieces that the spotter heard, in `voice.json`. It keeps no audio.
 

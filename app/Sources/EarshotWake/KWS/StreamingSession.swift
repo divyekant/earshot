@@ -1,5 +1,5 @@
 // Copied from soniqo/speech-swift (Apache-2.0), Sources/SpeechWakeWord/StreamingSession.swift at a57702e.
-// earshot changes: 16-bit floats through Half (vImage), because Float16 does not exist on Intel Macs; the frameSink hook for the enrolment; the near-miss count pass-through (D-11); no AudioCommon import. License: LICENSES/Apache-2.0.txt.
+// earshot changes: 16-bit floats through Half (vImage), because Float16 does not exist on Intel Macs; the frameSink hook for the enrolment; the near-miss count pass-through and the reset hold (D-11); an autorelease pool for each push; no AudioCommon import. License: LICENSES/Apache-2.0.txt.
 import CoreML
 import Foundation
 
@@ -180,6 +180,18 @@ public final class WakeWordSession {
             frameShiftSeconds: 0.04,
             autoResetSeconds: resolvedOptions.autoResetSeconds
         )
+        kwsDecoder.resetHoldFrames = Self.defaultResetHoldFrames
+    }
+
+    /// earshot (D-11): the auto reset waits up to 1 s (25 frames of 40 ms) while a path is inside the phrase.
+    /// A phrase takes about 1 s, so a phrase that starts before the reset point can end.
+    static let defaultResetHoldFrames = 25
+
+    /// earshot (D-11): the longest wait of the auto reset while a path is inside the phrase, in decoder frames.
+    /// 0 is the upstream rule. The bench uses it to compare the two rules.
+    var resetHoldFrames: Int {
+        get { kwsDecoder.resetHoldFrames }
+        set { kwsDecoder.resetHoldFrames = newValue }
     }
 
     /// Reset all streaming state (audio buffer, encoder caches, decoder beam).
@@ -213,8 +225,12 @@ public final class WakeWordSession {
 
     /// Push raw PCM and return any keyword detections that fired.
     public func pushAudio(_ samples: [Float]) throws -> [KeywordDetection] {
-        appendMelFrames(fbankSession.accept(samples))
-        return try drainEncoderChunks()
+        // earshot: Core ML gives each prediction output in an autorelease pool. A long loop with no pool, such as an
+        // async test or the enrolment, kept them all, and Core ML failed to allocate IOSurface buffers (CI, 108 runs).
+        try autoreleasepool {
+            appendMelFrames(fbankSession.accept(samples))
+            return try drainEncoderChunks()
+        }
     }
 
     /// Flush remaining audio and surface any final detections.

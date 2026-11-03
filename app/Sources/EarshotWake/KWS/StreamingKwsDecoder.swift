@@ -1,5 +1,5 @@
 // Copied from soniqo/speech-swift (Apache-2.0), Sources/SpeechWakeWord/StreamingKwsDecoder.swift at a57702e.
-// earshot changes: the near-miss count (D-11), marked "earshot:". License: LICENSES/Apache-2.0.txt.
+// earshot changes: the near-miss count and the reset hold (D-11), marked "earshot:". License: LICENSES/Apache-2.0.txt.
 import Foundation
 
 /// A single keyword emission from the streaming decoder.
@@ -107,6 +107,10 @@ public final class StreamingKwsDecoder {
     private var missPendingFrames = 0
     private var missCount = 0
     private var missBest = 0.0
+
+    /// earshot (D-11): the auto reset clears the beam, so a phrase that spans the reset point was lost. While a path
+    /// of the beam is inside a phrase, the reset waits, for at most this many more frames. 0 is the upstream rule.
+    public var resetHoldFrames = 0
 
     public init(
         decoderFn: @escaping DecoderFn,
@@ -290,7 +294,10 @@ public final class StreamingKwsDecoder {
         trackNearMiss(level: top?.contextState.level ?? 0)
         if emissions.isEmpty {
             framesSinceEmission += 1
-            if framesSinceEmission >= autoResetFrames {
+            // earshot: hold the reset while a path is inside a phrase, up to `resetHoldFrames` more frames.
+            let inPhrase = resetHoldFrames > 0 && beamList.contains { $0.contextState.level > 0 }
+            if framesSinceEmission >= autoResetFrames,
+               !(inPhrase && framesSinceEmission < autoResetFrames + resetHoldFrames) {
                 noteNearMiss()
                 reset()
             }
