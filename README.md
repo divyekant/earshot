@@ -70,6 +70,8 @@ App support is data, not code. earshot reads the menus, sidebars and search resu
 
 If you have a code signing identity, the script uses it. If you do not have one, the script signs the app ad hoc. With an ad-hoc signature, macOS asks for the permissions again after each rebuild.
 
+To update the installed app to the latest `develop`, run `scripts/update-app.sh`. The script builds `origin/develop` in a separate worktree, runs the release tests, quits earshot, copies the new build over `app/build/Earshot.app` and opens it again. Your checkout does not change. `--no-test` skips the tests.
+
 ## Set up
 
 1. Open `app/build/Earshot.app`. An ear icon shows in the menu bar. earshot has no Dock icon.
