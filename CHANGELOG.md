@@ -18,6 +18,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 - Always-on mode no longer acts on speech with no wake phrase. The "for me?" text gate is removed (R-ON-1, R-ON-2, D-11).
 - The default voice threshold is 0.35, from the live trial. A follow-up turn in another voice is logged with its voice score and no text (R-ON-3, D-11).
+- Always-on mode finds the wake phrase by its sound, from the 5 phrases that you say when you teach earshot your voice. Any phrase, name or language works. The log shows the match score of each wake. If you taught earshot before this change, teach it again. Until then, the old spotter listens (R-ON-1, R-ON-3, R-MD-1, D-11).
 
 ### Fixed
 

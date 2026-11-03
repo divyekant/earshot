@@ -70,7 +70,7 @@ Plain words with no command word are dictation: with the hold key, the pipeline 
 
 | Part | Component | Notes |
 |---|---|---|
-| Wake phrase | icefall KWS Zipformer (gigaspeech, 3.49M parameters, Apache-2.0), Core ML INT8 (`aufklarer/KWS-Zipformer-3M-CoreML-INT8`) | Open vocabulary: the phrase is text, no training. It runs on 320 ms chunks. Vendor time: 5.4 ms for each chunk on Apple silicon. |
+| Wake phrase | icefall KWS Zipformer (gigaspeech, 3.49M parameters, Apache-2.0), Core ML INT8 (`aufklarer/KWS-Zipformer-3M-CoreML-INT8`), and audio templates (`TemplateMatcher`) | The encoder runs on 320 ms chunks. Vendor time: 5.4 ms for each chunk on Apple silicon. After the owner teaches the phrase, a streaming DTW (dynamic time warping) matches the encoder frames against the owner's takes, and the keyword decoder does not run (E5). It uses no spelling, so any phrase, name or language works. Before the teach step, the spelled spotter listens: the phrase is text, no training. |
 | Owner voice check | WeSpeaker ResNet34-LM (VoxCeleb, CC BY 4.0), Core ML (`aufklarer/WeSpeaker-ResNet34-LM-CoreML`) | 256-value embedding. Cosine similarity against the mean of 5 enrolment phrases. Threshold 0.35 (live trial: owner 0.50 to 0.73, another voice 0.06). |
 | End of turn | `SpeechDetector` (energy with a noise floor that adapts) | 550 ms of quiet after the command. After the phrase alone, it waits 2 s for the command. |
 
@@ -78,23 +78,36 @@ The code is in `app/Sources/EarshotWake`. The spotter and voice code are copied 
 
 How a command flows (`EarshotInput/WakeTrigger.swift`):
 
-1. The spotter listens to 16 kHz audio. Between turns, nothing else runs. Speech without the phrase never reaches the speech engine.
-2. The spotter fires about 0.3 to 0.5 s after the phrase. If a voice is enrolled, the voice model scores the audio of the phrase. A low score stops here, and the log gets one line with no text.
+1. The wake listener (the spotter encoder, then the templates or the keyword decoder) listens to 16 kHz audio. Between turns, nothing else runs. Speech without the phrase never reaches the speech engine.
+2. The listener fires about 0.3 to 0.5 s after the phrase. If a voice is enrolled, the voice model scores the audio of the phrase. A low score stops here, and the log gets one line with no text.
+   - With templates, each new encoder frame (40 ms) updates the DTW match of each template. The score of a template is the mean cosine distance along its path: 0 is the same sound, 1 is an unrelated sound. The wake score is the mean of the 2 best template scores. earshot wakes when the score is below 0.33 and the next 2 frames give no lower score. The path can stay on a template frame up to 3 times (slower speech) or skip one frame (faster speech). After a wake, no second wake comes for 1.5 s.
+   - The match gives the first and the last frame of the phrase. These take the place of the time stamps of the word pieces, for the voice clip and for the time cut in step 4.
+   - The log line of a wake adds the match score and the worst part (the highest mean cost of 200 ms along the path). The worst part is not a wake limit. If sound-alike wakes occur, a limit of 0.5 on it is the first step (E5).
 3. The speech engine starts at the start of the phrase. `MicrophoneFeed` keeps 3 s of audio, and `PrerollControl.setNextPreroll` gives the engine the phrase and every word after it.
 4. The turn ends after the command. The pipeline removes the phrase, and the router runs as for the hold key.
-   - Apple SpeechTranscriber gives the audio time of each word (`.audioTimeRange`). The spotter gives the end of the phrase. The pipeline drops the first words that start more than 0.15 s before the phrase end (`WakePhrase.cut`). The start is the sure edge of a word, and the phrase end from the spotter tends to be a little late. So the spelling of the phrase does not matter ("Yeah, let's" for "hey atlas").
+   - Apple SpeechTranscriber gives the audio time of each word (`.audioTimeRange`). The listener gives the end of the phrase. The pipeline drops the first words that start more than 0.15 s before the phrase end (`WakePhrase.cut`). The start is the sure edge of a word, and the phrase end from the listener tends to be a little late. So the spelling of the phrase does not matter ("Yeah, let's" for "hey atlas").
    - Then the text match (`WakePhrase.strip`) removes what the time cut left, for example the last word of the phrase.
    - With no word times (Parakeet, on-device dictation), the text match alone runs. Apple speech can write the phrase as other words ("Here, at least" for "hey atlas"). So at the start of the text, the match may differ in up to half of the letters of the phrase.
    - Apple speech and dictation get the phrase as a hint (`contextualStrings`).
-5. For 5 s after a command, speech in the owner's voice starts a turn with no phrase. The voice is checked at the end of the turn. The spotter keeps on for the first 2.5 s of that turn. If the owner says the phrase again, the turn becomes a wake turn: the phrase is cut by time, and the voice of the phrase counts.
-6. The spotter clears its state every 1.5 s with no wake (the upstream rule). While a guess is inside the phrase, the reset waits up to 1 s more, so a phrase that falls on the reset point can end.
-7. The spotter counts near misses: the top guess matched half of the phrase pieces or more, then fell back with no wake, and no wake came in 1 s. The log gets the count and the best part of the phrase, every 60 s of audio and at each wake. It has no audio and no text.
+5. For 5 s after a command, speech in the owner's voice starts a turn with no phrase. The voice is checked at the end of the turn. The listener keeps on for the first 2.5 s of that turn, with the same match. If the owner says the phrase again, the turn becomes a wake turn: the phrase is cut by time, and the voice of the phrase counts.
+6. The spelled spotter clears its state every 1.5 s with no wake (the upstream rule). While a guess is inside the phrase, the reset waits up to 1 s more, so a phrase that falls on the reset point can end. The template match has no such reset: each frame can start a new path.
+7. The listener counts near misses. The log gets the count every 60 s of audio and at each wake. It has no audio and no text.
+   - Spelled spotter: the top guess matched half of the phrase pieces or more, then fell back with no wake, and no wake came in 1 s. The log also gets the best part of the phrase.
+   - Templates: a run of frames with a score below 0.41 (the limit + 0.08) that did not wake and did not go below the limit. The log also gets the lowest score of these runs. Use it to tune the limit.
 
-The enrolment (Manage > General > Teach earshot your voice) records 5 phrases. earshot keeps the mean embedding and, for a made-up name, the word pieces that the spotter heard, in `voice.json`. It keeps no audio.
+The enrolment (Manage > General > Teach earshot your voice) records 5 phrases. For each take, earshot finds the loud part and runs the encoder on it, with 0.3 s of digital quiet before it and 0.5 s after it. The template is the encoder frames of the loud part, with one more frame at each end. Then earshot scores each take against the templates of the other 4. A take with a lowest score above 0.33 gives no template: it does not sound like the others. At least 3 templates must stay, else the owner must teach earshot again. E5 proposed to ask again for such a take. The build leaves it out instead, so the teach step stays one pass.
 
-Limits: the spotter is English only. The voice check is less sure on short audio. A made-up name ("hey earshot") also wakes on sound-alikes ("hey, your shot"). Intel Macs run Core ML on the CPU; measure the speed there.
+earshot keeps the mean voice embedding and the templates (16-bit floats, about 100 KB for 5 takes) in `voice.json`. It keeps no audio, and earshot cannot play a template back. The templates count only for the phrase of the enrolment. After a change of the phrase, the spelled spotter listens until the owner teaches earshot the new phrase. The voice embedding counts for any phrase. A profile from before the templates has none: the spelled spotter listens, and the status line in Manage > General asks the owner to teach earshot again. The enrolment no longer learns word pieces for a made-up name.
 
-E5 (2026-11-03, [experiments/E5-wake-templates.md](experiments/E5-wake-templates.md)) measured the spotter against audio templates on 10 synthetic voices and 8 phrases. The spotter matches the spelling of the phrase, so it misses rare words and names: 56 % of test commands woke it with the reset fixed. Audio templates of the owner's 5 takes, matched with DTW (dynamic time warping) on the same encoder frames, woke on 93 %, with no false wake in 8.9 h of own talk. The owner chose this method on 2026-11-03: after the owner teaches the phrase, the template match replaces the keyword decoder. The voice check stays. The build is in progress.
+Limits:
+- The spelled spotter is English only. A made-up name ("hey earshot") also wakes it on sound-alikes ("hey, your shot").
+- The templates match the sound, not the person. The voice check must stop other people.
+- The templates wake on near names after "hey", for example "hey, Travis" for "hey jarvis" (E5). They do not wake on a sentence that only holds the name.
+- The limit 0.33 comes from synthetic voices. The live log of near misses must confirm it.
+- The voice check is less sure on short audio.
+- Intel Macs run Core ML on the CPU. Measure the speed there. The template match adds about 16 ms of CPU time for 10 s of audio (5 templates, release build on Linux, one core). The keyword decoder (beam search and joiner) does not run in template mode.
+
+E5 (2026-11-03, [experiments/E5-wake-templates.md](experiments/E5-wake-templates.md)) measured the spotter against audio templates on 10 synthetic voices and 8 phrases. The spotter matches the spelling of the phrase, so it misses rare words and names: 56 % of test commands woke it with the reset fixed. Audio templates of the owner's 5 takes, matched with DTW (dynamic time warping) on the same encoder frames, woke on 93 %, with no false wake in 8.9 h of own talk. The owner chose this method on 2026-11-03: after the owner teaches the phrase, the template match replaces the keyword decoder. The voice check stays. The template match is built (`TemplateMatcher`, `WakeTemplates`). A live check on the owner's voice must confirm the bench numbers.
 
 ### 3.2 Speech to text (R-MD-1, R-MD-5)
 

@@ -78,9 +78,15 @@ public final class WakeModels: @unchecked Sendable {
     }
 
     /// Makes a listener for the phrase.
-    /// The voice of the profile counts for any phrase. Its learned pieces count only for the phrase of the enrolment.
+    /// The voice of the profile counts for any phrase. Its templates and learned pieces count only for the phrase of
+    /// the enrolment. With templates (E5), the listener finds the phrase by its sound. Else the spelled spotter listens.
     /// - Parameter profile: nil if the owner did not teach earshot the voice. Then every voice can wake earshot.
     public func listener(phrase: String, profile: VoiceProfile?, voiceThreshold: Double) throws -> WakeListener {
+        let templates = (profile?.templates(for: phrase) ?? []).map(WakeTemplates.unpack).filter { !$0.isEmpty }
+        if templates.count >= TemplateMatcher.minTemplates {
+            return try PhraseListener(models: self, phrase: phrase, templates: templates, profile: profile,
+                                      voiceThreshold: voiceThreshold)
+        }
         let spelled = spelledPieces(phrase)
         let learned = profile.map { $0.matches(phrase: phrase) ? $0.keywordTokens : [] } ?? []
         let specs = Self.keywords(phrase: phrase, spelled: spelled, learned: learned)
@@ -90,36 +96,49 @@ public final class WakeModels: @unchecked Sendable {
     }
 
     /// Makes the owner's voice profile from the enrolment phrases (16 kHz mono, one phrase in each clip).
-    /// The profile keeps no audio: only the mean embedding and the word pieces.
+    /// The profile keeps no audio: only the mean voice embedding and the audio templates of the phrase (E5).
+    /// A take that does not match the other takes gives no template. At least 3 templates must stay.
     public func enrol(phrase: String, clips: [[Float]]) throws -> Enrolment {
-        let spoken = clips.map { SpeechTrim.trim($0) }.filter { $0.count >= 16000 / 4 }
-        guard spoken.count >= 3 else {
-            throw WakeError("earshot heard speech in \(spoken.count) of \(clips.count) phrases. Say the phrase again, near the Mac.")
-        }
-        return try locked {
-            let spelled = spelledPieces(phrase)
-            guard !spelled.isEmpty else { throw WakeError("The wake phrase has no words.") }
-            let spelledOnly = try base.rebuildContextGraph(keywords: Self.keywords(phrase: phrase, spelled: spelled, learned: []))
-            let reader = TokenReader(detector: base)
-            var hits = 0
-            var learned: [[String]] = []
-            var embeddings: [[Float]] = []
-            for clip in spoken {
-                let padded = [Float](repeating: 0, count: 4800) + clip + [Float](repeating: 0, count: 9600)
-                if !(try spelledOnly.detect(audio: padded)).isEmpty { hits += 1 }
-                let pieces = try reader.pieces(clip)
-                if pieces.count >= 3, pieces.count <= spelled.count + 6, pieces != spelled, !learned.contains(pieces) {
-                    learned.append(pieces)
-                }
-                embeddings.append(try voice.embed(clip))
+        let rate = 16000
+        let takes = clips.compactMap { (clip: [Float]) -> (clip: [Float], speech: Range<Int>)? in
+            guard let speech = SpeechTrim.span(clip), SpeechTrim.padded(clip, speech: speech).count >= rate / 4 else {
+                return nil
             }
-            // A phrase of known words fires spelled. Then extra pieces only add false wakes (Test 3).
-            let keep = hits >= spoken.count - 1 ? [] : learned
+            return (clip: clip, speech: speech)
+        }
+        guard takes.count >= 3 else {
+            throw WakeError("earshot heard speech in \(takes.count) of \(clips.count) phrases. Say the phrase again, near the Mac.")
+        }
+        guard !WakePhrase.words(phrase).isEmpty else { throw WakeError("The wake phrase has no words.") }
+        return try locked {
+            let reader = TokenReader(detector: base)
+            var embeddings: [[Float]] = []
+            var allFrames: [[[Float]]] = []
+            var templates: [[[Float]]] = []
+            for take in takes {
+                let piece = SpeechTrim.padded(take.clip, speech: take.speech)
+                let start = SpeechTrim.paddedStart(speech: take.speech)
+                let frames = try reader.frames(piece, lead: WakeTemplates.leadSamples, tail: WakeTemplates.tailSamples)
+                let speech = (take.speech.lowerBound - start)..<(take.speech.upperBound - start)
+                allFrames.append(frames)
+                templates.append(WakeTemplates.cut(frames, speech: speech))
+                embeddings.append(try voice.embed(piece))
+            }
+            // Each take against the other takes: a take that the others would not wake on is left out.
+            let scores = templates.indices.map { j -> Double in
+                let others = templates.indices.filter { $0 != j }.map { templates[$0] }
+                return TemplateMatcher(templates: others).lowestScore(allFrames[j])
+            }
+            let kept = templates.indices.filter { scores[$0] <= TemplateMatcher.defaultLimit && templates[$0].count >= 2 }
+            guard kept.count >= TemplateMatcher.minTemplates else {
+                throw WakeError("The phrases sound too different from each other (\(kept.count) of \(templates.count) match). "
+                                + "Say the phrase the same way each time, in a quiet room, and teach earshot again.")
+            }
             let mean = Self.mean(embeddings)
             let selfScore = embeddings.map { VoiceModel.cosine($0, mean) }.min() ?? 0
-            let profile = VoiceProfile(phrase: phrase, embedding: mean, keywordTokens: keep, samples: spoken.count,
-                                       selfScore: selfScore)
-            return Enrolment(profile: profile, spelledHits: hits, heardPieces: learned)
+            let profile = VoiceProfile(phrase: phrase, embedding: mean, keywordTokens: [], samples: embeddings.count,
+                                       selfScore: selfScore, templates: kept.map { WakeTemplates.pack(templates[$0]) })
+            return Enrolment(profile: profile, takeScores: scores, templatesKept: kept.count)
         }
     }
 
@@ -135,56 +154,5 @@ public final class WakeModels: @unchecked Sendable {
         var sum = [Float](repeating: 0, count: first.count)
         for v in vectors where v.count == sum.count { for i in 0..<v.count { sum[i] += v[i] } }
         return VoiceModel.normalized(sum)
-    }
-}
-
-/// The result of an enrolment, for the management window.
-public struct Enrolment: Sendable {
-    public let profile: VoiceProfile
-    /// The phrases in which the spelled phrase fired. If it is low, earshot listens for the heard pieces too.
-    public let spelledHits: Int
-    /// The word pieces that the spotter heard, for each distinct phrase. For the log.
-    public let heardPieces: [[String]]
-
-    /// One line for the management window.
-    public var summary: String {
-        var text = "earshot knows your voice (\(profile.samples) phrases)."
-        if profile.keywordTokens.isEmpty {
-            text += " It heard the phrase in \(spelledHits) of \(profile.samples)."
-        } else {
-            text += " The phrase is not a known word, so earshot also listens for how you say it"
-            text += " (\(profile.keywordTokens.count) forms). Sound-alike words can wake it."
-        }
-        if profile.selfScore < 0.5 {
-            text += " The phrases differ a lot. Teach it again in a quiet room for a better match."
-        }
-        return text
-    }
-}
-
-/// Cuts the quiet audio at the start and the end of a clip.
-enum SpeechTrim {
-    /// - Returns: the part from the first to the last loud 20 ms frame, with 150 ms more at each end.
-    ///   Empty if no frame is loud.
-    static func trim(_ samples: [Float], rate: Int = 16000) -> [Float] {
-        let frame = rate / 50
-        guard samples.count >= frame else { return [] }
-        var levels: [Double] = []
-        var i = 0
-        while i + frame <= samples.count {
-            var sum: Double = 0
-            for s in samples[i..<(i + frame)] { sum += Double(s) * Double(s) }
-            let rms = (sum / Double(frame)).squareRoot()
-            levels.append(rms > 0 ? 20 * log10(rms) : -120)
-            i += frame
-        }
-        let floor = levels.sorted()[levels.count / 10]
-        let threshold = max(floor + 12, -50)
-        guard let first = levels.firstIndex(where: { $0 >= threshold }),
-              let last = levels.lastIndex(where: { $0 >= threshold }) else { return [] }
-        let pad = rate * 15 / 100
-        let start = max(0, first * frame - pad)
-        let end = min(samples.count, (last + 1) * frame + pad)
-        return Array(samples[start..<end])
     }
 }

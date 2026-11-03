@@ -172,6 +172,18 @@ final class CommandPipelineTests: XCTestCase {
         XCTAssertEqual(r.note, "wake phrase near misses: 3, best 80 % of the phrase pieces")
         XCTAssertFalse(r.ok)
         XCTAssertTrue(runner.runs.isEmpty)
+        let t = p.nearMisses(NearMisses(count: 2, best: 0, bestScore: 0.362))
+        XCTAssertEqual(t.note, "wake phrase near misses: 2, best template score 0.36", "E5: the audio templates")
+        XCTAssertEqual(t.heard, "")
+    }
+
+    func testWakeSummaryHasTheTemplateScores() {
+        let spotter = WakeHit(phrase: "hey atlas", prerollSeconds: 1.2, voiceScore: 0.61, isOwner: true)
+        XCTAssertEqual(CommandPipeline.wakeSummary(spotter), "wake \"hey atlas\", voice 0.61, preroll 1.20 s")
+        let matched = WakeHit(phrase: "hey atlas", prerollSeconds: 1.2, voiceScore: 0.61, isOwner: true,
+                              matchScore: 0.214, matchWorst: 0.391)
+        XCTAssertEqual(CommandPipeline.wakeSummary(matched),
+                       "wake \"hey atlas\", voice 0.61, match 0.21, worst part 0.39, preroll 1.20 s")
     }
 
     func testRejectedWakeIsLoggedWithNoText() {

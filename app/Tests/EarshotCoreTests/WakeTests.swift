@@ -158,4 +158,57 @@ final class WakeTests: XCTestCase {
         m.add(NearMisses(count: 4, best: 0.5))
         XCTAssertEqual(m, NearMisses(count: 7, best: 1.0))
     }
+
+    // D-11, E5: the audio templates in the voice profile.
+    func testNearMissesAddKeepsTheLowestTemplateScore() {
+        var m = NearMisses(count: 1, best: 0, bestScore: 0.38)
+        m.add(NearMisses(count: 2, best: 0, bestScore: 0.35))
+        XCTAssertEqual(m, NearMisses(count: 3, best: 0, bestScore: 0.35))
+        m.add(NearMisses(count: 1, best: 0.5))
+        XCTAssertEqual(m, NearMisses(count: 4, best: 0.5, bestScore: 0.35), "a spotter near miss has no score")
+        var spotter = NearMisses(count: 1, best: 0.5)
+        spotter.add(NearMisses(count: 1, best: 0, bestScore: 0.4))
+        XCTAssertEqual(spotter.bestScore, 0.4)
+    }
+
+    func testOldProfileHasNoTemplates() throws {
+        // A voice.json from before the templates: the spelled spotter listens until the owner teaches earshot again.
+        let old = #"{"phrase":"hey atlas","embedding":[0.6,0.8],"keywordTokens":[["▁HE","Y"]],"samples":5,"selfScore":0.7,"createdAt":0}"#
+        let p = try JSONDecoder().decode(VoiceProfile.self, from: Data(old.utf8))
+        XCTAssertNil(p.templates)
+        XCTAssertTrue(p.templates(for: "hey atlas").isEmpty)
+    }
+
+    func testTemplatesCountOnlyForTheirPhrase() {
+        let good = WakeTemplate(frames: 2, width: 3, half: Data(count: 12))
+        let broken = WakeTemplate(frames: 2, width: 3, half: Data(count: 5))
+        let p = VoiceProfile(phrase: "hey atlas", embedding: [1], keywordTokens: [], samples: 5, selfScore: 0.7,
+                             templates: [good, broken, good])
+        XCTAssertEqual(p.templates(for: "Hey, Atlas").count, 2, "the broken template is left out")
+        XCTAssertTrue(p.templates(for: "hey jarvis").isEmpty, "a new phrase needs new takes")
+        XCTAssertTrue(good.isValid)
+        XCTAssertFalse(broken.isValid)
+        XCTAssertFalse(WakeTemplate(frames: 0, width: 3, half: Data()).isValid)
+    }
+
+    func testVoiceProfileWithTemplatesRoundTrip() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let store = Store(folder: folder)
+        let template = WakeTemplate(frames: 1, width: 2, half: Data([0x00, 0x3C, 0x00, 0xBC]))
+        let p = VoiceProfile(phrase: "hey atlas", embedding: [0.6, 0.8], keywordTokens: [], samples: 5, selfScore: 0.7,
+                             templates: [template])
+        try store.saveVoiceProfile(p)
+        XCTAssertEqual(store.voiceProfile?.templates, [template])
+        XCTAssertEqual(store.voiceProfile?.templates(for: "hey atlas"), [template])
+    }
+
+    func testWakeHitHasNoMatchScoreFromTheSpotter() {
+        let hit = WakeHit(phrase: phrase, prerollSeconds: 1, voiceScore: nil, isOwner: true)
+        XCTAssertNil(hit.matchScore)
+        XCTAssertNil(hit.matchWorst)
+        let matched = WakeHit(phrase: phrase, prerollSeconds: 1, voiceScore: 0.6, isOwner: true, matchScore: 0.2, matchWorst: 0.4)
+        XCTAssertEqual(matched.matchScore, 0.2)
+        XCTAssertEqual(matched.matchWorst, 0.4)
+    }
 }

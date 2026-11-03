@@ -123,11 +123,15 @@ final class WakeModelRunTests: XCTestCase {
         let enrolment = try models.enrol(phrase: "hey jarvis", clips: clips)
         let ms = Double(DispatchTime.now().uptimeNanoseconds - start) / 1e6
         let profile = enrolment.profile
-        print("enrolment: \(Int(ms)) ms for 5 clips; spelled fired \(enrolment.spelledHits) of 5; self score "
-              + String(format: "%.2f", profile.selfScore) + "; heard \(enrolment.heardPieces)")
+        print("enrolment: \(Int(ms)) ms for 5 clips; templates \(enrolment.templatesKept) of 5; take scores "
+              + enrolment.takeScores.map { String(format: "%.2f", $0) }.joined(separator: " ")
+              + String(format: "; self score %.2f", profile.selfScore))
         XCTAssertEqual(profile.embedding.count, 256)
         XCTAssertEqual(profile.samples, 5)
         XCTAssertGreaterThan(profile.selfScore, 0.3)
+        XCTAssertGreaterThanOrEqual(enrolment.templatesKept, 3)
+        XCTAssertEqual(profile.templates?.count, enrolment.templatesKept)
+        XCTAssertTrue(profile.keywordTokens.isEmpty, "the templates replace the learned piece strings")
 
         // The same voice says the phrase in a command: the voice check passes.
         let listener = try models.listener(phrase: "hey jarvis", profile: profile, voiceThreshold: 0.3)
@@ -174,6 +178,78 @@ final class WakeModelRunTests: XCTestCase {
               + "false wakes \(heldFalse)/\(n) with the hold, \(upstreamFalse)/\(n) with the upstream reset")
         XCTAssertGreaterThanOrEqual(heldHits, upstreamHits, "the hold must not lose a wake")
         XCTAssertLessThanOrEqual(heldFalse, upstreamFalse, "the hold must not add a false wake")
+    }
+
+    /// E5 on CI: the audio templates of 5 `say` takes against the spelled spotter, for a known phrase, a name and a
+    /// made-up word. It prints the hits, the false wakes and the scores for the pull request.
+    func testTemplatesAgainstTheSpotter() async throws {
+        let models = try await loadModels()
+        let negatives = try ["Open Notes and close the door.", "Hey, are you there?", "Her shot was great, nice job.",
+                             "They travel a lot, hey, it is nice.", "Can you open the calendar for me?"].map { try say($0) }
+        var templateHits = 0, spotterHits = 0, commands = 0, templateFalse = 0, spotterFalse = 0
+        var scores: [Double] = [], lags: [Double] = []
+        for phrase in ["hey jarvis", "hey atlas", "hey zorbix"] {
+            let cap = phrase.prefix(1).uppercased() + phrase.dropFirst()
+            let takes = try [150, 170, 190, 210, 230].map { try say(cap, rate: $0) }
+            let enrolment = try models.enrol(phrase: phrase, clips: takes)
+            XCTAssertGreaterThanOrEqual(enrolment.templatesKept, 3, phrase)
+            let profile = enrolment.profile
+            var th = 0, sh = 0
+            for (rate, command) in [(165, "open Notes"), (185, "scroll down"), (205, "what time is it"), (225, "open Slack")] {
+                let clip = try say("\(cap), \(command).", rate: rate)
+                commands += 1
+                let listener = try models.listener(phrase: phrase, profile: profile, voiceThreshold: -1)
+                XCTAssertNotNil((listener as? PhraseListener)?.matcher, "a taught phrase uses the templates")
+                if let hit = hits(listener, clip).first {
+                    th += 1
+                    scores.append(hit.matchScore ?? -1)
+                    lags.append(hit.phraseEndSeconds)
+                    XCTAssertGreaterThan(hit.prerollSeconds, hit.phraseEndSeconds, "the preroll reaches the phrase start")
+                }
+                let spotter = try models.listener(phrase: phrase, profile: nil, voiceThreshold: -1)
+                if !hits(spotter, clip).isEmpty { sh += 1 }
+            }
+            var tf = 0, sf = 0
+            for clip in negatives {
+                let listener = try models.listener(phrase: phrase, profile: profile, voiceThreshold: -1)
+                let spotter = try models.listener(phrase: phrase, profile: nil, voiceThreshold: -1)
+                tf += hits(listener, clip).count
+                sf += hits(spotter, clip).count
+            }
+            let silent = try models.listener(phrase: phrase, profile: profile, voiceThreshold: -1)
+            XCTAssertTrue(hits(silent, [Float](repeating: 0, count: 48000)).isEmpty, "silence never wakes")
+            print("templates \"\(phrase)\": hits \(th)/4 (spotter \(sh)/4), false wakes \(tf)/\(negatives.count) "
+                  + "(spotter \(sf)/\(negatives.count)), take scores "
+                  + enrolment.takeScores.map { String(format: "%.2f", $0) }.joined(separator: " "))
+            templateHits += th; spotterHits += sh; templateFalse += tf; spotterFalse += sf
+        }
+        print("templates against the spotter: hits \(templateHits)/\(commands) against \(spotterHits)/\(commands); "
+              + "false wakes \(templateFalse) against \(spotterFalse); match scores "
+              + scores.map { String(format: "%.2f", $0) }.joined(separator: " ") + "; seconds from the phrase end to the wake "
+              + lags.map { String(format: "%.2f", $0) }.joined(separator: " "))
+        XCTAssertGreaterThanOrEqual(templateHits, commands * 3 / 4)
+        XCTAssertGreaterThanOrEqual(templateHits, spotterHits)
+        XCTAssertLessThanOrEqual(templateFalse, 1)
+    }
+
+    /// The encoder and the template match, against the encoder and the keyword decoder, on 10 s of audio.
+    func testTemplateListenerSpeed() async throws {
+        let models = try await loadModels()
+        let takes = try [150, 170, 190, 210, 230].map { try say("Hey Atlas", rate: $0) }
+        let profile = try models.enrol(phrase: "hey atlas", clips: takes).profile
+        let audio = (0..<(16000 * 10)).map { Float(sin(Double($0) * 0.05) * 0.01) }
+        func time(_ listener: WakeListener) -> Double {
+            let start = DispatchTime.now().uptimeNanoseconds
+            _ = hits(listener, audio)
+            return Double(DispatchTime.now().uptimeNanoseconds - start) / 1e6
+        }
+        let templateListener = try models.listener(phrase: "hey atlas", profile: profile, voiceThreshold: 0.35)
+        let spotterListener = try models.listener(phrase: "hey atlas", profile: nil, voiceThreshold: 0.35)
+        let templates = time(templateListener)
+        let spotter = time(spotterListener)
+        print(String(format: "listener speed for 11.5 s of audio: templates %.0f ms (%.1f %% of one core), spotter %.0f ms (%.1f %%)",
+                     templates, templates / 115, spotter, spotter / 115))
+        XCTAssertLessThan(templates, 11_500 * 0.25, "the template listener must use well under one core")
     }
 
     func testSpotterSpeed() async throws {

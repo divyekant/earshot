@@ -20,11 +20,17 @@ public struct WakeHit: Sendable, Equatable {
     /// Nil if the wake started the turn. If the owner said the phrase again in a follow-up turn, the time from the
     /// start of that turn to the wake, in seconds.
     public var inTurnAfterSeconds: Double?
+    /// The score of the audio templates (0 is the same sound, 1 is unrelated), or nil if the spelled spotter woke
+    /// earshot. For the log.
+    public var matchScore: Double?
+    /// The worst 200 ms of the template match, or nil. For the log.
+    public var matchWorst: Double?
 
     public init(phrase: String, prerollSeconds: Double, phraseEndSeconds: Double = 0, voiceScore: Double?, isOwner: Bool,
-                inTurnAfterSeconds: Double? = nil) {
+                inTurnAfterSeconds: Double? = nil, matchScore: Double? = nil, matchWorst: Double? = nil) {
         self.phrase = phrase; self.prerollSeconds = prerollSeconds; self.phraseEndSeconds = phraseEndSeconds
         self.voiceScore = voiceScore; self.isOwner = isOwner; self.inTurnAfterSeconds = inTurnAfterSeconds
+        self.matchScore = matchScore; self.matchWorst = matchWorst
     }
 
     /// The end of the phrase in seconds from the start of the turn: negative if the phrase ended before the turn
@@ -32,19 +38,27 @@ public struct WakeHit: Sendable, Equatable {
     public var phraseEndInTurn: Double { (inTurnAfterSeconds ?? 0) - phraseEndSeconds }
 }
 
-/// Partial matches of the wake phrase that did not fire (D-11). Only a count and the best part of the phrase:
-/// no audio and no text.
+/// Partial matches of the wake phrase that did not fire (D-11). Only a count and the best part of the phrase, or the
+/// lowest template score: no audio and no text.
 public struct NearMisses: Sendable, Equatable {
     /// The number of near misses.
     public var count: Int
-    /// The largest part of the phrase pieces that matched, 0 to 1. 1 means all pieces matched, but the acoustic
-    /// score was below the threshold.
+    /// The spelled spotter: the largest part of the phrase pieces that matched, 0 to 1. 1 means all pieces matched,
+    /// but the acoustic score was below the threshold. 0 for the audio templates.
     public var best: Double
+    /// The audio templates: the lowest score of the near misses (the wake limit is lower). Nil for the spotter.
+    public var bestScore: Double?
 
-    public init(count: Int, best: Double) { self.count = count; self.best = best }
+    public init(count: Int, best: Double, bestScore: Double? = nil) {
+        self.count = count; self.best = best; self.bestScore = bestScore
+    }
 
     /// Adds other near misses to these.
-    public mutating func add(_ other: NearMisses) { count += other.count; best = max(best, other.best) }
+    public mutating func add(_ other: NearMisses) {
+        count += other.count
+        best = max(best, other.best)
+        if let score = other.bestScore { bestScore = min(bestScore ?? score, score) }
+    }
 }
 
 /// A speech engine that can take words to expect, such as the wake phrase (D-11). Apple speech then spells them
@@ -81,28 +95,56 @@ public protocol PrerollControl: AnyObject {
     func setNextPreroll(seconds: Double)
 }
 
+/// The sound pattern of one teach take: the encoder frames of the spotter model for the spoken part of the phrase
+/// (D-11, E5). It is not audio: earshot cannot play it back. It stays on the Mac in `voice.json` (R-MD-1).
+public struct WakeTemplate: Codable, Equatable, Sendable {
+    /// The number of frames (40 ms each).
+    public var frames: Int
+    /// The values in each frame (320 for the spotter model).
+    public var width: Int
+    /// The values as 16-bit floats (IEEE 754 half precision, little endian), frame after frame.
+    public var half: Data
+
+    public init(frames: Int, width: Int, half: Data) {
+        self.frames = frames; self.width = width; self.half = half
+    }
+
+    /// True if the data has the size of the frames.
+    public var isValid: Bool { frames > 0 && width > 0 && half.count == frames * width * 2 }
+}
+
 /// The owner's voice and the tokens of the wake phrase, from the enrolment in the management window.
 /// It holds no audio. It stays on the Mac in `voice.json` in the store folder (R-MD-1).
-/// The voice counts for any phrase. The learned tokens count only for the phrase of the enrolment.
+/// The voice counts for any phrase. The learned tokens and the templates count only for the phrase of the enrolment.
 public struct VoiceProfile: Codable, Equatable, Sendable {
     /// The wake phrase that the owner said in the enrolment.
     public var phrase: String
     /// The speaker embedding: the normalized mean of the enrolment embeddings.
     public var embedding: [Float]
-    /// The word pieces that the spotter heard for each enrolment phrase. The spotter listens for each of them.
-    /// The model hears a made-up name such as "earshot" as other words ("your shot"), so the spelled pieces alone
-    /// almost never fire. Empty if the spelled phrase fired on the enrolment: then extra forms only add false wakes.
+    /// The word pieces that the spotter heard for each enrolment phrase, from a profile before the templates (E5).
+    /// The spelled spotter listens for each of them. The model hears a made-up name such as "earshot" as other words
+    /// ("your shot"), so the spelled pieces alone almost never fire. Empty in a profile with templates.
     public var keywordTokens: [[String]]
     /// The number of enrolment phrases.
     public var samples: Int
     /// The lowest score of one enrolment phrase against the mean. A low value means a noisy enrolment.
     public var selfScore: Double
     public var createdAt: Date
+    /// The audio templates of the phrase (D-11, E5). With them, earshot finds the phrase by its sound, not by its
+    /// spelling. Nil in a profile from before the templates: then the spelled spotter listens until the owner teaches
+    /// earshot again.
+    public var templates: [WakeTemplate]?
 
     public init(phrase: String, embedding: [Float], keywordTokens: [[String]], samples: Int, selfScore: Double,
-                createdAt: Date = Date()) {
+                createdAt: Date = Date(), templates: [WakeTemplate]? = nil) {
         self.phrase = phrase; self.embedding = embedding; self.keywordTokens = keywordTokens
-        self.samples = samples; self.selfScore = selfScore; self.createdAt = createdAt
+        self.samples = samples; self.selfScore = selfScore; self.createdAt = createdAt; self.templates = templates
+    }
+
+    /// The templates for this phrase, or an empty list if the profile has none or belongs to another phrase.
+    public func templates(for other: String) -> [WakeTemplate] {
+        guard matches(phrase: other) else { return [] }
+        return (templates ?? []).filter(\.isValid)
     }
 
     /// The file name in the store folder.

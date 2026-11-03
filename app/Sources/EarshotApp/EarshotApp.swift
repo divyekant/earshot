@@ -331,6 +331,8 @@ final class AppController: ObservableObject {
             line += " Your voice: taught on \(date), \(profile.samples) phrases."
             if !profile.matches(phrase: settings.wakePhrase) {
                 line += " You taught it with \"\(profile.phrase)\". Teach it again with the new phrase for the best match."
+            } else if profile.templates(for: settings.wakePhrase).count < 3 {
+                line += " Teach it again: earshot now finds the phrase by its sound, and it needs new phrases for that."
             }
         } else {
             line += " Your voice: not taught. Until you teach it, any voice can wake earshot."
@@ -350,8 +352,9 @@ final class AppController: ObservableObject {
         guard let wake else { throw WakeError("The wake phrase models are not ready yet. Turn on always-on mode and wait.") }
         let enrolment = try await Task.detached(priority: .userInitiated) { try wake.enrol(phrase: phrase, clips: clips) }.value
         try store.saveVoiceProfile(enrolment.profile)
-        NSLog("earshot wake: enrolment for \"%@\": spelled phrase fired in %ld of %ld, heard forms %@", phrase,
-              enrolment.spelledHits, enrolment.profile.samples, "\(enrolment.heardPieces)")
+        let scores = enrolment.takeScores.map { String(format: "%.2f", $0) }.joined(separator: ", ")
+        NSLog("earshot wake: enrolment for \"%@\": %ld of %ld phrases give a template, take scores %@", phrase,
+              enrolment.templatesKept, enrolment.takeScores.count, scores)
         if settings.mode == .alwaysOn { startInput() }
         return enrolment.summary
     }

@@ -111,9 +111,13 @@ To turn on always-on mode:
 
 1. Open **Manage… > General**.
 2. Set **Mode** to **Always on**. The first time, earshot downloads the wake phrase models (about 18 MB). The download sends no audio.
-3. Click **Teach earshot your voice…**, then say the phrase 5 times. earshot keeps a voice summary (256 numbers) on this Mac. It does not keep the audio.
+3. Click **Teach earshot your voice…**, then say the phrase 5 times. Say it the same way each time. earshot keeps a voice summary (256 numbers) and the sound pattern of the phrase on this Mac. It does not keep the audio.
 
-Until you teach earshot your voice, any voice can wake it. For 5 s after a command, your voice can give the next command with no phrase. To change the phrase, type it in **Wake phrase** and click **Save**. Real words work best. A made-up name can also wake earshot on words that sound like it.
+After you teach earshot, it finds the phrase by its sound. Any phrase, name or language works. A name that sounds almost the same after "hey" can also wake earshot, for example "hey Travis" for "hey jarvis". The voice check stops other people.
+
+Until you teach earshot your voice, any voice can wake it, and earshot finds the phrase by its spelling. Then real English words work best. For 5 s after a command, your voice can give the next command with no phrase.
+
+To change the phrase, type it in **Wake phrase** and click **Save**. Then teach earshot again with the new phrase.
 
 earshot never presses Send or does a risky action from always-on mode. The hold key stays available.
 

@@ -257,7 +257,12 @@ final class CommandPipeline {
     /// The record has only a count and the best part of the phrase: no audio and no text.
     @discardableResult
     func nearMisses(_ misses: NearMisses) -> ActivityRecord {
-        let note = String(format: "wake phrase near misses: %ld, best %.0f %% of the phrase pieces", misses.count, misses.best * 100)
+        let note: String
+        if let score = misses.bestScore {
+            note = String(format: "wake phrase near misses: %ld, best template score %.2f", misses.count, score)
+        } else {
+            note = String(format: "wake phrase near misses: %ld, best %.0f %% of the phrase pieces", misses.count, misses.best * 100)
+        }
         let record = ActivityRecord(heard: "", intent: "none", tier: .none, ok: false, note: note, stages: [:])
         try? log?.append(record)
         return record
@@ -265,7 +270,10 @@ final class CommandPipeline {
 
     /// The log line of a wake: the voice score, or that no voice is enrolled.
     static func wakeSummary(_ wake: WakeHit) -> String {
-        let voice = wake.voiceScore.map { String(format: "voice %.2f", $0) } ?? "voice not checked (not taught)"
+        var voice = wake.voiceScore.map { String(format: "voice %.2f", $0) } ?? "voice not checked (not taught)"
+        if let score = wake.matchScore {
+            voice += String(format: ", match %.2f, worst part %.2f", score, wake.matchWorst ?? -1)
+        }
         if let after = wake.inTurnAfterSeconds {
             return String(format: "wake \"%@\" again in a follow-up turn at %.2f s, %@", wake.phrase, after, voice)
         }

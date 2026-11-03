@@ -82,7 +82,7 @@ struct TeachVoiceSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Teach earshot your voice").font(.headline)
-            Text("Press Record, then say \"\(phrase)\" in your normal voice, at your normal place. Do it \(needed) times. earshot keeps only a voice summary (256 numbers) on this Mac. It does not keep the audio.")
+            Text("Press Record, then say \"\(phrase)\" in your normal voice, at your normal place. Do it \(needed) times. earshot keeps a voice summary and the sound pattern of the phrase on this Mac. It does not keep the audio.")
                 .fixedSize(horizontal: false, vertical: true)
             ProgressView(value: Double(clips.count), total: Double(needed))
             Text("\(clips.count) of \(needed) phrases").font(.caption)
