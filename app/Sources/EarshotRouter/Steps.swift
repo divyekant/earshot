@@ -75,15 +75,18 @@ extension CommandRouter {
             let restPhrase = rest.joined(separator: " ")
 
             // A send phrase at the very end.
+            // Words that are not a command ("the blue fox jumps and send": dictation) stay whole.
             if endSends.contains(restPhrase) {
                 let head = tokens.raw(start..<i)
+                guard isCommandSentence(head, apps: context.apps) else { return steps.isEmpty ? [spoken] : steps + [head + " and send"] }
                 if inText {
                     steps.append(head + " and send")
                 } else {
                     steps.append(head)
                     steps.append("send")
                 }
-                return steps.count > 1 ? steps : [spoken]
+                // One step: the words with the send phrase as "and send", so "type hi, click send" never types "click send".
+                return steps
             }
 
             let verb = rest[0]
@@ -91,8 +94,9 @@ extension CommandRouter {
             var cut = stepStarts.contains(verb) && isCommandSentence(tokens.raw(start..<i), apps: context.apps)
                 && !["go ahead", "i want", "i need"].contains(Array(w[start..<i]).joined(separator: " "))
             if cut, inText, !strong { cut = false }
-            // "click notes and type hi": one step (the router types into the box). Not after a comma.
-            if cut, !strong, !softStop.contains(i), w[i] == "and" || w[i] == "then",
+            // "click notes and type hi", "focus on notes then type hi": one step (the router types into the box).
+            // Not after a comma or a sentence end.
+            if cut, !softStop.contains(i), !hardStop.contains(i), w[i] == "and" || w[i] == "then",
                ["type", "enter", "write"].contains(verb), pressStepVerbs.contains(firstVerb(Array(w[start..<i]))) {
                 cut = false
                 inText = true

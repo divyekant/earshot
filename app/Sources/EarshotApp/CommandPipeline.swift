@@ -245,6 +245,8 @@ final class CommandPipeline {
             stages["steps.cut"] = cutClock.ms
             return await runChain(steps, from: 0, heard: text, mode: mode, context: context, rows: rows, stages: stages, clock)
         }
+        // One step with its send phrase made "and send" ("type hi, click send"): route that form.
+        if let one = steps.first, one != text { text = one }
 
         let routeClock = Stopwatch()
         var result = await router.route(text, context: context)

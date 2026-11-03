@@ -24,7 +24,7 @@ final class StepsTests: XCTestCase {
     }
 
     func testOneCommandStaysWhole() {
-        for s in ["open Slack", "click Terms and Conditions", "type see you soon and send", "type see you soon, send it",
+        for s in ["open Slack", "click Terms and Conditions", "type see you soon and send", "the blue fox jumps and send",
                   "Yeah, actually let's send", "message Felix I am late and then I will call",
                   "type I will open it and then close it", "click steer this thread and type hi there",
                   "focus on steer this thread then type hi there", "Slack Ravi, call me later", "open Find and Replace"] {
@@ -34,6 +34,7 @@ final class StepsTests: XCTestCase {
 
     func testTextEndsOnlyAtAStrongJoiner() {
         XCTAssertEqual(steps("type hello, click send"), ["type hello and send"])
+        XCTAssertEqual(steps("type see you soon, send it"), ["type see you soon and send"])
         XCTAssertEqual(steps("type hello and open Notes"), ["type hello and open Notes"])
         XCTAssertEqual(steps("type hello and then open Notes"), ["type hello", "open Notes"])
         XCTAssertEqual(steps("type hello. Open Notes."), ["type hello", "Open Notes"])
