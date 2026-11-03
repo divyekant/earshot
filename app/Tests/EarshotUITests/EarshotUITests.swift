@@ -211,19 +211,20 @@ final class AppsFilterTests: XCTestCase {
 
 final class BrandTests: XCTestCase {
     func testMarkMatchesTheSVG() {
-        // glyph.svg: viewBox "276 286 472 452".
-        let all = (MarkShapes.bars + [MarkShapes.cursor]).map(\.rect).reduce(CGRect.null) { $0.union($1) }
-        XCTAssertEqual(all, CGRect(x: 276, y: 286, width: 472, height: 452))
-        XCTAssertEqual(MarkShapes.bars.count, 4)
-        // The bars rise to the third bar, then fall. The cursor is the tallest shape.
-        let heights = MarkShapes.bars.map(\.rect.height)
-        XCTAssertEqual(heights.max(), heights[2])
-        XCTAssertGreaterThan(MarkShapes.cursor.rect.height, heights[2])
+        // assets/brand/src/mark.svg: translate(161 180) scale(27), stroke-width 2.2.
+        XCTAssertEqual(MarkShapes.origin, CGPoint(x: 161, y: 180))
+        XCTAssertEqual(MarkShapes.scale, 27)
+        XCTAssertEqual(MarkShapes.strokeWidth, 59.4, accuracy: 0.01)
+        XCTAssertEqual(MarkShapes.strokes.count, 2)
+        XCTAssertEqual(MarkShapes.strokes.map { $0.curves.count }, [6, 4])
     }
 
     func testMarkIsCentredInTheTile() {
-        let all = (MarkShapes.bars + [MarkShapes.cursor]).map(\.rect).reduce(CGRect.null) { $0.union($1) }
-        XCTAssertEqual(all.midX, 512, accuracy: 1)
-        XCTAssertEqual(all.midY, 512, accuracy: 1)
+        let box = MarkShapes.path().boundingRect
+        XCTAssertEqual(box.midX, 512, accuracy: 4)
+        XCTAssertEqual(box.midY, 512, accuracy: 4)
+        // The ear stays inside the tile (100 to 924), with room for the stroke.
+        let outer = box.insetBy(dx: -MarkShapes.strokeWidth / 2, dy: -MarkShapes.strokeWidth / 2)
+        XCTAssertTrue(CGRect(x: 100, y: 100, width: 824, height: 824).contains(outer))
     }
 }
