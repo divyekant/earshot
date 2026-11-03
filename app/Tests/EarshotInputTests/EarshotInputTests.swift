@@ -164,82 +164,41 @@ final class SpeechDetectorTests: XCTestCase {
         XCTAssertEqual(run(&d, -55, ms: 500), [], "below -50 dB is not speech")
     }
 
+    func testTrackOpensNoTurn() {
+        var d = SpeechDetector()
+        for _ in 0..<50 { d.track(db: -65) }
+        for _ in 0..<50 { XCTAssertTrue(d.track(db: -25)) }
+        XCTAssertFalse(d.inTurn, "between wake phrases, speech alone opens no turn (D-11)")
+    }
+
+    func testWakeTurnWaitsForTheCommand() {
+        var d = SpeechDetector()
+        _ = run(&d, -65, ms: 500)
+        d.open(heardSpeech: false, quietMs: 0, graceMs: 2000)
+        XCTAssertEqual(run(&d, -65, ms: 1000), [], "a pause after the phrase keeps the turn")
+        XCTAssertEqual(run(&d, -25, ms: 400), [])
+        XCTAssertEqual(run(&d, -65, ms: 560), [.end], "the normal end silence after the command")
+    }
+
+    func testWakeTurnWithNoCommandEnds() {
+        var d = SpeechDetector()
+        _ = run(&d, -65, ms: 500)
+        d.open(heardSpeech: false, quietMs: 0, graceMs: 2000)
+        XCTAssertEqual(run(&d, -65, ms: 2020), [.end], "end, not drop: the speech engine decides")
+    }
+
+    func testWakeTurnAfterAFastCommand() {
+        var d = SpeechDetector()
+        _ = run(&d, -65, ms: 500)
+        // "hey jarvis, stop" said fast: the command ended 300 ms before the wake.
+        d.open(heardSpeech: true, quietMs: 300, graceMs: 2000)
+        XCTAssertEqual(run(&d, -65, ms: 260), [.end])
+    }
+
     func testDbOfSamples() {
         XCTAssertEqual(SpeechDetector.db([Float](repeating: 0, count: 10)), -120)
         XCTAssertEqual(SpeechDetector.db([Float](repeating: 1, count: 10)), 0, accuracy: 0.001)
         XCTAssertEqual(SpeechDetector.db([Float](repeating: 0.1, count: 10)), -20, accuracy: 0.001)
-    }
-}
-
-// R-ON-2, R-ON-5: the "for me?" gate.
-final class ForMeGateTests: XCTestCase {
-    let gate = ForMeGate()
-    let apps = [
-        AppEntry(id: "a1", name: "Slack", bundleID: "x.slack", aliases: ["slack"], isChat: true, approved: true),
-        AppEntry(id: "a2", name: "Messages", bundleID: "x.msg", aliases: ["imessage", "text"], isChat: true, approved: true),
-        AppEntry(id: "a3", name: "Notion", bundleID: "x.notion", approved: false),
-    ]
-
-    func testPrefixPasses() {
-        XCTAssertTrue(gate.check("Slack Ravi, running late", apps: apps, secondsSinceLastCommand: nil).isForMe)
-        XCTAssertTrue(gate.check("click the second result", apps: apps, secondsSinceLastCommand: nil).isForMe)
-        XCTAssertTrue(gate.check("iMessage mom", apps: apps, secondsSinceLastCommand: nil).isForMe)
-    }
-
-    func testHesitationBeforePrefix() {
-        XCTAssertTrue(gate.check("uh Slack me hi", apps: apps, secondsSinceLastCommand: nil).isForMe)
-        XCTAssertTrue(gate.check("um, Slack me running late", apps: apps, secondsSinceLastCommand: nil).isForMe)
-        XCTAssertTrue(gate.check("um open hn.com", apps: apps, secondsSinceLastCommand: nil).isForMe)
-        XCTAssertFalse(gate.check("uh I think so", apps: apps, secondsSinceLastCommand: nil).isForMe)
-        XCTAssertFalse(gate.check("uh um", apps: apps, secondsSinceLastCommand: 1).isForMe, "only hesitation words")
-        guard case .forMe(_, let maySend, _) = gate.check("uh send", apps: apps, secondsSinceLastCommand: 2)
-        else { return XCTFail("\"uh send\" in the window is a send command") }
-        XCTAssertTrue(maySend)
-    }
-
-    /// The gate runs on every always-on utterance, so it must be fast.
-    func testGateLatency() {
-        let texts = ["uh Slack me hi", "um open hn.com", "uh I think so", "Slack Ravi, running late", "send"]
-        let n = 10_000
-        let t0 = Date()
-        for i in 0..<n { _ = gate.check(texts[i % texts.count], apps: apps, secondsSinceLastCommand: 2) }
-        let us = Date().timeIntervalSince(t0) / Double(n) * 1_000_000
-        print("ForMeGate latency: \(String(format: "%.1f", us)) us per check")
-        XCTAssertLessThan(us, 1000, "the gate must take less than 1 ms")
-    }
-
-    func testTalkToPeopleIsRejected() {
-        XCTAssertFalse(gate.check("I think we should get lunch", apps: apps, secondsSinceLastCommand: nil).isForMe)
-        XCTAssertFalse(gate.check("", apps: apps, secondsSinceLastCommand: nil).isForMe)
-    }
-
-    func testUnapprovedAppDoesNotCount() {
-        XCTAssertFalse(gate.check("Notion is slow today", apps: apps, secondsSinceLastCommand: nil).isForMe)
-    }
-
-    func testFollowUpWindow() {
-        XCTAssertTrue(gate.check("running late", apps: apps, secondsSinceLastCommand: 2).isForMe)
-        XCTAssertFalse(gate.check("running late", apps: apps, secondsSinceLastCommand: 9).isForMe)
-        XCTAssertFalse(gate.check("running late", apps: apps, secondsSinceLastCommand: 2, inCall: true).isForMe)
-    }
-
-    func testSendNeedsShortCommandInWindow() {
-        XCTAssertEqual(gate.check("send", apps: apps, secondsSinceLastCommand: 2),
-                       .forMe(text: "send", maySend: true, why: "send in the follow-up window"))
-        XCTAssertFalse(gate.check("send", apps: apps, secondsSinceLastCommand: nil).isForMe, "no command before it")
-        XCTAssertFalse(gate.check("send", apps: apps, secondsSinceLastCommand: 2, inCall: true).isForMe, "in a call")
-        XCTAssertFalse(gate.check("did you send the report", apps: apps, secondsSinceLastCommand: 2).isForMe)
-    }
-
-    func testSendInsideCommandNeverMaySend() {
-        guard case .forMe(_, let maySend, _) = gate.check("Slack Ravi I will send it later", apps: apps, secondsSinceLastCommand: nil)
-        else { return XCTFail() }
-        XCTAssertFalse(maySend)
-    }
-
-    func testLongTalkInWindowNeedsPrefix() {
-        let long = Array(repeating: "word", count: 40).joined(separator: " ")
-        XCTAssertFalse(gate.check(long, apps: apps, secondsSinceLastCommand: 1).isForMe)
     }
 }
 
@@ -253,10 +212,38 @@ final class FakeTrigger: CancellableTrigger {
     func stop() { started = false }
 }
 
-final class FakeLevels: LevelSource {
-    var onLevel: (@Sendable (Double) -> Void)?
-    func start(frameMs: Double, onLevel: @escaping @Sendable (Double) -> Void) throws { self.onLevel = onLevel }
-    func stop() { onLevel = nil }
+/// A fake microphone: 16 kHz samples of one level, in blocks of 100 ms.
+final class FakeSamples: SampleSource {
+    var onSamples: (@Sendable ([Float]) -> Void)?
+    func start(onSamples: @escaping @Sendable ([Float]) -> Void) throws { self.onSamples = onSamples }
+    func stop() { onSamples = nil }
+    /// 0.0005 is about -66 dB (a quiet room). 0.05 is about -26 dB (speech).
+    func emit(_ level: Float, ms: Int) {
+        for _ in 0..<(ms / 100) { onSamples?([Float](repeating: level, count: 1600)) }
+    }
+}
+
+/// A fake wake listener: it reports one hit after `hitAfterSamples`.
+final class FakeListener: WakeListener, @unchecked Sendable {
+    var hitAfterSamples: Int?
+    var hit = WakeHit(phrase: "hey jarvis", prerollSeconds: 1.4, phraseEndSeconds: 0.4, voiceScore: 0.8, isOwner: true)
+    var score: Double? = 0.8
+    var voiceThreshold = 0.5
+    private(set) var fed = 0
+    private(set) var resets = 0
+    func feed(_ samples: [Float]) -> WakeHit? {
+        fed += samples.count
+        if let n = hitAfterSamples, fed >= n {
+            hitAfterSamples = nil
+            return hit
+        }
+        return nil
+    }
+    func voiceScore(_ samples: [Float]) -> Double? { score }
+    func reset() { resets += 1; fed = 0 }
+    /// The near misses for the next `takeNearMisses()`.
+    var misses: NearMisses?
+    func takeNearMisses() -> NearMisses? { defer { misses = nil }; return misses }
 }
 
 // R-ON-4: the hold key stays as the fallback in always-on mode.
@@ -270,9 +257,16 @@ final class InputSwitchTests: XCTestCase {
     func testAlwaysOnMakesBoth() {
         var settings = EarshotSettings()
         settings.mode = .alwaysOn
-        let s = InputTriggers.make(settings)
+        let s = InputTriggers.make(settings, wake: FakeListener())
         XCTAssertEqual(s.mode, .alwaysOn)
-        XCTAssertNotNil(s.alwaysOn)
+        XCTAssertTrue(s.alwaysOn is WakeTrigger)
+    }
+
+    func testAlwaysOnWithoutModelsHasTheHoldKeyOnly() {
+        var settings = EarshotSettings()
+        settings.mode = .alwaysOn
+        let s = InputTriggers.make(settings, wake: nil)
+        XCTAssertNil(s.alwaysOn, "until the wake models load, the hold key works alone (R-ON-4)")
     }
 
     func testHoldKeyTakesOverFromAlwaysOn() {
@@ -296,21 +290,276 @@ final class InputSwitchTests: XCTestCase {
         always.onCancel?("short")
         XCTAssertEqual(log, ["start:alwaysOn", "cancel:alwaysOn"])
     }
+}
 
-    func testAlwaysOnTriggerReportsTurn() {
-        let levels = FakeLevels()
-        let t = AlwaysOnTrigger(source: levels)
-        var log: [String] = []
-        let done = expectation(description: "turn")
-        t.onStart = { log.append("start") }
-        t.onStop = { log.append("stop"); done.fulfill() }
-        t.onCancel = { _ in log.append("cancel") }
-        XCTAssertNoThrow(try t.start())
-        for _ in 0..<50 { levels.onLevel?(-65) }
-        for _ in 0..<30 { levels.onLevel?(-25) }
-        for _ in 0..<40 { levels.onLevel?(-65) }
-        wait(for: [done], timeout: 2)
-        XCTAssertEqual(log, ["start", "stop"])
+// R-ON-1, R-ON-3, D-11: the wake trigger.
+final class WakeTriggerTests: XCTestCase {
+    let quiet: Float = 0.0005
+    let speech: Float = 0.05
+
+    private func make(_ listener: FakeListener, config: WakeConfig = WakeConfig()) -> (WakeTrigger, FakeSamples, Recorder) {
+        let source = FakeSamples()
+        let trigger = WakeTrigger(listener: listener, config: config, source: source)
+        let rec = Recorder()
+        trigger.onWake = { _ in rec.add("wake") }
+        trigger.onStart = { rec.add("start") }
+        trigger.onStop = { rec.add("stop") }
+        trigger.onCancel = { why in rec.add("cancel: \(why)") }
+        trigger.onRejected = { _ in rec.add("rejected") }
+        XCTAssertNoThrow(try trigger.start())
+        return (trigger, source, rec)
+    }
+
+    func testWakePhraseOpensATurnThatEndsAfterTheCommand() {
+        let listener = FakeListener()
+        listener.hitAfterSamples = 16000
+        let (t, mic, rec) = make(listener)
+        let stop = rec.expect("stop", self)
+        mic.emit(quiet, ms: 1000)     // the phrase fires here; no words after it yet
+        mic.emit(quiet, ms: 400)      // a short pause after the phrase does not end the turn
+        mic.emit(speech, ms: 600)     // the command
+        mic.emit(quiet, ms: 800)
+        wait(for: [stop], timeout: 2)
+        XCTAssertEqual(rec.log, ["wake", "start", "stop"])
         t.stop()
+    }
+
+    func testOtherVoiceStartsNothing() {
+        let listener = FakeListener()
+        listener.hitAfterSamples = 16000
+        listener.hit.isOwner = false
+        listener.hit.voiceScore = 0.2
+        let (t, mic, rec) = make(listener)
+        let rejected = rec.expect("rejected", self)
+        mic.emit(quiet, ms: 1000)
+        mic.emit(speech, ms: 600)
+        mic.emit(quiet, ms: 800)
+        wait(for: [rejected], timeout: 2)
+        XCTAssertEqual(rec.log, ["rejected"], "speech without the phrase never starts a turn")
+        t.stop()
+    }
+
+    func testSpeechWithoutThePhraseStartsNothing() {
+        let (t, mic, rec) = make(FakeListener())
+        mic.emit(quiet, ms: 500)
+        mic.emit(speech, ms: 1500)
+        mic.emit(quiet, ms: 800)
+        let settled = expectation(description: "settled")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { settled.fulfill() }
+        wait(for: [settled], timeout: 2)
+        XCTAssertEqual(rec.log, [])
+        t.stop()
+    }
+
+    func testPhraseAloneEndsAfterTheGraceTime() {
+        let listener = FakeListener()
+        listener.hitAfterSamples = 16000
+        let (t, mic, rec) = make(listener)
+        let stop = rec.expect("stop", self)
+        mic.emit(quiet, ms: 1000)
+        mic.emit(quiet, ms: 2200)     // no command: the turn ends after 2 s, and the text decides
+        wait(for: [stop], timeout: 2)
+        XCTAssertEqual(rec.log, ["wake", "start", "stop"])
+        t.stop()
+    }
+
+    func testFollowUpNeedsTheOwnersVoice() {
+        let listener = FakeListener()
+        listener.hitAfterSamples = 16000
+        let (t, mic, rec) = make(listener)
+        let first = rec.expect("stop", self)
+        mic.emit(quiet, ms: 1000)
+        mic.emit(speech, ms: 500)
+        mic.emit(quiet, ms: 700)
+        wait(for: [first], timeout: 2)
+
+        // The owner's voice in the follow-up window: a turn with no phrase.
+        t.openFollowUp()
+        let second = rec.expect("stop", self, count: 2)
+        mic.emit(speech, ms: 600)
+        mic.emit(quiet, ms: 700)
+        wait(for: [second], timeout: 2)
+        XCTAssertEqual(rec.log, ["wake", "start", "stop", "start", "stop"])
+
+        // Another voice in the window: the turn starts, then the voice check drops it.
+        listener.score = 0.2
+        t.openFollowUp()
+        let third = rec.expect("cancel: not the owner's voice (0.20)", self)
+        mic.emit(speech, ms: 600)
+        mic.emit(quiet, ms: 700)
+        wait(for: [third], timeout: 2)
+        XCTAssertTrue("not the owner's voice (0.20)".hasPrefix(WakeTrigger.otherVoice), "the app logs drops by this prefix")
+        t.stop()
+    }
+
+    func testFollowUpWindowCloses() {
+        let listener = FakeListener()
+        listener.hitAfterSamples = 16000
+        let (t, mic, rec) = make(listener)
+        let first = rec.expect("stop", self)
+        mic.emit(quiet, ms: 1000)
+        mic.emit(speech, ms: 500)
+        mic.emit(quiet, ms: 700)
+        wait(for: [first], timeout: 2)
+        t.openFollowUp()
+        mic.emit(quiet, ms: 5200)     // the window is 5 s
+        mic.emit(speech, ms: 600)
+        mic.emit(quiet, ms: 700)
+        let settled = expectation(description: "settled")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { settled.fulfill() }
+        wait(for: [settled], timeout: 2)
+        XCTAssertEqual(rec.log, ["wake", "start", "stop"])
+        t.stop()
+    }
+
+    // D-11, live test 2026-11-02: the owner said the phrase again at the start of a follow-up turn.
+    func testPhraseAgainInAFollowUpTurnMakesAWakeTurn() {
+        let listener = FakeListener()
+        listener.hitAfterSamples = 16000
+        let (t, mic, rec) = make(listener)
+        let first = rec.expect("stop", self)
+        mic.emit(quiet, ms: 1000)
+        mic.emit(speech, ms: 500)
+        mic.emit(quiet, ms: 700)
+        wait(for: [first], timeout: 2)
+
+        var hits: [WakeHit] = []
+        t.onWake = { hit in hits.append(hit); rec.add("wake") }
+        listener.score = 0.2           // the voice of the whole turn would fail; the voice of the phrase counts
+        listener.hitAfterSamples = 9600 // the spotter fires 0.6 s after the window opened
+        t.openFollowUp()
+        let second = rec.expect("stop", self, count: 2)
+        mic.emit(speech, ms: 1000)
+        mic.emit(quiet, ms: 700)
+        wait(for: [second], timeout: 2)
+        XCTAssertEqual(rec.log, ["wake", "start", "stop", "start", "wake", "stop"], "no second start: the engine runs already")
+        XCTAssertEqual(hits.count, 1)
+        let after = hits.first?.inTurnAfterSeconds ?? -1
+        XCTAssertGreaterThan(after, 0.3)
+        XCTAssertLessThanOrEqual(after, 0.6, "the time from the start of the follow-up turn to the wake")
+        t.stop()
+    }
+
+    func testPhraseLateInAFollowUpTurnIsNotHeard() {
+        let listener = FakeListener()
+        listener.hitAfterSamples = 16000
+        var config = WakeConfig()
+        config.followTurnWakeSeconds = 1.0
+        let (t, mic, rec) = make(listener, config: config)
+        let first = rec.expect("stop", self)
+        mic.emit(quiet, ms: 1000)
+        mic.emit(speech, ms: 500)
+        mic.emit(quiet, ms: 700)
+        wait(for: [first], timeout: 2)
+
+        listener.hitAfterSamples = 16000 * 2   // after the 1 s window: the spotter gets no audio then
+        t.openFollowUp()
+        let second = rec.expect("stop", self, count: 2)
+        mic.emit(speech, ms: 3000)
+        mic.emit(quiet, ms: 700)
+        wait(for: [second], timeout: 2)
+        XCTAssertEqual(rec.log, ["wake", "start", "stop", "start", "stop"], "no wake: the phrase came after the window")
+        t.stop()
+    }
+
+    func testOtherVoicePhraseInAFollowUpTurnKeepsTheVoiceCheck() {
+        let listener = FakeListener()
+        listener.hitAfterSamples = 16000
+        let (t, mic, rec) = make(listener)
+        let first = rec.expect("stop", self)
+        mic.emit(quiet, ms: 1000)
+        mic.emit(speech, ms: 500)
+        mic.emit(quiet, ms: 700)
+        wait(for: [first], timeout: 2)
+
+        listener.hit.isOwner = false
+        listener.score = 0.2
+        listener.hitAfterSamples = 9600
+        t.openFollowUp()
+        let dropped = rec.expect("cancel: not the owner's voice (0.20)", self)
+        mic.emit(speech, ms: 1000)
+        mic.emit(quiet, ms: 700)
+        wait(for: [dropped], timeout: 2)
+        XCTAssertEqual(rec.log, ["wake", "start", "stop", "start", "cancel: not the owner's voice (0.20)"])
+        t.stop()
+    }
+
+    /// After a dictation cue ("type", or earshot typed), the next follow-up turn ends after 1200 ms of quiet, not
+    /// 550 ms, so a natural pause does not cut a sentence in two (dk: "I have to speak fast").
+    private func followUpLength(longPause: Bool) -> Double? {
+        let listener = FakeListener()
+        listener.hitAfterSamples = 16000
+        let (t, mic, rec) = make(listener)
+        let first = rec.expect("stop", self)
+        mic.emit(quiet, ms: 1000)
+        mic.emit(speech, ms: 500)
+        mic.emit(quiet, ms: 700)
+        wait(for: [first], timeout: 2)
+        t.openFollowUp(longPause: longPause)
+        let second = rec.expect("stop", self, count: 2)
+        mic.emit(speech, ms: 1000)
+        mic.emit(quiet, ms: 700)   // a pause between 550 and 1200 ms
+        mic.emit(speech, ms: 800)
+        mic.emit(quiet, ms: 1300)
+        wait(for: [second], timeout: 3)
+        let seconds = t.lastFollowUpSeconds
+        t.stop()
+        return seconds
+    }
+
+    func testLongPauseKeepsOneTurnAfterADictationCue() throws {
+        let long = try XCTUnwrap(followUpLength(longPause: true))
+        XCTAssertGreaterThan(long, 3.0, "one turn over the 700 ms pause: \(long) s")
+    }
+
+    func testCommandsKeepTheShortPause() throws {
+        let short = try XCTUnwrap(followUpLength(longPause: false))
+        XCTAssertLessThan(short, 2.5, "the 700 ms pause ends a command turn: \(short) s")
+    }
+
+    func testNearMissesAreReported() {
+        let listener = FakeListener()
+        var config = WakeConfig()
+        config.nearMissReportSeconds = 1
+        let (t, mic, rec) = make(listener, config: config)
+        var got: [NearMisses] = []
+        let reported = rec.expect("near misses", self)
+        t.onNearMisses = { misses in got.append(misses); rec.add("near misses") }
+        listener.misses = NearMisses(count: 2, best: 0.8)
+        mic.emit(quiet, ms: 1200)
+        wait(for: [reported], timeout: 2)
+        XCTAssertEqual(got, [NearMisses(count: 2, best: 0.8)])
+        t.stop()
+    }
+
+    func testPauseDropsTheOpenTurn() {
+        let listener = FakeListener()
+        listener.hitAfterSamples = 16000
+        let (t, mic, rec) = make(listener)
+        let start = rec.expect("start", self)
+        mic.emit(quiet, ms: 1000)
+        wait(for: [start], timeout: 2)
+        let cancel = rec.expect("cancel: input stopped", self)
+        t.setPaused(true)
+        wait(for: [cancel], timeout: 2)
+        t.stop()
+    }
+}
+
+/// Collects the trigger events on the main thread.
+final class Recorder: @unchecked Sendable {
+    private(set) var log: [String] = []
+    private var waits: [(String, Int, XCTestExpectation)] = []
+
+    func add(_ event: String) {
+        log.append(event)
+        for (name, count, e) in waits where name == event && log.filter({ $0 == name }).count == count { e.fulfill() }
+    }
+
+    /// An expectation for the `count`th event of this name.
+    func expect(_ event: String, _ test: XCTestCase, count: Int = 1) -> XCTestExpectation {
+        let e = test.expectation(description: event)
+        waits.append((event, count, e))
+        return e
     }
 }

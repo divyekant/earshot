@@ -298,14 +298,30 @@ enum ScreenReader {
             let page = i < drafts.count
             let e = ScreenElement(id: id, role: d.role, subrole: d.subrole, label: d.label, url: d.url,
                                   inHeading: page && d.kind == "link" && areaPath != "window" ? inHeading(el) : false,
-                                  risky: SafetyPolicy.isRisky(d.label, role: d.role),
+                                  risky: SafetyPolicy.isRisky(d.label, role: d.role, subrole: d.subrole),
                                   x: d.frame.x, y: d.frame.y, w: d.frame.w, h: d.frame.h)
             elements.append(e)
             items[id] = ReadElement(element: e, kind: d.kind, handle: el, inPage: page || areaPath == "window")
         }
-        let snapshot = ScreenSnapshot(bundleID: bundleID, windowTitle: title, url: url, elements: elements)
+        let snapshot = ScreenSnapshot(bundleID: bundleID, windowTitle: title, url: url, elements: elements,
+                                      focusedID: focusedField(AX.appElement(pid), items))
         return ScreenRead(snapshot: snapshot, pid: pid, areaPath: areaPath, window: wf, viewport: vp, items: items,
                           at: Clock.nowNs(), ms: Clock.ms(since: t0), method: method)
+    }
+
+    /// The id of the field that has the keyboard focus, or nil. The focus can be on a child of the field
+    /// (a web text box), so the search goes up a few parents. A secure field never counts.
+    static func focusedField(_ app: AXUIElement, _ items: [String: ReadElement]) -> String? {
+        guard var el = AX.focused(app) else { return nil }
+        for _ in 0..<6 {
+            if let hit = items.first(where: { $0.value.kind == "field" && AX.same($0.value.handle, el) }) {
+                guard let h = hit.value.handle, AX.isEditableText(h, allowSearch: true) else { return nil }
+                return hit.key
+            }
+            guard let parent = AX.element(el, "AXParent") else { return nil }
+            el = parent
+        }
+        return nil
     }
 
     /// Adds the texts that OCR found to a read, with the next numbers.

@@ -4,10 +4,14 @@ import EarshotCore
 import Foundation
 
 /// Parakeet speech to text through transcribe.cpp (MIT), on the Mac with Metal (R-MD-1, E2).
-/// It reads the model file in place (for example the GGUF file of Hex) and keeps it loaded:
-/// the load takes about 14 s and about 890 MB (E2, section 5.4).
+/// It reads the model file in place (for example the GGUF file of Hex) and keeps it loaded.
+/// transcribe.cpp 0.4 maps the file (the default load parameters): the weights are clean file pages.
+/// macOS can drop them under memory pressure and read them from the file again, with no swap. They do not count
+/// in the app footprint, and an app that maps the same file (Hex) shares the same pages.
+/// With 0.3.1, the load copied about 700 MB of weights into app memory (memory study 2026-11-03, R-MD-3).
+/// The file must not change in place while the model is loaded. A changed page stops the app (SIGBUS).
 /// The model weights are CC BY 4.0 (NVIDIA Parakeet). Credit them in the app's About text.
-public final class ParakeetEngine: SpeechEngine, SpeechTimingReporting, @unchecked Sendable {
+public final class ParakeetEngine: TurnSpeechEngine, PrerollControl, @unchecked Sendable {
     public static let engineID = "parakeet"
     public let id = ParakeetEngine.engineID
     public let modelPath: String
@@ -92,6 +96,8 @@ public final class ParakeetEngine: SpeechEngine, SpeechTimingReporting, @uncheck
         baselineWarmMs = SpeechClock.ms(since: tb)
     }
 
+    public func setNextPreroll(seconds: Double) { mic.setNextPreroll(seconds: seconds) }
+
     public func begin() throws {
         guard useMicrophone else { throw SpeechError("this Parakeet engine has no microphone") }
         guard mic.isRunning else { throw SpeechError("Parakeet is not ready: call prepare() first") }
@@ -175,7 +181,7 @@ public final class ParakeetEngine: SpeechEngine, SpeechTimingReporting, @uncheck
             samples.removeAll(keepingCapacity: true)
             lastPartialFrames = 0
             listening = true
-            turn = SpeechTiming(engine: id, why: reason)
+            turn = SpeechTiming(engine: self.id, why: reason)
             turn.idleMs = lastRunEndNs == 0 ? 0 : Double(now &- lastRunEndNs) / 1_000_000
             if warmEveryTurn { turn.warmed = true }
             if let limit = warmAfterIdleSeconds, turn.idleMs >= limit * 1000 { turn.warmed = true }

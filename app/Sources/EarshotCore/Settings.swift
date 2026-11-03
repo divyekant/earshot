@@ -37,6 +37,14 @@ public struct EarshotSettings: Codable, Equatable, Sendable {
     /// Type the dictated text into any chat (R-NV-4). Typing is not Send. The own-chats-only rule is for live tests.
     public var typeIntoOthers: Bool = true
     public var showFeedback: Bool = true
+    /// A short system sound for each result: done, sent, or failed (not sure, blocked).
+    public var playSounds: Bool = true
+    /// The phrase that starts a command in always-on mode (R-ON-1, D-11). Known words work best.
+    public var wakePhrase: String = WakePhrase.defaultPhrase
+    /// The lowest voice score (cosine similarity to the owner's enrolled voice) that counts as the owner (R-ON-3).
+    /// The live trial of 2026-11-02 gave 0.50 to 0.73 for the owner and 0.06 for another voice. Tune it from the
+    /// voice scores in the activity log.
+    public var voiceThreshold: Double = 0.35
 
     public init() {}
 
@@ -59,6 +67,9 @@ public struct EarshotSettings: Codable, Equatable, Sendable {
         read(.jevScreenBudgetMs, &jevScreenBudgetMs)
         read(.typeIntoOthers, &typeIntoOthers)
         read(.showFeedback, &showFeedback)
+        read(.playSounds, &playSounds)
+        read(.wakePhrase, &wakePhrase)
+        read(.voiceThreshold, &voiceThreshold)
     }
 }
 

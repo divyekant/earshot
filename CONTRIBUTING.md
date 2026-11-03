@@ -52,6 +52,8 @@ These rules come from [AGENTS.md](AGENTS.md). A pull request that breaks one of 
 5. If your change touches the command path (speech, router, actions, discovery or input), measure the latency before and after the change. Use the **Activity** tab or the benchmark tests in `app/Tests`.
 6. Open a pull request with `develop` as the base. Fill in the template. Include the latency numbers and the requirement IDs.
 
+The workflow **CI** runs `swift build` and `swift test` on macOS for each pull request. The pull request can merge only when it passes.
+
 Do not open a feature pull request to `main`. `main` gets only release pull requests from `develop`. [docs/RELEASING.md](docs/RELEASING.md) gives the branches, the version numbers, the tags and the release procedure.
 
 ### Tests that use the screen, keys or the microphone

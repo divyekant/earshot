@@ -15,7 +15,7 @@ The owner wants to type less. Dictation tools, for example Wispr Flow, VoiceInk 
 
 The owner described this flow:
 
-1. Press one button. In the final version, no button is needed (see R-ON-1).
+1. Press one button, or say the wake phrase (see R-ON-1).
 2. Say something.
 3. earshot changes focus to the correct screen.
 4. earshot focuses the correct text box.
@@ -28,11 +28,11 @@ The owner described this flow:
 
 | ID | Requirement | Priority |
 |---|---|---|
-| R-ON-1 | earshot listens all the time. It does not need a key press or a wake word to start. | Must (final) |
-| R-ON-2 | earshot decides by itself whether the owner speaks to the computer or to someone else: a person in the room, a call, or nobody. | Must (final) |
-| R-ON-3 | earshot ignores voices that are not the owner's voice, for example TV, calls and other people. | Should |
+| R-ON-1 | earshot listens all the time. A command starts when the owner says the wake phrase (default "hey jarvis"). No key press is needed. Speech without the wake phrase does not start a command. Changed on 2026-11-02 from "no wake word" (D-11). | Must (final) |
+| R-ON-2 | earshot acts only on speech that is for it: speech after the wake phrase, or a follow-up command in the owner's voice up to 5 s after a command. Talk to a person in the room or in a call does not start a command (D-11). | Must (final) |
+| R-ON-3 | earshot ignores voices that are not the owner's voice, for example TV, calls and other people. The owner teaches earshot the voice with 5 wake phrases. Until the owner does this, any voice can wake earshot, and the management window says so (D-11). | Must |
 | R-ON-4 | A push-to-talk key is available. Use it in the first version, and keep it as a fallback. | Must (MVP) |
-| R-ON-5 | A false trigger must not cause an action that cannot be undone, for example a sent message. | Must |
+| R-ON-5 | A false trigger must not cause an action that cannot be undone, for example a sent message. One narrow exception (D-12): in always-on mode, "send" alone, in the checked voice of the owner, within 5 s after earshot typed in the same app, sends. | Must |
 
 ### 3.2 Speed
 
@@ -49,8 +49,8 @@ The owner described this flow:
 | R-NV-1 | earshot opens or switches to the app that the owner names. | Must |
 | R-NV-2 | earshot opens the conversation, channel or contact that the owner names, for example "Slack Ravi". | Must |
 | R-NV-3 | earshot puts the focus in the main text box of that screen. | Must |
-| R-NV-4 | earshot enters dictated text in the focused text box. A command can include the text: "Slack Ravi, running late". | Must |
-| R-NV-5 | earshot does not press Send unless the owner says so, for example "send" or "click Send". | Must |
+| R-NV-4 | earshot enters dictated text in the focused text box. A command can include the text: "Slack Ravi, running late". With the hold key, words with no command word are dictation. After a bare "type", the next turn within 5 s is dictation, also in always-on mode (in the owner's voice). Dictation never presses Return. | Must |
+| R-NV-5 | earshot does not press Send unless the owner says so, for example "send" or "click Send". A trailing "and send" after text is a send command, never text: with the hold key, earshot types and then sends; in always-on mode, it types only. | Must |
 | R-NV-6 | First apps to support: Slack, WhatsApp, Messages, Mail. | Must |
 | R-NV-7 | "Open <web address>" opens the address in the default browser, for example "open hn.com" or "go to news dot ycombinator dot com". earshot opens only http and https addresses, and presses no key. | Should |
 
@@ -101,7 +101,7 @@ The owner sees the screen and tells earshot what to do. earshot does not need to
 
 | ID | Question | How to answer it |
 |---|---|---|
-| Q-1 | How many false triggers does the "is this for me?" gate cause without a wake word? | Log one week of real use (DESIGN.md, Phase 3). |
+| Q-1 | How often does the wake phrase fire by mistake, and how often does it miss the owner? Which voice score separates the owner from other voices? | Log the wakes, the rejected wakes and the voice scores of one week of real use (DESIGN.md, Phase 3). |
 | Q-2 | Which speech-to-text model handles Hinglish well enough? | Test Nemotron-3.5 streaming and the community Hinglish fine-tunes on the owner's own audio. |
 | Q-3 | How long does an accessibility search take in Slack and other Electron apps? | Measure in Phase 0. |
 | Q-4 | Can one command include the message text, or must the owner pause after the target? | Test both in Phase 1. |

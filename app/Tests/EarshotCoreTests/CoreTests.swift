@@ -53,6 +53,14 @@ final class CoreTests: XCTestCase {
         XCTAssertTrue(SafetyPolicy.mayPressReturn(for: .openChat(appID: "slack", target: "Ravi", text: nil), inMessageBox: false))
     }
 
+    func testPlaySoundsDefaultsOnForAnOldFile() throws {
+        let old = Data(#"{"mode": "alwaysOn", "showFeedback": false}"#.utf8)
+        let s = try JSONDecoder().decode(EarshotSettings.self, from: old)
+        XCTAssertTrue(s.playSounds, "an old settings file has no playSounds key: sounds are on")
+        XCTAssertEqual(s.mode, .alwaysOn)
+        XCTAssertFalse(s.showFeedback)
+    }
+
     func testStoreAndLogRoundTrip() throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: folder) }

@@ -19,8 +19,9 @@ struct GeneralTab: View {
                 }
                 .pickerStyle(.segmented)
                 if settings.mode == .alwaysOn {
-                    Text("earshot listens all the time and decides if you speak to it. It never presses Send or does a risky action from always-on mode. The hold key also stays available.")
+                    Text("Say the wake phrase, then the command, for example \"\(settings.wakePhrase), open Notes\". For 5 s after a command, your voice can give the next command with no phrase. earshot never presses Send or does a risky action from always-on mode. The hold key also stays available.")
                         .font(.caption).foregroundStyle(.secondary)
+                    WakeSection(settings: $settings, voice: hooks.voice)
                 }
                 Picker("Hold key", selection: holdKeyBinding) {
                     ForEach(HoldKeys.modifiers) { Text($0.name).tag(Optional($0.code)) }
@@ -88,6 +89,7 @@ struct GeneralTab: View {
             Section("Behavior") {
                 Toggle("Type dictated text into chats with other people", isOn: $settings.typeIntoOthers)
                 Toggle("Show the note on screen", isOn: $settings.showFeedback)
+                Toggle("Play sounds", isOn: $settings.playSounds)
                 HStack {
                     Button("Show a test note") { hooks.feedback?.show("→ test note", ok: true) }
                         .disabled(hooks.feedback == nil)

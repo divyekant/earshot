@@ -1,5 +1,6 @@
 // T1 owns this module. See docs/BUILD-PLAN.md.
 // This file holds the logic with no audio device and no model, so that unit tests can check it.
+import EarshotCore
 import Foundation
 
 /// Monotonic time in milliseconds.
@@ -41,6 +42,21 @@ struct Preroll<T> {
         frames = 0
         return out
     }
+
+    /// Returns the newest chunks that cover `wanted` frames, oldest first, and empties the queue.
+    /// The older chunks are dropped.
+    mutating func drainLast(frames wanted: Int64) -> [T] {
+        var out: [T] = []
+        var got: Int64 = 0
+        for (item, count) in items.reversed() {
+            if got >= wanted { break }
+            out.append(item)
+            got += count
+        }
+        items.removeAll()
+        frames = 0
+        return out.reversed()
+    }
 }
 
 /// Silence at the end of the audio. The engines can drop the last word when the audio stops
@@ -72,6 +88,46 @@ struct TranscriptJoin {
 
     /// If the engine sends no final result for the last words, the volatile text stays.
     var text: String { finalText + pending }
+}
+
+/// Joins the results of Apple SpeechTranscriber as `TranscriptJoin` does, and keeps the audio time of each piece (D-11).
+struct TimedTranscript {
+    private var join = TranscriptJoin()
+    private(set) var finalWords: [TimedWord] = []
+    private(set) var pendingWords: [TimedWord] = []
+    /// False if a result had text that its pieces do not cover (a result with no times).
+    private var finalTimed = true
+    private var pendingTimed = true
+
+    /// Adds one result: its text and its pieces with times. Returns the text so far (final plus volatile).
+    mutating func add(_ text: String, words: [TimedWord], isFinal: Bool) -> String {
+        let timed = TextClean.clean(words.map(\.text).joined()) == TextClean.clean(text)
+        if isFinal {
+            finalWords += words
+            finalTimed = finalTimed && timed
+            pendingWords = []
+            pendingTimed = true
+        } else {
+            pendingWords = words
+            pendingTimed = timed
+        }
+        return join.add(text, isFinal: isFinal)
+    }
+
+    /// If the engine sends no final result for the last words, the volatile text stays.
+    var text: String { join.text }
+
+    /// The pieces with their times. Empty if the pieces do not cover all of the text: then the pipeline removes the
+    /// wake phrase by its text.
+    var words: [TimedWord] { finalTimed && pendingTimed ? finalWords + pendingWords : [] }
+
+    /// True if the times are in order and fit in the audio of the turn, in seconds from its first audio.
+    /// If not, the engine gives no times, and the pipeline removes the wake phrase by its text.
+    static func plausible(_ words: [TimedWord], audioSeconds: Double) -> Bool {
+        guard let first = words.first, let last = words.last else { return true }
+        let inOrder = zip(words, words.dropFirst()).allSatisfy { $0.start <= $1.start + 0.01 }
+        return inOrder && words.allSatisfy { $0.start <= $0.end } && first.start >= -0.05 && last.end <= audioSeconds + 0.5
+    }
 }
 
 enum TextClean {

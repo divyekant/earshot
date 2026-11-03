@@ -40,9 +40,9 @@ App support is data, not code. earshot reads the menus, sidebars and search resu
 
 ## Requirements
 
-- A Mac with Apple silicon.
-- macOS 26 (Tahoe) or later.
-- Xcode 26 or later, or a Swift 6 toolchain with the macOS 26 SDK.
+- A Mac with Apple silicon or an Intel processor.
+- macOS 14 (Sonoma) or later. macOS 26 (Tahoe) or later gives the best speech engine (see [Speech engines](#speech-engines)).
+- Xcode 16 or later, or the Command Line Tools with a Swift 6 toolchain. Build with the macOS 26 SDK (Xcode 26) to include Apple SpeechTranscriber.
 - A network connection for the first build. Swift Package Manager downloads transcribe.cpp (see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)).
 
 ## Build
@@ -105,14 +105,28 @@ To see the time of each step of each command, open the **Activity** tab.
 
 ### Always-on mode
 
-Always-on mode is off by default. In this mode, earshot listens all the time and decides if you speak to it. To turn it on, open **Manage… > General** and set **Mode** to **Always on**. earshot never presses Send or does a risky action from always-on mode. The hold key stays available.
+Always-on mode is off by default. In this mode, earshot listens for a wake phrase. The default phrase is "hey jarvis". Say the phrase, then the command, for example "hey jarvis, open Notes". Speech without the phrase does not start a command.
+
+To turn on always-on mode:
+
+1. Open **Manage… > General**.
+2. Set **Mode** to **Always on**. The first time, earshot downloads the wake phrase models (about 18 MB). The download sends no audio.
+3. Click **Teach earshot your voice…**, then say the phrase 5 times. Say it the same way each time. earshot keeps a voice summary (256 numbers) and the sound pattern of the phrase on this Mac. It does not keep the audio.
+
+After you teach earshot, it finds the phrase by its sound. Any phrase, name or language works. A name that sounds almost the same after "hey" can also wake earshot, for example "hey Travis" for "hey jarvis". The voice check stops other people.
+
+Until you teach earshot your voice, any voice can wake it, and earshot finds the phrase by its spelling. Then real English words work best. For 5 s after a command, your voice can give the next command with no phrase.
+
+To change the phrase, type it in **Wake phrase** and click **Save**. Then teach earshot again with the new phrase.
+
+earshot never presses Send or does a risky action from always-on mode. The hold key stays available.
 
 ### Speech engines
 
 | Engine | Notes |
 |---|---|
 | Automatic (default) | Uses the Apple speech engine. |
-| Apple | Apple speech on this Mac. |
+| Apple | Apple speech on this Mac. On macOS 26, earshot uses SpeechTranscriber. On older macOS, on Intel Macs, and if SpeechTranscriber does not load, earshot uses Apple on-device dictation (SFSpeechRecognizer). Both keep the audio on this Mac. |
 | Parakeet | NVIDIA Parakeet through transcribe.cpp. earshot does not include the model file. Set the path to a Parakeet GGUF file in **Manage… > General**. If the path is empty, earshot uses the model file of the Hex app, if it is installed. |
 
 ### Jev (optional)

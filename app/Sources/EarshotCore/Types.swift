@@ -83,9 +83,13 @@ public struct ScreenSnapshot: Codable, Hashable, Sendable {
     public var windowTitle: String
     public var url: String?
     public var elements: [ScreenElement]
+    /// The id of the element that has the keyboard focus, if it is a text field that is not secure.
+    /// "type X" with no box name types there.
+    public var focusedID: String?
 
-    public init(bundleID: String, windowTitle: String, url: String? = nil, elements: [ScreenElement]) {
+    public init(bundleID: String, windowTitle: String, url: String? = nil, elements: [ScreenElement], focusedID: String? = nil) {
         self.bundleID = bundleID; self.windowTitle = windowTitle; self.url = url; self.elements = elements
+        self.focusedID = focusedID
     }
 }
 
@@ -124,10 +128,17 @@ public struct RouteResult: Sendable {
     public var why: String
     /// Other intents that the router also considered, best first. The feedback note can offer them.
     public var alternatives: [Intent]
+    /// True only for a bare "type" with no text (intent .none). The app can then type the next turn
+    /// into the focused text field. Nothing else sets it.
+    public var awaitsText: Bool
+    /// True only if the owner said a send phrase after the text ("type see you soon and send"). The router removes
+    /// the phrase from the text. The app decides if it presses Send. Only `.send` and this flag can lead to a send (R-NV-5).
+    public var sendAfter: Bool
 
-    public init(intent: Intent, confidence: Double, tier: RouterTier, ms: Double, why: String = "", alternatives: [Intent] = []) {
+    public init(intent: Intent, confidence: Double, tier: RouterTier, ms: Double, why: String = "", alternatives: [Intent] = [],
+                awaitsText: Bool = false, sendAfter: Bool = false) {
         self.intent = intent; self.confidence = confidence; self.tier = tier; self.ms = ms
-        self.why = why; self.alternatives = alternatives
+        self.why = why; self.alternatives = alternatives; self.awaitsText = awaitsText; self.sendAfter = sendAfter
     }
 }
 
@@ -150,8 +161,24 @@ public struct Utterance: Sendable {
     public var engine: String
     /// From the end of speech (or key release) to the final text.
     public var ms: Double
+    /// The pieces of `text` with their audio times, if the engine gives them (Apple SpeechTranscriber). Else empty.
+    public var words: [TimedWord]
 
-    public init(text: String, engine: String, ms: Double) { self.text = text; self.engine = engine; self.ms = ms }
+    public init(text: String, engine: String, ms: Double, words: [TimedWord] = []) {
+        self.text = text; self.engine = engine; self.ms = ms; self.words = words
+    }
+}
+
+/// One piece of a transcript (about one word) with its audio time (D-11).
+/// The times are seconds from the start of the turn (`SpeechEngine.begin`). Audio from before the start
+/// (the preroll) has negative times.
+public struct TimedWord: Sendable, Equatable {
+    /// The text as the engine wrote it, with its spaces and punctuation. The pieces joined give the transcript.
+    public var text: String
+    public var start: Double
+    public var end: Double
+
+    public init(text: String, start: Double, end: Double) { self.text = text; self.start = start; self.end = end }
 }
 
 public struct ActionOutcome: Codable, Sendable {

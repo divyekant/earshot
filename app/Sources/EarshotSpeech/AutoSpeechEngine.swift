@@ -57,9 +57,9 @@ public struct AutoPolicy: Sendable {
 ///   and Parakeet stops with no decode. So a slow Parakeet never makes the owner wait.
 /// - Until Parakeet is loaded (about 15 s), Apple makes the text.
 /// `lastTiming.why` tells which engine ran and why.
-public final class AutoSpeechEngine: SpeechEngine, SpeechTimingReporting, @unchecked Sendable {
+public final class AutoSpeechEngine: TurnSpeechEngine, PrerollControl, PhraseHintControl, @unchecked Sendable {
     public let parakeet: ParakeetEngine
-    public let apple: AppleSpeechEngine
+    public let apple: TurnSpeechEngine
     public var policy = AutoPolicy()
     public var reason = ""
     var pressure: () -> MemoryPressureLevel = MemoryPressureLevel.current
@@ -73,7 +73,7 @@ public final class AutoSpeechEngine: SpeechEngine, SpeechTimingReporting, @unche
     /// The error of the Parakeet load, if it failed.
     public private(set) var parakeetError: String?
 
-    public init(parakeet: ParakeetEngine, apple: AppleSpeechEngine) {
+    public init(parakeet: ParakeetEngine, apple: TurnSpeechEngine) {
         self.parakeet = parakeet
         self.apple = apple
         parakeet.warmEveryTurn = true
@@ -81,7 +81,7 @@ public final class AutoSpeechEngine: SpeechEngine, SpeechTimingReporting, @unche
     }
 
     /// "parakeet" when Parakeet is loaded, else "apple". The engine of each command is in `lastTiming`.
-    public var id: String { lock.withLock { parakeetReady } ? ParakeetEngine.engineID : AppleSpeechEngine.engineID }
+    public var id: String { lock.withLock { parakeetReady } ? ParakeetEngine.engineID : AppleSpeech.engineID }
 
     public var lastTiming: SpeechTiming? { lock.withLock { timing } }
 
@@ -104,6 +104,15 @@ public final class AutoSpeechEngine: SpeechEngine, SpeechTimingReporting, @unche
             }
         }
     }
+
+    /// Both engines get the longer preroll, because the choice of engine comes at `begin`.
+    public func setNextPreroll(seconds: Double) {
+        (apple as? PrerollControl)?.setNextPreroll(seconds: seconds)
+        parakeet.setNextPreroll(seconds: seconds)
+    }
+
+    /// Apple takes the hints. Parakeet has no context input, so the text strip removes the phrase from its text.
+    public func setPhraseHints(_ phrases: [String]) { (apple as? PhraseHintControl)?.setPhraseHints(phrases) }
 
     public func begin() throws {
         let (start, why) = policy.tryParakeet(loaded: lock.withLock { parakeetReady }, pressure: pressure())

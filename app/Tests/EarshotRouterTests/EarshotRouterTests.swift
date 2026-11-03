@@ -647,6 +647,189 @@ final class EarshotRouterTests: XCTestCase {
         XCTAssertNotEqual(off.intent, .openApp(appID: "claude"), off.why)
     }
 
+    // MARK: - Typing into a text box (live strings; the page and its labels are made up)
+
+    func boxes(focused: String? = "e2") -> RouteContext {
+        RouteContext(apps: Fixtures.apps, names: Fixtures.names, frontBundleID: "com.google.Chrome",
+                     screen: ScreenSnapshot(bundleID: "com.google.Chrome", windowTitle: "Assistant", elements: [
+                        Fixtures.el("e1", "AXTextArea", "Ask a question…", y: 500),
+                        Fixtures.el("e2", "AXTextArea", "Steer this thread…", y: 300),
+                        Fixtures.el("e3", "AXLink", "Home", y: 10),
+                     ], focusedID: focused))
+    }
+
+    func testTypeIntoTheFocusedField() async {
+        await expect("Type hi, this is a test.", .typeText("hi, this is a test"), boxes())
+        await expect("type I'm in the meeting", .typeText("I'm in the meeting"), boxes())
+        // With no focus and no search field, "type X" does not guess a box.
+        let r = await route("Type hi, this is a test.", boxes(focused: nil))
+        XCTAssertNotEqual(r.intent, .typeText("hi, this is a test"), r.why)
+        XCTAssertFalse({ if case .typeInto = r.intent { return true }; return false }(), r.why)
+    }
+
+    func testFocusIsAPressWord() async {
+        await expect("Focus on steer this thread.", .click(elementID: "e2"), boxes())
+        await expect("focus to steer this thread", .click(elementID: "e2"), boxes())
+    }
+
+    func testBoxAndTextInOneCommand() async {
+        let into = Intent.typeInto(elementID: "e2", text: "hi there")
+        await expect("type a message and steer this thread. Hi, this is a test",
+                     .typeInto(elementID: "e2", text: "Hi, this is a test"), boxes(focused: nil))
+        await expect("type hi there into steer this thread", into, boxes(focused: nil))
+        await expect("in steer this thread type hi there", into, boxes(focused: nil))
+        await expect("click steer this thread and type hi there", into, boxes(focused: nil))
+        await expect("focus on steer this thread then type hi there", into, boxes(focused: nil))
+        // The box words must match a text field: else the words stay whole.
+        await expect("type I'm in the meeting", .typeText("I'm in the meeting"), boxes())
+        let none = await route("in the kitchen type hi", boxes())
+        XCTAssertEqual(none.intent, .none, none.why)
+    }
+
+    func testCommandInALaterSentence() async {
+        await expect("Not a … useful functionality. Click on steer this thread and type, hi, this is thread.",
+                     .typeInto(elementID: "e2", text: "hi, this is thread"), boxes(focused: nil))
+        // A command in the first sentence keeps all the words.
+        await expect("Type hi. This is a test.", .typeText("hi. This is a test"), boxes())
+        XCTAssertEqual(CommandRouter.fromCommandSentence("Slack me. Click home", apps: Fixtures.apps), "Slack me. Click home")
+    }
+
+    func testHasCommandWord() {
+        let ctx = boxes()
+        XCTAssertFalse(CommandRouter.hasCommandWord("hi, this is a test", context: ctx))
+        XCTAssertFalse(CommandRouter.hasCommandWord("I think the meeting moved to Thursday", context: ctx))
+        XCTAssertTrue(CommandRouter.hasCommandWord("Type hi", context: ctx))
+        XCTAssertTrue(CommandRouter.hasCommandWord("uh, click home", context: ctx))
+        XCTAssertTrue(CommandRouter.hasCommandWord("Not a useful thing. Click home", context: ctx))
+        XCTAssertTrue(CommandRouter.hasCommandWord("Slack me, running late", context: ctx))
+        XCTAssertTrue(CommandRouter.hasCommandWord("send", context: ctx))
+        XCTAssertTrue(CommandRouter.hasCommandWord("open hn.com", context: ctx))
+    }
+
+    // MARK: - Live always-on cases: the message box, UI word pairs
+
+    func chatPage(focused: String? = nil) -> RouteContext {
+        RouteContext(apps: Fixtures.apps, names: Fixtures.names, frontBundleID: "com.tinyspeck.slackmacgap",
+                     screen: ScreenSnapshot(bundleID: "com.tinyspeck.slackmacgap", windowTitle: "Team chat", elements: [
+                        Fixtures.el("s1", "AXTextField", "Find a conversation…", y: 10, subrole: "AXSearchField"),
+                        Fixtures.el("s2", "AXTextArea", "Message the team", y: 600),
+                     ], focusedID: focused))
+    }
+
+    func testTypePrefersTheMessageBox() async {
+        await expect("type, dude, this is working beautifully.", .typeInto(elementID: "s2", text: "dude, this is working beautifully"),
+                     chatPage())
+        await expect("enter hello there", .typeInto(elementID: "s2", text: "hello there"), chatPage())
+        // "search for X" keeps the search field.
+        await expect("search for weekly notes", .typeInto(elementID: "s1", text: "weekly notes"), chatPage())
+        // The focus still wins.
+        await expect("type hello there", .typeText("hello there"), chatPage(focused: "s1"))
+        // A one-line field alone is not a message box.
+        let form = RouteContext(apps: Fixtures.apps, names: Fixtures.names, screen: ScreenSnapshot(bundleID: "com.example.form",
+            windowTitle: "Form", elements: [Fixtures.el("f1", "AXTextField", "Email", y: 10)]))
+        let r = await route("type hello there", form)
+        XCTAssertNotEqual(r.intent, .typeInto(elementID: "f1", text: "hello there"), r.why)
+    }
+
+    func testUIWordPairs() async {
+        let menus = MenuElements.elements([MenuEntry(path: ["View", "Reload This Page"]), MenuEntry(path: ["File", "New Tab"])])
+        let toolbar = [Fixtures.el("b1", "AXButton", "Back", y: 5), Fixtures.el("b2", "AXButton", "Reload", y: 5, x: 40)]
+        let ctx = liveContext(toolbar + menus)
+        let r = await route("click on refresh.", ctx)
+        XCTAssertEqual(r.intent, .click(elementID: "b2"), r.why)
+        XCTAssertEqual(r.tier, .fuzzy, "a word pair is never an exact match")
+        // One word of a three-word label is not a sure match, through a pair or not: the router asks, it does not guess.
+        for s in ["click on refresh.", "click on reload"] {
+            let r = await route(s, liveContext(menus))
+            XCTAssertLessThan(r.confidence, SafetyPolicy.minimumConfidence, "\(s): \(r.why)")
+        }
+        await expect("open settings", .click(elementID: "p1"), liveContext([Fixtures.el("p1", "AXButton", "Preferences", y: 5)]))
+        // No pair holds a risky word.
+        for (w, others) in UIWords.other {
+            XCTAssertFalse(SafetyPolicy.isRisky(w), w)
+            for o in others { XCTAssertFalse(SafetyPolicy.isRisky(o), o) }
+        }
+    }
+
+    // MARK: - Bare command words and lead fillers (always-on trial)
+
+    func testBareCommandWordNeverMatchesATarget() async {
+        let menus = MenuElements.elements([MenuEntry(path: ["Window", "Move & Resize", "Top"]),
+                                           MenuEntry(path: ["Window", "Move & Resize", "Bottom"]),
+                                           MenuEntry(path: ["File", "Open…"])])
+        let ctx = liveContext(menus + [Fixtures.el("e1", "AXButton", "Tap", y: 10)])
+        for s in ["type.", "Type", "open", "click", "click on", "focus", "go to", "Yeah, let's type."] {
+            let r = await route(s, ctx)
+            XCTAssertEqual(r.intent, .none, "\(s): \(r.why)")
+            XCTAssertEqual(r.awaitsText, s.lowercased().contains("type"), s)
+        }
+        let bare = await route("type.", ctx)
+        XCTAssertEqual(bare.why, "type with no text")
+        // "type" with text still types. Nothing else sets awaitsText.
+        let typed = await route("type hello there", boxes())
+        XCTAssertEqual(typed.intent, .typeText("hello there"))
+        XCTAssertFalse(typed.awaitsText)
+        // With no verb, a sound match on a menu item is not enough.
+        let top = await route("tup", ctx)
+        XCTAssertNotEqual(top.intent, .click(elementID: "m:Window>Move & Resize>Top"), top.why)
+        // "go back" and "scroll" are still commands.
+        await expect("go back", .back, ctx)
+    }
+
+    func testLeadFillersAndTheBeforeAnApp() async {
+        await expect("Yeah, let's open the Slack", .openApp(appID: "slack"))
+        await expect("okay so open Slack", .openApp(appID: "slack"))
+        await expect("um, let's open the Notes app", .openApp(appID: "notes"))
+        XCTAssertEqual(CommandRouter.dropLeadFillers("Yeah, let's open the Slack"), "open the Slack")
+    }
+
+    // MARK: - A send phrase after the text (R-NV-5)
+
+    func testTrailingSendIsNeverText() async {
+        let focused = boxes()
+        for (said, text) in [("type see you soon and send", "see you soon"), ("type see you soon, send", "see you soon"),
+                             ("Type see you soon and send it.", "see you soon"), ("type see you soon then send", "see you soon"),
+                             ("type see you soon and then send now", "see you soon")] {
+            let r = await route(said, focused)
+            XCTAssertEqual(r.intent, .typeText(text), "\(said): \(r.why)")
+            XCTAssertTrue(r.sendAfter, said)
+        }
+        let into = await route("type see you soon into steer this thread and send", boxes(focused: nil))
+        XCTAssertEqual(into.intent, .typeInto(elementID: "e2", text: "see you soon"), into.why)
+        XCTAssertTrue(into.sendAfter)
+        let chat = await route("message Felix see you soon and send")
+        XCTAssertEqual(chat.intent, .openChat(appID: "messages", target: "Felix", text: "see you soon"), chat.why)
+        XCTAssertTrue(chat.sendAfter)
+        // Not a send phrase: a word such as "sender", or "send" inside the text.
+        for (said, text) in [("type a note for the sender", "a note for the sender"), ("type I will send it", "I will send it")] {
+            let r = await route(said, focused)
+            XCTAssertEqual(r.intent, .typeText(text), "\(said): \(r.why)")
+            XCTAssertFalse(r.sendAfter, said)
+        }
+        // "send" alone is still the send intent, and nothing else sets sendAfter.
+        let send = await route("send", focused)
+        XCTAssertEqual(send.intent, .send)
+        XCTAssertFalse(send.sendAfter)
+        let click = await route("click home and send", focused)
+        XCTAssertFalse(click.sendAfter, click.why)
+        XCTAssertNil(CommandRouter.withoutTrailingSend("and send"))
+        XCTAssertEqual(CommandRouter.withoutTrailingSend("see you soon, send."), "see you soon")
+    }
+
+    func testMoreLeadFillers() async {
+        // D-12: only "send" with fillers is the send intent.
+        for said in ["Yeah, actually let's send", "okay so send", "Right, send.", "um, just send it", "Here, send"] {
+            await expect(said, .send)
+        }
+        let more = await route("Yeah, actually let's send the report to the team")
+        XCTAssertNotEqual(more.intent, .send, more.why)
+        await expect("Here, let's open Slack", .openApp(appID: "slack"))
+        XCTAssertEqual(CommandRouter.dropLeadFillers("Here, let's open Slack"), "open Slack")
+        // "here" counts only at the start, and "right" is not a filler in "right click".
+        XCTAssertEqual(CommandRouter.dropLeadFillers("open here"), "open here")
+        XCTAssertEqual(CommandRouter.dropLeadFillers("right click the file"), "right click the file")
+    }
+
     func testE2NoCommand() async {
         let r = await route("what a lovely day", news)
         XCTAssertEqual(r.intent, .none)

@@ -5,11 +5,13 @@ This design is a proposal. Phase 0 measurements can change it. Each section name
 ## 1. Pipeline
 
 ```
-mic ─► [1 Audio gate] ─► [2 Speech to text] ─► [3 "For me?" gate] ─► [4 Router] ─► [5 Actions] ─► [6 Feedback]
-         VAD                streaming ASR         rules + classifier     rules →        navigate /
-         end of turn                                                     embeddings →   focus / type /
-         owner voice                                                     tiny model     click
+mic ─► [1 Wake gate] ─► [2 Speech to text] ─► [3 Strip the phrase] ─► [4 Router] ─► [5 Actions] ─► [6 Feedback]
+        wake phrase       streaming ASR         (always-on only)        rules →        navigate /
+        owner voice                                                     embeddings →   focus / type /
+        end of turn                                                     tiny model     click
 ```
+
+With the hold key, the key replaces stages 1 and 3.
 
 ## 2. Latency budget (R-SP-1, R-SP-3)
 
@@ -17,7 +19,8 @@ mic ─► [1 Audio gate] ─► [2 Speech to text] ─► [3 "For me?" gate] �
 |---|---|
 | End of turn detected | 100–200 ms after speech stops |
 | Final transcript | 100–300 ms |
-| "For me?" gate + router | under 50 ms (tiers 0–1); under 300 ms (tier 2) |
+| Wake phrase detected (always-on) | 300–500 ms after the phrase; the command can follow at once |
+| Router | under 50 ms (tiers 0–1); under 300 ms (tier 2) |
 | Open app + conversation | 100–400 ms (deep link or quick switcher) |
 | Focus text box (accessibility) | under 100 ms native; under 300 ms Electron |
 | **Total to focused box** | **about 1 s** |
@@ -42,7 +45,7 @@ earshot uses one model for all apps. A command is one verb and one target.
 | type | `typeText`, `typeInto`, the text of `openChat` | "type see you at five", "search for voice control" |
 | scroll | `scroll` | "scroll down", "go to the top" |
 | back | `back` | "go back" |
-| send | `send` | "send" (hold key only, R-NV-5) |
+| send | `send` | "send" (hold key; in always-on, only "send" alone after typing, D-12, R-NV-5) |
 
 "Show numbers" and "hide numbers" are display helpers for press.
 
@@ -61,22 +64,58 @@ earshot uses one model for all apps. A command is one verb and one target.
 3. Every target goes through the same matcher and the same safety rules (`SafetyPolicy`), from any source.
 4. Facts about one app are data (`apps.json`, `names.json`, `focus-methods.json`). They are never code.
 
-### 3.1 Audio gate (R-ON-1, R-ON-3)
+Plain words with no command word are dictation: with the hold key, the pipeline types them into the focused text field (`typeText`), if `ScreenSnapshot.focusedID` names an editable field that is not a password field and the page is not a sign-in, code or payment page. Dictation never presses Return. Always-on mode dictates only after a bare "type": the router sets `RouteResult.awaitsText`, and the next turn that starts within 5 s (in the owner's voice, so it passed the voice check) types its words into the focused field with the same field check. A command word in that turn runs as a command. It is one turn only. The log keeps the word count, not the words. Only a turn whose FIRST sentence is a command runs as a command; a command word later in the text is typed. After earshot typed in always-on mode, a turn that starts within 3 s in the same app, with no command in its first sentence, goes on with the text (one space before it, never Return). Each result plays a short system sound if "Play sounds" is on: one for done, one for sent, one for failed, blocked or not sure. A quiet start sound (Tink, volume 0.3) plays the moment earshot starts to listen: on hold-key down, and on the wake phrase (also inside a follow-up turn). It is loaded and warmed up at start, so it plays 20-31 ms after the event. The voice check never hears it: a wake uses the audio of the phrase, before the sound. If earshot's own window is in front, the pipeline first brings back the app that was in front before it; earshot's own window is never a target.
 
-| Part | Proposed component | Notes |
+### 3.1 Wake gate (R-ON-1, R-ON-2, R-ON-3, D-11)
+
+| Part | Component | Notes |
 |---|---|---|
-| Voice activity detection (VAD) | Silero VAD (about 2 MB, MIT) | Also test TEN VAD on the owner's own audio. |
-| End of turn | Pipecat Smart Turn v3 (about 8 MB, BSD-2) | Runs only after the VAD reports silence. Vendor latency is about 12 ms. |
-| Owner voice check | ECAPA-TDNN or CAM++ speaker embedding (CoreML) | Enroll the owner once. Reject segments below a tuned cosine score. |
+| Wake phrase | icefall KWS Zipformer (gigaspeech, 3.49M parameters, Apache-2.0), Core ML INT8 (`aufklarer/KWS-Zipformer-3M-CoreML-INT8`), and audio templates (`TemplateMatcher`) | The encoder runs on 320 ms chunks. Vendor time: 5.4 ms for each chunk on Apple silicon. After the owner teaches the phrase, a streaming DTW (dynamic time warping) matches the encoder frames against the owner's takes, and the keyword decoder does not run (E5). It uses no spelling, so any phrase, name or language works. Before the teach step, the spelled spotter listens: the phrase is text, no training. |
+| Owner voice check | WeSpeaker ResNet34-LM (VoxCeleb, CC BY 4.0), Core ML (`aufklarer/WeSpeaker-ResNet34-LM-CoreML`) | 256-value embedding. Cosine similarity against the mean of 5 enrolment phrases. Threshold 0.35 (live trial: owner 0.50 to 0.73, another voice 0.06). |
+| End of turn | `SpeechDetector` (energy with a noise floor that adapts) | 550 ms of quiet after the command. After the phrase alone, it waits 2 s for the command. A turn that is expected to hold dictated text (after a bare "type", or after earshot typed in always-on mode) ends after 1200 ms of quiet, so a natural pause does not cut the sentence in two. |
 
-Swift SDKs: FluidAudio and speech-swift bundle these parts.
+The code is in `app/Sources/EarshotWake`. The spotter and voice code are copied from soniqo/speech-swift at `a57702e` (Apache-2.0, see THIRD_PARTY_NOTICES.md). The models download one time (about 18 MB) at pinned revisions, with a SHA-256 check, into `~/Library/Application Support/earshot/models/`.
+
+How a command flows (`EarshotInput/WakeTrigger.swift`):
+
+1. The wake listener (the spotter encoder, then the templates or the keyword decoder) listens to 16 kHz audio. Between turns, nothing else runs. Speech without the phrase never reaches the speech engine.
+2. The listener fires about 0.3 to 0.5 s after the phrase. If a voice is enrolled, the voice model scores the audio of the phrase. A low score stops here, and the log gets one line with no text.
+   - With templates, each new encoder frame (40 ms) updates the DTW match of each template. The score of a template is the mean cosine distance along its path: 0 is the same sound, 1 is an unrelated sound. The wake score is the mean of the 2 best template scores. earshot wakes when the score is below 0.33 and the next 2 frames give no lower score. The path can stay on a template frame up to 3 times (slower speech) or skip one frame (faster speech). After a wake, no second wake comes for 1.5 s.
+   - The match gives the first and the last frame of the phrase. These take the place of the time stamps of the word pieces, for the voice clip and for the time cut in step 4.
+   - The log line of a wake adds the match score and the worst part (the highest mean cost of 200 ms along the path). The worst part is not a wake limit. If sound-alike wakes occur, a limit of 0.5 on it is the first step (E5).
+3. The speech engine starts at the start of the phrase. `MicrophoneFeed` keeps 3 s of audio, and `PrerollControl.setNextPreroll` gives the engine the phrase and every word after it.
+4. The turn ends after the command. The pipeline removes the phrase, and the router runs as for the hold key.
+   - Apple SpeechTranscriber gives the audio time of each word (`.audioTimeRange`). The listener gives the end of the phrase. The pipeline drops the first words that start more than 0.15 s before the phrase end (`WakePhrase.cut`). The start is the sure edge of a word, and the phrase end from the listener tends to be a little late. So the spelling of the phrase does not matter ("Yeah, let's" for "hey atlas").
+   - Then the text match (`WakePhrase.strip`) removes what the time cut left, for example the last word of the phrase.
+   - With no word times (Parakeet, on-device dictation), the text match alone runs. Apple speech can write the phrase as other words ("Here, at least" for "hey atlas"). So at the start of the text, the match may differ in up to half of the letters of the phrase.
+   - Apple speech and dictation get the phrase as a hint (`contextualStrings`).
+5. For 5 s after a command, speech in the owner's voice starts a turn with no phrase. The voice is checked at the end of the turn. A follow-up turn that fails the voice check (another voice, or too short) shows the note "not sure it was your voice", with the failed sound. The log keeps its voice score and audio length, with no text. The listener keeps on for the first 2.5 s of that turn, with the same match. If the owner says the phrase again, the turn becomes a wake turn: the phrase is cut by time, and the voice of the phrase counts.
+6. The spelled spotter clears its state every 1.5 s with no wake (the upstream rule). While a guess is inside the phrase, the reset waits up to 1 s more, so a phrase that falls on the reset point can end. The template match has no such reset: each frame can start a new path.
+7. The listener counts near misses. The log gets the count every 60 s of audio and at each wake. It has no audio and no text.
+   - Spelled spotter: the top guess matched half of the phrase pieces or more, then fell back with no wake, and no wake came in 1 s. The log also gets the best part of the phrase.
+   - Templates: a run of frames with a score below 0.41 (the limit + 0.08) that did not wake and did not go below the limit. The log also gets the lowest score of these runs. Use it to tune the limit.
+
+The enrolment (Manage > General > Teach earshot your voice) records 5 phrases. For each take, earshot finds the loud part and runs the encoder on it, with 0.3 s of digital quiet before it and 0.5 s after it. The template is the encoder frames of the loud part, with one more frame at each end. Then earshot scores each take against the templates of the other 4. A take with a lowest score above 0.33 gives no template: it does not sound like the others. At least 3 templates must stay, else the owner must teach earshot again. E5 proposed to ask again for such a take. The build leaves it out instead, so the teach step stays one pass.
+
+earshot keeps the mean voice embedding and the templates (16-bit floats, about 100 KB for 5 takes) in `voice.json`. It keeps no audio, and earshot cannot play a template back. The templates count only for the phrase of the enrolment. After a change of the phrase, the spelled spotter listens until the owner teaches earshot the new phrase. The voice embedding counts for any phrase. A profile from before the templates has none: the spelled spotter listens, and the status line in Manage > General asks the owner to teach earshot again. The enrolment no longer learns word pieces for a made-up name.
+
+Limits:
+- The spelled spotter is English only. A made-up name ("hey earshot") also wakes it on sound-alikes ("hey, your shot").
+- The templates match the sound, not the person. The voice check must stop other people.
+- The templates wake on near names after "hey", for example "hey, Travis" for "hey jarvis" (E5). They do not wake on a sentence that only holds the name.
+- The limit 0.33 comes from synthetic voices. The live log of near misses must confirm it.
+- The voice check is less sure on short audio.
+- Intel Macs run Core ML on the CPU. Measure the speed there. The template match adds about 16 ms of CPU time for 10 s of audio (5 templates, release build on Linux, one core). The keyword decoder (beam search and joiner) does not run in template mode.
+
+E5 (2026-11-03, [experiments/E5-wake-templates.md](experiments/E5-wake-templates.md)) measured the spotter against audio templates on 10 synthetic voices and 8 phrases. The spotter matches the spelling of the phrase, so it misses rare words and names: 56 % of test commands woke it with the reset fixed. Audio templates of the owner's 5 takes, matched with DTW (dynamic time warping) on the same encoder frames, woke on 93 %, with no false wake in 8.9 h of own talk. The owner chose this method on 2026-11-03: after the owner teaches the phrase, the template match replaces the keyword decoder. The voice check stays. The template match is built (`TemplateMatcher`, `WakeTemplates`). A live check on the owner's voice must confirm the bench numbers.
 
 ### 3.2 Speech to text (R-MD-1, R-MD-5)
 
 | Option | Use when |
 |---|---|
-| Parakeet 0.6B, the model file of Hex (`parakeet-unified-en-0.6b-Q8_0.gguf`, transcribe.cpp on Metal) | Optional, when the owner chooses "Parakeet" in Settings. It is not the default (live test 2026-11-02, below). earshot reads the file in place, so there is no download. E2: 114 of 126 commands routed correctly, 14.9 % word errors, 34 ms median on short commands. It loads in 14.4 s and uses about 890 MB, so it must stay loaded. English only. Weights CC BY 4.0. |
+| Parakeet 0.6B, the model file of Hex (`parakeet-unified-en-0.6b-Q8_0.gguf`, transcribe.cpp on Metal) | Optional, when the owner chooses "Parakeet" in Settings. It is not the default (live test 2026-11-02, below). earshot reads the file in place, so there is no download. E2: 114 of 126 commands routed correctly, 14.9 % word errors, 34 ms median on short commands. It loads in 14.4 s, so it stays loaded. From transcribe.cpp 0.4.1 the model file is mapped: the footprint after load fell from 887 MB to about 190-205 MB, and macOS can drop the pages under pressure (memory study 2026-11-03, PR #80). English only. Weights CC BY 4.0. |
 | Apple SpeechTranscriber (Speech framework, macOS 26 and later) | Default ("auto"). It is built into macOS and runs on the device. macOS manages the model, so earshot ships no speech model. E0: 14 of 14 commands heard correctly, final text 23 to 101 ms after key release. E2: 113 of 126 routed correctly, 18.8 % word errors, 56 ms median. It takes name hints (`AnalysisContext.contextualStrings`), but in E2 the hints did not change the text. |
+| Apple on-device dictation (`SFSpeechRecognizer`, `requiresOnDeviceRecognition`, macOS 14 and later) | The Apple engine on Intel Macs and on macOS before 26, and the fallback if SpeechTranscriber does not load. It runs on the device and never sends audio to a server. If the Mac cannot recognize the locale on the device, the engine does not start. Latency: measure on the Intel Mac (MacBook Pro 13", 2019, i5-8257U, 8 GB, macOS 15.7). |
 | Nemotron-3.5-ASR-Streaming-0.6B (speech-swift) | English and Hindi. Hindi word error rate is 8.0 at 160 ms chunks (model card). Test the Hinglish fine-tunes. |
 | Moonshine v2 small (MIT, 123M) | Fastest English-only option. The vendor reports 73 ms. |
 
@@ -97,15 +136,11 @@ E2 (section 6.2) chose Parakeet by a small margin: 1 command in 126, on `say` vo
 
 Both engines miss the same names, so the router must also match names by sound.
 
-### 3.3 "Is this for me?" gate (R-ON-2, R-ON-5)
+### 3.3 "Is this for me?" (R-ON-2, R-ON-5)
 
-No open model for device-directed speech detection (DDSD) exists. Apple's work is paper-only, and Attention Labs SAA is cloud-only. Build the gate in layers:
+The wake phrase decides (D-11). The first design had a text gate with no wake word (a prefix rule, a follow-up window and a call context). It passed common command words in normal talk, and it had no voice check. D-11 removed it.
 
-1. **Prefix rule.** A transcript that starts with a known app name, verb or command word passes at once. Examples: "Slack…", "click…", "go to…", "show numbers".
-2. **Follow-up window.** For a few seconds after a command, accept speech without a prefix, for example the dictated message text.
-3. **Context.** If a call app has the microphone, require the prefix.
-4. **Classifier.** A small text classifier for other cases. Train it on the logs from Phase 3.
-5. **Safety.** Actions that cannot be undone, such as Send, need an explicit spoken command. A false trigger can only focus, open or type.
+The safety rule stays: actions that cannot be undone, such as Send, need the hold key. A false wake can only focus, open or type (`ActionRules.sendBlock`). One narrow exception (D-12): in always-on mode, "send" alone sends if the voice of the turn was checked as the owner's (a wake in the owner's voice, or a follow-up turn with a voice score), earshot typed within 5 s, and the same app is in front. The pipeline checks this and sets `CommandInfo.ownerSendAfterTyping`; `sendBlock` then also checks the message box, the box text, the tier and the page.
 
 ### 3.4 Router: "System 1" (R-SP-2, R-MD-2)
 
@@ -152,13 +187,13 @@ E0 used each app's own search in place of links, so the owner gives names only. 
 
 **Click.**
 1. Collect buttons, links, menu items and rows from the front window. In a browser, find the page on screen with a hit test in the front window, and read its visible elements with one `AXUIElementsForSearchPredicate` call (12 ms in E2). Chrome keeps the pages of hidden tabs in the tree, so a page found by a tree search can be a hidden tab.
-2. Fuzzy-match the spoken label to `AXTitle`, `AXDescription` and `AXValue`. Numbers must match exactly. Block every label with a risky word (send, pay, delete, submit, vote, star and similar).
+2. Fuzzy-match the spoken label to `AXTitle`, `AXDescription` and `AXValue`. Numbers must match exactly. Block every label with a risky word (send, pay, delete, submit, vote, star and similar). A title is not a command: a tab button, and a menu item that names an open tab or window of the app (found by data, not by menu names), use the rule of a link. A title is risky only if it has 3 words or fewer and a risky word, or if it starts with a risky word. Bookmarks and History menus are not targets.
 3. Act only on a page of the expected app or site. Never act on a sign-in, code or payment page.
 4. Press the match with `AXPress` if the element offers it. A Chrome link does not offer it: `AXPress` returns success and does nothing (E2, section 5.6). Else click a point where the top element on screen is the match, and move the pointer back. If no such point exists, scroll the element into view (`AXScrollToVisible`) and try again.
 5. For ordinal commands ("second email", "second result"), sort the rows by position on screen. On a web page, a result is a link in a heading.
 6. If no label matches, run Apple Vision OCR (about 130–230 ms) and click the matched text.
 7. For "show numbers", draw numbered labels over the same element list.
-8. Optional, off by default (D-10, "Jev sees the screen"): if no label matches a hold-key click, take one picture of the front window, draw the numbers of step 7 on it, and ask Jev once. Jev picks a number, or else gives a box. For a box, earshot clicks its middle only if the element under the point is of the front app, has a label, and is not risky. The click then goes through steps 3 and 4. Never on a sign-in, code or payment page.
+8. Optional, off by default (D-10, "Jev sees the screen"): if no label matches a hold-key click, take one picture of the front window, draw the numbers of step 7 on it, and ask Jev once. Jev picks a number, or else gives a box. For a box, earshot clicks its middle only if the element under the point is of the front app, has a label, and is not risky. The click then goes through steps 3 and 4. Never on a sign-in, code or payment page. The command path asks only after the route, only for a press by the router's verb parse, and only if the route has no sure target and was not blocked. A blocked route never goes to the screenshot. The click runs at the tier `jev`.
 
 E2 measured this in Chrome on 4 public pages: 42 of 43 commands correct, 25 of 25 link clicks changed the page, 0 risky elements pressed.
 
@@ -205,11 +240,11 @@ Label match, ordinal match, number hints, OCR fallback. E2 tested the label matc
 
 ### Phase 3: Always on
 
-Add the audio gate and the "for me?" gate (prefix rule, follow-up window, call context). Log every trigger and every rejection for one week.
+Add the wake gate (wake phrase, owner voice, follow-up window; D-11). Log every wake, every rejected wake and every voice score for one week. Then tune the voice threshold and decide if a trained wake model (livekit-wakeword) is needed.
 
 ### Phase 4: Learn
 
-Fine-tune the gate classifier and the tier-2 router on the Phase 3 logs. Add Hinglish support if Phase 0 found a usable model.
+Fine-tune the tier-2 router on the Phase 3 logs. Add Hinglish support if Phase 0 found a usable model.
 
 ## 6. Existing projects to study
 
@@ -221,3 +256,4 @@ Fine-tune the gate classifier and the tier-2 router on the Phase 3 logs. Add Hin
 | FluidAudio, speech-swift | Apache-2.0 (check model terms) | VAD, ASR, turn detection, speaker embeddings in Swift |
 | Talon + Rango | Closed core + MIT | Command grammar and click-hint ideas |
 | macOS Voice Control | Apple | Reference behavior for "click <name>" and "show numbers" |
+| Hex (anomalyco/hex) | MIT | Parakeet speech in about 155 ms on this Mac. A Hex transformation can give the transcript to another program (E4). |

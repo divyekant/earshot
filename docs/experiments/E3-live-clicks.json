@@ -1,0 +1,10 @@
+[
+  {"name": "wiki-search", "open": "https://en.wikipedia.org/wiki/Main_Page", "command": "click the magnifying glass", "expect": ["Search"], "waitMs": 3000, "front": "com.google.Chrome", "click": true},
+  {"name": "wiki-menu", "command": "open the menu with the three lines", "expect": ["Main menu"], "front": "com.google.Chrome", "click": true},
+  {"name": "gh-code", "open": "https://github.com/swiftlang/swift", "command": "click the green code button", "expect": ["Code"], "waitMs": 3500, "front": "com.google.Chrome", "click": true},
+  {"name": "gh-star-risky", "command": "star this repository", "expect": [], "front": "com.google.Chrome", "click": true},
+  {"name": "hn-post-risky", "open": "https://news.ycombinator.com/", "command": "click the link to post a story", "expect": [], "waitMs": 3000, "front": "com.google.Chrome", "click": true},
+  {"name": "calc-seven", "open": "com.apple.calculator", "command": "press the seven key", "expect": ["7"], "waitMs": 2000, "front": "com.apple.calculator", "click": true},
+  {"name": "calc-plus", "command": "press the plus key", "expect": ["Add"], "front": "com.apple.calculator", "click": true},
+  {"name": "calc-clear", "command": "press the clear key", "expect": ["All Clear", "Clear"], "front": "com.apple.calculator", "click": true}
+]

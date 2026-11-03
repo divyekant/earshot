@@ -49,6 +49,12 @@ public struct SpeechDetector: Sendable {
     private var turnMs: Double = 0
     /// After a forced stop, wait for quiet before the next turn. So a TV does not make turn after turn.
     private var waitForQuiet = false
+    /// A turn that the wake phrase opened, with no speech after the phrase yet. It waits `graceMs` for the command.
+    public private(set) var awaitingCommand = false
+    private var graceMs: Double = 0
+    /// The end silence of the open turn, if not `config.endSilenceMs`. Dictation turns use a longer pause, so a
+    /// natural pause does not cut a sentence in two. The wake trigger sets it at the start of a turn.
+    public var endSilenceOverrideMs: Double?
 
     public init(config: DetectorConfig = DetectorConfig()) { self.config = config }
 
@@ -79,15 +85,31 @@ public struct SpeechDetector: Sendable {
         }
 
         turnMs += config.frameMs
+        if awaitingCommand {
+            // After the wake phrase: wait for the command. A short pause after the phrase is normal.
+            loudRun = loud ? loudRun + 1 : 0
+            if loudRun >= config.startFrames {
+                awaitingCommand = false
+                quietMs = 0
+                loudRun = 0
+            } else {
+                quietMs = loud ? 0 : quietMs + config.frameMs
+                if quietMs >= graceMs {
+                    // No command after the phrase. End, not drop: the command can be in the audio before the
+                    // wake ("hey jarvis, stop" said fast). The speech engine has it, and an empty text does nothing.
+                    inTurn = false
+                    awaitingCommand = false
+                    quietMs = 0
+                    return .end
+                }
+            }
+            if turnMs >= config.maximumTurnMs { return forcedStop() }
+            return nil
+        }
         if loud { speechMs += config.frameMs; quietMs = 0 } else { quietMs += config.frameMs }
 
-        if turnMs >= config.maximumTurnMs {
-            inTurn = false
-            waitForQuiet = true
-            quietMs = 0
-            return .drop("longer than \(Int(config.maximumTurnMs / 1000)) s")
-        }
-        if quietMs >= config.endSilenceMs {
+        if turnMs >= config.maximumTurnMs { return forcedStop() }
+        if quietMs >= (endSilenceOverrideMs ?? config.endSilenceMs) {
             inTurn = false
             quietMs = 0
             if speechMs < config.minimumSpeechMs { return .drop("speech shorter than \(Int(config.minimumSpeechMs)) ms") }
@@ -96,10 +118,46 @@ public struct SpeechDetector: Sendable {
         return nil
     }
 
+    private mutating func forcedStop() -> SpeechEvent {
+        inTurn = false
+        awaitingCommand = false
+        waitForQuiet = true
+        quietMs = 0
+        return .drop("longer than \(Int(config.maximumTurnMs / 1000)) s")
+    }
+
     /// Ends a turn from the outside. Returns `.drop` if a turn was open.
     public mutating func reset() -> SpeechEvent? {
-        defer { inTurn = false; loudRun = 0; quietMs = 0; waitForQuiet = false }
+        defer { inTurn = false; awaitingCommand = false; loudRun = 0; quietMs = 0; waitForQuiet = false }
         return inTurn ? .drop("input stopped") : nil
+    }
+
+    /// Feeds the level of one frame, but only to follow the noise floor. It opens no turn.
+    /// The wake trigger uses it while it waits for the wake phrase.
+    /// - Returns: true if the frame counts as speech.
+    @discardableResult
+    public mutating func track(db: Double) -> Bool {
+        let level = db.isFinite ? max(db, -120) : -120
+        let loud = level >= thresholdDb
+        adaptFloor(level, loud: loud)
+        return loud
+    }
+
+    /// Opens a turn from the outside, after the wake phrase (D-11). The phrase counts as speech, so a short
+    /// command after it is not dropped.
+    /// - Parameters:
+    ///   - heardSpeech: true if the owner already spoke after the phrase. Then the normal end silence ends the turn.
+    ///   - quietMs: the quiet time since the last speech.
+    ///   - graceMs: if the owner did not speak after the phrase, the turn waits this long for the command.
+    public mutating func open(heardSpeech: Bool, quietMs: Double, graceMs: Double) {
+        inTurn = true
+        waitForQuiet = false
+        awaitingCommand = !heardSpeech
+        self.graceMs = graceMs
+        self.quietMs = max(0, quietMs)
+        speechMs = config.minimumSpeechMs
+        turnMs = 0
+        loudRun = 0
     }
 
     private mutating func adaptFloor(_ level: Double, loud: Bool) {

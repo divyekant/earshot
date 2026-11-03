@@ -54,7 +54,7 @@ A native menu-bar app also uses less memory than Electron.
 
 ## D-7. Do not use computer-use agents or Cua Driver
 
-The owner asked about "CUA" on 2026-11-02. The facts below come from the trycua/cua README and the cua.ai documentation. Nobody ran Cua Driver on this Mac.
+The owner asked about "CUA" on 2026-11-02. The facts below come from the trycua/cua README and the cua.ai documentation. Later the same day, E4 ran Cua Driver on this Mac (see the end of this section).
 
 | Option | Result | Reason |
 |---|---|---|
@@ -72,6 +72,8 @@ Cua Driver is the only part of trycua/cua that operates the real Mac. These are 
 - If a model controls it, the model can press Return. Return sends the message in Slack, WhatsApp and Messages (R-NV-5).
 
 **Decision:** Keep the direct Accessibility approach (DESIGN.md, section 3.5). The E0 probe uses it, and it reached the Slack text box in a median of 466 ms (docs/experiments/E0-viability.md). Cua Driver reads the accessibility state again after each action to make sure that the change occurred. E0 already does a similar check: it types text only when the chat name on the screen is correct. Keep this check in the final design.
+
+**E4 (2026-11-02):** E4 ran Cua Driver 0.38 on this Mac, with the same glue program as a direct AX executor ([experiments/E4-hex-cua.md](experiments/E4-hex-cua.md)). A Cua click took 1.8 to 2.2 s. The AX click took 318 to 333 ms. A bare Cua call took 15 ms, so the cost is in the action tools. One Cua click reported success, but the page did not change. Cua shows no keyboard focus, so a chat step cannot prove where its text goes (R-NV-5). The decision stands.
 
 ## D-8. Do not use Clicky, HeyClicky or LocalClicky
 
@@ -134,3 +136,94 @@ The TypeSafe API takes images (an `assets` map and the header `TypeSafe-Danger-Z
 
 **How it differs from D-2.** D-2 rejected agents that take a screenshot, ask a large model, act, and repeat, in 3 to 4 steps of 1 to 5 s each. This fallback asks once for each command, only after the rules fail, and never loops (R-SP-2). The rules still decide most commands in a few ms.
 
+## D-11. Wake phrase and owner voice for always-on
+
+Date: 2026-11-02.
+
+The owner asked: always-on mode must start only on a wake phrase or a name, as "Hey Siri" does, and react only to the owner's voice. Use a light version of an open project that solves this. This replaces "no wake word" in R-ON-1 and the "is this for me?" text gate in always-on mode. The full search is in [research/wake-phrase-options.md](research/wake-phrase-options.md).
+
+| Option | Result | Reason |
+|---|---|---|
+| Keyword spotter + speaker check, files copied from soniqo/speech-swift (Apache-2.0) | Chosen | The phrase is text, so no training. Core ML, macOS 14, Intel Macs. About 18 MB of models. |
+| The speech-swift package | Rejected | It needs macOS 15, and its speaker code pulls in MLX. That breaks the macOS 14 and Intel build. |
+| k2-fsa/sherpa-onnx | Rejected | Same models, but a C++ static framework, ONNX Runtime and a fetch script. |
+| livekit/livekit-wakeword, openWakeWord | Not now | Fewer false wakes, but each phrase needs a trained model. The openWakeWord ready models are non-commercial. Keep livekit-wakeword as the upgrade if the spotter fires too often. |
+| Picovoice Porcupine + Eagle | Rejected | Closed engine and an online access key (R-MD-4). |
+| A text match on the transcript (Swabble) | Rejected | Speech to text runs on all speech, and there is no voice check. |
+
+Tests on 10 synthetic voices (Piper text to speech, 800 phrases of other talk, the ONNX version of the same spotter):
+
+| Phrase | Owner phrases that woke it | Other talk that woke it | Delay after the phrase |
+|---|---|---|---|
+| "hey earshot", spelled | 7 of 168 | 0 of 600 | 476 ms |
+| "hey earshot", learned from 5 owner phrases | 64 of 80 | 53 of 800, all sound-alikes ("hey, your shot") | 470 ms |
+| "hey jarvis", spelled | 69 of 80 | 0 of 800 | 325 ms |
+
+The spotter does not know the made-up word "earshot". It hears "your shot" or "here shut".
+
+Live trial on the owner's Mac (2026-11-02, phrase "hey atlas", Apple speech, 15 records):
+
+| Measure | Result |
+|---|---|
+| Model download and load | 7 s for the download. No errors. |
+| Owner wakes | 8. Voice scores 0.50 to 0.73 (median 0.63). Enrolment self score 0.75. |
+| Another voice (`say` through the speaker) | 1 wake, voice score 0.06, rejected. 4 other `say` voices did not wake the spotter. |
+| Commands that worked | 238 to 541 ms in total. |
+| Commands that failed | 7 began with a misheard form of the phrase ("Here, at least", "He at least"). The strict text match kept it, so the router found no command. The looser match at the start of the text removes it in 5 of the 7. |
+
+Second live test on the owner's Mac (2026-11-02, develop `e6f0ba8`, phrase "hey atlas", Apple speech):
+
+| Measure | Result |
+|---|---|
+| Wake turns | 4 of 4 fired in the owner's voice (0.53 to 0.66). |
+| Follow-up turns | 3 began with "Yeah, let's": the owner said the phrase again in the 5 s window. The spotter did not listen in a turn, so no wake came. |
+| Text match | The edit distance from "yeahlets" to "heyatlas" is 5. The loose limit is 4, so the text kept it. Result: one 2.6 s Jev and app search, and one lost "type". |
+
+**Decision:**
+- The keyword spotter (icefall KWS Zipformer, 3.49M parameters) listens for the phrase. The phrase is a setting. The default is "hey jarvis", because real words work best.
+- If the spelled phrase does not fire on the owner's enrolment phrases (a made-up name), the spotter also listens for the word pieces that it heard in them.
+- At each wake, the voice model (WeSpeaker ResNet34-LM) compares the voice of the phrase with the mean of the 5 enrolment phrases. The threshold is 0.35 (cosine). The live trial gave 0.50 to 0.73 for the owner and 0.06 for another voice. Tune it from the log.
+- Speech without the phrase never reaches the speech engine. So earshot keeps no text of talk that is not for it. A wake in another voice, and a follow-up turn in another voice, are logged with the voice score and no text.
+- The speech engine starts at the phrase (a longer preroll), and the pipeline removes the phrase from the text. Speech to text can write a known phrase as other words, so the first words of the text may differ from the phrase in up to half of its letters.
+- For 5 s after a command, the owner's voice can give the next command with no phrase. The voice is checked at the end of that turn.
+- Remove the phrase by time, not by spelling, where the engine gives word times (Apple SpeechTranscriber). Keep the text match as the fallback. The spotter stays on in the first 2.5 s of a follow-up turn, so a phrase said again there becomes a wake. Log near misses as a count and the best part of the phrase only.
+- The safety rules do not change. Always-on never presses Send or a risky button (R-ON-5, `ActionRules.sendBlock`). The hold key stays (R-ON-4).
+- The models download one time from Hugging Face, at pinned revisions, with a SHA-256 check. No audio leaves the Mac (R-MD-1).
+
+**Change on 2026-11-03 (E5, [experiments/E5-wake-templates.md](experiments/E5-wake-templates.md)):** the owner wants any phrase, name or language to work. The spelled spotter matches the spelling, so it misses rare words and names.
+
+| Method on the E5 bench (10 synthetic voices, 8 phrases) | Test commands that woke it, near | Far | False wakes in 8.9 h of own talk |
+|---|---|---|---|
+| Spelled spotter, reset fixed | 56 % | 45 % | 0 |
+| Audio templates of the 5 takes, streaming DTW, limit 0.33 | 93 % | 95 % | 0 |
+
+- After the owner teaches the phrase, audio templates find it: the spotter encoder runs, and a streaming DTW matches its frames against the owner's 5 takes. The keyword decoder does not run.
+- A take that does not match the other takes gives no template. At least 3 must stay.
+- The enrolment no longer learns word pieces for a made-up name.
+- Before the teach step, and for a profile from before the templates, the spelled spotter listens, as above.
+- The voice check, the time cut of the phrase and the follow-up turn do not change.
+- livekit-wakeword stays "Not now": it needs a training run for each phrase.
+- A live check on the owner's voice must confirm the bench numbers and the limit 0.33.
+
+## D-12. "send" alone after typing, in always-on mode
+
+Date: 2026-11-03.
+
+The owner chose this on a card: in always-on mode, earshot never sent, so a dictated message needed the hold key to send. The wake phrase and the owner voice check (D-11) make a false send much less likely than before.
+
+| Option | Result | Reason |
+|---|---|---|
+| Send stays hold-key only | Rejected by the owner | It breaks a hands-free message. |
+| "send" alone after typing, in the owner's checked voice | Chosen | Narrow: it needs a recent typing, the same app and a checked voice. |
+| Any "send" in always-on | Rejected | A false wake or another voice could send. |
+
+**Decision:**
+- In always-on mode, "send" alone (the router's send phrases, after lead fillers) sends only if all are true:
+  - the voice of the turn was checked as the owner's: a wake in the owner's voice, or a follow-up turn with a voice score above the threshold;
+  - earshot typed into a box within 5 s (typeText, typeInto, armed typing, or openChat with text);
+  - the front app is the app of the typing.
+- Each typing allows one send.
+- `ActionRules.sendBlock` keeps all its other checks: the tier, the message box, a box with text, and no sign-in, code or payment page.
+- Anything else in always-on mode stays blocked: "send needs the hold key".
+- A trailing "and send" after text is never typed. With the hold key, earshot types and then sends. In always-on mode, it types only, and the note says to say "send" on its own.
+- If no voice is enrolled, no voice check runs, so always-on never sends.

@@ -41,11 +41,13 @@ public struct CommandRouter: Router {
             if let i = await Self.ask(tier2, text, labels, budgetMs: tier2BudgetMs), i >= 0, i < d.options.count {
                 let intent = d.options[i].intent
                 return RouteResult(intent: intent, confidence: Self.tier2Confidence, tier: .jev, ms: ms(),
-                                   why: "tier 2: \(d.why)", alternatives: alternatives(intent))
+                                   why: "tier 2: \(d.why)", alternatives: alternatives(intent),
+                                   sendAfter: d.sendAfter && Self.hasText(intent))
             }
         }
         return RouteResult(intent: d.intent, confidence: Self.confidence(d), tier: Self.tier(d), ms: ms(),
-                           why: d.why, alternatives: alternatives(d.intent))
+                           why: d.why, alternatives: alternatives(d.intent), awaitsText: d.awaitsText,
+                           sendAfter: d.sendAfter && Self.hasText(d.intent))
     }
 
     /// The words that no known name explains, and the chat app that the owner named, if any.
@@ -54,6 +56,13 @@ public struct CommandRouter: Router {
         let d = ChatRouter.decide(text, apps: context.apps, names: context.names, frontBundleID: context.frontBundleID)
         guard let n = d.heardName else { return nil }
         return (n, d.heardApp)
+    }
+
+    /// True if the words ask for a press on the screen ("click X", "open the X tab"), by the router's own verb parse.
+    /// Not for typing, scrolling, back or an ordinal. The screenshot fallback runs only for a press (D-10).
+    public static func isPress(_ text: String) -> Bool {
+        let p = ScreenRouter.parse(text)
+        return p.isCommand && p.kind == .press && !p.target.isEmpty
     }
 
     /// The label words that the owner said for a click, for example "send" in "click the send button".
@@ -72,12 +81,137 @@ public struct CommandRouter: Router {
                                            "remove the numbers", "no numbers", "stop numbers", "hide labels"]
     /// Verbs that ask for a press on the screen, not for a chat.
     static let pressOnly: Set<String> = ["click", "press", "tap", "select", "choose", "hit", "follow", "visit", "toggle",
-                                         "expand", "check", "pick"]
+                                         "expand", "check", "pick", "focus"]
     static let typeFirst: Set<String> = ["search", "look", "type", "enter"]
     static let fillers: Set<String> = Set(["hey", "ok", "okay", "earshot", "please", "now", "then", "and"]).union(TextKit.hesitations)
 
+    // MARK: - Command words
+
+    /// Words that start a command.
+    static let commandStarts: Set<String> = ScreenRouter.pressVerbs.union(ScreenRouter.typeVerbs).union(ChatRouter.commandVerbs)
+        .union(pressOnly).union(["scroll", "back", "focus", "in", "into"])
+
+    /// True if the words hold a command word: a verb such as "click", "type" or "message", an app name at the start,
+    /// "send", "show numbers", a web address, or a later sentence that starts with a command word.
+    /// The app uses it for dictation: plain words with no command word in a focused text field (hold key only).
+    public static func hasCommandWord(_ text: String, context: RouteContext) -> Bool {
+        sentences(text).contains { isCommandSentence($0, apps: context.apps) }
+    }
+
+    /// True if the FIRST sentence is a command. Dictation after "type" uses it: a command word later in the text,
+    /// for example an app name, is text (live test: a dictated sentence that named "earshot" opened a Slack channel).
+    public static func startsWithCommand(_ text: String, context: RouteContext) -> Bool {
+        sentences(text).first.map { isCommandSentence($0, apps: context.apps) } ?? false
+    }
+
+    /// The sentences of the words, split after ".", "!", "?" or "…" and a space.
+    static func sentences(_ text: String) -> [Substring] {
+        var out: [Substring] = []
+        var start = text.startIndex
+        var i = text.startIndex
+        while i < text.endIndex {
+            let next = text.index(after: i)
+            if ".!?…".contains(text[i]), next < text.endIndex, text[next].isWhitespace {
+                out.append(text[start..<next])
+                start = next
+            }
+            i = next
+        }
+        out.append(text[start...])
+        return out.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+    }
+
+    /// True if one sentence is a command: a command word in its first three words (after fillers), an app name
+    /// at the start, or a fixed phrase (send, show numbers, a web address).
+    static func isCommandSentence<S: StringProtocol>(_ sentence: S, apps: [AppEntry]) -> Bool {
+        let text = String(sentence)
+        var words = TextKit.words(text)
+        while let f = words.first, fillers.contains(f) || ScreenRouter.fillers.contains(f), words.count > 1 { words.removeFirst() }
+        guard !words.isEmpty else { return false }
+        let phrase = words.joined(separator: " ")
+        if sendPhrases.contains(phrase) || showNumbers.contains(phrase) || hideNumbers.contains(phrase) { return true }
+        if words.prefix(3).contains(where: { commandStarts.contains($0) && $0 != "in" && $0 != "into" }) { return true }
+        if ["in", "into"].contains(words[0]), words.contains("type") || words.contains("enter") { return true }
+        if WebAddress.parse(text) != nil { return true }
+        let kind = ScreenRouter.parse(text).kind
+        if kind == .scroll || kind == .back || kind == .ordinal { return true }
+        // An app name at the start: "Slack me, running late", "Messages Ravi".
+        for span in 1...min(3, words.count) where exactApp(words[0..<span].joined(), apps) != nil { return true }
+        return false
+    }
+
+    /// The words from the first command sentence on. If the first sentence is a command, all the words.
+    /// "Not a useful feature. Click on notes and type hi." gives "Click on notes and type hi."
+    static func fromCommandSentence(_ text: String, apps: [AppEntry]) -> String {
+        let parts = sentences(text)
+        guard parts.count > 1, !isCommandSentence(parts[0], apps: apps),
+              let k = parts.indices.dropFirst().first(where: { isCommandSentence(parts[$0], apps: apps) }) else { return text }
+        return String(text[parts[k].startIndex...]).trimmingCharacters(in: .whitespaces)
+    }
+
     /// The rules answer, with no tier 2. Synchronous and on the Mac.
-    static func rules(_ text: String, context: RouteContext) -> RulesDecision {
+    /// Words at the start that are not part of the command: "Yeah, let's open the Slack" gives "open the Slack".
+    static let leadFillers: Set<String> = fillers.union(["yeah", "yep", "yes", "lets", "let", "us", "alright", "well",
+                                                         "hey", "can", "could", "you", "would", "actually", "basically",
+                                                         "just"])
+
+    /// The raw words with the lead fillers removed. Case and punctuation stay.
+    static func dropLeadFillers(_ text: String) -> String {
+        let tokens = Tokens(text)
+        var lead = 0
+        func isFiller(_ i: Int) -> Bool {
+            let w = tokens.words[i]
+            if leadFillers.contains(w) { return true }
+            // "Here" at the very start is most often the end of a wake phrase ("hey atlas" heard as "Here").
+            if i == 0, w == "here" { return true }
+            // "right" is a filler, but not in "right click".
+            if w == "right", tokens.words[i + 1] != "click" { return true }
+            return false
+        }
+        while lead < tokens.count - 1, isFiller(lead) { lead += 1 }
+        return lead == 0 ? text : tokens.raw(lead..<tokens.count)
+    }
+
+    /// Words that can follow a bare command word: "click on", "go to". A second command word is a target: "click chat".
+    static let bareWords: Set<String> = ["to", "on", "the", "in", "into", "a"]
+
+    // MARK: - A send phrase after the text
+
+    /// The words with a trailing send phrase removed: "type see you soon and send" gives "type see you soon".
+    /// The phrase needs "and", "then" or a comma before "send", so the text "I will send it" stays whole,
+    /// and "sender" is not "send". Nil if there is no such phrase, or if no words are left.
+    public static func withoutTrailingSend(_ text: String) -> String? {
+        let pattern = #"(?i)(\s*[,;]\s*|\s+)(?:(?:and|then|and then)\s+)send(?:\s+(?:it|this|that))?(?:\s+now)?[\s.!]*$|\s*[,;]\s*send(?:\s+(?:it|this|that))?(?:\s+now)?[\s.!]*$"#
+        guard let r = text.range(of: pattern, options: .regularExpression) else { return nil }
+        let rest = String(text[..<r.lowerBound]).trimmingCharacters(in: .whitespaces)
+        return TextKit.words(rest).isEmpty ? nil : rest
+    }
+
+    /// True for an intent that carries text: typeText, typeInto and openChat with text.
+    static func hasText(_ intent: Intent) -> Bool {
+        switch intent {
+        case .typeText(let t): return !t.isEmpty
+        case .typeInto(_, let t): return !t.isEmpty
+        case .openChat(_, _, let t): return !(t ?? "").isEmpty
+        default: return false
+        }
+    }
+
+    /// The rules answer. A trailing send phrase is never part of the text: the router routes the words without it,
+    /// and if the answer carries text, it sets sendAfter. Else it routes all the words as before.
+    static func rules(_ spoken: String, context: RouteContext) -> RulesDecision {
+        if let rest = withoutTrailingSend(spoken) {
+            var d = rulesBody(rest, context: context)
+            if hasText(d.intent) || d.options.contains(where: { hasText($0.intent) }) {
+                d.sendAfter = true
+                return d
+            }
+        }
+        return rulesBody(spoken, context: context)
+    }
+
+    static func rulesBody(_ spoken: String, context: RouteContext) -> RulesDecision {
+        let text = dropLeadFillers(fromCommandSentence(spoken, apps: context.apps))
         var words = TextKit.words(text)
         while let f = words.first, fillers.contains(f), words.count > 1 { words.removeFirst() }
         while let l = words.last, ["please", "now"].contains(l), words.count > 1, words != ["send", "now"] { words.removeLast() }
@@ -95,6 +229,18 @@ public struct CommandRouter: Router {
         }
         if hideNumbers.contains(phrase) {
             return RulesDecision(intent: .hideNumbers, sure: true, exact: true, why: "hide numbers", options: [])
+        }
+
+        // A bare command word never matches a target by sound or a fuzzy match: "type." once pressed the menu item "Top".
+        // A bare "type" tells the app that the next turn is the text (awaitsText).
+        if words.count <= 2, commandStarts.contains(words[0]), words.dropFirst().allSatisfy({ bareWords.contains($0) }),
+           ![.scroll, .back].contains(ScreenRouter.parse(text).kind) {
+            if words == ["type"] {
+                var d = RulesDecision(intent: .none, sure: true, exact: true, why: "type with no text", options: [])
+                d.awaitsText = true
+                return d
+            }
+            return RulesDecision(intent: .none, sure: true, exact: true, why: "\(phrase) with no target", options: [])
         }
 
         // A screen command for one app: "On Chrome, click Chat", "open notifications on Chrome", "Chrome, open settings".
@@ -121,7 +267,7 @@ public struct CommandRouter: Router {
         if parse.kind == .back { return RulesDecision(intent: .back, sure: true, exact: true, why: "back words", options: []) }
 
         let first = words.first ?? ""
-        let wantsScreen = pressOnly.contains(first) || typeFirst.contains(first) || parse.kind == .ordinal
+        let wantsScreen = pressOnly.contains(first) || typeFirst.contains(first) || parse.kind == .ordinal || parse.kind == .type
         if wantsScreen {
             if let screen = context.screen { return ScreenRouter.decide(text, screen: screen) }
             if first == "type", parse.kind == .type, let t = parse.text, !t.isEmpty, parse.target.isEmpty {

@@ -12,6 +12,15 @@ public struct KeychainSecret: Sendable {
 
     public static let jev = KeychainSecret()
 
+    /// Posted after a save or a removal, with the account as the object. The app makes the Jev router and the
+    /// screenshot picker again, so that a new key works without a restart.
+    public static let changed = Notification.Name("earshot.keychainSecretChanged")
+
+    private func posted(_ ok: Bool) -> Bool {
+        if ok { NotificationCenter.default.post(name: Self.changed, object: account) }
+        return ok
+    }
+
     private var query: [String: Any] {
         [kSecClass as String: kSecClassGenericPassword,
          kSecAttrService as String: service,
@@ -36,17 +45,17 @@ public struct KeychainSecret: Sendable {
         if trimmed.isEmpty { return delete() }
         let data = Data(trimmed.utf8)
         let status = SecItemUpdate(query as CFDictionary, [kSecValueData as String: data] as CFDictionary)
-        if status == errSecSuccess { return true }
+        if status == errSecSuccess { return posted(true) }
         guard status == errSecItemNotFound else { return false }
         var add = query
         add[kSecValueData as String] = data
         add[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlocked
-        return SecItemAdd(add as CFDictionary, nil) == errSecSuccess
+        return posted(SecItemAdd(add as CFDictionary, nil) == errSecSuccess)
     }
 
     @discardableResult
     public func delete() -> Bool {
         let status = SecItemDelete(query as CFDictionary)
-        return status == errSecSuccess || status == errSecItemNotFound
+        return posted(status == errSecSuccess || status == errSecItemNotFound)
     }
 }

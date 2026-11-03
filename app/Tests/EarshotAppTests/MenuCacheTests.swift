@@ -70,4 +70,21 @@ final class MenuCacheTests: XCTestCase {
         let field = [ScreenElement(id: "e2", role: "AXTextField", label: "Password", risky: false)]
         XCTAssertNotNil(SafetyPolicy.sensitive(url: "https://example.org", elements: field + menu))
     }
+
+    /// Live test: "open FPL guru tab" was blocked as risky, because the tab title has "transfer" (R-NV-5).
+    func testTabTitleMenuItemIsNotBlocked() async {
+        let fpl = "FPL Guru — AI Fantasy Premier League transfer tips, captain picks & chip strategy | FPL Guru"
+        let items = MenuIndex.flatten([MenuNode(title: "Tab", children: [MenuNode(title: fpl), MenuNode(title: "Close Tab")])],
+                                      titles: [fpl + " - Memory usage - 491 MB"])
+        let menu = MenuCache.elements(items)
+        let engine = TextEngine()
+        engine.text = "open FPL guru tab"
+        let runner = DryRunner()
+        let p = CommandPipeline(engine: engine, router: CommandRouter(), actions: runner, names: FakeNames(),
+                                apps: { Fixture.apps }, allNames: { Fixture.names }, frontBundleID: { "com.google.Chrome" })
+        p.menus = { _ in menu }
+        let r = await p.finish(mode: .hold)
+        XCTAssertEqual(runner.runs.first?.0, .click(elementID: MenuElements.id(["Tab", fpl])), r.note)
+        XCTAssertFalse(r.note.contains("risky"), r.note)
+    }
 }

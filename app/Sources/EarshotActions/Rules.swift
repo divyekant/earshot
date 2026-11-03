@@ -13,8 +13,12 @@ public struct CommandInfo: Sendable, Equatable {
     /// The words that the owner said for the target, for example "send" in "click send".
     public var spokenTarget: String
 
-    public init(mode: InputMode, tier: RouterTier, spokenTarget: String = "") {
-        self.mode = mode; self.tier = tier; self.spokenTarget = spokenTarget
+    /// True only for an always-on "send" alone, in the checked voice of the owner, within 5 s after earshot typed in
+    /// the same front app (the owner's choice, D-12). Only CommandPipeline sets it.
+    public var ownerSendAfterTyping: Bool
+
+    public init(mode: InputMode, tier: RouterTier, spokenTarget: String = "", ownerSendAfterTyping: Bool = false) {
+        self.mode = mode; self.tier = tier; self.spokenTarget = spokenTarget; self.ownerSendAfterTyping = ownerSendAfterTyping
     }
 
     /// The strictest facts. A command with these facts never presses a risky element and never sends.
@@ -268,9 +272,10 @@ enum ActionRules {
     // MARK: - Safety gates
 
     /// The reason not to press this element, or nil (R-NV-5, R-ON-5, E2 safety rules).
-    static func pressBlock(label: String, role: String? = nil, command: CommandInfo, sensitive: String?) -> String? {
+    static func pressBlock(label: String, role: String? = nil, subrole: String? = nil, command: CommandInfo,
+                           sensitive: String?) -> String? {
         if let sensitive { return "blocked: this looks like a sign-in, code or payment page (\(sensitive))" }
-        if !SafetyPolicy.mayPress(label: label, role: role, spokenTarget: command.spokenTarget, tier: command.tier,
+        if !SafetyPolicy.mayPress(label: label, role: role, subrole: subrole, spokenTarget: command.spokenTarget, tier: command.tier,
                                   mode: command.mode) {
             return "blocked: risky label \"\(label)\""
         }
@@ -281,7 +286,7 @@ enum ActionRules {
     /// and only from a message box that holds text (R-NV-5, R-ON-5).
     static func sendBlock(command: CommandInfo, inMessageBox: Bool, boxText: String, sensitive: String?) -> String? {
         if let sensitive { return "blocked: this looks like a sign-in, code or payment page (\(sensitive))" }
-        if command.mode != .hold { return "blocked: send needs the hold key" }
+        if command.mode != .hold, !command.ownerSendAfterTyping { return "blocked: send needs the hold key" }
         if command.tier != .rules { return "blocked: send needs the spoken word \"send\"" }
         if !inMessageBox { return "blocked: the focus is not in a message box" }
         if ActionText.squash(boxText).isEmpty { return "nothing to send: the box is empty" }

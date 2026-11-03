@@ -44,12 +44,20 @@ public enum SafetyPolicy {
     /// A non-control label of this many words or fewer is a command label ("Delete account"), so the strict rule applies.
     public static let shortLabelWords = 3
 
+    /// True if the element names a page or a window, not a command: a tab button of a tab strip, or a menu item
+    /// that names an open tab or window (MenuElements.titleSubrole, found by WindowTitles). A title uses the rule
+    /// of the non-control roles: a page title "… transfer tips …" must not block a tab switch (R-NV-5).
+    public static func isTitle(role: String?, subrole: String?) -> Bool {
+        role == "AXTab" || (role == "AXRadioButton" && subrole == "AXTabButton") || subrole == MenuElements.titleSubrole
+    }
+
     /// True if a press on an element with this label and role can change data, send something or spend money.
     /// - A control (button, menu item, checkbox, pop-up button and similar), or an unknown role: the strict rule.
     /// - A link, row, cell or text: risky only if the label is short (3 words or fewer) and has a risky word,
     ///   or if the label starts with a risky word or phrase ("Delete this repository and all its issues").
-    public static func isRisky(_ label: String, role: String?) -> Bool {
-        guard let role, nonControlRoles.contains(role) else { return isRisky(label) }
+    /// - A title (`isTitle`): the same rule as a link.
+    public static func isRisky(_ label: String, role: String?, subrole: String? = nil) -> Bool {
+        guard let role, nonControlRoles.contains(role) || isTitle(role: role, subrole: subrole) else { return isRisky(label) }
         let words = normalize(label).split(separator: " ").map(String.init)
         if words.count <= shortLabelWords { return isRisky(label) }
         if let first = words.first, riskyWords.contains(first) { return true }
@@ -57,14 +65,15 @@ public enum SafetyPolicy {
         return riskyPhrases.contains { n == $0 || n.hasPrefix($0 + " ") }
     }
 
-    public static func isRisky(_ element: ScreenElement) -> Bool { isRisky(element.label, role: element.role) }
+    public static func isRisky(_ element: ScreenElement) -> Bool { isRisky(element.label, role: element.role, subrole: element.subrole) }
 
     /// True if earshot may press the element with this label.
     /// A risky label needs all of these: the rules made the decision, the owner said the exact label,
     /// and the hold key started the command (R-NV-5: "click Send"; R-ON-5: no risky press from always-on).
-    /// `role` is the accessibility role of the element. Nil keeps the strict rule.
-    public static func mayPress(label: String, role: String? = nil, spokenTarget: String, tier: RouterTier, mode: InputMode) -> Bool {
-        guard isRisky(label, role: role) else { return true }
+    /// `role` and `subrole` are the accessibility role and subrole of the element. A nil role keeps the strict rule.
+    public static func mayPress(label: String, role: String? = nil, subrole: String? = nil, spokenTarget: String,
+                                tier: RouterTier, mode: InputMode) -> Bool {
+        guard isRisky(label, role: role, subrole: subrole) else { return true }
         return tier == .rules && mode == .hold && normalize(spokenTarget) == normalize(label)
     }
 

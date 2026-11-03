@@ -12,11 +12,12 @@ import XCTest
 final class TextEngine: SpeechEngine {
     let id = "fake"
     var text = ""
+    var words: [TimedWord] = []
     var began = 0
     var onPartial: (@Sendable (String) -> Void)?
     func prepare() async throws {}
     func begin() throws { began += 1 }
-    func end() async throws -> Utterance { Utterance(text: text, engine: id, ms: 1) }
+    func end() async throws -> Utterance { Utterance(text: text, engine: id, ms: 1, words: words) }
 }
 
 final class DryRunner: CommandActions {
@@ -87,12 +88,148 @@ final class CommandPipelineTests: XCTestCase {
         for stage in ["speech", "screen", "route", "total"] { XCTAssertNotNil(r.stages[stage], stage) }
     }
 
-    func testAlwaysOnDropsTalkThatIsNotForEarshot() async {
-        let (p, _, runner) = make("I think the meeting moved to Thursday")
+    // D-11: the speech engine starts before the wake phrase, so the pipeline removes it.
+    func testAlwaysOnRemovesTheWakePhrase() async {
+        let (p, _, runner) = make("Hey Jarvis, open notes")
+        p.wakePhrase = "hey jarvis"
+        let r = await p.finish(mode: .alwaysOn)
+        XCTAssertTrue(r.ok, r.note)
+        XCTAssertEqual(r.heard, "open notes")
+        XCTAssertEqual(runner.runs.first?.0, .openApp(appID: "notes"))
+        XCTAssertEqual(runner.runs.first?.1.mode, .alwaysOn)
+    }
+
+    func testAlwaysOnPhraseAloneDoesNothing() async {
+        let (p, _, runner) = make("Hey, Jarvis.")
+        p.wakePhrase = "hey jarvis"
         let r = await p.finish(mode: .alwaysOn)
         XCTAssertFalse(r.ok)
-        XCTAssertTrue(r.note.hasPrefix("not for earshot"), r.note)
+        XCTAssertEqual(r.note, "no words")
         XCTAssertTrue(runner.runs.isEmpty)
+    }
+
+    func testHoldKeyKeepsTheWords() async {
+        let (p, _, _) = make("hey jarvis open notes")
+        p.wakePhrase = "hey jarvis"
+        let r = await p.finish(mode: .hold)
+        XCTAssertEqual(r.heard, "hey jarvis open notes", "the hold key has no wake phrase to remove")
+    }
+
+    func testWakeGoesToTheLog() async {
+        let (p, _, _) = make("hey jarvis open notes")
+        p.wakePhrase = "hey jarvis"
+        p.pendingWake = WakeHit(phrase: "hey jarvis", prerollSeconds: 1.4, voiceScore: 0.71, isOwner: true)
+        let r = await p.finish(mode: .alwaysOn)
+        XCTAssertTrue(r.note.contains("wake \"hey jarvis\", voice 0.71"), r.note)
+        XCTAssertNil(p.pendingWake, "one wake is for one turn")
+    }
+
+    // D-11, live test 2026-11-02: the owner said the phrase again in a follow-up turn, and Apple speech wrote it as
+    // "Yeah, let's". The text strip kept it. The cut by time removes it.
+    func testRepeatedPhraseIsCutByTime() async {
+        let (p, engine, runner) = make("Yeah, let's open notes")
+        engine.words = [TimedWord(text: "Yeah, ", start: -0.1, end: 0.15), TimedWord(text: "let's ", start: 0.15, end: 0.45),
+                        TimedWord(text: "open ", start: 0.7, end: 0.95), TimedWord(text: "notes", start: 0.95, end: 1.3)]
+        p.wakePhrase = "hey atlas"
+        p.pendingWake = WakeHit(phrase: "hey atlas", prerollSeconds: 1.3, phraseEndSeconds: 0.4, voiceScore: 0.6,
+                                isOwner: true, inTurnAfterSeconds: 0.9)
+        let r = await p.finish(mode: .alwaysOn)
+        XCTAssertTrue(r.ok, r.note)
+        XCTAssertEqual(r.heard, "open notes")
+        XCTAssertEqual(runner.runs.first?.0, .openApp(appID: "notes"))
+        XCTAssertTrue(r.note.contains("again in a follow-up turn at 0.90 s"), r.note)
+        XCTAssertTrue(r.note.contains("phrase removed by time at 0.50 s"), r.note)
+    }
+
+    func testTextStripRemovesWhatTheTimeCutLeft() {
+        // The phrase end came a little early: the last word of the phrase is after the cut.
+        let words = [TimedWord(text: "Hey ", start: -1.0, end: -0.7), TimedWord(text: "Atlas, ", start: -0.6, end: -0.2),
+                     TimedWord(text: "open ", start: 0.0, end: 0.3), TimedWord(text: "notes", start: 0.3, end: 0.7)]
+        let hit = WakeHit(phrase: "hey atlas", prerollSeconds: 1.5, phraseEndSeconds: 0.5, voiceScore: 0.6, isOwner: true)
+        let r = CommandPipeline.removePhrase("Hey Atlas, open notes", words: words, wake: hit, phrase: "hey atlas")
+        XCTAssertEqual(r.text, "open notes")
+        XCTAssertEqual(r.how, "by time at -0.50 s")
+        let search = [TimedWord(text: "Hey ", start: -1.0, end: -0.7), TimedWord(text: "Atlas ", start: -0.7, end: -0.4),
+                      TimedWord(text: "search ", start: 0.0, end: 0.3), TimedWord(text: "for ", start: 0.3, end: 0.4),
+                      TimedWord(text: "atlas", start: 0.4, end: 0.8)]
+        XCTAssertEqual(CommandPipeline.removePhrase("Hey Atlas search for atlas", words: search, wake: hit, phrase: "hey atlas").text,
+                       "search for atlas", "a word of the phrase later in the command stays")
+    }
+
+    func testNoTimesUsesTheTextStrip() {
+        let hit = WakeHit(phrase: "hey jarvis", prerollSeconds: 1.4, phraseEndSeconds: 0.4, voiceScore: 0.7, isOwner: true)
+        let r = CommandPipeline.removePhrase("Hey Jarvis, open notes", words: [], wake: hit, phrase: "hey jarvis")
+        XCTAssertEqual(r.text, "open notes")
+        XCTAssertEqual(r.how, "by text", "Parakeet and dictation give no word times")
+        XCTAssertEqual(CommandPipeline.removePhrase("Hey Jarvis, open notes", words: [], wake: nil, phrase: "hey jarvis").text,
+                       "open notes", "a follow-up turn with no wake: the text strip")
+    }
+
+    func testNearMissesAreLoggedWithNoText() {
+        let (p, _, runner) = make("")
+        let r = p.nearMisses(NearMisses(count: 3, best: 0.8))
+        XCTAssertEqual(r.heard, "", "no audio and no text (D-11)")
+        XCTAssertEqual(r.note, "wake phrase near misses: 3, best 80 % of the phrase pieces")
+        XCTAssertFalse(r.ok)
+        XCTAssertTrue(runner.runs.isEmpty)
+        let t = p.nearMisses(NearMisses(count: 2, best: 0, bestScore: 0.362))
+        XCTAssertEqual(t.note, "wake phrase near misses: 2, best template score 0.36", "E5: the audio templates")
+        XCTAssertEqual(t.heard, "")
+    }
+
+    func testWakeSummaryHasTheTemplateScores() {
+        let spotter = WakeHit(phrase: "hey atlas", prerollSeconds: 1.2, voiceScore: 0.61, isOwner: true)
+        XCTAssertEqual(CommandPipeline.wakeSummary(spotter), "wake \"hey atlas\", voice 0.61, preroll 1.20 s")
+        let matched = WakeHit(phrase: "hey atlas", prerollSeconds: 1.2, voiceScore: 0.61, isOwner: true,
+                              matchScore: 0.214, matchWorst: 0.391)
+        XCTAssertEqual(CommandPipeline.wakeSummary(matched),
+                       "wake \"hey atlas\", voice 0.61, match 0.21, worst part 0.39, preroll 1.20 s")
+    }
+
+    func testRejectedWakeIsLoggedWithNoText() {
+        let (p, _, runner) = make("")
+        let hit = WakeHit(phrase: "hey jarvis", prerollSeconds: 1, voiceScore: 0.21, isOwner: false)
+        let r = p.rejectedWake(hit, threshold: 0.45)
+        XCTAssertEqual(r.heard, "", "the speech engine did not run, so there is no text (R-MD-1)")
+        XCTAssertTrue(r.note.contains("0.21"), r.note)
+        XCTAssertFalse(r.ok)
+        XCTAssertTrue(runner.runs.isEmpty)
+    }
+
+    func testDroppedFollowUpIsLoggedWithNoText() {
+        let (p, _, runner) = make("")
+        let note = NoteRecorder()
+        p.feedback = note
+        var sounds: [FeedbackSound] = []
+        p.playSound = { sounds.append($0) }
+        p.wakePhrase = "hey atlas"
+        let r = p.droppedFollowUp("not the owner's voice (0.31)", seconds: 0.92)
+        XCTAssertEqual(r.heard, "", "the words were not the owner's, so the record has no text")
+        XCTAssertTrue(r.note.contains("0.31"), r.note)
+        XCTAssertTrue(r.note.contains("audio 0.92 s"), r.note)
+        XCTAssertFalse(r.ok)
+        XCTAssertTrue(runner.runs.isEmpty)
+        // dk: "I do not know if send works". A dropped turn shows a note and the failed sound.
+        XCTAssertEqual(note.shown.first?.0, "✗ not sure it was your voice: say \"hey atlas, …\"")
+        XCTAssertEqual(sounds, [.failed])
+    }
+
+    func testResultSounds() async {
+        var sounds: [FeedbackSound] = []
+        let (p, e, _) = make("open notes")
+        p.playSound = { sounds.append($0) }
+        _ = await p.finish(mode: .hold)
+        e.text = "send"
+        _ = await p.finish(mode: .hold)
+        e.text = "what is the weather like today"
+        _ = await p.finish(mode: .hold)
+        XCTAssertEqual(sounds, [.done, .sent, .failed])
+        p.playSounds = false
+        e.text = "open notes"
+        _ = await p.finish(mode: .hold)
+        XCTAssertEqual(sounds.count, 3, "the toggle turns the sounds off")
+        XCTAssertEqual(Set(FeedbackSound.allCases.map(\.systemName)).count, FeedbackSound.allCases.count, "a different sound for each")
+        XCTAssertLessThan(FeedbackSound.start.volume, 0.5, "the start sound is quiet: the microphone hears it")
     }
 
     func testAlwaysOnNeverSendsFromASentence() async {
@@ -214,6 +351,11 @@ final class DiscoverHookTests: XCTestCase {
         XCTAssertFalse(CommandPipeline.needsAppSearch("Slack me running late", app, appID: "slack"))
         XCTAssertFalse(CommandPipeline.needsAppSearch("happening click on tab in Chrome Home X", garbled, appID: "slack"))
         XCTAssertFalse(CommandPipeline.needsAppSearch("open my own chat in Slack", unsureChat, appID: "slack"))
+        // Live test: a sure "open <app>" with extra words ran a 2.1 s search that typed into the app.
+        let sureApp = RouteResult(intent: .openApp(appID: "slack"), confidence: CommandRouter.sureConfidence, tier: .rules, ms: 0)
+        let unsureApp = RouteResult(intent: .openApp(appID: "slack"), confidence: 0.7, tier: .rules, ms: 0)
+        XCTAssertFalse(CommandPipeline.needsAppSearch("open Slack quickly", sureApp, appID: "slack"))
+        XCTAssertTrue(CommandPipeline.needsAppSearch("open Slack quickly", unsureApp, appID: "slack"))
     }
 }
 

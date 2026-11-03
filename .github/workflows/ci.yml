@@ -1,0 +1,77 @@
+# Builds the app and runs the tests on macOS for each pull request and each push to develop.
+# Tests that use the live screen, keys or the microphone stay skipped: they need an EARSHOT_* variable.
+name: CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  swift:
+    name: Swift build and test
+    runs-on: macos-26
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select the newest Xcode 26
+        run: |
+          set -euo pipefail
+          xcode="$(ls -d /Applications/Xcode_26*.app | sort -V | tail -n 1)"
+          echo "Using $xcode"
+          sudo xcode-select -s "$xcode/Contents/Developer"
+          swift --version
+
+      - name: Cache SwiftPM
+        uses: actions/cache@v4
+        with:
+          path: |
+            app/.build
+          key: spm-${{ runner.os }}-${{ hashFiles('app/Package.swift', 'app/Package.resolved') }}
+          restore-keys: spm-${{ runner.os }}-
+
+      - name: Build
+        run: swift build
+
+      # D-11: the wake model tests download about 18 MB from Hugging Face one time (pinned revisions,
+      # SHA-256 checked) and run the models on speech from the say command. The cache keeps the files.
+      - name: Cache the wake phrase models
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/earshot-wake-models
+          key: wake-models-${{ hashFiles('app/Sources/EarshotWake/ModelFiles.swift') }}
+
+      # The tests run on the release build, the same build as the app bundle (build-app.sh).
+      # The latency benches (OfflineBench, MenuBench) assert release limits there. A debug build
+      # on a shared runner is about 15 times slower and does not show the latency of the app.
+      - name: Test (release build)
+        env:
+          EARSHOT_WAKE_MODELS: ${{ runner.temp }}/earshot-wake-models
+        run: swift test -c release -Xswiftc -enable-testing
+
+      # The app bundle must not depend on the Xcode of the build Mac (rpaths, Swift libraries).
+      # build-app.sh fails if an rpath outside the bundle and /usr/lib/swift stays.
+      - name: Build the app bundle
+        env:
+          EARSHOT_APP_OUT: ${{ runner.temp }}/Earshot.app
+        run: |
+          set -euo pipefail
+          scripts/build-app.sh
+          exe="$EARSHOT_APP_OUT/Contents/MacOS/earshot"
+          echo "rpaths:"; otool -l "$exe" | awk '$2 == "LC_RPATH" { getline; getline; print "  " $2 }'
+          echo "Swift libraries:"; otool -L "$exe" | grep -i swift || true
+          ls -la "$EARSHOT_APP_OUT/Contents/Frameworks"
+          codesign --verify --deep --strict "$EARSHOT_APP_OUT"

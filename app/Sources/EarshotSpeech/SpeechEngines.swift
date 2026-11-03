@@ -1,6 +1,33 @@
 import EarshotCore
 import Foundation
 
+/// An engine with turns that the caller can drop, and a microphone that the caller can close.
+/// AutoSpeechEngine uses the Apple engine through this protocol, so that it works with either Apple engine.
+public protocol TurnSpeechEngine: SpeechEngine, SpeechTimingReporting {
+    /// Drops the turn with no final text.
+    func cancelTurn()
+    /// Closes the microphone.
+    func shutdown()
+}
+
+/// The Apple speech engine for this Mac.
+public enum AppleSpeech {
+    /// The id of the Apple engine in the settings and in "auto".
+    public static let engineID = "apple"
+
+    /// SpeechTranscriber on macOS 26, with on-device dictation as the fallback if SpeechTranscriber does not load
+    /// (it is reported to need Apple silicon). On-device dictation alone on older macOS.
+    /// Both keep the audio on the Mac (R-MD-1).
+    public static func make(locale: Locale) -> TurnSpeechEngine {
+        #if compiler(>=6.2)
+        if #available(macOS 26, *) {
+            return FallbackSpeechEngine(primary: AppleSpeechEngine(locale: locale), fallback: { DictationEngine(locale: locale) })
+        }
+        #endif
+        return DictationEngine(locale: locale)
+    }
+}
+
 /// Makes the speech engine from the owner's settings. EarshotApp calls this one time at start.
 public enum SpeechEngines {
     /// Returns the engine for the settings, and the reason for the log.
@@ -13,11 +40,11 @@ public enum SpeechEngines {
         let (resolved, why) = EngineResolver.resolve(settings.engine, configuredModel: settings.parakeetModelPath, locator: locator)
         switch resolved {
         case .apple:
-            let apple = AppleSpeechEngine(locale: locale)
+            let apple = AppleSpeech.make(locale: locale)
             apple.reason = why
             return (apple, why)
         case .parakeet(let path):
-            let engine = AutoSpeechEngine(parakeet: ParakeetEngine(modelPath: path), apple: AppleSpeechEngine(locale: locale))
+            let engine = AutoSpeechEngine(parakeet: ParakeetEngine(modelPath: path), apple: AppleSpeech.make(locale: locale))
             engine.reason = why
             return (engine, why)
         }
@@ -26,11 +53,12 @@ public enum SpeechEngines {
 
 /// Uses `primary`. If `primary` fails in `prepare`, it uses the fallback engine.
 /// So a broken model file never stops voice commands.
-public final class FallbackSpeechEngine: SpeechEngine, SpeechTimingReporting, @unchecked Sendable {
+public final class FallbackSpeechEngine: TurnSpeechEngine, PrerollControl, PhraseHintControl, @unchecked Sendable {
     private let lock = NSLock()
     private var current: SpeechEngine
     private var makeFallback: (() -> SpeechEngine)?
     private var partial: (@Sendable (String) -> Void)?
+    private var hints: [String] = []
     /// The error of the primary engine, if the fallback engine is in use.
     public private(set) var fallbackReason: String?
 
@@ -66,7 +94,8 @@ public final class FallbackSpeechEngine: SpeechEngine, SpeechTimingReporting, @u
                 guard let make = makeFallback else { return nil }
                 let next = make()
                 next.onPartial = partial
-                (next as? SpeechTimingReporting)?.reason = "fallback to Apple: \(error)"
+                (next as? PhraseHintControl)?.setPhraseHints(hints)
+                (next as? SpeechTimingReporting)?.reason = "fallback: \(error)"
                 current = next
                 makeFallback = nil
                 fallbackReason = "\(error)"
@@ -78,5 +107,13 @@ public final class FallbackSpeechEngine: SpeechEngine, SpeechTimingReporting, @u
     }
 
     public func begin() throws { try active.begin() }
+    public func setNextPreroll(seconds: Double) { (active as? PrerollControl)?.setNextPreroll(seconds: seconds) }
+    /// The fallback engine gets the same hints if it takes over.
+    public func setPhraseHints(_ phrases: [String]) {
+        let engine = lock.withLock { () -> SpeechEngine in hints = phrases; return current }
+        (engine as? PhraseHintControl)?.setPhraseHints(phrases)
+    }
     public func end() async throws -> Utterance { try await active.end() }
+    public func cancelTurn() { (active as? TurnSpeechEngine)?.cancelTurn() }
+    public func shutdown() { (active as? TurnSpeechEngine)?.shutdown() }
 }

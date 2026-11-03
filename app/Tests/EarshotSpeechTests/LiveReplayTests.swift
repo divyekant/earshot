@@ -89,8 +89,10 @@ final class LiveReplayTests: XCTestCase {
         XCTAssertLessThan(last, first * 2 + 20, "the speech stage grew over 20 commands")
     }
 
+    #if compiler(>=6.2)
     func testAppleReplay() async throws {
         try XCTSkipUnless(enabled, "set EARSHOT_SPEECH_BENCH=1")
+        guard #available(macOS 26, *) else { throw XCTSkip("SpeechTranscriber needs macOS 26") }
         let engine = AppleSpeechEngine()
         engine.reason = "bench"
         let format = try await engine.prepareModel()
@@ -111,6 +113,44 @@ final class LiveReplayTests: XCTestCase {
             }
         }
     }
+    #endif
+
+    #if compiler(>=6.2)
+    /// D-11: the word times and the wake phrase as context. It prints each piece with its time, and the speech stage
+    /// with no hint and with the hint, so that the change of the speech stage can go into the pull request.
+    /// Run: EARSHOT_SPEECH_BENCH=1 swift test --filter LiveReplayTests/testAppleWordTimesAndHints
+    func testAppleWordTimesAndHints() async throws {
+        try XCTSkipUnless(enabled, "set EARSHOT_SPEECH_BENCH=1")
+        guard #available(macOS 26, *) else { throw XCTSkip("SpeechTranscriber needs macOS 26") }
+        let engine = AppleSpeechEngine()
+        engine.reason = "bench"
+        let format = try await engine.prepareModel()
+        let url = try say("hey atlas, open messages", 10)
+        for hints in [[String](), ["hey atlas"]] {
+            engine.setPhraseHints(hints)
+            for run in 0..<3 {
+                let whole = try read(url, as: format)
+                let feed = try engine.beginWithoutMicrophone()
+                let chunk = AVAudioFrameCount(format.sampleRate * chunkSeconds)
+                var at: AVAudioFrameCount = 0
+                while at < whole.frameLength {
+                    if let part = slice(whole, from: at, count: min(chunk, whole.frameLength - at)) { feed(part) }
+                    at += chunk
+                    try await Task.sleep(nanoseconds: UInt64(chunkSeconds * 1e9))
+                }
+                let u = try await engine.end()
+                line("apple hints=\(hints.count) #\(run)", engine.lastTiming, u.text)
+                print("REPLAY pieces: " + u.words.map { String(format: "[%.2f-%.2f]%@", $0.start, $0.end, $0.text) }.joined())
+                XCTAssertFalse(u.words.isEmpty, "SpeechTranscriber must give word times")
+                XCTAssertEqual(TextClean.clean(u.words.map(\.text).joined()), u.text, "the pieces joined give the text")
+                if let open = u.words.first(where: { $0.text.lowercased().contains("open") }) {
+                    let rest = WakePhrase.cut(u.words, phraseEnd: open.start) ?? ""
+                    XCTAssertTrue(rest.lowercased().hasPrefix("open"), rest)
+                }
+            }
+        }
+    }
+    #endif
 
     func read(_ url: URL, as format: AVAudioFormat) throws -> AVAudioPCMBuffer {
         let file = try AVAudioFile(forReading: url)

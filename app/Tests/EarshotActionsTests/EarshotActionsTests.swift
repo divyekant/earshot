@@ -272,11 +272,23 @@ final class ActionRunnerTests: XCTestCase {
         var focusSets = 0
         init(showsAt: Double, ownFocus: Bool, acceptsAX: Bool) { fieldShowsAtMs = showsAt; takesFocusOnItsOwn = ownFocus; acceptsAXFocus = acceptsAX }
         var shown: Bool { Clock.ms(since: t0) >= fieldShowsAtMs }
+        /// The number of focus checks after the field showed.
+        var pollsAfterShown = 0
+        /// The number of focus checks after the first set-focus call.
+        var pollsAfterSet = 0
+        /// The number of scans that found the field.
+        var scansFound = 0
         func focused() -> (String?, Bool, Bool) {
+            if shown { pollsAfterShown += 1 }
+            if focusSets > 0 { pollsAfterSet += 1 }
             if shown && (takesFocusOnItsOwn || focusedField) { return ("to-field", true, false) }
             return ("message-box", false, true)  // the focus stays in the message box of the open chat
         }
-        func newField() -> String? { shown ? "to-field" : nil }
+        func newField() -> String? {
+            guard shown else { return nil }
+            scansFound += 1
+            return "to-field"
+        }
         func setFocus(_ f: String) { focusSets += 1; if acceptsAXFocus { focusedField = true } }
     }
 
@@ -293,10 +305,19 @@ final class ActionRunnerTests: XCTestCase {
         let runner = EarshotActionRunner(store: nil)
         let fake = FakeSwitcher(showsAt: 200, ownFocus: false, acceptsAX: true)
         let (field, _, stats) = await runner.waitForSwitcherField(scanDelayMs: 0, focused: fake.focused, newField: fake.newField, setFocus: fake.setFocus)
+        let ms = Clock.ms(since: fake.t0)
+        print("EARSHOT_BENCH fake switcher AX focus: \(ms) ms (field at 200 ms), \(stats.polls) polls")
         XCTAssertEqual(field, "to-field")
-        XCTAssertGreaterThanOrEqual(fake.focusSets, 1)
         XCTAssertTrue(stats.setFocus)
-        XCTAssertLessThan(Clock.ms(since: fake.t0), 330)
+        // The behaviour: the first scan that finds the field sets the focus once.
+        XCTAssertEqual(fake.scansFound, 1)
+        XCTAssertEqual(fake.focusSets, 1)
+        // The focus check right after the set ends the wait. No sleep, no second set.
+        XCTAssertEqual(fake.pollsAfterSet, 1)
+        // The field showed, then at most one scan interval of polls ran before the scan found it.
+        XCTAssertLessThanOrEqual(fake.pollsAfterShown, 2 + SwitcherTiming.scanMs / SwitcherTiming.pollMs)
+        // A wall-time bound with margin for a busy CI runner. The checks above carry the exact behaviour.
+        XCTAssertLessThan(ms, 200 + Double(SwitcherTiming.scanMs) + 200)
     }
 
     func testFocusStaysInMessageBoxTypesNothing() async {
@@ -323,9 +344,13 @@ final class ActionRunnerTests: XCTestCase {
         let ms = Clock.ms(since: fake.t0)
         print("EARSHOT_BENCH fake switcher field: \(ms) ms (field at 100 ms), \(stats.polls) polls")
         XCTAssertEqual(field, "to-field")
-        XCTAssertEqual(scans, 0)  // no scan before scanDelayMs (150 ms)
+        // The behaviour: the first focus check after the field shows ends the wait. No later poll, no sleep in between.
+        XCTAssertEqual(fake.pollsAfterShown, 1)
+        // No scan: a scan runs only after scanDelayMs (150 ms), so the wait also ended before that.
+        XCTAssertEqual(scans, 0)
         XCTAssertFalse(stats.setFocus)
-        XCTAssertLessThan(ms, 100 + 2.0 * Double(SwitcherTiming.pollMs) + 10)
+        // A wall-time bound with margin for a busy CI runner. The two checks above carry the exact behaviour.
+        XCTAssertLessThan(ms, Double(SwitcherTiming.scanDelayMs) + 100)
     }
 
     /// An app without a learned behaviour scans only after scanDelayMs; an app learned as "set" scans at once.
@@ -344,15 +369,20 @@ final class ActionRunnerTests: XCTestCase {
         let runner = EarshotActionRunner(store: nil)
         let view = Frame(x: 0, y: 100, w: 1200, h: 700)
         var scrolledAt: UInt64?
+        var readsAfterMove = 0  // frame reads after the frame moved into view
         let t0 = Clock.nowNs()
         let f = await runner.scrollIntoView(perform: { scrolledAt = Clock.nowNs() }, frame: {
             guard let s = scrolledAt, Clock.ms(since: s) >= 60 else { return Frame(x: 20, y: 1400, w: 200, h: 20) }
+            readsAfterMove += 1
             return Frame(x: 20, y: 400, w: 200, h: 20)
         }, view: view)
         let ms = Clock.ms(since: t0)
         print("EARSHOT_BENCH fake scroll into view: \(ms) ms (frame moves at 60 ms)")
         XCTAssertEqual(f, Frame(x: 20, y: 400, w: 200, h: 20))
-        XCTAssertLessThan(ms, 120)
+        // The behaviour: the first frame read after the move ends the wait. No later read.
+        XCTAssertEqual(readsAfterMove, 1)
+        // A wall-time bound with margin for a busy CI runner. The check above carries the exact behaviour.
+        XCTAssertLessThan(ms, 60 + 100)
     }
 
     /// The frame never comes into view: nil at the time limit, so earshot does not click.
@@ -427,5 +457,22 @@ final class ActionRunnerTests: XCTestCase {
             ocr.sort()
             print("EARSHOT_BENCH OCR: \(found) texts, median \(ocr[2]) ms, max \(ocr[4]) ms")
         }
+    }
+}
+
+/// The always-on "send" alone after typing (D-12, R-ON-5). Return is pressed only by ActionRunner.send, which asks
+/// sendBlock first. Made-up text only.
+final class OwnerSendRuleTests: XCTestCase {
+    func testOnlyTheSendPathPressesReturn() {
+        // Return is pressed only by ActionRunner.send, which asks sendBlock first.
+        let info = { (owner: Bool) in CommandInfo(mode: .alwaysOn, tier: .rules, spokenTarget: "send", ownerSendAfterTyping: owner) }
+        XCTAssertEqual(ActionRules.sendBlock(command: info(false), inMessageBox: true, boxText: "made up", sensitive: nil),
+                       "blocked: send needs the hold key")
+        XCTAssertNil(ActionRules.sendBlock(command: info(true), inMessageBox: true, boxText: "made up", sensitive: nil))
+        XCTAssertNotNil(ActionRules.sendBlock(command: info(true), inMessageBox: false, boxText: "made up", sensitive: nil))
+        XCTAssertNotNil(ActionRules.sendBlock(command: info(true), inMessageBox: true, boxText: "", sensitive: nil))
+        XCTAssertNotNil(ActionRules.sendBlock(command: info(true), inMessageBox: true, boxText: "made up", sensitive: "a password field"))
+        var jev = info(true); jev.tier = .jev
+        XCTAssertNotNil(ActionRules.sendBlock(command: jev, inMessageBox: true, boxText: "made up", sensitive: nil))
     }
 }

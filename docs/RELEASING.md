@@ -42,7 +42,8 @@ Do not make, move or delete a tag by hand. If a workflow fails, fix the cause an
 2. Make the change.
 3. Add one line for the change under `## [Unreleased]` in `CHANGELOG.md`. Use the correct group: `Added`, `Changed`, `Fixed`, `Removed` or `Security`. Write the line for a user of earshot, and include the requirement IDs.
 4. Open a pull request with `develop` as the base.
-5. Merge the pull request with a merge commit.
+5. Make sure that the check **Swift build and test** (workflow **CI**) passes.
+6. Merge the pull request with a merge commit.
 
 If the change is not visible to a user (for example, a test or a document only), you can omit the `CHANGELOG.md` line.
 
@@ -54,7 +55,7 @@ If the change is not visible to a user (for example, a test or a document only),
 4. Update the compare links at the bottom of `CHANGELOG.md`.
 5. Open a pull request to `develop` with the title `Prepare vX.Y.Z`, and merge it.
 6. Open a pull request from `develop` to `main` with the title `Release vX.Y.Z`.
-7. Make sure that the check **Release check** passes. The check makes sure that the version is new and that `CHANGELOG.md` has a section for it.
+7. Make sure that the checks **Release check** and **Swift build and test** pass. The check makes sure that the version is new and that `CHANGELOG.md` has a section for it.
 8. Merge the pull request with a merge commit. Do not squash or rebase, because `develop` and `main` must keep the same history.
 9. Make sure that the workflow **Release** made the tag `vX.Y.Z` and the GitHub release.
 

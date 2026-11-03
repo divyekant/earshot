@@ -1,12 +1,17 @@
 import AVFoundation
+import CoreMedia
 import EarshotCore
 import Foundation
 import Speech
 
+#if compiler(>=6.2)   // Swift 6.2 comes with the macOS 26 SDK, which has SpeechTranscriber.
+
 /// Apple SpeechTranscriber, on the Mac (R-MD-1, E0). It needs no model file from the owner:
 /// macOS downloads the speech model for the locale one time.
-public final class AppleSpeechEngine: SpeechEngine, SpeechTimingReporting, @unchecked Sendable {
-    public static let engineID = "apple"
+/// It needs macOS 26. On older macOS, and if it does not load, `AppleSpeech.make` uses DictationEngine.
+@available(macOS 26, *)
+public final class AppleSpeechEngine: TurnSpeechEngine, PrerollControl, PhraseHintControl, @unchecked Sendable {
+    public static let engineID = AppleSpeech.engineID
     public let id = AppleSpeechEngine.engineID
     public let locale: Locale
     public var onPartial: (@Sendable (String) -> Void)?
@@ -17,12 +22,16 @@ public final class AppleSpeechEngine: SpeechEngine, SpeechTimingReporting, @unch
     private let lock = NSLock()
     private var mic: MicrophoneFeed?
     private var resolvedLocale: Locale?
-    private var setup: Task<(SpeechAnalyzer, Task<String, Error>), Error>?
+    private var setup: Task<(SpeechAnalyzer, Task<TimedTranscript, Error>), Error>?
     private var finish: (() -> Void)?
     private var sink: ((AVAudioPCMBuffer) -> Void)?
     private var format: AVAudioFormat?
     private var frames: Int64 = 0
     private var timing: SpeechTiming?
+    /// The preroll of the current turn, in seconds. The word times count from the start of the turn.
+    private var turnPreroll: Double = 0
+    /// Words to expect, such as the wake phrase (D-11). They go to the analyzer as context.
+    private var hints: [String] = []
     let activity = TurnActivity()
 
     public init(locale: Locale = Locale(identifier: "en_US")) { self.locale = locale }
@@ -30,8 +39,9 @@ public final class AppleSpeechEngine: SpeechEngine, SpeechTimingReporting, @unch
     deinit { mic?.stop() }
 
     private static func makeTranscriber(_ locale: Locale) -> SpeechTranscriber {
+        // The audio time of each word lets the pipeline remove the wake phrase by time (D-11).
         SpeechTranscriber(locale: locale, transcriptionOptions: [],
-                          reportingOptions: [.volatileResults, .fastResults], attributeOptions: [])
+                          reportingOptions: [.volatileResults, .fastResults], attributeOptions: [.audioTimeRange])
     }
 
     /// Checks the locale, downloads the speech model if it is missing, loads it, and opens the microphone.
@@ -65,12 +75,17 @@ public final class AppleSpeechEngine: SpeechEngine, SpeechTimingReporting, @unch
         return format
     }
 
+    public func setNextPreroll(seconds: Double) { lock.withLock { mic }?.setNextPreroll(seconds: seconds) }
+
+    public func setPhraseHints(_ phrases: [String]) { lock.withLock { hints = phrases.filter { !$0.isEmpty } } }
+
     /// Key down: audio goes to the analyzer at once. The analyzer starts in parallel.
     public func begin() throws {
         guard let mic = lock.withLock({ self.mic }) else {
             throw SpeechError("Apple speech is not ready: call prepare() first")
         }
-        mic.begin(try startTurn())
+        let preroll = mic.begin(try startTurn())
+        lock.withLock { turnPreroll = preroll }
     }
 
     /// Starts a turn with no microphone, for measurements. Give the audio (in the model format) to the returned function.
@@ -85,7 +100,7 @@ public final class AppleSpeechEngine: SpeechEngine, SpeechTimingReporting, @unch
         }
         activity.begin("earshot speech command")
         let (stream, continuation) = AsyncStream.makeStream(of: AnalyzerInput.self)
-        let task = Self.startAnalyzer(locale: loc, input: stream, onPartial: onPartial)
+        let task = Self.startAnalyzer(locale: loc, input: stream, hints: lock.withLock { hints }, onPartial: onPartial)
         let feed: (AVAudioPCMBuffer) -> Void = { [weak self] buffer in
             self?.lock.withLock { self?.frames += Int64(buffer.frameLength) }
             continuation.yield(AnalyzerInput(buffer: buffer))
@@ -94,6 +109,7 @@ public final class AppleSpeechEngine: SpeechEngine, SpeechTimingReporting, @unch
             setup = task
             sink = feed
             frames = 0
+            turnPreroll = 0
             finish = { continuation.finish() }   // `end` closes the stream.
         }
         return feed
@@ -122,14 +138,21 @@ public final class AppleSpeechEngine: SpeechEngine, SpeechTimingReporting, @unch
         t.waitMs = SpeechClock.ms(since: tWait)
         let tDecode = SpeechClock.nowNs()
         try await analyzer.finalizeAndFinishThroughEndOfInput()
-        let text = TextClean.clean(try await collector.value)
+        let joined = try await collector.value
+        let text = TextClean.clean(joined.text)
         t.decodeMs = SpeechClock.ms(since: tDecode)
         t.totalMs = SpeechClock.ms(since: t0)
-        lock.withLock {
+        let preroll = lock.withLock {
             if let format { t.audioMs = Double(frames) / format.sampleRate * 1000 }
             timing = t
+            return turnPreroll
         }
-        return Utterance(text: text, engine: id, ms: t.totalMs)
+        // The analyzer counts time from the first audio, which is the preroll. The pipeline counts from the start.
+        var words: [TimedWord] = []
+        if TimedTranscript.plausible(joined.words, audioSeconds: t.audioMs / 1000) {
+            words = joined.words.map { TimedWord(text: $0.text, start: $0.start - preroll, end: $0.end - preroll) }
+        }
+        return Utterance(text: text, engine: id, ms: t.totalMs, words: words)
     }
 
     /// Drops the turn with no final text.
@@ -170,31 +193,61 @@ public final class AppleSpeechEngine: SpeechEngine, SpeechTimingReporting, @unch
         } else {
             await analyzer.cancelAndFinishNow()
         }
-        let text = TextClean.clean(try await collector.value)
-        return Utterance(text: text, engine: id, ms: SpeechClock.ms(since: t0))
+        let joined = try await collector.value
+        return Utterance(text: TextClean.clean(joined.text), engine: id, ms: SpeechClock.ms(since: t0), words: joined.words)
     }
 
     public func shutdown() { lock.withLock { mic }?.stop() }
 
-    private static func startAnalyzer(locale: Locale, input: AsyncStream<AnalyzerInput>,
-                                      onPartial: (@Sendable (String) -> Void)?) -> Task<(SpeechAnalyzer, Task<String, Error>), Error> {
+    private static func startAnalyzer(locale: Locale, input: AsyncStream<AnalyzerInput>, hints: [String],
+                                      onPartial: (@Sendable (String) -> Void)?) -> Task<(SpeechAnalyzer, Task<TimedTranscript, Error>), Error> {
         Task {
             let module = makeTranscriber(locale)
             let analyzer = SpeechAnalyzer(modules: [module], options: options)
             let collector = collect(module, onPartial: onPartial)
+            if !hints.isEmpty {
+                // The wake phrase as context, so that the model spells it right more often (D-11). The probe used
+                // the same call for names (E2). If the context does not apply, the turn goes on without it.
+                let context = AnalysisContext()
+                context.contextualStrings = [.general: hints]
+                try? await analyzer.setContext(context)
+            }
             try await analyzer.start(inputSequence: input)
             return (analyzer, collector)
         }
     }
 
-    private static func collect(_ module: SpeechTranscriber, onPartial: (@Sendable (String) -> Void)?) -> Task<String, Error> {
+    private static func collect(_ module: SpeechTranscriber,
+                                onPartial: (@Sendable (String) -> Void)?) -> Task<TimedTranscript, Error> {
         Task {
-            var join = TranscriptJoin()
+            var join = TimedTranscript()
             for try await r in module.results {
-                let so = join.add(String(r.text.characters), isFinal: r.isFinal)
+                let so = join.add(String(r.text.characters), words: pieces(r.text), isFinal: r.isFinal)
                 if !r.isFinal { onPartial?(TextClean.clean(so)) }
             }
-            return join.text
+            return join
         }
     }
+
+    /// The runs of a result with their audio times, in seconds from the first audio of the turn.
+    /// A run with no time (for example a space) joins the piece before it, so the pieces joined give the text.
+    static func pieces(_ text: AttributedString) -> [TimedWord] {
+        var out: [TimedWord] = []
+        var lead = ""
+        for run in text.runs {
+            let piece = String(text[run.range].characters)
+            if let range = run.audioTimeRange, range.start.isNumeric, range.duration.isNumeric {
+                out.append(TimedWord(text: lead + piece, start: range.start.seconds, end: range.end.seconds))
+                lead = ""
+            } else if out.isEmpty {
+                lead += piece
+            } else {
+                out[out.count - 1].text += piece
+            }
+        }
+        if !lead.isEmpty, !out.isEmpty { out[out.count - 1].text += lead }
+        return out
+    }
 }
+
+#endif
