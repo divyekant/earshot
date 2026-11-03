@@ -219,6 +219,7 @@ The owner chose "Turn check and one print per mic" on a card.
 - earshot keeps one voice profile for each microphone (at most 4), keyed by the Core Audio UID of the default input device. Always-on uses the profile of the microphone in use, and starts again when the default input device changes.
 - A dropped turn shows no note and plays no sound (PR #92). The log keeps the scores.
 - A follow-up turn with 1 s of speech or more that misses the limit also passes at 0.45 or more against the voice of the owner's last turn that passed the profile (E6, section 8). Live test 2026-11-03: two go-on parts of the owner's dictation scored 0.23 and 0.25 against the profile and were dropped. On the bench, at 2.8 s far from the microphone, the owner passes 95 % of the time (was 66 %), and other voices 0.78 % (was 0.25 %). "send" alone stays on the profile (D-12).
+- The profile learns the owner's free speech from wake turns that passed well (E6, section 8.2). The 5 takes hold the wake phrase only, and follow-up turns in the owner's voice scored 0.16 to 0.28 in the live retest of 2026-11-03. Only a wake turn teaches, at 0.05 or more over its limit and with 1.5 s of speech or more. At most 10 turns. Embeddings only, no audio.
 - Rejected: max or top-2 over the 5 takes instead of the mean (no gain on the bench); repeat padding (no gain).
 
 ## D-12. "send" alone after typing, in always-on mode

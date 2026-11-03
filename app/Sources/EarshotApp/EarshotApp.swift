@@ -309,6 +309,7 @@ final class AppController: ObservableObject {
             }
             trigger.onRejected = { hit in pipeline.rejectedWake(hit, threshold: gate) }
             trigger.onTurnVoice = { voice in pipeline.turnVoice = voice }
+            trigger.onVoiceLearned = { [weak self] profile in self?.saveLearnedVoice(profile) }
             trigger.onNearMisses = { misses in pipeline.nearMisses(misses) }
             trigger.onTurnCheck = { check in pipeline.turnCheck(check) }
             trigger.onTurnEnd = { end in pipeline.turnEnd(end) }
@@ -340,7 +341,10 @@ final class AppController: ObservableObject {
         }
         do {
             // The phrase alone only has to pass the gate. The voice of the whole turn decides at its end (E6).
-            return try wake.listener(phrase: settings.wakePhrase, profile: profile, voiceThreshold: settings.voiceGate)
+            // The profile learns from good wake turns only on its own microphone (an older profile has none).
+            let learns = profile.map { $0.micID == nil || $0.micID == mic?.id } ?? false
+            return try wake.listener(phrase: settings.wakePhrase, profile: profile, voiceThreshold: settings.voiceGate,
+                                     learns: learns)
         } catch {
             wakeState = "The wake phrase did not start: \(error.localizedDescription)"
             status = wakeState
@@ -398,6 +402,16 @@ final class AppController: ObservableObject {
     }
 
     /// One line for the management window: the models and the owner's voice.
+    /// Saves a profile that learned the voice of a good wake turn (E6, section 8.2). A teach step since then made a
+    /// new profile for that microphone: then the learned one is old, and it is not saved.
+    private func saveLearnedVoice(_ profile: VoiceProfile) {
+        let current = store.voiceBook.profiles.contains { $0.micID == profile.micID && $0.createdAt == profile.createdAt }
+        guard current else { return }
+        do { try store.saveVoiceProfile(profile) } catch {
+            NSLog("earshot wake: the learned voice was not saved: %@", "\(error)")
+        }
+    }
+
     private func voiceStatus() -> String {
         var line = wakeLoad != nil && !WakeModels.isDownloaded(store: store.folder)
             ? "Downloading the wake phrase models: \(wakeProgress.value) %." : wakeState
@@ -406,7 +420,9 @@ final class AppController: ObservableObject {
         if let profile = book.profile(forMic: mic?.id) {
             let date = profile.createdAt.formatted(date: .abbreviated, time: .omitted)
             line += " Your voice: taught on \(date), \(profile.samples) phrases"
-            line += profile.micName.map { " with \"\($0)\"." } ?? "."
+            line += profile.micName.map { " with \"\($0)\"" } ?? ""
+            let learned = profile.learnedTurns?.count ?? 0
+            line += learned > 0 ? ", and learned from \(learned) of your wake turns." : "."
             if let mic, !book.hasProfile(forMic: mic.id) {
                 line += " The microphone now is \"\(mic.name)\". Teach earshot again with it: the voice check is surer"
                     + " on the microphone of the teach step."

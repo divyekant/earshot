@@ -416,6 +416,15 @@ final class FakeListener: WakeListener, @unchecked Sendable {
     func voiceScore(_ samples: [Float]) -> Double? { score }
     /// The voice embedding that `voiceCheck` reports.
     var embedding: [Float] = []
+    /// True if `learn` takes the turn.
+    var learns = false
+    private(set) var learned: [[Float]] = []
+    func learn(_ turn: [Float]) -> VoiceProfile? {
+        guard learns else { return nil }
+        learned.append(turn)
+        return VoiceProfile(phrase: "hey jarvis", embedding: [1, 0, 0], keywordTokens: [], samples: 5, selfScore: 0.9,
+                            learnedTurns: learned)
+    }
     func voiceCheck(_ samples: [Float]) -> VoiceCheck? {
         checked.append(samples.count)
         return score.map { VoiceCheck(score: $0, seconds: checkSeconds ?? Double(samples.count) / 16000, embedding: embedding) }
@@ -762,6 +771,71 @@ final class WakeTriggerTests: XCTestCase {
         XCTAssertEqual(log.last, "stop")
         XCTAssertEqual(voice?.passed, true)
         XCTAssertEqual(voice?.byLastTurn, false)
+    }
+
+    /// E6, section 8.2: a wake turn with `score` and `seconds` of speech, with a listener that learns.
+    private func learningWakeTurn(score: Double, seconds: Double) -> (FakeListener, TurnVoice?, [VoiceProfile]) {
+        let listener = FakeListener()
+        listener.hitAfterSamples = 16000
+        listener.learns = true
+        listener.score = score
+        listener.checkSeconds = seconds
+        listener.embedding = [0.6, 0.8, 0]
+        let (t, mic, rec) = make(listener)
+        var saved: [VoiceProfile] = []
+        let learned = expectation(description: "learned")
+        learned.isInverted = !listener.learns || !VoiceRule().learns(score: score, limit: VoiceRule().limit(seconds: seconds),
+                                                                     seconds: seconds)
+        t.onVoiceLearned = { profile in saved.append(profile); learned.fulfill() }
+        let stop = rec.expect("stop", self)
+        mic.emit(quiet, ms: 1000)
+        mic.emit(speech, ms: 600)
+        mic.emit(quiet, ms: 800)
+        wait(for: [stop], timeout: 2)
+        wait(for: [learned], timeout: 0.3)
+        let voice = t.lastTurnVoice
+        t.stop()
+        return (listener, voice, saved)
+    }
+
+    func testGoodWakeTurnTeachesTheProfile() {
+        let (listener, voice, saved) = learningWakeTurn(score: 0.6, seconds: 2.0)
+        XCTAssertEqual(listener.learned, [[0.6, 0.8, 0]])
+        XCTAssertEqual(voice?.learnedTurns, 1)
+        XCTAssertEqual(saved.first?.learnedTurns?.count, 1, "the app gets the profile to save")
+        XCTAssertTrue(voice?.summary.hasSuffix(", learned (1 turn)") == true, voice?.summary ?? "")
+    }
+
+    func testWakeTurnNearTheLimitOrShortDoesNotTeach() {
+        let (near, nearVoice, _) = learningWakeTurn(score: 0.45, seconds: 2.5)   // needs 0.42 + 0.05
+        XCTAssertTrue(near.learned.isEmpty)
+        XCTAssertEqual(nearVoice?.passed, true, "it still passes the check")
+        XCTAssertNil(nearVoice?.learnedTurns)
+        let (short, _, _) = learningWakeTurn(score: 0.8, seconds: 1.2)          // under 1.5 s of speech
+        XCTAssertTrue(short.learned.isEmpty)
+    }
+
+    func testFollowUpTurnDoesNotTeach() {
+        let listener = FakeListener()
+        listener.hitAfterSamples = 16000
+        listener.embedding = [1, 0, 0]
+        listener.checkSeconds = 0.8      // the wake turn is too short to teach
+        let (t, mic, rec) = make(listener)
+        let first = rec.expect("stop", self)
+        mic.emit(quiet, ms: 1000)
+        mic.emit(speech, ms: 600)
+        mic.emit(quiet, ms: 800)
+        wait(for: [first], timeout: 2)
+        listener.learns = true
+        listener.checkSeconds = 3
+        let second = rec.expect("stop", self, count: 2)
+        t.openFollowUp()
+        mic.emit(speech, ms: 1000)
+        mic.emit(quiet, ms: 700)
+        wait(for: [second], timeout: 2)
+        XCTAssertEqual(t.lastTurnVoice?.kind, .followUp)
+        XCTAssertTrue(listener.learned.isEmpty, "only a wake turn, with its phrase, teaches the profile")
+        t.stop()
     }
 
     func testTurnVoiceComesBeforeTheStop() {

@@ -76,6 +76,9 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
     public var onRejected: ((WakeHit) -> Void)?
     /// The voice check at the end of a turn. It comes right before `onStop` or `onCancel` of that turn.
     public var onTurnVoice: ((TurnVoice) -> Void)?
+    /// A wake turn that passed the check well added its voice to the profile (E6, section 8.2). Save the profile.
+    /// It holds embeddings only, no audio.
+    public var onVoiceLearned: ((VoiceProfile) -> Void)?
     /// Partial matches of the phrase that did not fire, since the last report. For the log: a count and the best
     /// part of the phrase only. No audio and no text (D-11).
     public var onNearMisses: ((NearMisses) -> Void)?
@@ -344,9 +347,17 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
             let last = kind == .followUp ? keptLastPassed().flatMap { check.similarity(to: $0) } : nil
             let byLast = !byProfile && check.seconds >= rule.lastTurnMinSeconds && (last ?? -1) >= rule.lastTurn
             let ms = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
+            // Only a wake turn teaches the profile: its phrase passed the gate, and the whole turn passed well.
+            var learned: VoiceProfile?
+            if kind == .wake, byProfile, !check.embedding.isEmpty,
+               rule.learns(score: check.score, limit: limit, seconds: check.seconds) {
+                learned = listener.learn(check.embedding)
+            }
             lastTurnVoice = TurnVoice(kind: kind, score: check.score, seconds: check.seconds, audioSeconds: audio,
                                       limit: limit, passed: byProfile || byLast, ms: ms, level: check.level,
-                                      lastTurnScore: last, lastTurnLimit: rule.lastTurn, byLastTurn: byLast)
+                                      lastTurnScore: last, lastTurnLimit: rule.lastTurn, byLastTurn: byLast,
+                                      learnedTurns: learned.map { $0.learnedTurns?.count ?? 0 })
+            if let learned { DispatchQueue.main.async { [weak self] in self?.onVoiceLearned?(learned) } }
             // Only a pass by the profile gives the next reference. A chain of passes by the last turn could drift
             // away from the owner's voice.
             if byProfile, !check.embedding.isEmpty { lastPassed = (check.embedding, clock) }
