@@ -39,8 +39,8 @@ final class ArmedDictationTests: XCTestCase {
         XCTAssertFalse(typed.note.contains("blue fox"), typed.note)
         XCTAssertNil(p.armedUntil)
 
-        // One turn only: the next plain sentence in always-on is not typed.
-        clock += 1
+        // The armed window is one turn only. After 3 s, the go-on window is closed too, so a plain sentence is not typed.
+        clock += 4
         _ = await say(p, e, "the green owl sleeps", .alwaysOn)
         XCTAssertEqual(runner.runs.count, 1)
     }
@@ -134,5 +134,34 @@ final class ArmedDictationTests: XCTestCase {
         _ = await say(p, e, "the build looks fine. Then open Slack later and tell the team", .alwaysOn)
         XCTAssertEqual(runner.runs.count, 1)
         if case .typeText = runner.runs.first?.0 {} else { XCTFail("typed text expected, got \(String(describing: runner.runs.first?.0))") }
+    }
+
+    /// After earshot typed in always-on mode, a turn that starts within 3 s goes on with the text, with one space.
+    func testNextTurnGoesOnWithTheText() async {
+        let (p, e, runner) = make()
+        _ = await say(p, e, "type", .alwaysOn)
+        clock += 1
+        _ = await say(p, e, "the blue fox jumps", .alwaysOn)
+        XCTAssertTrue(p.expectsText, "the next turn gets the long pause")
+        clock += 2
+        _ = p.begin()
+        clock += 4
+        let r = await say(p, e, "over the lazy dog", .alwaysOn)
+        XCTAssertEqual(runner.runs.map(\.0), [.typeText("the blue fox jumps"), .typeText(" over the lazy dog")], r.note)
+        // A command in the first sentence stays a command.
+        clock += 1
+        _ = await say(p, e, "click market", .alwaysOn)
+        XCTAssertEqual(runner.runs.last?.0, .click(elementID: "e1"))
+        XCTAssertFalse(p.expectsText)
+    }
+
+    func testGoOnNeedsTheSameAppAndAlwaysOn() async {
+        let (p, e, runner) = make()
+        _ = await say(p, e, "type", .hold)
+        clock += 1
+        _ = await say(p, e, "the blue fox jumps", .hold)
+        clock += 1
+        _ = await say(p, e, "over the lazy dog", .alwaysOn)
+        XCTAssertEqual(runner.runs.count, 1, "a hold-key typing does not open the go-on window")
     }
 }

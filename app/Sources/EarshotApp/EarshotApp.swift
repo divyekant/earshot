@@ -277,7 +277,7 @@ final class AppController: ObservableObject {
             Task { @MainActor in
                 let record = await pipeline.finish(mode: mode)
                 // After an always-on command, the owner's voice can give the next one with no wake phrase.
-                if mode == .alwaysOn, !record.heard.isEmpty { input?.commandFinished() }
+                if mode == .alwaysOn, !record.heard.isEmpty { input?.commandFinished(expectsText: pipeline.expectsText) }
                 // A command can change which items are enabled ("Copy" after "select all"). Read again for the next one.
                 if let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier { menus.refresh(front) }
             }

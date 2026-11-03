@@ -57,6 +57,13 @@ final class CommandPipeline {
     /// within `sendAfterTypingSeconds`, in the same app (the owner's choice, D-12, R-ON-5).
     private(set) var lastTyped: (at: Date, app: String?)?
     static let sendAfterTypingSeconds: TimeInterval = 5
+    /// After earshot typed in always-on mode, a turn that starts within this time goes on with the text.
+    static let continueTypingSeconds: TimeInterval = 3
+    /// True if the last typing was in always-on mode.
+    private var lastTypedAlwaysOn = false
+    /// True if the next turn is expected to hold dictated text (armed, or right after typing in always-on). The app
+    /// gives it to the trigger, so that turn gets the long end silence (WakeTrigger.dictationEndSilenceMs).
+    private(set) var expectsText = false
     /// A short sound for each result, if `playSounds`. The app plays a system sound (NSSound).
     var playSound: ((FeedbackSound) -> Void)?
     var playSounds = true
@@ -113,6 +120,7 @@ final class CommandPipeline {
         // A finish with no begin (the tests, the Test tab) starts now.
         let started = turnStartedAt ?? now()
         turnStartedAt = nil
+        expectsText = false
         sentThisTurn = false
         speechSummary = ""  // a speech error must not show the line of the last command
         var stages: [String: Double] = [:]
@@ -178,6 +186,13 @@ final class CommandPipeline {
                 return await typeArmed(text, mode: mode, context: context, rows: rows, stages: stages, clock)
             }
         }
+        // After earshot typed in always-on mode, a turn that starts within `continueTypingSeconds` in the same app,
+        // with no command in its first sentence, goes on with the text (one space before it, never Return).
+        if mode == .alwaysOn, lastTypedAlwaysOn, let t = lastTyped, t.app != nil, t.app == front,
+           started <= t.at.addingTimeInterval(Self.continueTypingSeconds),
+           !CommandRouter.startsWithCommand(text, context: context) {
+            return await typeArmed(text, mode: mode, context: context, rows: rows, stages: stages, clock, continues: true)
+        }
 
         let routeClock = Stopwatch()
         var result = await router.route(text, context: context)
@@ -199,6 +214,7 @@ final class CommandPipeline {
         // A bare "type": wait for the text in the next turn (hold key, or the owner's voice in always-on mode).
         if result.awaitsText {
             armedUntil = now().addingTimeInterval(Self.armedSeconds)
+            expectsText = true
             stages["dictation.armed"] = Self.armedSeconds * 1000
             return done(heard: text, intent: "type: waiting for the text", tier: result.tier, ok: true,
                         note: "say the text to type", stages: stages, clock, why: result.why)
@@ -225,7 +241,7 @@ final class CommandPipeline {
             let outcome = await actions.run(.typeText(body ?? text), context: context, command: CommandInfo(mode: .hold, tier: .rules))
             pauseAlwaysOn(false)
             for (k, ms) in outcome.stages { stages["action." + k] = ms }
-            if outcome.ok { noteTyped() }
+            if outcome.ok { noteTyped(mode: .hold) }
             var (ok, note) = (outcome.ok, outcome.note)
             if body != nil, outcome.ok { (ok, note) = await sendAfterTyping(mode: .hold, note: note, context: context, stages: &stages) }
             return done(heard: text, intent: IntentText.describe(.typeText(body ?? text), apps: rows, screen: context.screen),
@@ -274,7 +290,7 @@ final class CommandPipeline {
         if types { pauseAlwaysOn(false) }
         for (k, v) in outcome.stages { stages["action." + k] = v }
         if intent == .send { lastTyped = nil; sentThisTurn = outcome.ok }
-        if types, outcome.ok { noteTyped() }
+        if types, outcome.ok { noteTyped(mode: mode) }
         var (ok, note) = (outcome.ok, outcome.note)
         // "type X and send" (RouteResult.sendAfter): the router removed the send words. Type, then send.
         if result.sendAfter, types, outcome.ok {
@@ -336,8 +352,9 @@ final class CommandPipeline {
     }
 
     /// Types the words of an armed turn into the focused field. The log keeps the word count, not the words.
+    /// `continues`: the text goes on after the last typing (always-on), so it gets one space before it.
     private func typeArmed(_ text: String, mode: InputMode, context: RouteContext, rows: [AppEntry], stages: [String: Double],
-                           _ clock: Stopwatch) async -> ActivityRecord {
+                           _ clock: Stopwatch, continues: Bool = false) async -> ActivityRecord {
         var stages = stages
         let words = text.split(whereSeparator: \.isWhitespace).count
         let heard = "(\(words) word\(words == 1 ? "" : "s"))"
@@ -350,19 +367,22 @@ final class CommandPipeline {
         let body = CommandRouter.withoutTrailingSend(text)
         pauseAlwaysOn(true)
         // The real mode of the turn, so that a mode rule of the action module also holds here.
-        let outcome = await actions.run(.typeText(body ?? text), context: context, command: CommandInfo(mode: mode, tier: .rules))
+        let typed = (continues ? " " : "") + (body ?? text)
+        let outcome = await actions.run(.typeText(typed), context: context, command: CommandInfo(mode: mode, tier: .rules))
         pauseAlwaysOn(false)
         for (k, ms) in outcome.stages { stages["action." + k] = ms }
-        if outcome.ok { noteTyped() }
+        if outcome.ok { noteTyped(mode: mode) }
         var (ok, note) = (outcome.ok, outcome.note)
         if body != nil, outcome.ok { (ok, note) = await sendAfterTyping(mode: mode, note: note, context: context, stages: &stages) }
         return done(heard: heard, intent: "Type \(words) word\(words == 1 ? "" : "s")", tier: .rules, ok: ok,
-                    note: note, stages: stages, clock, why: "armed by \"type\"")
+                    note: note, stages: stages, clock, why: continues ? "goes on with the last typing" : "armed by \"type\"")
     }
 
     /// Records a typing that worked, with the front app, for an always-on "send" alone (D-12).
-    private func noteTyped() {
+    private func noteTyped(mode: InputMode) {
         lastTyped = (now(), frontBundleID().flatMap { $0 == ownBundleID ? nil : $0 })
+        lastTypedAlwaysOn = mode == .alwaysOn
+        if mode == .alwaysOn { expectsText = true }
     }
 
     /// After "… and send": with the hold key, send now through the normal send rules. In always-on mode, type
