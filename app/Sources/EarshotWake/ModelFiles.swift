@@ -168,8 +168,29 @@ public enum WakeModelPacks {
         ]
     )
 
+    /// The turn model: Pipecat Smart Turn v3.2 (BSD-2-Clause, about 8M parameters), Core ML (R-ON-1, I-2).
+    /// It is optional: if it does not download or load, the end silence alone ends a turn.
+    public static let turn = ModelPack(
+        name: "smart-turn-v3.2",
+        repo: "aufklarer/Smart-Turn-v3.2-CoreML",
+        revision: "75f069717f500947195fa1945c46ddb472559cff",
+        files: [
+            ModelFile(path: "config.json", size: 1029,
+                      sha256: "bc09d1b40285465b389dc42cef54290fa1db7b4928348018bc61d819b4914402"),
+            ModelFile(path: "smart_turn.mlmodelc/analytics/coremldata.bin", size: 243,
+                      sha256: "1646746d0029e78d26be065e62602d4f89e51013ec238b653adf7d7d21057f89"),
+            ModelFile(path: "smart_turn.mlmodelc/coremldata.bin", size: 643,
+                      sha256: "9245ac99889c9d738cba6c89da9e851fd16488bf8effbc15a109d06b401c9383"),
+            ModelFile(path: "smart_turn.mlmodelc/model.mil", size: 69968,
+                      sha256: "41a6d9ac0f7d01d738e56ecdf4435e55f139591541b7cf1a4dba6b9ce2f1c9ef"),
+            ModelFile(path: "smart_turn.mlmodelc/weights/weight.bin", size: 16714240,
+                      sha256: "b6295316741a0149e1fcab7cdf030e1b9bfb0eef778207accee91a2a9703a39c"),
+        ]
+    )
+
+    /// The packs that always-on mode needs. The turn model is extra (`turn`).
     public static let all = [spotter, voice]
 
-    /// The sum of the download sizes, in bytes (about 17.7 MB).
+    /// The sum of the download sizes of the needed packs, in bytes (about 17.7 MB).
     public static var totalBytes: Int { all.reduce(0) { $0 + $1.totalBytes } }
 }

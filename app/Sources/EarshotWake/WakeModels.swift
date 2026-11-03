@@ -11,6 +11,8 @@ public final class WakeModels: @unchecked Sendable {
     /// The spotter with the default phrase. Each listener makes its own keyword graph from it.
     let base: WakeWordDetector
     let voice: VoiceModel
+    /// The turn model, or nil if it did not download or load (R-ON-1, I-2).
+    let turn: TurnModel?
     private let lock = NSLock()
     /// The time of the load, in ms. For the log.
     public let loadMs: Double
@@ -23,8 +25,11 @@ public final class WakeModels: @unchecked Sendable {
     static let learnedThreshold = 0.2
     static let learnedBoost = 1.5
 
-    init(base: WakeWordDetector, voice: VoiceModel, loadMs: Double) {
-        self.base = base; self.voice = voice; self.loadMs = loadMs
+    /// True if the turn model is loaded.
+    public var hasTurnModel: Bool { turn != nil }
+
+    init(base: WakeWordDetector, voice: VoiceModel, turn: TurnModel? = nil, loadMs: Double) {
+        self.base = base; self.voice = voice; self.turn = turn; self.loadMs = loadMs
     }
 
     /// True if both model packs are in the store folder and checked.
@@ -50,7 +55,22 @@ public final class WakeModels: @unchecked Sendable {
         try base.warmUp()
         _ = try voice.embed([Float](repeating: 0, count: 16000))
         let ms = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
-        return WakeModels(base: base, voice: voice, loadMs: ms)
+        // The turn model is extra (16.8 MB, one time). A failure leaves always-on with the end silence alone.
+        let turn = await loadTurnModel(store: store)
+        return WakeModels(base: base, voice: voice, turn: turn, loadMs: ms)
+    }
+
+    /// Downloads, checks and loads the turn model, or returns nil.
+    static func loadTurnModel(store: URL) async -> TurnModel? {
+        do {
+            let folder = try await WakeModelPacks.turn.ensure(in: store)
+            let model = try TurnModel(folder: folder)
+            try model.warmUp()
+            return model
+        } catch {
+            NSLog("earshot wake: the turn model did not load: %@", "\(error)")
+            return nil
+        }
     }
 
     func locked<T>(_ body: () throws -> T) rethrows -> T {
@@ -81,18 +101,25 @@ public final class WakeModels: @unchecked Sendable {
     /// The voice of the profile counts for any phrase. Its templates and learned pieces count only for the phrase of
     /// the enrolment. With templates (E5), the listener finds the phrase by its sound. Else the spelled spotter listens.
     /// - Parameter profile: nil if the owner did not teach earshot the voice. Then every voice can wake earshot.
-    public func listener(phrase: String, profile: VoiceProfile?, voiceThreshold: Double) throws -> WakeListener {
+    /// - Parameter learns: true if the voice of good wake turns goes into the profile (E6, section 8.2). Pass true
+    ///   only for a profile of the microphone in use, or an older profile with no microphone.
+    public func listener(phrase: String, profile: VoiceProfile?, voiceThreshold: Double,
+                         learns: Bool = false) throws -> WakeListener {
         let templates = (profile?.templates(for: phrase) ?? []).map(WakeTemplates.unpack).filter { !$0.isEmpty }
         if templates.count >= TemplateMatcher.minTemplates {
-            return try PhraseListener(models: self, phrase: phrase, templates: templates, profile: profile,
-                                      voiceThreshold: voiceThreshold)
+            let listener = try PhraseListener(models: self, phrase: phrase, templates: templates, profile: profile,
+                                              voiceThreshold: voiceThreshold)
+            listener.learns = learns
+            return listener
         }
         let spelled = spelledPieces(phrase)
         let learned = profile.map { $0.matches(phrase: phrase) ? $0.keywordTokens : [] } ?? []
         let specs = Self.keywords(phrase: phrase, spelled: spelled, learned: learned)
         guard !specs.isEmpty else { throw WakeError("The wake phrase has no words.") }
-        return try PhraseListener(models: self, phrase: phrase, keywords: specs, profile: profile,
-                                  voiceThreshold: voiceThreshold, nearMissLength: spelled.count)
+        let listener = try PhraseListener(models: self, phrase: phrase, keywords: specs, profile: profile,
+                                          voiceThreshold: voiceThreshold, nearMissLength: spelled.count)
+        listener.learns = learns
+        return listener
     }
 
     /// Makes the owner's voice profile from the enrolment phrases (16 kHz mono, one phrase in each clip).
@@ -142,11 +169,32 @@ public final class WakeModels: @unchecked Sendable {
         }
     }
 
+    /// The voice check of a whole turn against a profile (E6): the cosine similarity, -1 to 1, the speech that the
+    /// model scored, in seconds, its level, and the embedding of the turn. The quiet parts are cut first
+    /// (`SpeechTrim.condensed`).
+    public func voiceCheck(_ samples: [Float], profile: VoiceProfile) throws -> VoiceCheck {
+        let clip = SpeechTrim.condensed(samples)
+        let input = clip.isEmpty ? samples : clip
+        let embedding = try locked { try voice.embed(input) }
+        // The whole turn has free speech, so it compares with the phrases and the learned turns (E6, section 8.2).
+        return VoiceCheck(score: VoiceModel.cosine(embedding, profile.turnEmbedding), seconds: Double(input.count) / 16000,
+                          embedding: embedding, level: SpeechTrim.level(input))
+    }
+
     /// The voice score of a clip against a profile: the cosine similarity, -1 to 1.
     public func voiceScore(_ samples: [Float], profile: VoiceProfile) throws -> Double {
         let clip = SpeechTrim.trim(samples)
         let embedding = try locked { try voice.embed(clip.isEmpty ? samples : clip) }
         return VoiceModel.cosine(embedding, profile.embedding)
+    }
+
+    /// The probability that the turn is done (Smart Turn v3.2), or nil if the model is not loaded or failed.
+    public func turnScore(_ samples: [Float]) -> Double? {
+        guard let turn, !samples.isEmpty else { return nil }
+        do { return try locked { try turn.probability(samples) } } catch {
+            NSLog("earshot wake: the turn model failed: %@", "\(error)")
+            return nil
+        }
     }
 
     static func mean(_ vectors: [[Float]]) -> [Float] {

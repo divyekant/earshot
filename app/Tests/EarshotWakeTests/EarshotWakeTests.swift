@@ -91,6 +91,32 @@ final class WakePartsTests: XCTestCase {
         XCTAssertNil(SpeechTrim.span(quiet))
     }
 
+    /// E6: the voice check of a whole turn scores the speech, not the pause between the phrase and the command.
+    func testCondensedCutsLongPausesInside() {
+        let quiet = [Float](repeating: 0.0005, count: 8000)                       // 500 ms
+        let tone = (0..<8000).map { Float(sin(Double($0) * 0.1) * 0.1) }           // 500 ms
+        let shortPause = [Float](repeating: 0.0005, count: 3200)                  // 200 ms: it stays
+        let longPause = [Float](repeating: 0.0005, count: 16000)                  // 1 s: it becomes 300 ms
+        let turn = quiet + tone + shortPause + tone + longPause + tone + quiet
+        let out = SpeechTrim.condensed(turn)
+        // 3 tones, the short pause, 300 ms of the long pause, and 150 ms at each end, to the 20 ms frame.
+        let expected = 3 * 8000 + 3200 + 4800 + 2 * 2400
+        XCTAssertEqual(Double(out.count), Double(expected), accuracy: 2 * 320)
+        XCTAssertLessThan(out.count, SpeechTrim.trim(turn).count - 10000, "the long pause is cut")
+        XCTAssertEqual(SpeechTrim.condensed(tone + tone).count, SpeechTrim.trim(tone + tone).count,
+                       "with no long pause, it is the same as trim")
+        XCTAssertTrue(SpeechTrim.condensed(quiet).isEmpty)
+        XCTAssertTrue(SpeechTrim.condensed([]).isEmpty)
+    }
+
+    /// E6, section 8: the log gives the level of the scored speech.
+    func testLevelIsTheRMSInDecibels() {
+        let tone = (0..<8000).map { $0 % 2 == 0 ? Float(0.1) : Float(-0.1) }       // RMS 0.1: -20 dB
+        XCTAssertEqual(SpeechTrim.level(tone), -20, accuracy: 1e-6)
+        XCTAssertEqual(SpeechTrim.level([]), -120)
+        XCTAssertEqual(SpeechTrim.level([Float](repeating: 0, count: 100)), -120)
+    }
+
     func testTemplateCutFollowsTheSpeech() {
         // 100 frames of 40 ms. The take has 0.3 s of quiet before it (WakeTemplates.leadSamples).
         let frames = (0..<100).map { [Float](repeating: Float($0), count: 4) }
@@ -121,7 +147,7 @@ final class WakePartsTests: XCTestCase {
 // D-11: the model download is pinned and checked.
 final class ModelFilesTests: XCTestCase {
     func testManifest() {
-        for pack in WakeModelPacks.all {
+        for pack in WakeModelPacks.all + [WakeModelPacks.turn] {
             XCTAssertEqual(pack.revision.count, 40, pack.name)
             for file in pack.files {
                 XCTAssertEqual(file.sha256.count, 64, file.path)
@@ -136,6 +162,20 @@ final class ModelFilesTests: XCTestCase {
             XCTAssertTrue(names.contains(needed), needed)
         }
         XCTAssertEqual(Double(WakeModelPacks.totalBytes), 17.7e6, accuracy: 0.1e6)
+        XCTAssertTrue(WakeModelPacks.turn.files.contains { $0.path == "smart_turn.mlmodelc/weights/weight.bin" })
+        XCTAssertEqual(Double(WakeModelPacks.turn.totalBytes), 16.8e6, accuracy: 0.1e6)
+    }
+
+    // R-ON-1: the turn model hears the last 8 s, with zeros at the front of a shorter turn.
+    func testTurnWindow() {
+        let short = TurnModel.window([Float](repeating: 0.5, count: 100) + [.nan])
+        XCTAssertEqual(short.count, TurnModel.windowSamples)
+        XCTAssertEqual(short[0], 0)
+        XCTAssertEqual(short[TurnModel.windowSamples - 2], 0.5)
+        XCTAssertEqual(short[TurnModel.windowSamples - 1], 0, "a sample that is not a number becomes 0")
+        let long = TurnModel.window((0..<(TurnModel.windowSamples + 10)).map { Float($0) })
+        XCTAssertEqual(long.first, 10, "only the last 8 s count")
+        XCTAssertEqual(long.last, Float(TurnModel.windowSamples + 9))
     }
 
     func testFolderAndReady() throws {

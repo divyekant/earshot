@@ -9,7 +9,11 @@ public enum InputTriggers {
     public static func make(_ settings: EarshotSettings, wake: WakeListener? = nil) -> InputSwitch {
         let hold = HoldKeyTrigger(settings: settings)
         var alwaysOn: InputTrigger?
-        if settings.mode == .alwaysOn, let wake { alwaysOn = WakeTrigger(listener: wake) }
+        if settings.mode == .alwaysOn, let wake {
+            var config = WakeConfig()
+            config.voice = settings.voiceRule
+            alwaysOn = WakeTrigger(listener: wake, config: config)
+        }
         return InputSwitch(hold: hold, alwaysOn: alwaysOn)
     }
 }
@@ -44,7 +48,10 @@ public final class InputSwitch: InputTrigger {
 
     /// A command finished: open the follow-up window of always-on. `expectsText`: the next turn holds dictated text,
     /// so it gets the long end silence.
-    public func commandFinished(expectsText: Bool = false) { (alwaysOn as? WakeTrigger)?.openFollowUp(longPause: expectsText) }
+    /// `soundSeconds`: the length of the result sound that plays now. The follow-up window starts after it.
+    public func commandFinished(expectsText: Bool = false, soundSeconds: Double = 0) {
+        (alwaysOn as? WakeTrigger)?.openFollowUp(longPause: expectsText, afterSeconds: soundSeconds)
+    }
 
     public func start() throws {
         try hold.start()

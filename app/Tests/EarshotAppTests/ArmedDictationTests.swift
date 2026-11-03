@@ -69,7 +69,8 @@ final class ArmedDictationTests: XCTestCase {
         let r = await say(p, e, "made up secret words", .alwaysOn)
         XCTAssertTrue(runner.runs.isEmpty)
         // A password field makes the page a sign-in page (SafetyPolicy.sensitive), so that reason comes first.
-        XCTAssertEqual(r.note, "type: a sign-in, code or payment page")
+        // The always-on log line also says that no check of the turn voice ran (E6).
+        XCTAssertEqual(r.note, "type: a sign-in, code or payment page · speech: voice not checked")
     }
 
     func testNoFocusedFieldLogsTheReason() async {
@@ -79,7 +80,7 @@ final class ArmedDictationTests: XCTestCase {
         let r = await say(p, e, "the blue fox jumps", .alwaysOn)
         XCTAssertTrue(runner.runs.isEmpty)
         XCTAssertFalse(r.ok)
-        XCTAssertEqual(r.note, "type: no focused text field")
+        XCTAssertEqual(r.note, "type: no focused text field · speech: voice not checked")
     }
 
     func testCommandWordInTheArmedTurnRunsAsACommand() async {
@@ -163,5 +164,32 @@ final class ArmedDictationTests: XCTestCase {
         clock += 1
         _ = await say(p, e, "over the lazy dog", .alwaysOn)
         XCTAssertEqual(runner.runs.count, 1, "a hold-key typing does not open the go-on window")
+    }
+
+    /// Review of #86: when earshot waits for the owner's words (after "type", or after a typing), it plays no result
+    /// sound, so nothing mutes the detector, and the owner can go on at once.
+    func testTypingPlaysNoSoundAndTheNextTurnGoesOn() async {
+        let (p, e, runner) = make()
+        var sounds: [FeedbackSound] = []
+        p.playSound = { sounds.append($0) }
+        _ = await say(p, e, "type", .alwaysOn)
+        XCTAssertTrue(sounds.isEmpty, "the arming waits for words: no sound")
+        XCTAssertNil(p.lastSound, "so the app mutes nothing")
+        clock += 0.2
+        _ = p.begin()
+        clock += 2
+        _ = await say(p, e, "the blue fox jumps", .alwaysOn)
+        XCTAssertEqual(runner.runs.map(\.0), [.typeText("the blue fox jumps")], "a text turn 0.2 s after the arming is typed")
+        XCTAssertNil(p.lastSound, "a typing plays no sound either")
+        clock += 0.2
+        _ = p.begin()
+        clock += 2
+        _ = await say(p, e, "over the lazy dog", .alwaysOn)
+        XCTAssertEqual(runner.runs.map(\.0), [.typeText("the blue fox jumps"), .typeText(" over the lazy dog")])
+        XCTAssertTrue(sounds.isEmpty, "no result sound in the whole dictation")
+        // A command that does not wait for words keeps its sound.
+        clock += 10
+        _ = await say(p, e, "click market", .alwaysOn)
+        XCTAssertEqual(sounds, [.done])
     }
 }

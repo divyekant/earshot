@@ -6,29 +6,26 @@ public enum Brand {
     static func hex(_ v: UInt32) -> Color {
         Color(red: Double((v >> 16) & 0xFF) / 255, green: Double((v >> 8) & 0xFF) / 255, blue: Double(v & 0xFF) / 255)
     }
-    public static let tileTop = hex(0x3A2FA8)
-    public static let tileBottom = hex(0x0E0B2E)
-    public static let barTop = hex(0xFFFFFF)
-    public static let barBottom = hex(0xC4BAFF)
-    public static let cursorTop = hex(0xFFD978)
-    public static let cursorBottom = hex(0xFF9A3C)
-    public static let ink = hex(0x14112E)
-    /// The tint of the window controls. A lighter violet in dark mode, so the controls keep their contrast.
+    public static let tileTop = hex(0x2C2C29)
+    public static let tileBottom = hex(0x0C0C0B)
+    public static let ear = hex(0xF2F2EE)
+    public static let ink = hex(0x161615)
+    /// The tint of the window controls: graphite in light mode, a light gray in dark mode, so the controls keep their contrast.
     public static let accent = Color(nsColor: NSColor(name: "earshotAccent") { look in
         look.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-            ? NSColor(srgbRed: 0x9A / 255, green: 0x8F / 255, blue: 0xFF / 255, alpha: 1)
-            : NSColor(srgbRed: 0x3A / 255, green: 0x2F / 255, blue: 0xA8 / 255, alpha: 1)
+            ? NSColor(srgbRed: 0xD8 / 255, green: 0xD8 / 255, blue: 0xD2 / 255, alpha: 1)
+            : NSColor(srgbRed: 0x2C / 255, green: 0x2C / 255, blue: 0x29 / 255, alpha: 1)
     })
 
     /// The version from Info.plist, or nil for a build that is not an app bundle (swift run, tests).
     public static var version: String? { Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String }
 }
 
-/// The earshot mark as vector shapes: four voice bars, then the text cursor.
-/// The shapes are the same as in assets/brand/mark.svg and glyph.svg (1024 canvas, tile at 100,100, 824 wide).
+/// The earshot mark as vector shapes: an ear, drawn as one stroke.
+/// The shapes are the same as in assets/brand/src/mark.svg (1024 canvas, tile at 100,100, 824 wide).
 /// SwiftUI draws them, so the mark is sharp at every size, and the module needs no resource file.
 public struct EarshotMark: View {
-    /// Draw the tile behind the mark. Without the tile, the bars and the cursor use `glyph`, as glyph.svg does.
+    /// Draw the tile behind the mark. Without the tile, the ear uses `glyph`, as glyph.svg does.
     var tile: Bool
     var glyph: Color
 
@@ -39,11 +36,10 @@ public struct EarshotMark: View {
             let side = min(size.width, size.height)
             let k = side / 824
             let toView = CGAffineTransform(scaleX: k, y: k).translatedBy(x: -100, y: -100)
-            func path(_ r: MarkShapes.Bar) -> Path {
-                Path(roundedRect: r.rect, cornerRadius: r.rect.width / 2).applying(toView)
-            }
+            let ear = MarkShapes.path().applying(toView)
+            let stroke = StrokeStyle(lineWidth: MarkShapes.strokeWidth * k, lineCap: .round, lineJoin: .round)
             guard tile else {
-                for b in MarkShapes.bars + [MarkShapes.cursor] { ctx.fill(path(b), with: .color(glyph)) }
+                ctx.stroke(ear, with: .color(glyph), style: stroke)
                 return
             }
             let tileRect = CGRect(x: 0, y: 0, width: side, height: side)
@@ -54,18 +50,7 @@ public struct EarshotMark: View {
             ctx.fill(tilePath, with: .radialGradient(Gradient(colors: [.white.opacity(0.18), .white.opacity(0)]),
                                                      center: CGPoint(x: 0.3 * side, y: 0.12 * side),
                                                      startRadius: 0, endRadius: 0.75 * side))
-            let barTop = CGPoint(x: 0, y: (286 - 100) * k), barBottom = CGPoint(x: 0, y: (738 - 100) * k)
-            for b in MarkShapes.bars {
-                ctx.fill(path(b), with: .linearGradient(Gradient(colors: [Brand.barTop, Brand.barBottom]),
-                                                        startPoint: barTop, endPoint: barBottom))
-            }
-            let c = path(MarkShapes.cursor)
-            var glow = ctx
-            glow.addFilter(.blur(radius: 16 * k))
-            glow.fill(c, with: .color(Brand.cursorBottom.opacity(0.55)))
-            ctx.fill(c, with: .linearGradient(Gradient(colors: [Brand.cursorTop, Brand.cursorBottom]),
-                                              startPoint: CGPoint(x: 0, y: c.boundingRect.minY),
-                                              endPoint: CGPoint(x: 0, y: c.boundingRect.maxY)))
+            ctx.stroke(ear, with: .color(Brand.ear), style: stroke)
             ctx.stroke(tilePath.applying(CGAffineTransform(translationX: side / 2, y: side / 2).scaledBy(x: 0.9964, y: 0.9964)
                         .translatedBy(x: -side / 2, y: -side / 2)),
                        with: .color(.white.opacity(0.16)), lineWidth: max(0.5, 3 * k))
@@ -75,17 +60,51 @@ public struct EarshotMark: View {
     }
 }
 
-/// The shapes of the mark in SVG coordinates (y goes down). Each is a rounded bar: corner radius is half the width.
+/// The ear in SVG coordinates (y goes down). The curves use a 24-unit grid, the same as the menu bar icon.
+/// `scale` and `origin` put the grid on the 1024 canvas, with the center of the ear at 512,512.
 enum MarkShapes {
-    struct Bar { var rect: CGRect }
-    static let bars = [
-        Bar(rect: CGRect(x: 276, y: 437, width: 70, height: 150)),
-        Bar(rect: CGRect(x: 384, y: 367, width: 70, height: 290)),
-        Bar(rect: CGRect(x: 492, y: 307, width: 70, height: 410)),
-        Bar(rect: CGRect(x: 600, y: 387, width: 70, height: 250)),
+    static let scale: CGFloat = 27
+    static let origin = CGPoint(x: 161, y: 180)
+    /// The stroke width on the 1024 canvas (2.2 grid units).
+    static let strokeWidth: CGFloat = 2.2 * scale
+
+    /// Each stroke: a start point, then cubic curves as (control 1, control 2, end), in grid units.
+    typealias Curve = (CGPoint, CGPoint, CGPoint)
+    static let strokes: [(start: CGPoint, curves: [Curve])] = [
+        // The outer rim, down to the lobe.
+        (CGPoint(x: 6.5, y: 9.6), [
+            (CGPoint(x: 6.5, y: 5.9), CGPoint(x: 9.3, y: 3), CGPoint(x: 12.9, y: 3)),
+            (CGPoint(x: 16.6, y: 3), CGPoint(x: 19.4, y: 5.9), CGPoint(x: 19.4, y: 9.5)),
+            (CGPoint(x: 19.4, y: 12.3), CGPoint(x: 17.9, y: 13.7), CGPoint(x: 16.5, y: 15)),
+            (CGPoint(x: 15.3, y: 16.1), CGPoint(x: 14.7, y: 16.9), CGPoint(x: 14.5, y: 18.5)),
+            (CGPoint(x: 14.2, y: 20.5), CGPoint(x: 12.8, y: 21.6), CGPoint(x: 11.1, y: 21.6)),
+            (CGPoint(x: 9.6, y: 21.6), CGPoint(x: 8.4, y: 20.7), CGPoint(x: 7.9, y: 19.3)),
+        ]),
+        // The inner fold.
+        (CGPoint(x: 9.9, y: 9.7), [
+            (CGPoint(x: 9.9, y: 7.8), CGPoint(x: 11.3, y: 6.3), CGPoint(x: 13, y: 6.3)),
+            (CGPoint(x: 14.8, y: 6.3), CGPoint(x: 16.1, y: 7.7), CGPoint(x: 16.1, y: 9.4)),
+            (CGPoint(x: 16.1, y: 10.7), CGPoint(x: 15.3, y: 11.4), CGPoint(x: 14.4, y: 11.8)),
+            (CGPoint(x: 13.4, y: 12.2), CGPoint(x: 12.9, y: 13), CGPoint(x: 12.9, y: 14)),
+        ]),
     ]
-    /// The text cursor: earshot puts the cursor in the message box. It never sends.
-    static let cursor = Bar(rect: CGRect(x: 708, y: 286, width: 40, height: 452))
+
+    /// A grid point on the 1024 canvas.
+    static func canvas(_ p: CGPoint) -> CGPoint {
+        CGPoint(x: origin.x + scale * p.x, y: origin.y + scale * p.y)
+    }
+
+    /// The ear as one path on the 1024 canvas.
+    static func path() -> Path {
+        var path = Path()
+        for s in strokes {
+            path.move(to: canvas(s.start))
+            for c in s.curves {
+                path.addCurve(to: canvas(c.2), control1: canvas(c.0), control2: canvas(c.1))
+            }
+        }
+        return path
+    }
 }
 
 /// The band at the top of the management window: the mark, the name, one line on what earshot does, and the version.

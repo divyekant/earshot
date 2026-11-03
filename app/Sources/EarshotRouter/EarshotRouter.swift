@@ -127,6 +127,11 @@ public struct CommandRouter: Router {
         let text = String(sentence)
         var words = TextKit.words(text)
         while let f = words.first, fillers.contains(f) || ScreenRouter.fillers.contains(f), words.count > 1 { words.removeFirst() }
+        // "here at least open Slack" (the wake phrase heard wrong), "go ahead and click login".
+        for lead in [["here", "at", "least"], ["at", "least"], ["go", "ahead"]] where words.count > lead.count && words.starts(with: lead) {
+            words.removeFirst(lead.count)
+            while let f = words.first, fillers.contains(f) || ScreenRouter.fillers.contains(f), words.count > 1 { words.removeFirst() }
+        }
         guard !words.isEmpty else { return false }
         let phrase = words.joined(separator: " ")
         if sendPhrases.contains(phrase) || showNumbers.contains(phrase) || hideNumbers.contains(phrase) { return true }
@@ -153,7 +158,7 @@ public struct CommandRouter: Router {
     /// Words at the start that are not part of the command: "Yeah, let's open the Slack" gives "open the Slack".
     static let leadFillers: Set<String> = fillers.union(["yeah", "yep", "yes", "lets", "let", "us", "alright", "well",
                                                          "hey", "can", "could", "you", "would", "actually", "basically",
-                                                         "just"])
+                                                         "just", "i", "want", "wanna", "need", "to"])
 
     /// The raw words with the lead fillers removed. Case and punctuation stay.
     static func dropLeadFillers(_ text: String) -> String {
@@ -161,11 +166,19 @@ public struct CommandRouter: Router {
         var lead = 0
         func isFiller(_ i: Int) -> Bool {
             let w = tokens.words[i]
+            // "I message" is the app name iMessage, heard as two words (PR #24). Keep it.
+            if w == "i", tokens.words[i + 1] == "message" { return false }
             if leadFillers.contains(w) { return true }
             // "Here" at the very start is most often the end of a wake phrase ("hey atlas" heard as "Here").
             if i == 0, w == "here" { return true }
             // "right" is a filler, but not in "right click".
             if w == "right", tokens.words[i + 1] != "click" { return true }
+            // "here at least" at the start is most often the wake phrase "hey atlas" (activity records, 2026-11-03).
+            if i <= 1, w == "at", tokens.words[i + 1] == "least" { return true }
+            if (1...2).contains(i), w == "least", tokens.words[i - 1] == "at" { return true }
+            // "go ahead and click login": "go ahead" is not the verb "go".
+            if w == "go", tokens.words[i + 1] == "ahead" { return true }
+            if i >= 1, w == "ahead", tokens.words[i - 1] == "go" { return true }
             return false
         }
         while lead < tokens.count - 1, isFiller(lead) { lead += 1 }

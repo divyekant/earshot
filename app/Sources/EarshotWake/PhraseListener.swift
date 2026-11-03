@@ -14,7 +14,9 @@ final class PhraseListener: WakeListener {
     let voiceThreshold: Double
     private let models: WakeModels
     private let session: WakeWordSession
-    private let profile: VoiceProfile?
+    private var profile: VoiceProfile?
+    /// True if the voice of good wake turns goes into `profile` (E6, section 8.2): the profile is of this microphone.
+    var learns = false
     /// The audio templates, or nil: then the spelled spotter listens.
     let matcher: TemplateMatcher?
     /// The match of the last push, if the templates found the phrase.
@@ -143,6 +145,21 @@ final class PhraseListener: WakeListener {
     func voiceScore(_ samples: [Float]) -> Double? {
         guard let profile else { return nil }
         return try? models.voiceScore(samples, profile: profile)
+    }
+
+    func turnScore(_ samples: [Float]) -> Double? { models.turnScore(samples) }
+
+    func voiceCheck(_ samples: [Float]) -> VoiceCheck? {
+        guard let profile else { return nil }
+        return try? models.voiceCheck(samples, profile: profile)
+    }
+
+    func learn(_ turn: [Float]) -> VoiceProfile? {
+        guard learns, let profile else { return nil }
+        let next = profile.learning(turn)
+        guard next != profile else { return nil }
+        self.profile = next
+        return next
     }
 
     func reset() {

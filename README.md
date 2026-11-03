@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="assets/brand/logo.svg" alt="earshot" width="320">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/logo-dark.svg">
+    <img src="assets/brand/logo.svg" alt="earshot" width="320">
+  </picture>
 </p>
 
 # earshot
@@ -69,6 +72,15 @@ App support is data, not code. earshot reads the menus, sidebars and search resu
    The script writes `app/build/Earshot.app`.
 
 If you have a code signing identity, the script uses it. If you do not have one, the script signs the app ad hoc. With an ad-hoc signature, macOS asks for the permissions again after each rebuild.
+
+To update the installed app to the latest `develop` with no clicks, run `scripts/update-app.sh`:
+
+1. The script builds `origin/develop` in a separate worktree (`~/Library/Caches/earshot/develop`). Your checkout does not change.
+2. It runs the release tests and checks the new build: the signature, the designated requirement, the icon, CTranscribe and the rpaths.
+3. It waits until the last voice turn is 2 minutes old, then quits earshot. Rejected wakes from room sounds do not count.
+4. It keeps the old app in `app/build/old-<time>.zip`, copies the new build over `app/build/Earshot.app` and opens it again.
+
+If the new build does not start, the script puts back the old app. If the installed app is already on the `develop` commit, the script does nothing. `--dry-run` shows the steps and changes nothing. `--skip-tests`, `--now` (no idle wait) and `--force` (install again) change the steps. `EARSHOT_APP` sets another installed app. The log goes to `~/Library/Logs/earshot-mem/`.
 
 ## Set up
 
@@ -153,6 +165,7 @@ earshot waits at most 1 s for Jev. After that, the rules answer wins.
 | `probe/` | The lab for the experiments E0, E1 and E2. |
 | `docs/` | Requirements, design, decisions, build plan, experiments and research. |
 | `assets/brand/` | The app icon and the logo. |
+| `site/` | The static landing page for earshot.divyekant.com. |
 
 ## Documents
 

@@ -15,6 +15,8 @@ cp "$bin/earshot" "$app/Contents/MacOS/earshot"
 cp scripts/Info.plist "$app/Contents/Info.plist"
 # The VERSION file at the repository root is the one source of the version (docs/RELEASING.md).
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $(tr -d '[:space:]' < ../VERSION)" "$app/Contents/Info.plist"
+# The source commit. scripts/update-app.sh compares it with the installed app.
+/usr/libexec/PlistBuddy -c "Add :EarshotCommit string $(git rev-parse HEAD 2>/dev/null || echo unknown)" "$app/Contents/Info.plist"
 cp ../assets/brand/AppIcon.icns "$app/Contents/Resources/AppIcon.icns"
 # transcribe.cpp (Parakeet). EarshotSpeech finds it at @executable_path/../Frameworks (T1).
 cp -R "$bin/CTranscribe.framework" "$app/Contents/Frameworks/"

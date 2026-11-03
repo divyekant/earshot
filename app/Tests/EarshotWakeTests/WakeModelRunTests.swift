@@ -262,4 +262,78 @@ final class WakeModelRunTests: XCTestCase {
         print(String(format: "spotter: %.0f ms for 11.5 s of audio (%.1f %% of one core)", ms, ms / 115))
         XCTAssertLessThan(ms, 11_500 * 0.25, "the spotter must use well under one core")
     }
+
+    // E6: the voice check of a whole turn. The same voice passes the turn limit, a pause inside the turn is cut, and
+    // the check is short: it runs before the turn ends, so its time is part of the command path. The print gives the
+    // numbers for the pull request.
+    func testTurnVoiceCheckSpeedAndScores() async throws {
+        let models = try await loadModels()
+        let takes = try [150, 170, 190, 210, 230].map { try say("Hey Atlas", rate: $0) }
+        let profile = try models.enrol(phrase: "hey atlas", clips: takes).profile
+        let pause = [Float](repeating: 0, count: 16000)
+        let phrase = try say("Hey Atlas")
+        let command = try say("open the notes app and make a new note")
+        let turn = phrase + pause + command + [Float](repeating: 0, count: 16000 / 2)
+        var times: [Double] = []
+        var last: VoiceCheck?
+        for _ in 0..<7 {
+            let start = DispatchTime.now().uptimeNanoseconds
+            last = try models.voiceCheck(turn, profile: profile)
+            times.append(Double(DispatchTime.now().uptimeNanoseconds - start) / 1e6)
+        }
+        let check = try XCTUnwrap(last)
+        let phraseOnly = try models.voiceScore(phrase, profile: profile)
+        let other = try? models.voiceCheck(try say("open the notes app and make a new note", voice: "Zarvox"), profile: profile)
+        let sorted = times.sorted()
+        print(String(format: "turn voice check: same voice %.2f on %.2f s of speech (audio %.2f s), phrase alone %.2f, "
+                     + "other voice %.2f; check median %.1f ms, max %.1f ms", check.score, check.seconds,
+                     Double(turn.count) / 16000, phraseOnly, other?.score ?? -1, sorted[sorted.count / 2], sorted.last ?? 0))
+        XCTAssertLessThan(check.seconds, Double(turn.count) / 16000 - 0.9, "the 1 s pause is cut to 300 ms")
+        XCTAssertGreaterThan(check.score, VoiceRule().limit(seconds: check.seconds), "the same voice passes the turn limit")
+        XCTAssertLessThan(sorted[sorted.count / 2], 100, "a check must be short: it runs before the turn ends")
+
+        // E6, section 8: a go-on part of the same voice, against the voice of the turn before it.
+        let goOnClip = try say("and then the brown dog sat down on the mat")
+        let goOn = try models.voiceCheck(goOnClip, profile: profile)
+        let goOnLast = try XCTUnwrap(goOn.similarity(to: check.embedding))
+        let otherLast = other.flatMap { $0.similarity(to: check.embedding) } ?? -1
+        print(String(format: "last-turn check: same voice %.2f (profile %.2f) on %.2f s, other voice %.2f, level %.0f dB",
+                     goOnLast, goOn.score, goOn.seconds, otherLast, goOn.level ?? 0))
+        XCTAssertEqual(check.embedding.count, 256)
+        XCTAssertGreaterThan(goOnLast, otherLast, "the same voice is nearer to its last turn than another voice")
+
+        // E6, section 8.2: the profile learns the wake turn, so free speech of the same voice scores higher.
+        let taught = profile.learning(check.embedding)
+        let goOnTaught = try models.voiceCheck(goOnClip, profile: taught)
+        let otherTaught = try? models.voiceCheck(try say("open the notes app and make a new note", voice: "Zarvox"),
+                                                 profile: taught)
+        print(String(format: "learned turn: same voice %.2f (was %.2f), other voice %.2f (was %.2f)",
+                     goOnTaught.score, goOn.score, otherTaught?.score ?? -1, other?.score ?? -1))
+        XCTAssertGreaterThan(goOnTaught.score, goOn.score)
+    }
+
+    // R-ON-1, I-2: the turn model gives a probability for a whole sentence and for a sentence cut in the middle, and
+    // a check is fast enough for the audio queue. The print gives the numbers for the pull request.
+    func testTurnModelSpeedAndScores() async throws {
+        let models = try await loadModels()
+        guard models.hasTurnModel else { throw XCTSkip("the turn model did not load") }
+        let whole = try say("Open the notes app.")
+        let cut = Array(try say("Send a message to the team and").prefix(16000 * 3 / 2))
+        let silence = [Float](repeating: 0, count: 16000 * 3 / 10)
+        var times: [Double] = []
+        var scores: [Double] = []
+        for audio in [whole + silence, cut + silence] {
+            for _ in 0..<5 {
+                let start = DispatchTime.now().uptimeNanoseconds
+                let p = try XCTUnwrap(models.turnScore(audio))
+                times.append(Double(DispatchTime.now().uptimeNanoseconds - start) / 1e6)
+                XCTAssertTrue((0...1).contains(p))
+                scores.append(p)
+            }
+        }
+        let sorted = times.sorted()
+        print(String(format: "turn model: P whole %.2f, P cut %.2f; check median %.1f ms, max %.1f ms",
+                     scores[0], scores[5], sorted[sorted.count / 2], sorted.last ?? 0))
+        XCTAssertLessThan(sorted[sorted.count / 2], 50, "a check must be short: it runs in the audio queue")
+    }
 }
