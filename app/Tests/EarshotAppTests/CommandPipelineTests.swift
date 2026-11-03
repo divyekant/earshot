@@ -214,6 +214,33 @@ final class CommandPipelineTests: XCTestCase {
         XCTAssertEqual(sounds, [.failed])
     }
 
+    /// Live test (19:06): the phrase matched, but the voice check said "another voice", and nothing showed it.
+    func testRejectedWakeShowsANoteAndTheFailedSound() {
+        let (p, _, runner) = make("")
+        let note = NoteRecorder()
+        p.feedback = note
+        var sounds: [FeedbackSound] = []
+        p.playSound = { sounds.append($0) }
+        p.wakePhrase = "hey atlas"
+        let r = p.rejectedWake(WakeHit(phrase: "hey atlas", prerollSeconds: 1, voiceScore: 0.25, isOwner: false), threshold: 0.35)
+        XCTAssertTrue(r.note.contains("0.25"), r.note)
+        XCTAssertEqual(r.heard, "")
+        XCTAssertTrue(runner.runs.isEmpty)
+        XCTAssertEqual(note.shown.first?.0, "✗ not sure it was your voice: say \"hey atlas, …\"")
+        XCTAssertEqual(sounds, [.failed])
+    }
+
+    func testLastSoundIsKeptForTheMute() async {
+        let (p, e, _) = make("open notes")
+        p.playSound = { _ in }
+        _ = await p.finish(mode: .hold)
+        XCTAssertEqual(p.lastSound, .done)
+        p.playSounds = false
+        e.text = "open notes"
+        _ = await p.finish(mode: .hold)
+        XCTAssertNil(p.lastSound, "no sound, so no mute")
+    }
+
     func testResultSounds() async {
         var sounds: [FeedbackSound] = []
         let (p, e, _) = make("open notes")
