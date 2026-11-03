@@ -107,7 +107,7 @@ final class CommandPipelineTests: XCTestCase {
         p.wakePhrase = "hey jarvis"
         let r = await p.finish(mode: .alwaysOn)
         XCTAssertFalse(r.ok)
-        XCTAssertEqual(r.note, "no words")
+        XCTAssertEqual(r.note, "no words · speech: voice not checked")
         XCTAssertTrue(runner.runs.isEmpty)
     }
 
