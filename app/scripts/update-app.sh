@@ -37,7 +37,7 @@ lsregister=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchSe
 logs="$HOME/Library/Logs/earshot-mem"
 if [ "$dry" = 1 ]; then log_file=/dev/null; else mkdir -p "$logs"; log_file="$logs/update-$(date -u +%Y%m%d-%H%M%SZ).log"; fi
 
-old="unknown" new="unknown" test_result="not run" quit_done=0 backup=""
+old="unknown" new="unknown" test_result="not run" quit_done=0 backup="" staging=""
 
 log() { printf '%s %s\n' "$(date -u +%H:%M:%SZ)" "$*" | tee -a "$log_file"; }
 plan() { log "dry run: would $*"; }
@@ -60,10 +60,20 @@ rollback() {
     log "Opened the old app again."
 }
 
+# The Dock and Spotlight must find only the installed copy: two registered copies with the same bundle ID
+# let an old build open. Also after a failed step.
+disable_staging() {
+    [ -n "$staging" ] && [ -d "$staging" ] || return 0
+    rm -rf "$staging-disabled"
+    mv "$staging" "$staging-disabled"
+    "$lsregister" -u "$staging" 2>/dev/null || true
+}
+
 fail() {
     trap - ERR
     log "FAILED: $*"
     if [ "$quit_done" = 1 ]; then rollback || log "The rollback failed. Unzip $backup by hand."; fi
+    disable_staging || log "Could not unregister the staging copy $staging."
     result "failed" "$(pids | paste -sd' ' -)"
     exit 1
 }
@@ -172,9 +182,7 @@ codesign --verify --deep --strict "$app" || fail "the signature of the installed
 cmp -s "$staging/Contents/Info.plist" "$app/Contents/Info.plist" || fail "Info.plist was not copied"
 
 # 8. Only the installed copy can open.
-rm -rf "$staging-disabled"
-mv "$staging" "$staging-disabled"
-"$lsregister" -u "$staging" 2>/dev/null || true
+disable_staging
 "$lsregister" -f "$app"
 # shellcheck disable=SC2012
 ls -1dt "$builds"/staging-* | tail -n +4 | while read -r d; do rm -rf "$d"; done
