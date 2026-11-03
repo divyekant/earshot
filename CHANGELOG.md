@@ -6,9 +6,13 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+### Changed
+
+- In always-on mode, earshot no longer shows "not sure it was your voice" or plays the failed sound when the voice check drops a wake phrase or a follow-up turn. Other voices, a TV and room sounds set them off too often. The activity log keeps the voice score of each dropped turn (R-ON-3, R-FB-1).
+
 ### Fixed
 
-- A result sound no longer starts a follow-up turn in always-on mode: the follow-up window opens when the sound ends, and the detector ignores earshot's own sounds. When earshot waits for your words (after "type", or after a typing), it plays no result sound, so you can go on talking at once. When the wake phrase is heard but the voice check rejects it, earshot now shows "not sure it was your voice" and plays the failed sound (R-ON-1, R-ON-3, R-FB-1).
+- A result sound no longer starts a follow-up turn in always-on mode: the follow-up window opens when the sound ends, and the detector ignores earshot's own sounds. When earshot waits for your words (after "type", or after a typing), it plays no result sound, so you can go on talking at once (R-ON-1, R-FB-1).
 - In always-on mode, a soft end of a word, or speech from a quieter microphone, no longer counts as the pause that ends your turn. A dictated text longer than 15 s is no longer lost: it ends at 60 s with its words (R-ON-1, I-2, I-26).
 
 ## [0.2.0] - 2026-11-03
