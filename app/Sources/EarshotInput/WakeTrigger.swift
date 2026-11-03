@@ -139,13 +139,32 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
 
     /// A command finished. For `followUpSeconds`, the owner's voice can give the next command with no phrase.
     /// With `longPause`, the next turn in the window (a follow-up or a wake) ends after `dictationEndSilenceMs`.
-    public func openFollowUp(longPause: Bool = false) {
+    /// `afterSeconds`: the length of a result sound that plays now. The detector ignores the sound, and the window
+    /// starts when the sound ends (live test: a result sound became a follow-up turn, dropped as another voice).
+    public func openFollowUp(longPause: Bool = false, afterSeconds: Double = 0) {
         queue.async { [self] in
             guard running, !paused, state == .idle else { return }
-            state = .followUp(until: clock + Int(config.followUpSeconds * Double(Self.rate)))
+            muteLocked(afterSeconds)
+            let after = Int(max(0, afterSeconds) * Double(Self.rate))
+            state = .followUp(until: clock + after + Int(config.followUpSeconds * Double(Self.rate)))
             nextTurnLongPause = longPause
         }
     }
+
+    /// The detector ignores the audio for `seconds` from now: earshot plays a sound, and the microphone hears it.
+    /// The detector does not change in that time, so the sound opens no turn, ends no turn, and moves no noise floor.
+    /// The spotter and the speech engine still get the audio.
+    public func mute(seconds: Double) {
+        queue.async { [self] in muteLocked(seconds) }
+    }
+
+    private func muteLocked(_ seconds: Double) {
+        guard seconds > 0 else { return }
+        muteUntilClock = max(muteUntilClock, clock + Int(seconds * Double(Self.rate)))
+    }
+
+    /// The sample clock until which the detector ignores the audio (`mute`).
+    private var muteUntilClock = 0
 
     /// True if the next turn in the follow-up window uses the long end silence.
     private var nextTurnLongPause = false
@@ -200,6 +219,7 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
 
     /// Feeds one level to the detector. Between turns, only the follow-up window can open a turn.
     private func level(_ db: Double) -> SpeechEvent? {
+        if clock < muteUntilClock { return nil }
         switch state {
         case .idle:
             detector.track(db: db)

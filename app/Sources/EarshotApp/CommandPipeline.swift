@@ -67,6 +67,8 @@ final class CommandPipeline {
     /// A short sound for each result, if `playSounds`. The app plays a system sound (NSSound).
     var playSound: ((FeedbackSound) -> Void)?
     var playSounds = true
+    /// The result sound of the last record, if one played. The app mutes the always-on detector for its length.
+    private(set) var lastSound: FeedbackSound?
     /// True if a send worked in this turn, for the "sent" sound.
     private var sentThisTurn = false
     /// The start of the open turn (begin()). The armed window and the send window test the start of the next turn,
@@ -348,6 +350,9 @@ final class CommandPipeline {
         let note = String(format: "wake phrase in another voice (score %@, needs %.2f)", score, threshold)
         let record = ActivityRecord(heard: "", intent: "none", tier: .none, ok: false, note: note, stages: [:])
         try? log?.append(record)
+        // The phrase matched: say so, so that the owner knows earshot heard it (live test, 19:06).
+        if showFeedback { feedback?.show("✗ not sure it was your voice: say \"\(wakePhrase), …\"", ok: false) }
+        if playSounds { playSound?(.failed) }
         return record
     }
 
@@ -471,7 +476,12 @@ final class CommandPipeline {
         if showFeedback, !quiet {
             feedback?.show(ok ? "→ \(intent)" : "✗ \(note)", ok: ok)
         }
-        if playSounds, !quiet { playSound?(ok ? (sentThisTurn ? .sent : .done) : .failed) }
+        lastSound = nil
+        if playSounds, !quiet {
+            let sound: FeedbackSound = ok ? (sentThisTurn ? .sent : .done) : .failed
+            playSound?(sound)
+            lastSound = sound
+        }
         return record
     }
 

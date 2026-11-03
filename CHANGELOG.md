@@ -25,6 +25,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Fixed
 
+- A result sound no longer starts a follow-up turn in always-on mode: the follow-up window opens when the sound ends, and the detector ignores earshot's own sounds. When the wake phrase is heard but the voice check rejects it, earshot now shows "not sure it was your voice" and plays the failed sound (R-ON-1, R-ON-3, R-FB-1).
 - After "type", a command word later in the dictated text (for example an app name) is typed as text. Only a first sentence that starts with a command runs as a command (R-NV-4).
 - After "type" or after typing, a long sentence that starts within the 5 s window now counts, even if it ends later. Before, a 10 s sentence after "type" was not typed (R-NV-4, R-ON-5, D-12).
 - "Yeah, actually let's send" now sends like "send", and "Here, let's open Slack" opens Slack by the rules. The router drops more spoken fillers at the start of a command ("actually", "just", "right", and "here" as the first word) (R-NV-5, R-SP-2).

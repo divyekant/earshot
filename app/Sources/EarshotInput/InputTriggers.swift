@@ -44,7 +44,10 @@ public final class InputSwitch: InputTrigger {
 
     /// A command finished: open the follow-up window of always-on. `expectsText`: the next turn holds dictated text,
     /// so it gets the long end silence.
-    public func commandFinished(expectsText: Bool = false) { (alwaysOn as? WakeTrigger)?.openFollowUp(longPause: expectsText) }
+    /// `soundSeconds`: the length of the result sound that plays now. The follow-up window starts after it.
+    public func commandFinished(expectsText: Bool = false, soundSeconds: Double = 0) {
+        (alwaysOn as? WakeTrigger)?.openFollowUp(longPause: expectsText, afterSeconds: soundSeconds)
+    }
 
     public func start() throws {
         try hold.start()
