@@ -64,6 +64,11 @@ public struct VoiceRule: Sendable, Equatable {
     /// The check against the last turn needs this much speech, in seconds. A shorter clip, for example "send" alone,
     /// must pass the profile (D-12).
     public var lastTurnMinSeconds: Double
+    /// A wake turn adds its voice to the profile (`VoiceProfile.learning`) only if its score is this much over its
+    /// limit. A turn near the limit is not sure enough to learn from.
+    public var learnMargin: Double
+    /// A wake turn adds its voice to the profile only with this much speech, in seconds: the phrase and a command.
+    public var learnMinSeconds: Double
 
     /// The gate stays at 0.35, not 0.10 (the E6 bench value): in the live run of 2026-11-03, room sounds matched the
     /// phrase templates every 4 to 6 s for 2 minutes, with voice scores of 0.17 to 0.29. A lower gate would start a
@@ -71,10 +76,17 @@ public struct VoiceRule: Sendable, Equatable {
     /// The bench for `lastTurn` (E6, section 8): at 0.45 and 1.0 s, the owner passes more often far from the
     /// microphone (66 % to 95 % at 2.8 s), and other voices pass 0.1 to 0.5 points more often.
     public init(gate: Double = 0.35, short: Double = 0.35, turn: Double = 0.42, shortSeconds: Double = 1.0,
-                turnSeconds: Double = 2.0, lastTurn: Double = 0.45, lastTurnMinSeconds: Double = 1.0) {
+                turnSeconds: Double = 2.0, lastTurn: Double = 0.45, lastTurnMinSeconds: Double = 1.0,
+                learnMargin: Double = 0.05, learnMinSeconds: Double = 1.5) {
         self.gate = gate; self.short = short; self.turn = turn
         self.shortSeconds = shortSeconds; self.turnSeconds = max(turnSeconds, shortSeconds)
         self.lastTurn = lastTurn; self.lastTurnMinSeconds = lastTurnMinSeconds
+        self.learnMargin = learnMargin; self.learnMinSeconds = learnMinSeconds
+    }
+
+    /// True if a wake turn with this score, limit and speech length is sure enough to add its voice to the profile.
+    public func learns(score: Double, limit: Double, seconds: Double) -> Bool {
+        score >= limit + learnMargin && seconds >= learnMinSeconds
     }
 
     /// The limit for a clip with this much speech, in seconds.
@@ -113,14 +125,16 @@ public struct TurnVoice: Sendable, Equatable {
     public var lastTurnLimit: Double
     /// True if the turn missed `limit` and passed by `lastTurnScore`.
     public var byLastTurn: Bool
+    /// The number of learned turns in the profile after this turn, if this turn added its voice to it. Else nil.
+    public var learnedTurns: Int?
 
     public init(kind: Kind, score: Double, seconds: Double, audioSeconds: Double, limit: Double, passed: Bool,
                 byTurn: Bool = true, ms: Double = 0, level: Double? = nil, lastTurnScore: Double? = nil,
-                lastTurnLimit: Double = 0, byLastTurn: Bool = false) {
+                lastTurnLimit: Double = 0, byLastTurn: Bool = false, learnedTurns: Int? = nil) {
         self.kind = kind; self.score = score; self.seconds = seconds; self.audioSeconds = audioSeconds
         self.limit = limit; self.passed = passed; self.byTurn = byTurn; self.ms = ms
         self.level = level; self.lastTurnScore = lastTurnScore; self.lastTurnLimit = lastTurnLimit
-        self.byLastTurn = byLastTurn
+        self.byLastTurn = byLastTurn; self.learnedTurns = learnedTurns
     }
 
     /// One part of a log line, for example "turn voice 0.51 (speech 1.84 s, audio 2.60 s, level -31 dB, needs 0.42,
@@ -135,6 +149,7 @@ public struct TurnVoice: Sendable, Equatable {
         if let last = lastTurnScore {
             text += String(format: ", last turn %.2f (needs %.2f", last, lastTurnLimit) + (byLastTurn ? ", passed)" : ")")
         }
+        if let learned = learnedTurns { text += ", learned (\(learned) turn\(learned == 1 ? "" : "s"))" }
         return text
     }
 }
@@ -209,6 +224,9 @@ public protocol WakeListener: AnyObject {
     func voiceCheck(_ samples: [Float]) -> VoiceCheck?
     /// The lowest score of the phrase that starts a turn (the gate of `VoiceRule`). `WakeHit.isOwner` uses it.
     var voiceThreshold: Double { get }
+    /// Adds the voice of a wake turn that passed well to the profile in use (`VoiceProfile.learning`). Returns the
+    /// new profile, to save it. Nil if the listener does not learn: no profile, or a profile of another microphone.
+    func learn(_ turn: [Float]) -> VoiceProfile?
     /// Starts again with no audio, for example after a turn.
     func reset()
     /// The near misses since the last call, or nil if there were none. Then it starts to count again.
@@ -220,6 +238,7 @@ public protocol WakeListener: AnyObject {
 
 public extension WakeListener {
     func takeNearMisses() -> NearMisses? { nil }
+    func learn(_ turn: [Float]) -> VoiceProfile? { nil }
     func turnScore(_ samples: [Float]) -> Double? { nil }
     /// The score of `voiceScore`, with the length of all the samples and no embedding.
     func voiceCheck(_ samples: [Float]) -> VoiceCheck? {
@@ -341,12 +360,38 @@ public struct VoiceProfile: Codable, Equatable, Sendable {
     public var micID: String?
     /// The name of that microphone, for the management window.
     public var micName: String?
+    /// The voice embeddings of the owner's last wake turns that passed the check well, oldest first, at most
+    /// `maxLearnedTurns` (E6, section 8.2). The enrolment holds the wake phrase only, so it matches the owner's free
+    /// speech less well. These turns add free speech to the check of a whole turn. Nil in an older profile.
+    public var learnedTurns: [[Float]]?
+
+    /// The most wake turns that a profile learns. The oldest goes first.
+    public static let maxLearnedTurns = 10
 
     public init(phrase: String, embedding: [Float], keywordTokens: [[String]], samples: Int, selfScore: Double,
-                createdAt: Date = Date(), templates: [WakeTemplate]? = nil, micID: String? = nil, micName: String? = nil) {
+                createdAt: Date = Date(), templates: [WakeTemplate]? = nil, micID: String? = nil, micName: String? = nil,
+                learnedTurns: [[Float]]? = nil) {
         self.phrase = phrase; self.embedding = embedding; self.keywordTokens = keywordTokens
         self.samples = samples; self.selfScore = selfScore; self.createdAt = createdAt; self.templates = templates
-        self.micID = micID; self.micName = micName
+        self.micID = micID; self.micName = micName; self.learnedTurns = learnedTurns
+    }
+
+    /// The embedding for the check of a whole turn: the mean of the enrolment phrases and the learned turns, each
+    /// with the same weight. With no learned turns, it is `embedding`. The phrase alone (the gate) uses `embedding`.
+    public var turnEmbedding: [Float] {
+        let turns = (learnedTurns ?? []).filter { $0.count == embedding.count }
+        guard !turns.isEmpty else { return embedding }
+        var sum = embedding.map { $0 * Float(max(1, samples)) }
+        for turn in turns { for i in sum.indices { sum[i] += turn[i] } }
+        return sum
+    }
+
+    /// The profile with one more learned turn. The oldest goes after `maxLearnedTurns`.
+    public func learning(_ turn: [Float]) -> VoiceProfile {
+        guard turn.count == embedding.count else { return self }
+        var copy = self
+        copy.learnedTurns = Array(((learnedTurns ?? []) + [turn]).suffix(Self.maxLearnedTurns))
+        return copy
     }
 
     /// The templates for this phrase, or an empty list if the profile has none or belongs to another phrase.

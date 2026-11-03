@@ -101,18 +101,25 @@ public final class WakeModels: @unchecked Sendable {
     /// The voice of the profile counts for any phrase. Its templates and learned pieces count only for the phrase of
     /// the enrolment. With templates (E5), the listener finds the phrase by its sound. Else the spelled spotter listens.
     /// - Parameter profile: nil if the owner did not teach earshot the voice. Then every voice can wake earshot.
-    public func listener(phrase: String, profile: VoiceProfile?, voiceThreshold: Double) throws -> WakeListener {
+    /// - Parameter learns: true if the voice of good wake turns goes into the profile (E6, section 8.2). Pass true
+    ///   only for a profile of the microphone in use, or an older profile with no microphone.
+    public func listener(phrase: String, profile: VoiceProfile?, voiceThreshold: Double,
+                         learns: Bool = false) throws -> WakeListener {
         let templates = (profile?.templates(for: phrase) ?? []).map(WakeTemplates.unpack).filter { !$0.isEmpty }
         if templates.count >= TemplateMatcher.minTemplates {
-            return try PhraseListener(models: self, phrase: phrase, templates: templates, profile: profile,
-                                      voiceThreshold: voiceThreshold)
+            let listener = try PhraseListener(models: self, phrase: phrase, templates: templates, profile: profile,
+                                              voiceThreshold: voiceThreshold)
+            listener.learns = learns
+            return listener
         }
         let spelled = spelledPieces(phrase)
         let learned = profile.map { $0.matches(phrase: phrase) ? $0.keywordTokens : [] } ?? []
         let specs = Self.keywords(phrase: phrase, spelled: spelled, learned: learned)
         guard !specs.isEmpty else { throw WakeError("The wake phrase has no words.") }
-        return try PhraseListener(models: self, phrase: phrase, keywords: specs, profile: profile,
-                                  voiceThreshold: voiceThreshold, nearMissLength: spelled.count)
+        let listener = try PhraseListener(models: self, phrase: phrase, keywords: specs, profile: profile,
+                                          voiceThreshold: voiceThreshold, nearMissLength: spelled.count)
+        listener.learns = learns
+        return listener
     }
 
     /// Makes the owner's voice profile from the enrolment phrases (16 kHz mono, one phrase in each clip).
@@ -169,7 +176,8 @@ public final class WakeModels: @unchecked Sendable {
         let clip = SpeechTrim.condensed(samples)
         let input = clip.isEmpty ? samples : clip
         let embedding = try locked { try voice.embed(input) }
-        return VoiceCheck(score: VoiceModel.cosine(embedding, profile.embedding), seconds: Double(input.count) / 16000,
+        // The whole turn has free speech, so it compares with the phrases and the learned turns (E6, section 8.2).
+        return VoiceCheck(score: VoiceModel.cosine(embedding, profile.turnEmbedding), seconds: Double(input.count) / 16000,
                           embedding: embedding, level: SpeechTrim.level(input))
     }
 
