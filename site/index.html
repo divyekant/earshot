@@ -108,18 +108,18 @@
 
           <!-- Scene: web -->
           <div class="win w-web" data-scene="web">
-            <div class="win-top"><i></i><i></i><i></i><span class="url">search.example</span></div>
+            <div class="win-top"><i></i><i></i><i></i><span class="url" id="w-url">New Tab</span></div>
             <div class="web" id="w-results">
-              <div class="search" id="w-search"><span class="ph" id="w-ph">Search</span><span class="typed" id="w-typed"></span></div>
+              <div class="search" id="w-search"><span class="ph" id="w-ph">Search Wikipedia</span><span class="typed" id="w-typed"></span></div>
               <ol class="results" id="w-list">
-                <li><b>Lisbon train times and tickets</b><i></i><i class="s"></i></li>
-                <li id="w-two"><b>Porto to Lisbon: every train today</b><i></i><i class="s"></i></li>
-                <li><b>Rail map of Portugal</b><i></i><i class="s"></i></li>
-                <li><b>Night trains from Madrid</b><i></i><i class="s"></i></li>
+                <li><b>Lisbon</b><i></i><i class="s"></i></li>
+                <li id="w-two"><b>Lisbon Metro</b><i></i><i class="s"></i></li>
+                <li><b>History of Lisbon</b><i></i><i class="s"></i></li>
+                <li><b>1755 Lisbon earthquake</b><i></i><i class="s"></i></li>
               </ol>
             </div>
             <div class="web article" id="w-article">
-              <h4>Porto to Lisbon: every train today</h4>
+              <h4>Lisbon Metro</h4>
               <i></i><i></i><i class="s"></i><i></i><i class="s"></i>
             </div>
           </div>
@@ -220,12 +220,12 @@
       </article>
 
       <article class="use">
-        <video class="clip" src="clips/web.mp4" poster="clips/web.jpg" muted loop playsinline preload="none" aria-label="Clip: search for trains to Lisbon, then open the second result."></video>
+        <video class="clip" src="clips/web.mp4" poster="clips/web.jpg" muted loop playsinline preload="none" aria-label="Clip: open wikipedia.org, search for Lisbon, then open the second result."></video>
         <div class="use-text">
           <h3>Use the web without the mouse</h3>
           <ul class="phrases">
-            <li><q>Open hn.com</q><span>Opens the address in your browser.</span></li>
-            <li><q>Search for trains to Lisbon</q><span>Types into the search field of the page.</span></li>
+            <li><q>Open wikipedia.org</q><span>Opens the site in your default browser. “Go to news dot ycombinator dot com” works too.</span></li>
+            <li><q>Search for Lisbon</q><span>Types into the search field of the page.</span></li>
             <li><q>Open the second result</q><span>Clicks the result by its position.</span></li>
             <li><q>Click Pull requests</q><span>Clicks the link by its label, even if you say it a little wrong.</span></li>
           </ul>
@@ -293,23 +293,23 @@
           <span class="stop end" data-at="9"><b>70–90 ms</b> clicked, after you stop talking</span>
         </div>
       </div>
-      <figcaption>Medians from the live tests E0 and E2 on an Apple M4 Pro Mac mini.</figcaption>
+      <figcaption>Medians from live tests on an Apple M4 Pro Mac mini.</figcaption>
     </figure>
     <div class="table-wrap">
       <table class="lab">
         <thead>
-          <tr><th scope="col">Test</th><th scope="col">Result</th><th scope="col">Report</th></tr>
+          <tr><th scope="col">Test</th><th scope="col">Result</th><th scope="col">Details</th></tr>
         </thead>
         <tbody>
-          <tr><td>Voice to the cursor in the right Slack chat</td><td><b>571 ms</b> median, 11 of 11 reached</td><td><a href="https://github.com/divyekant/earshot/blob/main/docs/experiments/E0-viability.md">E0</a></td></tr>
-          <tr><td>Speech to final text, on the Mac</td><td><b>52 ms</b> median</td><td><a href="https://github.com/divyekant/earshot/blob/main/docs/experiments/E0-viability.md">E0</a></td></tr>
-          <tr><td>Commands routed to the right chat, from apps it read by itself</td><td><b>42 of 42</b>, no wrong chat, 20 ms median</td><td><a href="https://github.com/divyekant/earshot/blob/main/docs/experiments/E1-generic-router.md">E1</a></td></tr>
-          <tr><td>Voice clicks on four live web pages</td><td><b>45 of 45</b>, no wrong press, 24 ms median</td><td><a href="https://github.com/divyekant/earshot/blob/main/docs/experiments/E2-web-and-speech.md">E2</a></td></tr>
-          <tr><td>Read every button and link on a page</td><td><b>26 to 47 ms</b></td><td><a href="https://github.com/divyekant/earshot/blob/main/docs/experiments/E2-web-and-speech.md">E2</a></td></tr>
+          <tr><td>Voice to the cursor in the right Slack chat</td><td><b>571 ms</b> median, 11 of 11 reached</td><td><a href="https://github.com/divyekant/earshot/blob/main/docs/experiments/E0-viability.md">How we tested</a></td></tr>
+          <tr><td>Speech to final text, on the Mac</td><td><b>52 ms</b> median</td><td><a href="https://github.com/divyekant/earshot/blob/main/docs/experiments/E0-viability.md">How we tested</a></td></tr>
+          <tr><td>Commands routed to the right chat, from apps it read by itself</td><td><b>42 of 42</b>, no wrong chat, 20 ms median</td><td><a href="https://github.com/divyekant/earshot/blob/main/docs/experiments/E1-generic-router.md">How we tested</a></td></tr>
+          <tr><td>Voice clicks on four live web pages</td><td><b>45 of 45</b>, no wrong press, 24 ms median</td><td><a href="https://github.com/divyekant/earshot/blob/main/docs/experiments/E2-web-and-speech.md">How we tested</a></td></tr>
+          <tr><td>Read every button and link on a page</td><td><b>26 to 47 ms</b></td><td><a href="https://github.com/divyekant/earshot/blob/main/docs/experiments/E2-web-and-speech.md">How we tested</a></td></tr>
         </tbody>
       </table>
     </div>
-    <p class="fine">The router results with no miss use the optional cloud helper, Jev, for the commands that the rules were not sure of. With the rules alone, on the Mac: 40 of 42 chats and 42 of 45 web clicks.</p>
+    <p class="fine">The results with no miss use the optional cloud helper for the commands that the rules were not sure of. With the rules alone, on the Mac: 40 of 42 chats and 42 of 45 web clicks.</p>
   </div>
 </section>
 
@@ -319,7 +319,7 @@
     <h2 id="privacy-title">No audio leaves your Mac.</h2>
     <div class="facts">
       <p>earshot saves no audio. Speech recognition and every decision run on the Mac by default.</p>
-      <p>One optional cloud helper, Jev, can answer when the rules are not sure. It is off by default. If you turn it on, earshot sends text only: the command words and a short list of labels on the screen.</p>
+      <p>One optional cloud helper can answer when the rules are not sure. It is off by default. If you turn it on, earshot sends text only: the command words and a short list of labels on the screen.</p>
       <p>The code is open source under the MIT License. Read it, build it and change it. Your settings, app list and name list are JSON files in <code>~/Library/Application Support/earshot</code>.</p>
     </div>
   </div>

@@ -146,13 +146,19 @@
       name: "web", app: "Chrome",
       reset: function () {
         $("w-typed").textContent = ""; $("w-typed").classList.remove("caret"); $("w-ph").hidden = false;
+        $("w-url").textContent = "New Tab"; $("w-results").classList.add("blank");
         $("w-list").classList.remove("show"); $("w-two").classList.remove("hit");
         $("w-results").classList.remove("gone"); $("w-article").classList.remove("come");
       },
       run: async function (id) {
-        await say("Search for trains to Lisbon", id);
+        await say("Open wikipedia.org", id);
+        $("w-url").textContent = "wikipedia.org"; $("w-results").classList.remove("blank");
+        showNote("Opened wikipedia.org in the browser");
+        await sleep(1200, id);
+        hideNote();
+        await say("Search for Lisbon", id);
         ringOn($("w-search")); $("w-ph").hidden = true;
-        await typeInto($("w-typed"), "trains to Lisbon", 34, id);
+        await typeInto($("w-typed"), "Lisbon", 40, id);
         await sleep(300, id);
         $("w-list").classList.add("show");
         showNote("Chrome · typed in the search field");
@@ -239,6 +245,7 @@
     Object.keys(wins).forEach(function (k) { wins[k].classList.toggle("show", k === s.name); });
     scenes.forEach(function (o) { o.reset(); });
     hideNote(); ringOff();
+    caption.textContent = "";
     mbarApp.textContent = s.app;
     Array.prototype.forEach.call(chapters.children, function (li, k) {
       li.classList.toggle("done", k < i); li.classList.toggle("now", k === i);

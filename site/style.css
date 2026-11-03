@@ -201,6 +201,7 @@ h1 { font-size: clamp(3rem, 7.6vw, 6.25rem); line-height: 0.94; letter-spacing: 
 .article h4 { font-size: 28px; letter-spacing: -0.02em; margin-bottom: 20px; }
 .article i { height: 10px; margin-top: 12px; }
 .web.gone { opacity: 0; transform: translateX(-30px); }
+.web.blank { opacity: 0; }
 .web.article.come { opacity: 1; transform: none; }
 
 /* notes doc */
