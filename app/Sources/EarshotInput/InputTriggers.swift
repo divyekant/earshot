@@ -42,8 +42,9 @@ public final class InputSwitch: InputTrigger {
     /// Pauses always-on, for example while earshot types, so that earshot does not hear its own typing.
     public func setAlwaysOnPaused(_ value: Bool) { pauseAlwaysOn(value) }
 
-    /// A command finished: open the follow-up window of always-on.
-    public func commandFinished() { (alwaysOn as? WakeTrigger)?.openFollowUp() }
+    /// A command finished: open the follow-up window of always-on. `expectsText`: the next turn holds dictated text,
+    /// so it gets the long end silence.
+    public func commandFinished(expectsText: Bool = false) { (alwaysOn as? WakeTrigger)?.openFollowUp(longPause: expectsText) }
 
     public func start() throws {
         try hold.start()

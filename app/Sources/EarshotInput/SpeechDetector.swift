@@ -52,6 +52,9 @@ public struct SpeechDetector: Sendable {
     /// A turn that the wake phrase opened, with no speech after the phrase yet. It waits `graceMs` for the command.
     public private(set) var awaitingCommand = false
     private var graceMs: Double = 0
+    /// The end silence of the open turn, if not `config.endSilenceMs`. Dictation turns use a longer pause, so a
+    /// natural pause does not cut a sentence in two. The wake trigger sets it at the start of a turn.
+    public var endSilenceOverrideMs: Double?
 
     public init(config: DetectorConfig = DetectorConfig()) { self.config = config }
 
@@ -106,7 +109,7 @@ public struct SpeechDetector: Sendable {
         if loud { speechMs += config.frameMs; quietMs = 0 } else { quietMs += config.frameMs }
 
         if turnMs >= config.maximumTurnMs { return forcedStop() }
-        if quietMs >= config.endSilenceMs {
+        if quietMs >= (endSilenceOverrideMs ?? config.endSilenceMs) {
             inTurn = false
             quietMs = 0
             if speechMs < config.minimumSpeechMs { return .drop("speech shorter than \(Int(config.minimumSpeechMs)) ms") }

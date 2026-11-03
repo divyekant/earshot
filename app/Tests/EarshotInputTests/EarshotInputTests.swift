@@ -484,6 +484,39 @@ final class WakeTriggerTests: XCTestCase {
         t.stop()
     }
 
+    /// After a dictation cue ("type", or earshot typed), the next follow-up turn ends after 1200 ms of quiet, not
+    /// 550 ms, so a natural pause does not cut a sentence in two (dk: "I have to speak fast").
+    private func followUpLength(longPause: Bool) -> Double? {
+        let listener = FakeListener()
+        listener.hitAfterSamples = 16000
+        let (t, mic, rec) = make(listener)
+        let first = rec.expect("stop", self)
+        mic.emit(quiet, ms: 1000)
+        mic.emit(speech, ms: 500)
+        mic.emit(quiet, ms: 700)
+        wait(for: [first], timeout: 2)
+        t.openFollowUp(longPause: longPause)
+        let second = rec.expect("stop", self, count: 2)
+        mic.emit(speech, ms: 1000)
+        mic.emit(quiet, ms: 700)   // a pause between 550 and 1200 ms
+        mic.emit(speech, ms: 800)
+        mic.emit(quiet, ms: 1300)
+        wait(for: [second], timeout: 3)
+        let seconds = t.lastFollowUpSeconds
+        t.stop()
+        return seconds
+    }
+
+    func testLongPauseKeepsOneTurnAfterADictationCue() throws {
+        let long = try XCTUnwrap(followUpLength(longPause: true))
+        XCTAssertGreaterThan(long, 3.0, "one turn over the 700 ms pause: \(long) s")
+    }
+
+    func testCommandsKeepTheShortPause() throws {
+        let short = try XCTUnwrap(followUpLength(longPause: false))
+        XCTAssertLessThan(short, 2.5, "the 700 ms pause ends a command turn: \(short) s")
+    }
+
     func testNearMissesAreReported() {
         let listener = FakeListener()
         var config = WakeConfig()

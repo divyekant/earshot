@@ -89,6 +89,7 @@ struct GeneralTab: View {
             Section("Behavior") {
                 Toggle("Type dictated text into chats with other people", isOn: $settings.typeIntoOthers)
                 Toggle("Show the note on screen", isOn: $settings.showFeedback)
+                Toggle("Play sounds", isOn: $settings.playSounds)
                 HStack {
                     Button("Show a test note") { hooks.feedback?.show("→ test note", ok: true) }
                         .disabled(hooks.feedback == nil)

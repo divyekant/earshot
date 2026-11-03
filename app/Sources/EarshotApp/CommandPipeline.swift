@@ -57,6 +57,18 @@ final class CommandPipeline {
     /// within `sendAfterTypingSeconds`, in the same app (the owner's choice, D-12, R-ON-5).
     private(set) var lastTyped: (at: Date, app: String?)?
     static let sendAfterTypingSeconds: TimeInterval = 5
+    /// After earshot typed in always-on mode, a turn that starts within this time goes on with the text.
+    static let continueTypingSeconds: TimeInterval = 3
+    /// True if the last typing was in always-on mode.
+    private var lastTypedAlwaysOn = false
+    /// True if the next turn is expected to hold dictated text (armed, or right after typing in always-on). The app
+    /// gives it to the trigger, so that turn gets the long end silence (WakeTrigger.dictationEndSilenceMs).
+    private(set) var expectsText = false
+    /// A short sound for each result, if `playSounds`. The app plays a system sound (NSSound).
+    var playSound: ((FeedbackSound) -> Void)?
+    var playSounds = true
+    /// True if a send worked in this turn, for the "sent" sound.
+    private var sentThisTurn = false
     /// The start of the open turn (begin()). The armed window and the send window test the start of the next turn,
     /// so a long sentence that starts in time still counts (live test: a 9.7 s sentence after "type" was lost).
     private var turnStartedAt: Date?
@@ -108,6 +120,8 @@ final class CommandPipeline {
         // A finish with no begin (the tests, the Test tab) starts now.
         let started = turnStartedAt ?? now()
         turnStartedAt = nil
+        expectsText = false
+        sentThisTurn = false
         speechSummary = ""  // a speech error must not show the line of the last command
         var stages: [String: Double] = [:]
         let wake = mode == .alwaysOn ? pendingWake : nil
@@ -163,13 +177,21 @@ final class CommandPipeline {
         let front = frontBundleID().flatMap { $0 == ownBundleID ? nil : $0 }
         var context = RouteContext(apps: rows, names: known, frontBundleID: front, screen: withMenus(screen, front: front))
 
-        // A bare "type" armed this turn: its words go into the focused field, unless they hold a command word.
-        // One turn only. A voice that the wake check dropped never reaches this point, so it does not disarm.
+        // A bare "type" armed this turn: its words go into the focused field, unless its first sentence is a command.
+        // A command word later in the text is text. One turn only. A voice that the wake check dropped never
+        // reaches this point, so it does not disarm.
         if let until = armedUntil {
             armedUntil = nil
-            if started <= until, !CommandRouter.hasCommandWord(text, context: context) {
+            if started <= until, !CommandRouter.startsWithCommand(text, context: context) {
                 return await typeArmed(text, mode: mode, context: context, rows: rows, stages: stages, clock)
             }
+        }
+        // After earshot typed in always-on mode, a turn that starts within `continueTypingSeconds` in the same app,
+        // with no command in its first sentence, goes on with the text (one space before it, never Return).
+        if mode == .alwaysOn, lastTypedAlwaysOn, let t = lastTyped, t.app != nil, t.app == front,
+           started <= t.at.addingTimeInterval(Self.continueTypingSeconds),
+           !CommandRouter.startsWithCommand(text, context: context) {
+            return await typeArmed(text, mode: mode, context: context, rows: rows, stages: stages, clock, continues: true)
         }
 
         let routeClock = Stopwatch()
@@ -192,6 +214,7 @@ final class CommandPipeline {
         // A bare "type": wait for the text in the next turn (hold key, or the owner's voice in always-on mode).
         if result.awaitsText {
             armedUntil = now().addingTimeInterval(Self.armedSeconds)
+            expectsText = true
             stages["dictation.armed"] = Self.armedSeconds * 1000
             return done(heard: text, intent: "type: waiting for the text", tier: result.tier, ok: true,
                         note: "say the text to type", stages: stages, clock, why: result.why)
@@ -218,7 +241,7 @@ final class CommandPipeline {
             let outcome = await actions.run(.typeText(body ?? text), context: context, command: CommandInfo(mode: .hold, tier: .rules))
             pauseAlwaysOn(false)
             for (k, ms) in outcome.stages { stages["action." + k] = ms }
-            if outcome.ok { noteTyped() }
+            if outcome.ok { noteTyped(mode: .hold) }
             var (ok, note) = (outcome.ok, outcome.note)
             if body != nil, outcome.ok { (ok, note) = await sendAfterTyping(mode: .hold, note: note, context: context, stages: &stages) }
             return done(heard: text, intent: IntentText.describe(.typeText(body ?? text), apps: rows, screen: context.screen),
@@ -266,8 +289,8 @@ final class CommandPipeline {
         let outcome = await actions.run(intent, context: context, command: command)
         if types { pauseAlwaysOn(false) }
         for (k, v) in outcome.stages { stages["action." + k] = v }
-        if intent == .send { lastTyped = nil }
-        if types, outcome.ok { noteTyped() }
+        if intent == .send { lastTyped = nil; sentThisTurn = outcome.ok }
+        if types, outcome.ok { noteTyped(mode: mode) }
         var (ok, note) = (outcome.ok, outcome.note)
         // "type X and send" (RouteResult.sendAfter): the router removed the send words. Type, then send.
         if result.sendAfter, types, outcome.ok {
@@ -329,8 +352,9 @@ final class CommandPipeline {
     }
 
     /// Types the words of an armed turn into the focused field. The log keeps the word count, not the words.
+    /// `continues`: the text goes on after the last typing (always-on), so it gets one space before it.
     private func typeArmed(_ text: String, mode: InputMode, context: RouteContext, rows: [AppEntry], stages: [String: Double],
-                           _ clock: Stopwatch) async -> ActivityRecord {
+                           _ clock: Stopwatch, continues: Bool = false) async -> ActivityRecord {
         var stages = stages
         let words = text.split(whereSeparator: \.isWhitespace).count
         let heard = "(\(words) word\(words == 1 ? "" : "s"))"
@@ -343,19 +367,22 @@ final class CommandPipeline {
         let body = CommandRouter.withoutTrailingSend(text)
         pauseAlwaysOn(true)
         // The real mode of the turn, so that a mode rule of the action module also holds here.
-        let outcome = await actions.run(.typeText(body ?? text), context: context, command: CommandInfo(mode: mode, tier: .rules))
+        let typed = (continues ? " " : "") + (body ?? text)
+        let outcome = await actions.run(.typeText(typed), context: context, command: CommandInfo(mode: mode, tier: .rules))
         pauseAlwaysOn(false)
         for (k, ms) in outcome.stages { stages["action." + k] = ms }
-        if outcome.ok { noteTyped() }
+        if outcome.ok { noteTyped(mode: mode) }
         var (ok, note) = (outcome.ok, outcome.note)
         if body != nil, outcome.ok { (ok, note) = await sendAfterTyping(mode: mode, note: note, context: context, stages: &stages) }
         return done(heard: heard, intent: "Type \(words) word\(words == 1 ? "" : "s")", tier: .rules, ok: ok,
-                    note: note, stages: stages, clock, why: "armed by \"type\"")
+                    note: note, stages: stages, clock, why: continues ? "goes on with the last typing" : "armed by \"type\"")
     }
 
     /// Records a typing that worked, with the front app, for an always-on "send" alone (D-12).
-    private func noteTyped() {
+    private func noteTyped(mode: InputMode) {
         lastTyped = (now(), frontBundleID().flatMap { $0 == ownBundleID ? nil : $0 })
+        lastTypedAlwaysOn = mode == .alwaysOn
+        if mode == .alwaysOn { expectsText = true }
     }
 
     /// After "… and send": with the hold key, send now through the normal send rules. In always-on mode, type
@@ -366,6 +393,7 @@ final class CommandPipeline {
         let out = await actions.run(.send, context: context, command: CommandInfo(mode: .hold, tier: .rules, spokenTarget: "send"))
         for (k, ms) in out.stages { stages["send." + k] = ms }
         lastTyped = nil
+        sentThisTurn = out.ok
         return (out.ok, note + " · " + out.note)
     }
 
@@ -392,10 +420,14 @@ final class CommandPipeline {
     /// Logs a follow-up turn that earshot dropped because the voice is not the owner's (R-ON-3). Nothing ran.
     /// The record has no text: the words were not the owner's.
     @discardableResult
-    func droppedFollowUp(_ why: String) -> ActivityRecord {
-        let record = ActivityRecord(heard: "", intent: "none", tier: .none, ok: false, note: "follow-up dropped: \(why)",
+    func droppedFollowUp(_ why: String, seconds: Double? = nil) -> ActivityRecord {
+        let length = seconds.map { String(format: ", audio %.2f s", $0) } ?? ""
+        let record = ActivityRecord(heard: "", intent: "none", tier: .none, ok: false, note: "follow-up dropped: \(why)\(length)",
                                     stages: [:])
         try? log?.append(record)
+        // The owner may have spoken: say so, and how to go on (dk: "I do not know if send works").
+        if showFeedback { feedback?.show("✗ not sure it was your voice: say \"\(wakePhrase), …\"", ok: false) }
+        if playSounds { playSound?(.failed) }
         return record
     }
 
@@ -439,6 +471,7 @@ final class CommandPipeline {
         if showFeedback, !quiet {
             feedback?.show(ok ? "→ \(intent)" : "✗ \(note)", ok: ok)
         }
+        if playSounds, !quiet { playSound?(ok ? (sentThisTurn ? .sent : .done) : .failed) }
         return record
     }
 
@@ -507,4 +540,24 @@ final class CommandPipeline {
         default: return false
         }
     }
+}
+
+/// The result sounds (dk: "you need to tell me" if a send worked). The app maps them to system sounds.
+enum FeedbackSound: String, CaseIterable {
+    /// `start`: earshot starts to listen (hold key down, or the wake phrase), as Hex does (dk).
+    case start, done, sent, failed
+
+    /// A macOS system sound name (/System/Library/Sounds). No sound files ship with earshot.
+    /// The start sound is the shortest one (Tink, 0.56 s), so it is over before most words.
+    var systemName: String {
+        switch self {
+        case .start: return "Tink"
+        case .done: return "Morse"
+        case .sent: return "Glass"
+        case .failed: return "Basso"
+        }
+    }
+
+    /// The start sound is quiet: the microphone hears it at the start of a hold-key turn.
+    var volume: Float { self == .start ? 0.3 : 1 }
 }

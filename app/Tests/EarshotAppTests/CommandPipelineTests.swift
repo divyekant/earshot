@@ -198,11 +198,38 @@ final class CommandPipelineTests: XCTestCase {
 
     func testDroppedFollowUpIsLoggedWithNoText() {
         let (p, _, runner) = make("")
-        let r = p.droppedFollowUp("not the owner's voice (0.31)")
+        let note = NoteRecorder()
+        p.feedback = note
+        var sounds: [FeedbackSound] = []
+        p.playSound = { sounds.append($0) }
+        p.wakePhrase = "hey atlas"
+        let r = p.droppedFollowUp("not the owner's voice (0.31)", seconds: 0.92)
         XCTAssertEqual(r.heard, "", "the words were not the owner's, so the record has no text")
         XCTAssertTrue(r.note.contains("0.31"), r.note)
+        XCTAssertTrue(r.note.contains("audio 0.92 s"), r.note)
         XCTAssertFalse(r.ok)
         XCTAssertTrue(runner.runs.isEmpty)
+        // dk: "I do not know if send works". A dropped turn shows a note and the failed sound.
+        XCTAssertEqual(note.shown.first?.0, "✗ not sure it was your voice: say \"hey atlas, …\"")
+        XCTAssertEqual(sounds, [.failed])
+    }
+
+    func testResultSounds() async {
+        var sounds: [FeedbackSound] = []
+        let (p, e, _) = make("open notes")
+        p.playSound = { sounds.append($0) }
+        _ = await p.finish(mode: .hold)
+        e.text = "send"
+        _ = await p.finish(mode: .hold)
+        e.text = "what is the weather like today"
+        _ = await p.finish(mode: .hold)
+        XCTAssertEqual(sounds, [.done, .sent, .failed])
+        p.playSounds = false
+        e.text = "open notes"
+        _ = await p.finish(mode: .hold)
+        XCTAssertEqual(sounds.count, 3, "the toggle turns the sounds off")
+        XCTAssertEqual(Set(FeedbackSound.allCases.map(\.systemName)).count, FeedbackSound.allCases.count, "a different sound for each")
+        XCTAssertLessThan(FeedbackSound.start.volume, 0.5, "the start sound is quiet: the microphone hears it")
     }
 
     func testAlwaysOnNeverSendsFromASentence() async {

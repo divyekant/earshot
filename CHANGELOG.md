@@ -12,6 +12,8 @@ This release adds the wake phrase and owner voice check for always-on mode, dict
 
 ### Added
 
+- A short system sound when earshot starts to listen (hold key down, or the wake phrase), and one for each result: done, sent, or failed (not sure, blocked). Turn them off with "Play sounds" in Manage > General. A follow-up turn that earshot drops because it is not sure of your voice now shows a note (R-FB-1).
+- Pauses while you dictate: after "type", or after earshot typed in always-on mode, a pause of up to 1.2 s no longer ends your sentence. A sentence that starts within 3 s after earshot typed goes on with the text (R-NV-4, R-ON-1).
 - In always-on mode, "send" said alone, in your voice, within 5 s after earshot typed a message, now sends it. Anything else still needs the hold key to send. "Type X and send" never types the word "send": with the hold key, it types and sends; in always-on mode, it types only (R-ON-5, R-NV-5, D-12).
 - earshot runs on Intel Macs and on macOS 14 and 15. On these Macs, it uses Apple on-device dictation for speech. No audio leaves the Mac (R-MD-1).
 - "Jev sees the screen" now works in the app: an unsure hold-key click that was not blocked can ask Jev with one picture of the front window. It is off by default (R-MD-1, R-NV-5, D-10).
@@ -27,7 +29,9 @@ This release adds the wake phrase and owner voice check for always-on mode, dict
 
 ### Fixed
 
+- After "type", a command word later in the dictated text (for example an app name) is typed as text. Only a first sentence that starts with a command runs as a command (R-NV-4).
 - After "type" or after typing, a long sentence that starts within the 5 s window now counts, even if it ends later. Before, a 10 s sentence after "type" was not typed (R-NV-4, R-ON-5, D-12).
+- "Yeah, actually let's send" now sends like "send", and "Here, let's open Slack" opens Slack by the rules. The router drops more spoken fillers at the start of a command ("actually", "just", "right", and "here" as the first word) (R-NV-5, R-SP-2).
 - With the Parakeet engine, earshot uses about 700 MB less memory. transcribe.cpp 0.4.1 maps the model file instead of a copy in app memory, so macOS can drop the pages under pressure, and Hex and earshot share them (R-MD-3, E2).
 - "Type <text> and send" no longer types the words "and send". The router removes a trailing send phrase from the text and tells the app with `sendAfter`. Only an explicit send can press Send (R-NV-5).
 - A bare command word such as "type" or "open" no longer presses a menu item that sounds like it. A bare "type" now tells the app that the next turn is the text. "Yeah, let's open the Slack" now opens Slack by the rules (R-NV-5, R-SP-2).
