@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>earshot: talk to any app on your Mac</title>
 <meta name="description" content="earshot is voice control for macOS. Say what you want and it opens the chat, clicks the link, picks the menu item or types your words, in under a second. Nothing you say leaves the Mac. Open source.">
-<meta name="theme-color" content="#F3F3F1">
+<meta name="theme-color" content="#0C0C0B">
 <meta property="og:title" content="earshot: talk to any app on your Mac">
 <meta property="og:description" content="Voice control for macOS that acts in under a second. Nothing you say leaves the Mac. Open source, MIT License.">
 <meta property="og:image" content="https://earshot.divyekant.com/assets/og.png">
@@ -287,6 +287,7 @@
 
 <section id="privacy" class="privacy" aria-labelledby="privacy-title">
   <div class="wrap">
+    <canvas class="inwave" id="inwave" aria-hidden="true"></canvas>
     <h2 id="privacy-title">No audio leaves your Mac.</h2>
     <div class="facts">
       <p>earshot saves no audio. Speech recognition and every decision run on the Mac by default.</p>
@@ -352,5 +353,6 @@ open build/Earshot.app</code></pre>
 </footer>
 
 <script src="demo.js" defer></script>
+<script src="motion.js" defer></script>
 </body>
 </html>
