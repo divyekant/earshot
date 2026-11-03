@@ -102,4 +102,27 @@ final class ArmedDictationTests: XCTestCase {
         }
         XCTAssertFalse(runner.runs.contains { $0.0 == .typeText("send") }, "send is a command word, never typed")
     }
+
+    /// Live test: a 9.7 s sentence that started 2 s after "type" ended after the 5 s window and was lost.
+    /// The window tests the start of the turn (begin()), not its end.
+    func testLongTurnThatStartsInTheWindowIsTyped() async {
+        let (p, e, runner) = make()
+        _ = await say(p, e, "type", .alwaysOn)
+        clock += 2
+        _ = p.begin()
+        clock += 9.7
+        let r = await say(p, e, "the blue fox jumps over the lazy dog and runs into the green wood", .alwaysOn)
+        XCTAssertEqual(runner.runs.count, 1, r.note)
+        if case .typeText = runner.runs.first?.0 {} else { XCTFail("typed text expected: \(r.note)") }
+    }
+
+    func testTurnThatStartsAfterTheWindowIsNotTyped() async {
+        let (p, e, runner) = make()
+        _ = await say(p, e, "type", .alwaysOn)
+        clock += 6
+        _ = p.begin()
+        clock += 1
+        _ = await say(p, e, "the blue fox jumps", .alwaysOn)
+        XCTAssertTrue(runner.runs.isEmpty)
+    }
 }
