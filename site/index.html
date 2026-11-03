@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>earshot · voice control for your Mac</title>
-<meta name="description" content="earshot is a local voice interface for macOS. Say what you want. earshot finds the app, focuses the text box, types what you dictate and clicks what you name. Audio stays on your Mac.">
-<meta name="theme-color" content="#0E0B2E">
+<title>earshot: voice control that stays on your Mac</title>
+<meta name="description" content="earshot is a local voice interface for macOS. Hold a key and say what you want. earshot finds the app, focuses the text box, types what you dictate and clicks what you name. Audio stays on your Mac.">
+<meta name="theme-color" content="#F3F3F1">
 <meta property="og:title" content="earshot">
-<meta property="og:description" content="A local voice interface for macOS. Audio stays on your Mac. Open source, MIT License.">
+<meta property="og:description" content="Voice control for macOS. Audio stays on your Mac. Open source, MIT License.">
 <meta property="og:image" content="https://earshot.divyekant.com/assets/og.png">
 <meta property="og:url" content="https://earshot.divyekant.com/">
 <meta property="og:type" content="website">
@@ -15,178 +15,174 @@
 <link rel="icon" type="image/svg+xml" href="assets/mark.svg">
 <link rel="icon" type="image/png" href="assets/mark.png">
 <link rel="apple-touch-icon" href="assets/mark.png">
+<link rel="preload" href="fonts/schibsted-grotesk-wght.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<header class="nav">
-  <div class="wrap nav-row">
-    <a class="brand" href="#top" aria-label="earshot home"><img src="assets/logo-dark.svg" alt="earshot" width="134" height="40"></a>
+<svg class="sprite" aria-hidden="true">
+  <symbol id="glyph" viewBox="276 286 472 452">
+    <rect x="276" y="437" width="70" height="150" rx="35"/>
+    <rect x="384" y="367" width="70" height="290" rx="35"/>
+    <rect x="492" y="307" width="70" height="410" rx="35"/>
+    <rect x="600" y="387" width="70" height="250" rx="35"/>
+    <rect x="708" y="286" width="40" height="452" rx="20"/>
+  </symbol>
+</svg>
+
+<header class="menubar">
+  <div class="menubar-row">
+    <a class="wordmark" href="#top"><svg class="glyph" aria-hidden="true"><use href="#glyph"/></svg>earshot</a>
     <nav aria-label="Sections">
+      <a href="#say">Commands</a>
       <a href="#how">How it works</a>
       <a href="#privacy">Privacy</a>
-      <a href="#safety">Safety</a>
-      <a href="#start">Get started</a>
-      <a class="nav-gh" href="https://github.com/divyekant/earshot">GitHub</a>
+      <a href="#start">Build</a>
     </nav>
+    <a class="menubar-gh" href="https://github.com/divyekant/earshot">GitHub</a>
   </div>
 </header>
 
 <main id="top">
 
-<section class="hero">
-  <div class="wrap hero-grid">
-    <div class="hero-copy">
-      <p class="pill"><span class="dot" aria-hidden="true"></span> Open source · MIT License · early software</p>
-      <h1>Say it.<br><span class="grad">Your Mac <span class="nw">does it.</span></span></h1>
-      <p class="lede">earshot is a local voice interface for macOS. Look at the screen and say what you want. earshot finds the app, focuses the text box, types what you dictate and clicks what you name.</p>
-      <p class="lede small">All audio stays on your Mac. Small, fast rules make each decision. earshot does not use a large AI agent for each step.</p>
-      <div class="cta">
-        <a class="btn primary" href="https://github.com/divyekant/earshot">View the source on GitHub</a>
-        <a class="btn ghost" href="#start">Build it</a>
+<section class="hero" aria-labelledby="hero-title">
+  <div class="wrap">
+    <h1 id="hero-title">Hold a key.<br>Say what you want.<br>Your Mac does it.</h1>
+
+    <div class="stage">
+      <div class="stage-key">
+        <button class="keycap" id="talk" type="button" aria-describedby="talk-help">
+          <span class="keycap-sym" aria-hidden="true">⌥</span>
+          <span class="keycap-name">option</span>
+        </button>
+        <p class="stage-help" id="talk-help">Press and hold the key to hear the next command. This is a simulation. The page uses no microphone.</p>
+      </div>
+
+      <div class="stage-out" aria-live="polite">
+        <div class="wave" id="wave" aria-hidden="true"></div>
+        <p class="caption" id="caption">“Slack Ravi, running late”</p>
+        <dl class="log" id="log">
+          <div><dt>App</dt><dd>Slack</dd></div>
+          <div><dt>Target</dt><dd>Conversation with Ravi</dd></div>
+          <div><dt>Action</dt><dd>Focus the message box, type “running late”</dd></div>
+          <div><dt>Send</dt><dd>No. earshot waits for you to say “send”.</dd></div>
+        </dl>
       </div>
     </div>
 
-    <div class="demo" aria-label="Example: you hold the right Option key and say a command. earshot shows the result.">
-      <div class="win">
-        <div class="win-bar"><i></i><i></i><i></i><span>earshot</span></div>
-        <div class="win-body">
-          <div class="keyrow">
-            <kbd id="demo-key">⌥ right Option</kbd>
-            <div class="bars" id="demo-bars" aria-hidden="true"><b></b><b></b><b></b><b></b><b></b></div>
-          </div>
-          <p class="said">You say</p>
-          <p class="utter"><span id="demo-text">Slack Ravi, running late</span><span class="caret" aria-hidden="true"></span></p>
-          <p class="said">earshot does</p>
-          <p class="result" id="demo-result">→ Slack · Ravi · types "running late"</p>
-        </div>
+    <div class="hero-foot">
+      <p class="lede">earshot is a voice interface for macOS. It finds the app, focuses the text box, types what you dictate and clicks what you name. Speech and decisions stay on your Mac.</p>
+      <div class="actions">
+        <a class="btn btn-ink" href="https://github.com/divyekant/earshot">Get the source</a>
+        <a class="btn btn-line" href="#start">Build it</a>
       </div>
-      <p class="demo-note">Illustration. earshot never presses Send unless you say "send".</p>
     </div>
   </div>
 </section>
 
-<section id="say" class="band">
+<section id="say" class="say" aria-labelledby="say-title">
   <div class="wrap">
-    <h2>What you can say</h2>
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th scope="col">You say</th><th scope="col">earshot does</th></tr></thead>
-        <tbody>
-          <tr><td>"Slack Ravi, running late"</td><td>Opens Slack, opens the conversation with Ravi, focuses the message box and types "running late".</td></tr>
-          <tr><td>"WhatsApp Mom"</td><td>Opens WhatsApp, opens the chat with Mom and focuses the message box. You then dictate.</td></tr>
-          <tr><td>"Open hn.com"</td><td>Opens the web address in your browser.</td></tr>
-          <tr><td>"Click Send"</td><td>Clicks the button with the label "Send" in the front window.</td></tr>
-          <tr><td>"Show numbers", then "click 4"</td><td>Shows numbers on the items that you can click, then clicks item 4.</td></tr>
-          <tr><td>"Type", then your sentence</td><td>Types the next sentence into the text field that has the focus.</td></tr>
-        </tbody>
-      </table>
-    </div>
+    <h2 id="say-title">Things you can say</h2>
+    <ul class="phrases">
+      <li><q>Slack Ravi, running late</q><span>Opens Slack, opens the conversation with Ravi, focuses the message box and types “running late”.</span></li>
+      <li><q>WhatsApp Mom</q><span>Opens the chat with Mom and focuses the message box. Then you dictate.</span></li>
+      <li><q>Open hn.com</q><span>Opens the web address in your browser.</span></li>
+      <li><q>Click Send</q><span>Clicks the button with the label “Send” in the front window.</span></li>
+      <li><q>Show numbers</q><span>Puts a number on each item that you can click. Then say “click 4”.</span></li>
+      <li><q>Type</q><span>Types your next sentence into the text field that has the focus.</span></li>
+    </ul>
+    <p class="aside">earshot has no script for each app. It reads the menus, sidebars and search results of your apps through macOS accessibility. You approve the apps that it can act in.</p>
   </div>
 </section>
 
-<section id="how">
+<section id="how" class="how" aria-labelledby="how-title">
   <div class="wrap">
-    <h2>How it works</h2>
-    <p class="section-lede">Three steps run on your Mac for each command.</p>
-    <ol class="steps">
+    <h2 id="how-title">How a command runs</h2>
+    <ol class="pipe">
       <li>
-        <span class="num">1</span>
         <h3>Hear</h3>
-        <p>Speech becomes text on your Mac. earshot uses Apple speech, or NVIDIA Parakeet if you give it the model file. earshot saves no audio.</p>
+        <p>Apple speech, or NVIDIA Parakeet if you give earshot the model file, turns your voice into text on the Mac.</p>
       </li>
       <li>
-        <span class="num">2</span>
         <h3>Decide</h3>
-        <p>Small, fast rules find the app, the target and the action. The rules have a time limit of about 300 ms. There is no large-model agent loop in the command path.</p>
+        <p>Small rules find the app, the target and the action in about 300&nbsp;ms. No large AI agent runs in this step.</p>
       </li>
       <li>
-        <span class="num">3</span>
         <h3>Act</h3>
-        <p>earshot reads the menus, sidebars and search results of your apps through macOS accessibility. Then it focuses, types or clicks.</p>
+        <p>earshot uses macOS accessibility to open, focus, type or click. Then it shows a short note with the result.</p>
       </li>
     </ol>
-    <div class="note-card">
-      <h3>App support is data, not code</h3>
-      <p>earshot has no script for each app. It discovers your apps and reads their labels. You approve the apps that earshot can act in.</p>
+
+    <div class="modes">
+      <div>
+        <h3>Hold key</h3>
+        <p>Hold the right Option key, speak, release. You can pick another key.</p>
+      </div>
+      <div>
+        <h3>Always on</h3>
+        <p>Off until you turn it on. earshot waits for a wake phrase, such as “hey jarvis”. Teach it your voice with five phrases, and other voices cannot start a command.</p>
+      </div>
     </div>
   </div>
 </section>
 
-<section id="modes" class="band">
-  <div class="wrap two">
-    <div class="card">
-      <h3>Hold key</h3>
-      <p>Hold the right Option key, say a command, then release the key. earshot shows a small note with the result. You can change the key.</p>
-    </div>
-    <div class="card">
-      <h3>Always on <span class="tag">off by default</span></h3>
-      <p>earshot listens for a wake phrase, for example "hey jarvis". Say it 5 times to teach earshot your voice. Then other voices cannot start a command.</p>
-    </div>
-  </div>
-</section>
-
-<section id="privacy">
+<section id="privacy" class="privacy" aria-labelledby="privacy-title">
   <div class="wrap">
-    <h2>Privacy</h2>
-    <ul class="grid3">
-      <li class="card"><h3>Audio stays on your Mac</h3><p>earshot sends no audio to the cloud and saves no audio on disk.</p></li>
-      <li class="card"><h3>Decisions stay on your Mac</h3><p>By default, the rules decide each command on your Mac with no network.</p></li>
-      <li class="card"><h3>Optional cloud help is off</h3><p>One optional cloud model, Jev, can help when the rules are not sure. It is off by default. If you turn it on, earshot sends only text: the command words and a short list of labels on screen.</p></li>
-    </ul>
-    <p class="fine">earshot keeps the Jev key in the macOS Keychain. Settings, the app list and the name list are JSON files in <code>~/Library/Application Support/earshot</code>.</p>
-  </div>
-</section>
-
-<section id="safety" class="band">
-  <div class="wrap">
-    <h2>Safety</h2>
-    <div class="warn" role="note">
-      <p><strong>Warning:</strong> a Return key press in a message box sends the message. You cannot undo a sent message.</p>
+    <h2 id="privacy-title">No audio leaves your Mac.</h2>
+    <div class="facts">
+      <p>earshot saves no audio. Speech recognition and every decision run on the Mac by default.</p>
+      <p>One optional cloud helper, Jev, can answer when the rules are not sure. It is off by default. If you turn it on, earshot sends text only: the command words and a short list of labels on the screen.</p>
+      <p>The Jev key stays in the macOS Keychain. Your settings, app list and name list are JSON files in <code>~/Library/Application Support/earshot</code>.</p>
     </div>
-    <ul class="checks">
-      <li>earshot never presses Return or Send in a message box unless you say "send".</li>
-      <li>earshot does not act on sign-in, code or payment pages.</li>
-      <li>earshot acts only in the apps that you approve.</li>
-      <li>earshot never types into a password field.</li>
-    </ul>
   </div>
 </section>
 
-<section id="start">
-  <div class="wrap two start">
+<section id="safety" class="safety" aria-labelledby="safety-title">
+  <div class="wrap safety-grid">
+    <h2 id="safety-title">It never presses Send unless you say “send”.</h2>
     <div>
-      <h2>Get started</h2>
-      <p>earshot is early software. There is no signed download yet. Build it from the source.</p>
-      <h3>You need</h3>
-      <ul class="plain">
-        <li>A Mac with Apple silicon or an Intel processor.</li>
-        <li>macOS 14 or later. macOS 26 gives the best speech engine.</li>
-        <li>Xcode 16 or later, or the Command Line Tools with Swift 6.</li>
+      <p class="warning"><strong>Warning:</strong> a Return key press in a message box sends the message. You cannot undo a sent message.</p>
+      <ul class="rules">
+        <li>No Return or Send in a message box without the word “send”.</li>
+        <li>No action on sign-in, code or payment pages.</li>
+        <li>No typing into a password field.</li>
+        <li>Action only in the apps that you approve.</li>
       </ul>
     </div>
+  </div>
+</section>
+
+<section id="start" class="start" aria-labelledby="start-title">
+  <div class="wrap start-grid">
     <div>
-      <pre class="code" aria-label="Build commands"><code><span class="c"># Get the source</span>
+      <h2 id="start-title">Build it</h2>
+      <p>earshot is early software. There is no signed download yet, so you build it from the source.</p>
+      <ul class="needs">
+        <li>A Mac with Apple silicon or an Intel processor</li>
+        <li>macOS 14 or later. macOS 26 has the best speech engine.</li>
+        <li>Xcode 16 or later, or the Command Line Tools with Swift 6</li>
+      </ul>
+    </div>
+    <div class="term">
+      <pre><code><span class="c"># get the source</span>
 git clone https://github.com/divyekant/earshot.git
 cd earshot/app
 
-<span class="c"># Run the tests</span>
+<span class="c"># test, then build the app bundle</span>
 swift test
-
-<span class="c"># Build the app bundle</span>
 scripts/build-app.sh
 open build/Earshot.app</code></pre>
-      <p class="fine">Then open <strong>Manage…</strong> from the menu bar icon, give the permissions and approve your apps. The <a href="https://github.com/divyekant/earshot#set-up">README</a> gives each step.</p>
+      <p>Then click the earshot icon in the menu bar, open <b>Manage…</b>, give the permissions and approve your apps. The <a href="https://github.com/divyekant/earshot#set-up">README</a> has each step.</p>
     </div>
   </div>
 </section>
 
 </main>
 
-<footer>
-  <div class="wrap foot">
-    <img src="assets/mark.svg" alt="" width="28" height="28" class="foot-mark">
-    <p>earshot is released under the <a href="https://github.com/divyekant/earshot/blob/main/LICENSE">MIT License</a>.</p>
+<footer class="foot">
+  <div class="wrap foot-row">
+    <a class="wordmark" href="#top"><svg class="glyph" aria-hidden="true"><use href="#glyph"/></svg>earshot</a>
+    <p>Open source under the <a href="https://github.com/divyekant/earshot/blob/main/LICENSE">MIT License</a>.</p>
     <nav aria-label="Project links">
       <a href="https://github.com/divyekant/earshot">Source</a>
       <a href="https://github.com/divyekant/earshot/releases">Releases</a>

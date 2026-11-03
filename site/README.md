@@ -2,18 +2,19 @@
 
 This folder holds the static landing page for earshot. The planned address is `https://earshot.divyekant.com`.
 
-The page has no build step and no third-party requests. It uses the system font, so the browser loads no web fonts.
+The page has no build step and no third-party requests. The fonts are in `fonts/` on the same server.
 
 ## Files
 
 | File | Contents |
 |---|---|
 | `index.html` | The page. The text comes from the root `README.md`. |
-| `style.css` | The styles. The colors come from `assets/brand/README.md`. |
-| `demo.js` | The example commands in the hero window. If the reader asks for reduced motion, the first example stays still. |
-| `assets/` | Copies of `logo-dark.svg`, `mark.svg` and `mark.png` from `assets/brand/`, and `og.png` (1200 × 630) for link previews. |
+| `style.css` | The styles. Graphite ink on a light stone ground, with one dark band. |
+| `demo.js` | The hold-to-talk key in the hero. It is a simulation: it uses no microphone and no network. If the reader asks for reduced motion, the text shows with no animation. |
+| `fonts/` | Schibsted Grotesk (variable) and JetBrains Mono, as WOFF2 files, with their SIL Open Font License 1.1 texts. |
+| `assets/` | Copies of `mark.svg` and `mark.png` from `assets/brand/` for the browser icon, and `og.png` (1200 × 630) for link previews. |
 
-If the brand files in `assets/brand/` change, copy them into `site/assets/` again.
+The page draws the one-color mark from `assets/brand/glyph.svg` inline. If the brand files change, update `site/` in the same pull request.
 
 If the README text changes (commands, privacy, safety), update `index.html` in the same pull request.
 
