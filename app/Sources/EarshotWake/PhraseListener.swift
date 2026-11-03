@@ -4,12 +4,21 @@ import Foundation
 /// Listens for the wake phrase in 16 kHz mono audio, and checks the voice of the phrase (R-ON-1, R-ON-3, D-11).
 /// It keeps the last 6 s of audio in memory for the voice check and drops older audio. It saves no audio.
 /// One queue calls it (the input queue of the wake trigger).
+///
+/// Two ways to find the phrase:
+/// - Audio templates (E5), after the owner teaches earshot the phrase: the spotter's encoder runs, and
+///   `TemplateMatcher` matches its frames against the owner's takes. The keyword decoder does not run.
+/// - The spelled spotter, before the owner teaches the phrase: the encoder and the keyword decoder.
 final class PhraseListener: WakeListener {
     let phrase: String
     let voiceThreshold: Double
     private let models: WakeModels
     private let session: WakeWordSession
     private let profile: VoiceProfile?
+    /// The audio templates, or nil: then the spelled spotter listens.
+    let matcher: TemplateMatcher?
+    /// The match of the last push, if the templates found the phrase.
+    private var pendingMatch: TemplateMatcher.Match?
 
     static let rate = 16000
     /// One encoder frame of the spotter is 40 ms.
@@ -28,6 +37,7 @@ final class PhraseListener: WakeListener {
     /// The samples fed since the start of the session.
     private var total = 0
 
+    /// Makes a listener with the spelled spotter.
     /// - Parameter nearMissLength: the piece count of the spelled phrase, for the near-miss log (D-11). 0 turns it off.
     init(models: WakeModels, phrase: String, keywords: [KeywordSpec], profile: VoiceProfile?,
          voiceThreshold: Double, nearMissLength: Int = 0) throws {
@@ -35,9 +45,27 @@ final class PhraseListener: WakeListener {
         self.phrase = phrase
         self.profile = profile
         self.voiceThreshold = voiceThreshold
+        matcher = nil
         let detector = try models.locked { try models.base.rebuildContextGraph(keywords: keywords) }
         session = try detector.createSession()
         session.nearMissLength = nearMissLength
+    }
+
+    /// Makes a listener with the audio templates of the owner's takes (E5). Only the encoder of the spotter runs.
+    init(models: WakeModels, phrase: String, templates: [[[Float]]], profile: VoiceProfile?, voiceThreshold: Double,
+         limit: Double = TemplateMatcher.defaultLimit) throws {
+        self.models = models
+        self.phrase = phrase
+        self.profile = profile
+        self.voiceThreshold = voiceThreshold
+        let matcher = TemplateMatcher(templates: templates, limit: limit)
+        self.matcher = matcher
+        session = try models.locked { try models.base.createSession() }
+        // Each encoder frame goes to the matcher, and the keyword decoder does not run.
+        session.frameSink = { [weak self] frame in
+            guard let self, let match = matcher.push(frame), self.pendingMatch == nil else { return }
+            self.pendingMatch = match
+        }
     }
 
     /// The longest wait of the spotter's auto reset while a guess is inside the phrase, in 40 ms frames (D-11).
@@ -47,8 +75,13 @@ final class PhraseListener: WakeListener {
         set { session.resetHoldFrames = newValue }
     }
 
-    /// The near misses since the last call: a count and the best part of the phrase. No audio and no text (D-11).
+    /// The near misses since the last call: a count and the best part of the phrase, or the lowest template score.
+    /// No audio and no text (D-11).
     func takeNearMisses() -> NearMisses? {
+        if let matcher {
+            let (count, best) = matcher.takeNearMisses()
+            return count > 0 ? NearMisses(count: count, best: 0, bestScore: best) : nil
+        }
         let (count, best) = session.takeNearMisses()
         return count > 0 ? NearMisses(count: count, best: best) : nil
     }
@@ -69,13 +102,19 @@ final class PhraseListener: WakeListener {
             NSLog("earshot wake: the spotter failed: %@", "\(error)")
             return nil
         }
+        if matcher != nil {
+            guard let match = pendingMatch else { return nil }
+            pendingMatch = nil
+            // The first and the last frame of the match take the place of the time stamps of the word pieces.
+            return hit(stamps: [match.startFrame, match.endFrame], matchScore: match.score, matchWorst: match.worst)
+        }
         guard let detection = detections.first else { return nil }
-        return hit(for: detection)
+        return hit(stamps: detection.streamTimestamps ?? [])
     }
 
     /// Makes the hit: the phrase span, the voice score and the preroll for the speech engine.
-    func hit(for detection: KeywordDetection) -> WakeHit {
-        let stamps = detection.streamTimestamps ?? []
+    /// - Parameter stamps: the encoder frames of the phrase (40 ms each), counted from the last reset.
+    func hit(stamps: [Int], matchScore: Double? = nil, matchWorst: Double? = nil) -> WakeHit {
         let span = Self.span(stamps: stamps, total: total, ringStart: ringStart)
         var score: Double?
         if let profile, span.clipEnd > span.start {
@@ -86,7 +125,7 @@ final class PhraseListener: WakeListener {
         return WakeHit(phrase: phrase,
                        prerollSeconds: Double(total - span.start) / Double(Self.rate) + Self.prerollMargin,
                        phraseEndSeconds: Double(max(0, total - span.end)) / Double(Self.rate),
-                       voiceScore: score, isOwner: isOwner)
+                       voiceScore: score, isOwner: isOwner, matchScore: matchScore, matchWorst: matchWorst)
     }
 
     /// The phrase in sample indexes: the start, the end of the last word piece, and the end of the voice clip.
@@ -110,6 +149,8 @@ final class PhraseListener: WakeListener {
         ring.removeAll(keepingCapacity: true)
         ringStart = 0
         total = 0
+        matcher?.reset()
+        pendingMatch = nil
         do { try models.locked { try session.reset() } } catch {
             NSLog("earshot wake: the spotter reset failed: %@", "\(error)")
         }

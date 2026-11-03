@@ -68,13 +68,53 @@ final class WakePartsTests: XCTestCase {
     }
 
     func testEnrolmentSummary() {
-        let known = Enrolment(profile: VoiceProfile(phrase: "hey jarvis", embedding: [1], keywordTokens: [], samples: 5,
-                                                    selfScore: 0.8), spelledHits: 5, heardPieces: [])
-        XCTAssertTrue(known.summary.contains("5 of 5"), known.summary)
-        let madeUp = Enrolment(profile: VoiceProfile(phrase: "hey earshot", embedding: [1], keywordTokens: [["▁A", "B", "C"]],
-                                                     samples: 5, selfScore: 0.3), spelledHits: 0, heardPieces: [])
-        XCTAssertTrue(madeUp.summary.contains("Sound-alike"), madeUp.summary)
-        XCTAssertTrue(madeUp.summary.contains("quiet room"), madeUp.summary)
+        let all = Enrolment(profile: VoiceProfile(phrase: "hey jarvis", embedding: [1], keywordTokens: [], samples: 5,
+                                                  selfScore: 0.8), takeScores: [0.1, 0.12, 0.08, 0.2, 0.15], templatesKept: 5)
+        XCTAssertTrue(all.summary.contains("5 of 5"), all.summary)
+        XCTAssertFalse(all.summary.contains("left out"), all.summary)
+        let some = Enrolment(profile: VoiceProfile(phrase: "hey zorbix", embedding: [1], keywordTokens: [], samples: 5,
+                                                   selfScore: 0.3), takeScores: [0.1, 0.5, 0.08, 0.2, 0.15], templatesKept: 4)
+        XCTAssertTrue(some.summary.contains("left out 1 phrase "), some.summary)
+        XCTAssertTrue(some.summary.contains("quiet room"), some.summary)
+    }
+
+    func testSpeechSpanAndPadding() {
+        let quiet = [Float](repeating: 0.0005, count: 8000)
+        let tone = (0..<8000).map { Float(sin(Double($0) * 0.1) * 0.1) }
+        let clip = quiet + tone + quiet
+        guard let span = SpeechTrim.span(clip) else { return XCTFail("the tone is loud") }
+        XCTAssertEqual(Double(span.lowerBound), 8000, accuracy: 320)
+        XCTAssertEqual(Double(span.upperBound), 16000, accuracy: 320)
+        XCTAssertEqual(SpeechTrim.paddedStart(speech: span), span.lowerBound - SpeechTrim.padSamples)
+        XCTAssertEqual(SpeechTrim.padded(clip, speech: span), SpeechTrim.trim(clip))
+        XCTAssertEqual(SpeechTrim.paddedStart(speech: 1000..<2000), 0, "the padding stops at the clip start")
+        XCTAssertNil(SpeechTrim.span(quiet))
+    }
+
+    func testTemplateCutFollowsTheSpeech() {
+        // 100 frames of 40 ms. The take has 0.3 s of quiet before it (WakeTemplates.leadSamples).
+        let frames = (0..<100).map { [Float](repeating: Float($0), count: 4) }
+        // Speech from 0.21 s to 0.81 s of the take: 0.51 s to 1.11 s of the frames, frames 12.75 to 27.75.
+        let cut = WakeTemplates.cut(frames, speech: 3360..<12960)
+        // Rounded: 13 and 28, then 2 frames of delay and 1 frame more at each end: frames 14 to 30.
+        XCTAssertEqual(cut.first?.first, 14)
+        XCTAssertEqual(cut.last?.first, 30)
+        XCTAssertEqual(cut.count, 17)
+        XCTAssertTrue(WakeTemplates.cut(Array(frames.prefix(5)), speech: 3360..<12960).isEmpty, "no frames there")
+    }
+
+    func testTemplatePackRoundTrip() {
+        let frames: [[Float]] = [[0, 1, -1, 0.5], [3.140625, -1000, 2, 0.25]]
+        let packed = WakeTemplates.pack(frames)
+        XCTAssertEqual(packed.frames, 2)
+        XCTAssertEqual(packed.width, 4)
+        XCTAssertEqual(packed.half.count, 16, "2 bytes for each value")
+        XCTAssertTrue(packed.isValid)
+        XCTAssertEqual(WakeTemplates.unpack(packed), frames, "these values are exact in 16-bit floats")
+        var broken = packed
+        broken.half = Data(count: 3)
+        XCTAssertFalse(broken.isValid)
+        XCTAssertTrue(WakeTemplates.unpack(broken).isEmpty)
     }
 }
 

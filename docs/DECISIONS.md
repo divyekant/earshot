@@ -190,6 +190,21 @@ Second live test on the owner's Mac (2026-11-02, develop `e6f0ba8`, phrase "hey 
 - The safety rules do not change. Always-on never presses Send or a risky button (R-ON-5, `ActionRules.sendBlock`). The hold key stays (R-ON-4).
 - The models download one time from Hugging Face, at pinned revisions, with a SHA-256 check. No audio leaves the Mac (R-MD-1).
 
+**Change on 2026-11-03 (E5, [experiments/E5-wake-templates.md](experiments/E5-wake-templates.md)):** the owner wants any phrase, name or language to work. The spelled spotter matches the spelling, so it misses rare words and names.
+
+| Method on the E5 bench (10 synthetic voices, 8 phrases) | Test commands that woke it, near | Far | False wakes in 8.9 h of own talk |
+|---|---|---|---|
+| Spelled spotter, reset fixed | 56 % | 45 % | 0 |
+| Audio templates of the 5 takes, streaming DTW, limit 0.33 | 93 % | 95 % | 0 |
+
+- After the owner teaches the phrase, audio templates find it: the spotter encoder runs, and a streaming DTW matches its frames against the owner's 5 takes. The keyword decoder does not run.
+- A take that does not match the other takes gives no template. At least 3 must stay.
+- The enrolment no longer learns word pieces for a made-up name.
+- Before the teach step, and for a profile from before the templates, the spelled spotter listens, as above.
+- The voice check, the time cut of the phrase and the follow-up turn do not change.
+- livekit-wakeword stays "Not now": it needs a training run for each phrase.
+- A live check on the owner's voice must confirm the bench numbers and the limit 0.33.
+
 ## D-12. "send" alone after typing, in always-on mode
 
 Date: 2026-11-03.
@@ -212,4 +227,3 @@ The owner chose this on a card: in always-on mode, earshot never sent, so a dict
 - Anything else in always-on mode stays blocked: "send needs the hold key".
 - A trailing "and send" after text is never typed. With the hold key, earshot types and then sends. In always-on mode, it types only, and the note says to say "send" on its own.
 - If no voice is enrolled, no voice check runs, so always-on never sends.
-

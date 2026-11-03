@@ -1,9 +1,9 @@
 import CoreML
 import Foundation
 
-/// Reads which word pieces the spotter model hears in a short clip, with greedy transducer decoding.
-/// The enrolment uses it: the model hears a made-up name such as "earshot" as other words ("YOUR SHOT"),
-/// so earshot listens for the pieces that the model heard when the owner said the phrase.
+/// Reads the encoder frames of a short clip, or the word pieces that the spotter model hears in it (greedy
+/// transducer decoding). The enrolment uses the frames for the audio templates (E5). The pieces are for the tests:
+/// the model hears a made-up name such as "earshot" as other words ("YOUR SHOT").
 struct TokenReader {
     let detector: WakeWordDetector
 
@@ -12,17 +12,24 @@ struct TokenReader {
         try ids(audio).compactMap { detector.vocabulary.idToToken[$0] }
     }
 
-    /// The token ids of the clip. Blank frames give no token. One token at most for each encoder frame
-    /// (40 ms), the same as the streaming greedy search of sherpa-onnx.
-    func ids(_ audio: [Float]) throws -> [Int] {
+    /// The encoder frames of the clip (40 ms each), with quiet before and after it.
+    /// The audio templates of the wake phrase (E5) come from these frames.
+    func frames(_ audio: [Float], lead: Int, tail: Int) throws -> [[Float]] {
         let session = try detector.createSession()
         var frames: [[Float]] = []
         session.frameSink = { frames.append($0) }
-        let rate = detector.config.feature.sampleRate
-        // Silence before and after the clip, so that the first and the last word are not cut.
-        let padded = [Float](repeating: 0, count: rate / 4) + audio + [Float](repeating: 0, count: rate / 2)
+        let padded = [Float](repeating: 0, count: lead) + audio + [Float](repeating: 0, count: tail)
         _ = try session.pushAudio(padded)
         _ = try session.finalize()
+        return frames
+    }
+
+    /// The token ids of the clip. Blank frames give no token. One token at most for each encoder frame
+    /// (40 ms), the same as the streaming greedy search of sherpa-onnx.
+    func ids(_ audio: [Float]) throws -> [Int] {
+        let rate = detector.config.feature.sampleRate
+        // Silence before and after the clip, so that the first and the last word are not cut.
+        let frames = try self.frames(audio, lead: rate / 4, tail: rate / 2)
 
         let blank = detector.config.decoder.blankId
         let contextSize = detector.config.decoder.contextSize
