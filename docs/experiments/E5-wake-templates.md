@@ -118,7 +118,7 @@ A fusion of the fixed spotter and the templates (wake if either fires) gave no m
 
 ## 9. Decision
 
-Open. The owner picks one:
+The owner chose A, audio templates, on 2026-11-03. The options were:
 
 | Option | Hits on the bench | What it takes |
 |---|---|---|
