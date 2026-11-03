@@ -94,6 +94,8 @@ The enrolment (Manage > General > Teach earshot your voice) records 5 phrases. e
 
 Limits: the spotter is English only. The voice check is less sure on short audio. A made-up name ("hey earshot") also wakes on sound-alikes ("hey, your shot"). Intel Macs run Core ML on the CPU; measure the speed there.
 
+E5 (2026-11-03, [experiments/E5-wake-templates.md](experiments/E5-wake-templates.md)) measured the spotter against audio templates on 10 synthetic voices and 8 phrases. The spotter matches the spelling of the phrase, so it misses rare words and names: 56 % of test commands woke it with the reset fixed. Audio templates of the owner's 5 takes, matched with DTW (dynamic time warping) on the same encoder frames, woke on 93 %, with no false wake in 8.9 h of own talk. The owner chose this method on 2026-11-03: after the owner teaches the phrase, the template match replaces the keyword decoder. The voice check stays. The build is in progress.
+
 ### 3.2 Speech to text (R-MD-1, R-MD-5)
 
 | Option | Use when |
