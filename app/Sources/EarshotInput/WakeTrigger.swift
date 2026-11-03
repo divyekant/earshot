@@ -76,6 +76,9 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
     public var onNearMisses: ((NearMisses) -> Void)?
     /// One check of the turn model at a pause. For the log: numbers only (R-ON-1, I-2).
     public var onTurnCheck: ((TurnCheck) -> Void)?
+    /// How each turn that goes to the pipeline ended: the rule and the end silence. It comes before `onStop`.
+    /// For the log: numbers only (R-ON-1, I-2).
+    public var onTurnEnd: ((TurnEnd) -> Void)?
 
     public let config: WakeConfig
     private let listener: WakeListener
@@ -283,14 +286,18 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
         case (.wakeTurn, .end):
             let (samples, count, wake) = (turnSamples, turnSampleCount, turnWake)
             finishTurn()
-            deliver(verdict(.wake, samples, audioSamples: count, phrase: wake), voice: lastTurnVoice)
+            let result = verdict(.wake, samples, audioSamples: count, phrase: wake)
+            if result == .end { reportEnd() }
+            deliver(result, voice: lastTurnVoice)
         case (.wakeTurn, .drop):
             finishTurn()
             deliver(event)
         case (.followTurn, .end):
             let (samples, count) = (turnSamples, turnSampleCount)
             finishTurn()
-            deliver(followUpVerdict(samples, audioSamples: count), voice: lastTurnVoice)
+            let result = followUpVerdict(samples, audioSamples: count)
+            if result == .end { reportEnd() }
+            deliver(result, voice: lastTurnVoice)
         case (.followTurn, .drop):
             finishTurn()
             deliver(event)
@@ -465,6 +472,12 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
                               runMs: runMs, dictation: dictation)
         DispatchQueue.main.async { [weak self] in self?.onTurnCheck?(check) }
         return event
+    }
+
+    /// Posts how the turn ended. It goes to the main queue before the `onStop` of the same turn.
+    private func reportEnd() {
+        guard let end = detector.lastEnd else { return }
+        DispatchQueue.main.async { [weak self] in self?.onTurnEnd?(end) }
     }
 
     private func keepTurnAudio(_ samples: [Float]) {

@@ -311,6 +311,7 @@ final class AppController: ObservableObject {
             trigger.onTurnVoice = { voice in pipeline.turnVoice = voice }
             trigger.onNearMisses = { misses in pipeline.nearMisses(misses) }
             trigger.onTurnCheck = { check in pipeline.turnCheck(check) }
+            trigger.onTurnEnd = { end in pipeline.turnEnd(end) }
         }
         pipeline.pauseAlwaysOn = { [weak input] paused in
             DispatchQueue.main.async { input?.setAlwaysOnPaused(paused) }

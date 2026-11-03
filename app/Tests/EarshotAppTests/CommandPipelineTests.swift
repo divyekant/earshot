@@ -146,6 +146,9 @@ final class CommandPipelineTests: XCTestCase {
         let r = await p.finish(mode: .alwaysOn)
         XCTAssertTrue(r.note.contains("turn: P 0.12 after 300 ms quiet: wait, model 3.5 ms; "
                                       + "P 0.81 after 300 ms quiet: end (dictation), model 3.5 ms"), r.note)
+        p.turnEnd(TurnEnd(rule: .model, endSilenceMs: 550, silenceMs: 300, turnMs: 2140))
+        let ended = await p.finish(mode: .alwaysOn)
+        XCTAssertTrue(ended.note.contains("turn: end model: 300 ms quiet of 550 ms, turn 2140 ms"), ended.note)
         let next = await p.finish(mode: .alwaysOn)
         XCTAssertFalse(next.note.contains("turn: "), "the checks are for one turn: \(next.note)")
     }
