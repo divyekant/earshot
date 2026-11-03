@@ -69,8 +69,9 @@ final class CommandPipeline {
     var playSounds = true
     /// The result sound of the last record, if one played. The app mutes the always-on detector for its length.
     private(set) var lastSound: FeedbackSound?
-    /// True if typing worked in this turn. A typing plays no result sound and mutes nothing: the text on screen is
-    /// the feedback, and the owner may go on talking at once (go-on typing, or "send").
+    /// True if typing worked in this turn. When earshot waits for the owner's words next (after "type", or after a
+    /// typing), it plays no result sound and mutes nothing: the note on screen is the cue, and the owner may go on
+    /// talking at once (go-on typing, the text after "type", or "send").
     private var typedThisTurn = false
     /// True if a send worked in this turn, for the "sent" sound.
     private var sentThisTurn = false
@@ -482,7 +483,7 @@ final class CommandPipeline {
             feedback?.show(ok ? "→ \(intent)" : "✗ \(note)", ok: ok)
         }
         lastSound = nil
-        if playSounds, !quiet, !(ok && typedThisTurn && !sentThisTurn) {
+        if playSounds, !quiet, !(ok && !sentThisTurn && (typedThisTurn || expectsText)) {
             let sound: FeedbackSound = ok ? (sentThisTurn ? .sent : .done) : .failed
             playSound?(sound)
             lastSound = sound

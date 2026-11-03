@@ -165,22 +165,30 @@ final class ArmedDictationTests: XCTestCase {
         XCTAssertEqual(runner.runs.count, 1, "a hold-key typing does not open the go-on window")
     }
 
-    /// Review of #86: a typing plays no result sound, so nothing mutes the detector, and the owner can go on at once.
+    /// Review of #86: when earshot waits for the owner's words (after "type", or after a typing), it plays no result
+    /// sound, so nothing mutes the detector, and the owner can go on at once.
     func testTypingPlaysNoSoundAndTheNextTurnGoesOn() async {
         let (p, e, runner) = make()
         var sounds: [FeedbackSound] = []
         p.playSound = { sounds.append($0) }
         _ = await say(p, e, "type", .alwaysOn)
-        XCTAssertEqual(sounds, [.done], "the arming is a command: it plays its sound")
-        clock += 1
+        XCTAssertTrue(sounds.isEmpty, "the arming waits for words: no sound")
+        XCTAssertNil(p.lastSound, "so the app mutes nothing")
+        clock += 0.2
+        _ = p.begin()
+        clock += 2
         _ = await say(p, e, "the blue fox jumps", .alwaysOn)
-        XCTAssertNil(p.lastSound, "a typing plays no sound, so the app mutes nothing")
-        XCTAssertEqual(sounds, [.done])
+        XCTAssertEqual(runner.runs.map(\.0), [.typeText("the blue fox jumps")], "a text turn 0.2 s after the arming is typed")
+        XCTAssertNil(p.lastSound, "a typing plays no sound either")
         clock += 0.2
         _ = p.begin()
         clock += 2
         _ = await say(p, e, "over the lazy dog", .alwaysOn)
         XCTAssertEqual(runner.runs.map(\.0), [.typeText("the blue fox jumps"), .typeText(" over the lazy dog")])
-        XCTAssertEqual(sounds, [.done], "the go-on typing plays no sound either")
+        XCTAssertTrue(sounds.isEmpty, "no result sound in the whole dictation")
+        // A command that does not wait for words keeps its sound.
+        clock += 10
+        _ = await say(p, e, "click market", .alwaysOn)
+        XCTAssertEqual(sounds, [.done])
     }
 }
