@@ -147,7 +147,7 @@ public struct CommandRouter: Router {
     /// Words at the start that are not part of the command: "Yeah, let's open the Slack" gives "open the Slack".
     static let leadFillers: Set<String> = fillers.union(["yeah", "yep", "yes", "lets", "let", "us", "alright", "well",
                                                          "hey", "can", "could", "you", "would", "actually", "basically",
-                                                         "just", "maybe", "like"])
+                                                         "just"])
 
     /// The raw words with the lead fillers removed. Case and punctuation stay.
     static func dropLeadFillers(_ text: String) -> String {
