@@ -263,6 +263,61 @@ final class SpeechDetectorTests: XCTestCase {
         XCTAssertEqual(events, [.end], "the 60 s limit ends the turn, with its text")
         XCTAssertEqual(Double(frames + 3) * d.config.frameMs, 60000, accuracy: 40)
     }
+
+    /// Opens a turn with 500 ms of speech, with pause checks on.
+    private func openTurn(checks: Bool = true) -> SpeechDetector {
+        var d = SpeechDetector()
+        d.pauseChecks = checks
+        _ = run(&d, -65, ms: 1000)
+        XCTAssertEqual(run(&d, -25, ms: 500), [.start])
+        return d
+    }
+
+    // R-ON-1, I-2: the turn model gets one check at the first pause, after 300 ms with no speech frame.
+    func testPauseCheckIsDueOnceAtTheFirstPause() {
+        var d = openTurn()
+        XCTAssertEqual(run(&d, -65, ms: 280), [])
+        XCTAssertFalse(d.takePauseCheck(), "no check before 300 ms")
+        XCTAssertEqual(run(&d, -65, ms: 20), [])
+        XCTAssertTrue(d.takePauseCheck())
+        XCTAssertEqual(d.pauseMs, 300, accuracy: 0.001)
+        XCTAssertFalse(d.takePauseCheck(), "one check for each pause")
+        XCTAssertEqual(d.endTurnNow(), .end, "a sure end ends the turn at once")
+        XCTAssertFalse(d.inTurn)
+        XCTAssertNil(d.endTurnNow())
+    }
+
+    // An unsure end keeps the turn open up to the wait time. The next pause has the usual end silence again.
+    func testUnsurePauseWaitsForTheLongerSilence() {
+        var d = openTurn()
+        _ = run(&d, -65, ms: 300)
+        XCTAssertTrue(d.takePauseCheck())
+        d.answerPauseCheck(waitMs: 2000)
+        XCTAssertEqual(run(&d, -65, ms: 1600), [], "550 ms of quiet does not end the turn now")
+        XCTAssertEqual(run(&d, -25, ms: 300), [], "the speaker goes on in the same turn")
+        _ = run(&d, -65, ms: 300)
+        XCTAssertTrue(d.takePauseCheck(), "a new pause gets a new check")
+        XCTAssertEqual(run(&d, -65, ms: 260), [.end], "with no answer, the usual 550 ms ends it")
+    }
+
+    // The wait is never shorter than the end silence of the turn (for example 1200 ms after a dictation cue).
+    func testPauseWaitIsNotShorterThanTheEndSilence() {
+        var d = openTurn()
+        d.endSilenceOverrideMs = 1200
+        _ = run(&d, -65, ms: 300)
+        XCTAssertTrue(d.takePauseCheck())
+        d.answerPauseCheck(waitMs: 500)
+        XCTAssertEqual(run(&d, -65, ms: 880), [])
+        XCTAssertEqual(run(&d, -65, ms: 40), [.end])
+    }
+
+    // With no turn model, no check is due and the end silence alone ends the turn, as before.
+    func testNoPauseCheckWithoutATurnModel() {
+        var d = openTurn(checks: false)
+        XCTAssertEqual(run(&d, -65, ms: 400), [])
+        XCTAssertFalse(d.takePauseCheck())
+        XCTAssertEqual(run(&d, -65, ms: 160), [.end])
+    }
 }
 
 /// A fake trigger for the switch tests.
@@ -309,6 +364,14 @@ final class FakeListener: WakeListener, @unchecked Sendable {
     /// The near misses for the next `takeNearMisses()`.
     var misses: NearMisses?
     func takeNearMisses() -> NearMisses? { defer { misses = nil }; return misses }
+    /// The answer of the fake turn model. Nil: no turn model.
+    var turnProbability: Double?
+    private(set) var turnScoreSamples: [Int] = []
+    func turnScore(_ samples: [Float]) -> Double? {
+        guard let turnProbability else { return nil }
+        turnScoreSamples.append(samples.count)
+        return turnProbability
+    }
 }
 
 // R-ON-4: the hold key stays as the fallback in always-on mode.
@@ -638,6 +701,70 @@ final class WakeTriggerTests: XCTestCase {
         mic.emit(quiet, ms: 1200)
         wait(for: [reported], timeout: 2)
         XCTAssertEqual(got, [NearMisses(count: 2, best: 0.8)])
+        t.stop()
+    }
+
+    // R-ON-1, I-2: a sure end from the turn model ends the turn at the first pause, before the 550 ms end silence.
+    func testTurnModelEndsTheTurnAtTheFirstPause() {
+        let listener = FakeListener()
+        listener.hitAfterSamples = 16000
+        listener.turnProbability = 0.9
+        let (t, mic, rec) = make(listener)
+        var checks: [TurnCheck] = []
+        t.onTurnCheck = { checks.append($0) }
+        let stop = rec.expect("stop", self)
+        mic.emit(quiet, ms: 1000)
+        mic.emit(speech, ms: 600)
+        mic.emit(quiet, ms: 400)      // shorter than the 550 ms end silence
+        wait(for: [stop], timeout: 2)
+        XCTAssertEqual(rec.log, ["wake", "start", "stop"])
+        XCTAssertEqual(checks.map(\.decision), [.end])
+        XCTAssertEqual(checks.first?.probability, 0.9)
+        XCTAssertEqual(checks.first?.silenceMs ?? 0, 300, accuracy: 0.001)
+        XCTAssertGreaterThan(listener.turnScoreSamples.first ?? 0, 16000, "the model hears the phrase and the command")
+        t.stop()
+    }
+
+    // An unsure end keeps the turn open over a pause that would end it with the end silence alone.
+    func testUnsurePauseKeepsOneTurn() {
+        let listener = FakeListener()
+        listener.hitAfterSamples = 16000
+        listener.turnProbability = 0.1
+        let (t, mic, rec) = make(listener)
+        var checks: [TurnCheck] = []
+        t.onTurnCheck = { checks.append($0) }
+        let start = rec.expect("start", self)
+        mic.emit(quiet, ms: 1000)
+        mic.emit(speech, ms: 600)
+        mic.emit(quiet, ms: 1000)     // longer than the 550 ms end silence
+        mic.emit(speech, ms: 500)
+        wait(for: [start], timeout: 2)
+        let settled = expectation(description: "settled")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { settled.fulfill() }
+        wait(for: [settled], timeout: 2)
+        XCTAssertEqual(rec.log, ["wake", "start"], "the pause did not end the turn")
+        let stop = rec.expect("stop", self)
+        mic.emit(quiet, ms: 2200)     // the 2 s wait ends it
+        wait(for: [stop], timeout: 2)
+        XCTAssertEqual(rec.log, ["wake", "start", "stop"])
+        XCTAssertEqual(checks.map(\.decision), [.wait, .wait])
+        t.stop()
+    }
+
+    // With no turn model, the trigger works as before and reports no check.
+    func testNoTurnModelReportsNoCheck() {
+        let listener = FakeListener()
+        listener.hitAfterSamples = 16000
+        let (t, mic, rec) = make(listener)
+        var checks: [TurnCheck] = []
+        t.onTurnCheck = { checks.append($0) }
+        let stop = rec.expect("stop", self)
+        mic.emit(quiet, ms: 1000)
+        mic.emit(speech, ms: 600)
+        mic.emit(quiet, ms: 800)
+        wait(for: [stop], timeout: 2)
+        XCTAssertEqual(rec.log, ["wake", "start", "stop"])
+        XCTAssertEqual(checks, [])
         t.stop()
     }
 

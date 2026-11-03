@@ -262,4 +262,29 @@ final class WakeModelRunTests: XCTestCase {
         print(String(format: "spotter: %.0f ms for 11.5 s of audio (%.1f %% of one core)", ms, ms / 115))
         XCTAssertLessThan(ms, 11_500 * 0.25, "the spotter must use well under one core")
     }
+
+    // R-ON-1, I-2: the turn model gives a probability for a whole sentence and for a sentence cut in the middle, and
+    // a check is fast enough for the audio queue. The print gives the numbers for the pull request.
+    func testTurnModelSpeedAndScores() async throws {
+        let models = try await loadModels()
+        guard models.hasTurnModel else { throw XCTSkip("the turn model did not load") }
+        let whole = try say("Open the notes app.")
+        let cut = Array(try say("Send a message to the team and").prefix(16000 * 3 / 2))
+        let silence = [Float](repeating: 0, count: 16000 * 3 / 10)
+        var times: [Double] = []
+        var scores: [Double] = []
+        for audio in [whole + silence, cut + silence] {
+            for _ in 0..<5 {
+                let start = DispatchTime.now().uptimeNanoseconds
+                let p = try XCTUnwrap(models.turnScore(audio))
+                times.append(Double(DispatchTime.now().uptimeNanoseconds - start) / 1e6)
+                XCTAssertTrue((0...1).contains(p))
+                scores.append(p)
+            }
+        }
+        let sorted = times.sorted()
+        print(String(format: "turn model: P whole %.2f, P cut %.2f; check median %.1f ms, max %.1f ms",
+                     scores[0], scores[5], sorted[sorted.count / 2], sorted.last ?? 0))
+        XCTAssertLessThan(sorted[sorted.count / 2], 50, "a check must be short: it runs in the audio queue")
+    }
 }

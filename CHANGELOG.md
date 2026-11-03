@@ -11,6 +11,10 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - A result sound no longer starts a follow-up turn in always-on mode: the follow-up window opens when the sound ends, and the detector ignores earshot's own sounds. When earshot waits for your words (after "type", or after a typing), it plays no result sound, so you can go on talking at once. When the wake phrase is heard but the voice check rejects it, earshot now shows "not sure it was your voice" and plays the failed sound (R-ON-1, R-ON-3, R-FB-1).
 - In always-on mode, a soft end of a word, or speech from a quieter microphone, no longer counts as the pause that ends your turn. A dictated text longer than 15 s is no longer lost: it ends at 60 s with its words (R-ON-1, I-2, I-26).
 
+### Added
+
+- In always-on mode, a small turn model (Smart Turn v3.2, about 17 MB, one download) listens at the first pause. If it hears that you finished, the turn ends after 300 ms of quiet. If it hears a pause in a sentence, the turn waits up to 2 s (3 s for dictation). No audio leaves the Mac. If the model is not available, the pause rule works as before (R-ON-1, R-MD-1, I-2).
+
 ## [0.2.0] - 2026-11-03
 
 This release adds the wake phrase and owner voice check for always-on mode, dictation into the focused field, "type" then the text, and "send" said alone after earshot types a message. It also adds sound cues for listen and result. With Parakeet, earshot uses about 700 MB less memory.

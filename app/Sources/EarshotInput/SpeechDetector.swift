@@ -29,6 +29,11 @@ public struct DetectorConfig: Sendable, Equatable {
     /// A frame between the two levels can also be noise that changes (keys, a TV), not speech. So frames that are not
     /// speech also end the turn after the end silence plus this time, as a fallback.
     public var softEndExtraMs: Double = 1000
+    /// With a turn model (`pauseChecks`): after this much time with no speech frame, the trigger asks the model if
+    /// the turn is done. The 300 ms comes from Hex's Smart Turn experiment (anomalyco/hex f748282, MIT).
+    public var pauseCheckMs: Double = 300
+    /// No check before this much speech in the turn (Hex: 200 ms).
+    public var pauseCheckMinimumSpeechMs: Double = 200
     /// Frames above the threshold in a row before `start`. 3 frames of 20 ms is 60 ms.
     public var startFrames: Int = 3
     /// Quiet after speech that ends the turn. Commands have short pauses, for example after "Slack Ravi,".
@@ -73,6 +78,14 @@ public struct SpeechDetector: Sendable {
     /// True if the open turn holds dictated text. It uses `config.dictationMaximumTurnMs`, and the limit ends the turn
     /// with its text. The wake trigger sets it at the start of a turn, with `endSilenceOverrideMs`.
     public var dictationTurn = false
+    /// True if the trigger has a turn model. Then each pause gives one check (`takePauseCheck`).
+    public var pauseChecks = false
+    /// The end silence of this pause, after the turn model heard a pause inside the turn. Nil: the usual end silence.
+    private var pauseWaitMs: Double?
+    /// True if this pause had its check.
+    private var pauseChecked = false
+    /// True if a pause check is due and the trigger did not take it yet.
+    private var pauseCheckDue = false
 
     public init(config: DetectorConfig = DetectorConfig()) { self.config = config }
 
@@ -103,6 +116,7 @@ public struct SpeechDetector: Sendable {
             turnMs = speechMs
             quietMs = 0
             softMs = 0
+            pauseChecked = false; pauseCheckDue = false; pauseWaitMs = nil
             loudRun = 0
             return .start
         }
@@ -134,9 +148,14 @@ public struct SpeechDetector: Sendable {
         let quiet = level <= quietDbBefore
         if loud {
             speechMs += config.frameMs; quietMs = 0; softMs = 0
+            pauseChecked = false; pauseCheckDue = false; pauseWaitMs = nil
         } else {
             softMs += config.frameMs
             quietMs = quiet ? quietMs + config.frameMs : 0
+            if pauseChecks, !pauseChecked, softMs >= config.pauseCheckMs, speechMs >= config.pauseCheckMinimumSpeechMs {
+                pauseChecked = true
+                pauseCheckDue = true
+            }
         }
 
         if dictationTurn {
@@ -147,7 +166,7 @@ public struct SpeechDetector: Sendable {
                 return .end
             }
         } else if turnMs >= config.maximumTurnMs { return forcedStop() }
-        let endSilence = endSilenceOverrideMs ?? config.endSilenceMs
+        let endSilence = pauseWaitMs ?? endSilenceOverrideMs ?? config.endSilenceMs
         if quietMs >= endSilence || softMs >= endSilence + config.softEndExtraMs {
             inTurn = false
             quietMs = 0
@@ -156,6 +175,34 @@ public struct SpeechDetector: Sendable {
             return .end
         }
         return nil
+    }
+
+    /// The quiet time of the open turn (frames with no speech), in ms.
+    public var pauseMs: Double { softMs }
+
+    /// True once for each pause that needs a check of the turn model. The trigger then calls `answerPauseCheck` or
+    /// `endTurnNow`.
+    public mutating func takePauseCheck() -> Bool {
+        defer { pauseCheckDue = false }
+        return pauseCheckDue && inTurn
+    }
+
+    /// The turn model heard a pause inside the turn: this pause ends the turn only after `waitMs` of quiet.
+    public mutating func answerPauseCheck(waitMs: Double) {
+        guard inTurn else { return }
+        pauseWaitMs = max(waitMs, endSilenceOverrideMs ?? config.endSilenceMs)
+    }
+
+    /// The turn model heard the end of the turn: ends the open turn now. Returns nil if no turn is open.
+    public mutating func endTurnNow() -> SpeechEvent? {
+        guard inTurn, !awaitingCommand else { return nil }
+        inTurn = false
+        quietMs = 0
+        softMs = 0
+        pauseWaitMs = nil
+        pauseCheckDue = false
+        if speechMs < config.minimumSpeechMs { return .drop("speech shorter than \(Int(config.minimumSpeechMs)) ms") }
+        return .end
     }
 
     private mutating func forcedStop() -> SpeechEvent {
@@ -168,7 +215,8 @@ public struct SpeechDetector: Sendable {
 
     /// Ends a turn from the outside. Returns `.drop` if a turn was open.
     public mutating func reset() -> SpeechEvent? {
-        defer { inTurn = false; awaitingCommand = false; loudRun = 0; quietMs = 0; softMs = 0; waitForQuiet = false; dictationTurn = false }
+        defer { inTurn = false; awaitingCommand = false; loudRun = 0; quietMs = 0; softMs = 0; waitForQuiet = false; dictationTurn = false
+            pauseChecked = false; pauseCheckDue = false; pauseWaitMs = nil }
         return inTurn ? .drop("input stopped") : nil
     }
 
@@ -196,6 +244,7 @@ public struct SpeechDetector: Sendable {
         self.graceMs = graceMs
         self.quietMs = max(0, quietMs)
         softMs = self.quietMs
+        pauseChecked = false; pauseCheckDue = false; pauseWaitMs = nil
         speechMs = config.minimumSpeechMs
         turnMs = 0
         loudRun = 0

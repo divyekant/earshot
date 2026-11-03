@@ -80,10 +80,40 @@ public protocol WakeListener: AnyObject {
     func reset()
     /// The near misses since the last call, or nil if there were none. Then it starts to count again.
     func takeNearMisses() -> NearMisses?
+    /// The probability (0 to 1) that the speaker finished the turn, from the sound of the last 8 s of the turn
+    /// (Smart Turn v3.2). Nil if the turn model is not loaded or failed: then the end silence alone ends the turn.
+    func turnScore(_ samples: [Float]) -> Double?
 }
 
 public extension WakeListener {
     func takeNearMisses() -> NearMisses? { nil }
+    func turnScore(_ samples: [Float]) -> Double? { nil }
+}
+
+/// One check of the turn model at a pause (R-ON-1, I-2). For the log: numbers only, no audio and no text.
+public struct TurnCheck: Sendable, Equatable {
+    public enum Decision: String, Sendable {
+        /// The model heard the end of the turn. The turn ends now.
+        case end
+        /// The model heard a pause inside the turn. The turn waits up to the fallback silence.
+        case wait
+        /// No model, or the model failed. The usual end silence counts.
+        case none
+    }
+    /// The probability that the turn is done, or nil if no model ran.
+    public var probability: Double?
+    /// The quiet time at the check, in ms.
+    public var silenceMs: Double
+    public var decision: Decision
+    /// The time of the model run, in ms.
+    public var runMs: Double
+    /// True if the turn holds dictated text.
+    public var dictation: Bool
+
+    public init(probability: Double?, silenceMs: Double, decision: Decision, runMs: Double, dictation: Bool) {
+        self.probability = probability; self.silenceMs = silenceMs; self.decision = decision
+        self.runMs = runMs; self.dictation = dictation
+    }
 }
 
 /// A speech engine that can start the next turn further back than its usual 250 ms preroll (D-11).

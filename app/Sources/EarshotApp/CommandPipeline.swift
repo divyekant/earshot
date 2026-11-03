@@ -99,6 +99,8 @@ final class CommandPipeline {
     var jevScreenBudgetMs = 1500
     /// The speech engine's line for the log of the current command (engine, why, audio length).
     private var speechSummary = ""
+    /// The turn model checks of the open always-on turn, for its log note (R-ON-1, I-2).
+    private var turnChecks: [String] = []
 
     init(engine: SpeechEngine, router: Router, actions: CommandActions, names: NameFinder,
          apps: @escaping () -> [AppEntry], allNames: @escaping () async -> [NameEntry],
@@ -110,12 +112,14 @@ final class CommandPipeline {
     /// The input opened a turn (key down, or speech start in always-on).
     func begin() -> String? {
         turnStartedAt = now()
+        turnChecks = []
         do { try engine.begin(); return nil } catch { return "speech did not start: \(error)" }
     }
 
     /// The input dropped the turn. The text is not used.
     func cancel() async {
         turnStartedAt = nil
+        turnChecks = []
         _ = try? await engine.end()
     }
 
@@ -135,6 +139,8 @@ final class CommandPipeline {
         pendingWake = nil
         let followScore = followUpVoiceScore
         followUpVoiceScore = nil
+        let checks = turnChecks
+        turnChecks = []
         // The voice of an always-on turn was checked: a wake in the owner's voice, or a follow-up with a score.
         let ownerVoice = mode == .alwaysOn && (wake.map { $0.voiceScore != nil && $0.isOwner } ?? (followScore != nil))
         var text: String
@@ -162,6 +168,9 @@ final class CommandPipeline {
             if let wake {
                 speechSummary = Self.wakeSummary(wake) + ", phrase removed " + removed.how
                     + (speechSummary.isEmpty ? "" : " · " + speechSummary)
+            }
+            if !checks.isEmpty {
+                speechSummary += (speechSummary.isEmpty ? "" : " · ") + "turn: " + checks.joined(separator: "; ")
             }
         }
         guard !text.isEmpty else { return done(heard: "", intent: "none", tier: .none, ok: false, note: "no words", stages: stages, clock, quiet: true) }
@@ -333,6 +342,20 @@ final class CommandPipeline {
         let record = ActivityRecord(heard: "", intent: "none", tier: .none, ok: false, note: note, stages: [:])
         try? log?.append(record)
         return record
+    }
+
+    /// Keeps one check of the turn model at a pause (R-ON-1, I-2): numbers only, no audio and no text. The record of
+    /// the turn shows the checks in its speech note, so each check does not make a record of its own. The log gives
+    /// the threshold for the owner's own turns.
+    func turnCheck(_ check: TurnCheck) {
+        turnChecks.append(Self.turnCheckSummary(check))
+    }
+
+    /// The log text of one turn check, for example "P 0.82 after 300 ms quiet: end, model 3.5 ms".
+    static func turnCheckSummary(_ check: TurnCheck) -> String {
+        let p = check.probability.map { String(format: "%.2f", $0) } ?? "none"
+        return String(format: "P %@ after %.0f ms quiet: %@%@, model %.1f ms",
+                      p, check.silenceMs, check.decision.rawValue, check.dictation ? " (dictation)" : "", check.runMs)
     }
 
     /// The log line of a wake: the voice score, or that no voice is enrolled.

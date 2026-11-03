@@ -310,6 +310,7 @@ final class AppController: ObservableObject {
                 if pipeline.playSounds { trigger?.mute(seconds: Self.seconds(of: .failed)) }
             }
             trigger.onNearMisses = { misses in pipeline.nearMisses(misses) }
+            trigger.onTurnCheck = { check in pipeline.turnCheck(check) }
         }
         pipeline.pauseAlwaysOn = { [weak input] paused in
             DispatchQueue.main.async { input?.setAlwaysOnPaused(paused) }
@@ -337,12 +338,12 @@ final class AppController: ObservableObject {
         }
     }
 
-    /// Downloads (one time, about 18 MB) and loads the wake phrase models in the background (D-11).
+    /// Downloads (one time, about 35 MB with the turn model) and loads the wake phrase models in the background (D-11).
     private func loadWakeModels() {
         guard wake == nil, wakeLoad == nil else { return }
         let folder = store.folder, progress = wakeProgress
         let downloaded = WakeModels.isDownloaded(store: folder)
-        wakeState = downloaded ? "Loading the wake phrase models…" : "Downloading the wake phrase models (about 18 MB, one time)…"
+        wakeState = downloaded ? "Loading the wake phrase models…" : "Downloading the wake phrase models (about 35 MB, one time)…"
         status = wakeState
         wakeLoad = Task { [weak self] in
             let result: Result<WakeModels, Error>
@@ -359,6 +360,7 @@ final class AppController: ObservableObject {
             case .success(let models):
                 self.wake = models
                 self.wakeState = String(format: "The wake phrase models are ready (load %.0f ms).", models.loadMs)
+                    + (models.hasTurnModel ? " The turn model is ready." : " The turn model is not loaded: a pause alone ends a turn.")
                 if self.settings.mode == .alwaysOn {
                     self.startInput()
                     self.status = "Ready · \(self.pipeline.engine.id) · always on (\"\(self.settings.wakePhrase)\")"
