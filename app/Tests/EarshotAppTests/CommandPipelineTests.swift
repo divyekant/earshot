@@ -9,8 +9,11 @@ import XCTest
 // Unit tests of the T7 command path, with a fake speech engine, a fake action runner and fake names.
 // Nothing here opens an app, presses a key or uses the microphone.
 
-final class TextEngine: SpeechEngine {
+final class TextEngine: SpeechEngine, CaptureControl {
     let id = "fake"
+    /// The values of `setNextCapture`, in order.
+    var captures: [Double] = []
+    func setNextCapture(seconds: Double) { captures.append(seconds) }
     var text = ""
     var words: [TimedWord] = []
     var began = 0
@@ -122,6 +125,15 @@ final class CommandPipelineTests: XCTestCase {
         let r = await p.finish(mode: .alwaysOn)
         XCTAssertTrue(r.note.contains("wake \"hey jarvis\", voice 0.71"), r.note)
         XCTAssertNil(p.pendingWake, "one wake is for one turn")
+    }
+
+    // R-ON-1, R-SP-1: an always-on turn ended on a pause, so it does not wait for more audio. The hold key does.
+    func testAlwaysOnSkipsTheCaptureWait() async {
+        let (p, engine, _) = make("open notes")
+        _ = await p.finish(mode: .hold)
+        XCTAssertEqual(engine.captures, [], "the hold key keeps the usual 200 ms")
+        _ = await p.finish(mode: .alwaysOn)
+        XCTAssertEqual(engine.captures, [0])
     }
 
     // R-ON-1, I-2: the turn model checks go into the note of the turn record, not into records of their own.

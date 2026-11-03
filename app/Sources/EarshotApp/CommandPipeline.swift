@@ -145,6 +145,8 @@ final class CommandPipeline {
         let ownerVoice = mode == .alwaysOn && (wake.map { $0.voiceScore != nil && $0.isOwner } ?? (followScore != nil))
         var text: String
         var words: [TimedWord] = []
+        // An always-on turn ended on a pause that the detector heard: no more audio to wait for (R-ON-1, R-SP-1).
+        if mode == .alwaysOn { (engine as? CaptureControl)?.setNextCapture(seconds: 0) }
         do {
             let heard = try await engine.end()
             text = heard.text.trimmingCharacters(in: .whitespacesAndNewlines)

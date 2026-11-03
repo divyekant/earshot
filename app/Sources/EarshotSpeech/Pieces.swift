@@ -67,7 +67,9 @@ enum TailPad {
     /// Real audio that the microphone still records after key release, before the silence. The microphone gives
     /// audio in blocks of up to about 100 ms, and people often release the key on the last sound of a word.
     /// Live test 2026-11-02: one command was heard as "Open up", with the end lost.
-    static let captureSeconds = 0.1
+    /// Hex measured the release edge: with 0 to 200 ms more audio, 10 of 10 last words were kept; with 100 ms less,
+    /// 7 of 10. So the hold key keeps 200 ms. An always-on turn uses 0 (`CaptureControl`).
+    static let captureSeconds = 0.2
 
     static func frames(sampleRate: Double, seconds: Double = TailPad.seconds) -> Int {
         max(0, Int((sampleRate * seconds).rounded()))
