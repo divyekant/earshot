@@ -282,7 +282,9 @@ final class FakeSamples: SampleSource {
     func stop() { onSamples = nil }
     /// 0.0005 is about -66 dB (a quiet room). 0.05 is about -26 dB (speech).
     func emit(_ level: Float, ms: Int) {
-        for _ in 0..<(ms / 100) { onSamples?([Float](repeating: level, count: 1600)) }
+        // A square wave of this level: the detector removes a steady (DC) value, so constant samples are silence.
+        let block: [Float] = (0..<1600).map { $0 % 2 == 0 ? level : -level }
+        for _ in 0..<(ms / 100) { onSamples?(block) }
     }
 }
 
