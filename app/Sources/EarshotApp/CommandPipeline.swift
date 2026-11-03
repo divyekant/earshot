@@ -60,6 +60,12 @@ final class CommandPipeline {
     var restoreFront: () async -> Double? = { nil }
     /// earshot's own bundle id. earshot's own window is never a target of a voice command.
     var ownBundleID: String?
+    /// After a bare "type" (RouteResult.awaitsText), the end of the window in which the next turn types its words
+    /// into the focused field (the owner's choice, R-NV-4). One turn only. Nil when not armed.
+    private(set) var armedUntil: Date?
+    static let armedSeconds: TimeInterval = 5
+    /// The clock, for the tests.
+    var now: () -> Date = Date.init
     /// The screenshot picker (D-10). Nil is off, the default (ScreenPickerFactory.make).
     var picker: ScreenPicker?
     /// The longest wait for the screenshot fallback (settings.jevScreenBudgetMs).
@@ -137,6 +143,15 @@ final class CommandPipeline {
         let front = frontBundleID().flatMap { $0 == ownBundleID ? nil : $0 }
         var context = RouteContext(apps: rows, names: known, frontBundleID: front, screen: withMenus(screen, front: front))
 
+        // A bare "type" armed this turn: its words go into the focused field, unless they hold a command word.
+        // One turn only. A voice that the wake check dropped never reaches this point, so it does not disarm.
+        if let until = armedUntil {
+            armedUntil = nil
+            if now() <= until, !CommandRouter.hasCommandWord(text, context: context) {
+                return await typeArmed(text, mode: mode, context: context, rows: rows, stages: stages, clock)
+            }
+        }
+
         let routeClock = Stopwatch()
         var result = await router.route(text, context: context)
         stages["route"] = routeClock.ms
@@ -152,6 +167,14 @@ final class CommandPipeline {
                 context.names += found
                 result = await router.route(text, context: context)
             }
+        }
+
+        // A bare "type": wait for the text in the next turn (hold key, or the owner's voice in always-on mode).
+        if result.awaitsText {
+            armedUntil = now().addingTimeInterval(Self.armedSeconds)
+            stages["dictation.armed"] = Self.armedSeconds * 1000
+            return done(heard: text, intent: "type: waiting for the text", tier: result.tier, ok: true,
+                        note: "say the text to type", stages: stages, clock, why: result.why)
         }
 
         let describe = IntentText.describe(result.intent, apps: rows, screen: context.screen)
@@ -260,6 +283,26 @@ final class CommandPipeline {
         return record
     }
 
+    /// Types the words of an armed turn into the focused field. The log keeps the word count, not the words.
+    private func typeArmed(_ text: String, mode: InputMode, context: RouteContext, rows: [AppEntry], stages: [String: Double],
+                           _ clock: Stopwatch) async -> ActivityRecord {
+        var stages = stages
+        let words = text.split(whereSeparator: \.isWhitespace).count
+        let heard = "(\(words) word\(words == 1 ? "" : "s"))"
+        let sensitive = context.screen.map { SafetyPolicy.sensitive(url: $0.url, elements: $0.elements) != nil } ?? false
+        guard !sensitive, Self.dictationField(context.screen) != nil else {
+            let why = sensitive ? "a sign-in, code or payment page" : "no focused text field"
+            return done(heard: heard, intent: "none", tier: .rules, ok: false, note: "type: \(why)", stages: stages, clock)
+        }
+        pauseAlwaysOn(true)
+        // The real mode of the turn, so that a mode rule of the action module also holds here.
+        let outcome = await actions.run(.typeText(text), context: context, command: CommandInfo(mode: mode, tier: .rules))
+        pauseAlwaysOn(false)
+        for (k, ms) in outcome.stages { stages["action." + k] = ms }
+        return done(heard: heard, intent: "Type \(words) word\(words == 1 ? "" : "s")", tier: .rules, ok: outcome.ok,
+                    note: outcome.note, stages: stages, clock, why: "armed by \"type\"")
+    }
+
     /// The focused text field for dictation: ScreenSnapshot.focusedID (set only for an editable field), and not a
     /// password field.
     static func dictationField(_ screen: ScreenSnapshot?) -> ScreenElement? {
@@ -353,7 +396,9 @@ final class CommandPipeline {
         guard !namesSelf(text), result.confidence >= minimumSearchConfidence else { return false }
         switch result.intent {
         case .openChat(let id, _, _): return id == appID && result.confidence < CommandRouter.sureConfidence
-        case .openApp(let id): return id == appID
+        // Live test: "Yeah, let's open the Slack" was a sure openApp, but the extra words ran a 2.1 s search
+        // that typed into Slack. Search only when the route is not sure, the same as for a chat.
+        case .openApp(let id): return id == appID && result.confidence < CommandRouter.sureConfidence
         default: return false
         }
     }

@@ -312,6 +312,11 @@ final class DiscoverHookTests: XCTestCase {
         XCTAssertFalse(CommandPipeline.needsAppSearch("Slack me running late", app, appID: "slack"))
         XCTAssertFalse(CommandPipeline.needsAppSearch("happening click on tab in Chrome Home X", garbled, appID: "slack"))
         XCTAssertFalse(CommandPipeline.needsAppSearch("open my own chat in Slack", unsureChat, appID: "slack"))
+        // Live test: a sure "open <app>" with extra words ran a 2.1 s search that typed into the app.
+        let sureApp = RouteResult(intent: .openApp(appID: "slack"), confidence: CommandRouter.sureConfidence, tier: .rules, ms: 0)
+        let unsureApp = RouteResult(intent: .openApp(appID: "slack"), confidence: 0.7, tier: .rules, ms: 0)
+        XCTAssertFalse(CommandPipeline.needsAppSearch("open Slack quickly", sureApp, appID: "slack"))
+        XCTAssertTrue(CommandPipeline.needsAppSearch("open Slack quickly", unsureApp, appID: "slack"))
     }
 }
 

@@ -11,6 +11,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - earshot runs on Intel Macs and on macOS 14 and 15. On these Macs, it uses Apple on-device dictation for speech. No audio leaves the Mac (R-MD-1).
 - "Jev sees the screen" now works in the app: an unsure hold-key click that was not blocked can ask Jev with one picture of the front window. It is off by default (R-MD-1, R-NV-5, D-10).
 - With the hold key, words with no command word go into the focused text field, for example "Hi, this is a test" after "click the message box". Never into a password field, never on a sign-in, code or payment page, never in always-on mode, and never with Return (R-NV-4, R-NV-5, R-ON-5).
+- Say "type", then the text: after a bare "type", the next sentence within 5 s goes into the focused text field, also in always-on mode. A command word in that sentence runs as a command. Never with Return (R-NV-4, R-NV-5, R-ON-5).
 - Always-on mode starts on a wake phrase (default "hey jarvis") and checks the owner's voice. Teach earshot your voice with 5 phrases in Manage > General. The models download one time (about 18 MB). No audio leaves the Mac (R-ON-1, R-ON-2, R-ON-3, R-MD-1, D-11).
 
 ### Changed
