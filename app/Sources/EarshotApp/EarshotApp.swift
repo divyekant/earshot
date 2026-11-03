@@ -305,10 +305,7 @@ final class AppController: ObservableObject {
                 pipeline.pendingWake = hit
                 if self?.settings.showFeedback == true { feedback.show("Listening…", ok: true) }
             }
-            trigger.onRejected = { [weak trigger] hit in
-                pipeline.rejectedWake(hit, threshold: threshold)
-                if pipeline.playSounds { trigger?.mute(seconds: Self.seconds(of: .failed)) }
-            }
+            trigger.onRejected = { hit in _ = pipeline.rejectedWake(hit, threshold: threshold) }
             trigger.onNearMisses = { misses in pipeline.nearMisses(misses) }
         }
         pipeline.pauseAlwaysOn = { [weak input] paused in

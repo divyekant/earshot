@@ -214,8 +214,8 @@ final class CommandPipelineTests: XCTestCase {
         XCTAssertEqual(sounds, [.failed])
     }
 
-    /// Live test (19:06): the phrase matched, but the voice check said "another voice", and nothing showed it.
-    func testRejectedWakeShowsANoteAndTheFailedSound() {
+    /// Live test (2026-11-03): other sounds also match the phrase, so a rejected wake is only logged.
+    func testRejectedWakeIsQuiet() {
         let (p, _, runner) = make("")
         let note = NoteRecorder()
         p.feedback = note
@@ -226,8 +226,8 @@ final class CommandPipelineTests: XCTestCase {
         XCTAssertTrue(r.note.contains("0.25"), r.note)
         XCTAssertEqual(r.heard, "")
         XCTAssertTrue(runner.runs.isEmpty)
-        XCTAssertEqual(note.shown.first?.0, "✗ not sure it was your voice: say \"hey atlas, …\"")
-        XCTAssertEqual(sounds, [.failed])
+        XCTAssertTrue(note.shown.isEmpty, "no note for a rejected wake")
+        XCTAssertEqual(sounds, [], "no sound for a rejected wake")
     }
 
     func testLastSoundIsKeptForTheMute() async {

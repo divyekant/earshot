@@ -348,16 +348,14 @@ final class CommandPipeline {
     }
 
     /// Logs a wake phrase in a voice that is not the owner's (R-ON-3). Nothing ran. The record has no text,
-    /// because the speech engine did not run.
+    /// because the speech engine did not run. It shows no note and plays no sound: other sounds in the room
+    /// also match the phrase, and the owner heard the failed sound every 5 s (dk, live test 2026-11-03).
     @discardableResult
     func rejectedWake(_ wake: WakeHit, threshold: Double) -> ActivityRecord {
         let score = wake.voiceScore.map { String(format: "%.2f", $0) } ?? "none"
         let note = String(format: "wake phrase in another voice (score %@, needs %.2f)", score, threshold)
         let record = ActivityRecord(heard: "", intent: "none", tier: .none, ok: false, note: note, stages: [:])
         try? log?.append(record)
-        // The phrase matched: say so, so that the owner knows earshot heard it (live test, 19:06).
-        if showFeedback { feedback?.show("✗ not sure it was your voice: say \"\(wakePhrase), …\"", ok: false) }
-        if playSounds { playSound?(.failed) }
         return record
     }
 
