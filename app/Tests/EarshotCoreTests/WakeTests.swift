@@ -200,6 +200,37 @@ final class WakeTests: XCTestCase {
         XCTAssertTrue(missed.summary.hasSuffix(", last turn 0.20 (needs 0.45)"), missed.summary)
     }
 
+    // E6, section 8.2: the profile learns the owner's free speech from good wake turns.
+    func testProfileLearnsTurns() throws {
+        let profile = VoiceProfile(phrase: "hey atlas", embedding: [1, 0], keywordTokens: [], samples: 5, selfScore: 0.9)
+        XCTAssertEqual(profile.turnEmbedding, [1, 0], "with no learned turns, the phrases alone")
+        let one = profile.learning([0, 1])
+        XCTAssertEqual(one.learnedTurns ?? [], [[0, 1]])
+        XCTAssertEqual(one.turnEmbedding, [5, 1], "each phrase and each turn has the same weight")
+        XCTAssertEqual(one.embedding, [1, 0], "the gate on the phrase alone keeps the phrases")
+        XCTAssertEqual(profile.learning([1, 2, 3]), profile, "a turn of another length is not learned")
+        var many = profile
+        for i in 0..<12 { many = many.learning([0, Float(i)]) }
+        XCTAssertEqual(many.learnedTurns?.count, VoiceProfile.maxLearnedTurns)
+        XCTAssertEqual(many.learnedTurns?.first, [0, 2], "the oldest turns go first")
+        // A voice.json from before the learned turns reads with none.
+        let data = try JSONEncoder().encode(VoiceBook(profiles: [profile]))
+        let read = try JSONDecoder().decode(VoiceBook.self, from: data)
+        XCTAssertNil(read.profiles.first?.learnedTurns)
+        let back = try JSONDecoder().decode(VoiceBook.self, from: try JSONEncoder().encode(VoiceBook(profiles: [one])))
+        XCTAssertEqual(back.profiles.first?.learnedTurns ?? [], [[0, 1]])
+    }
+
+    func testLearnRule() {
+        let rule = VoiceRule()
+        XCTAssertTrue(rule.learns(score: 0.47, limit: 0.42, seconds: 1.5))
+        XCTAssertFalse(rule.learns(score: 0.46, limit: 0.42, seconds: 2), "too near the limit")
+        XCTAssertFalse(rule.learns(score: 0.9, limit: 0.4, seconds: 1.4), "too short")
+        let turn = TurnVoice(kind: .wake, score: 0.6, seconds: 2, audioSeconds: 2.5, limit: 0.42, passed: true, ms: 9,
+                             learnedTurns: 3)
+        XCTAssertTrue(turn.summary.hasSuffix(", learned (3 turns)"), turn.summary)
+    }
+
     func testLastTurnRuleAndSimilarity() {
         let rule = VoiceRule()
         XCTAssertEqual(rule.lastTurn, 0.45)

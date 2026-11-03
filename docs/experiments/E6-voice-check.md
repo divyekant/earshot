@@ -151,3 +151,20 @@ At 0.40, other voices pass 1.2 % to 1.8 % of the time. At 0.50, the owner passes
 
 The bench profile holds free speech. The owner's profile holds the wake phrase only, so for the owner the gain of the last-turn check is likely larger than the bench shows. The next live log gives the last-turn score of each follow-up turn.
 
+### 8.2 The owner's profile holds one phrase (`voice_narrow.py`)
+
+Retest on 5ba965b (04:47 to 04:50 UTC): 4 more follow-up turns were dropped, at 0.16 to 0.28 (1.1 s to 3.9 s of speech). The owner's wake turns in the same minutes scored 0.47 to 0.76. A wake turn starts with the phrase, and a follow-up turn has none. The profile holds 5 takes of the wake phrase only.
+
+LibriSpeech has no phrase said 5 times. As a stand-in, the narrow profile is 5 takes of the same 0.8 s of one file, at offsets of up to 80 ms: the same words, one way of speech. The tests are free speech of the same chapter. 13 speakers, 177 owner clips and 2124 other-voice clips in each case. Pass rates are with the line of `VoiceRule`.
+
+| Profile | Owner, 1.4 s | Other voices, 1.4 s | Owner, 2.8 s | Other voices, 2.8 s |
+|---|---|---|---|---|
+| 5 takes of varied speech (the E6 bench) | 96.6 % (median 0.60) | 0.71 % | 100.0 % (median 0.67) | 0.42 % |
+| 5 takes of one phrase | 72.9 % (median 0.44) | 0.19 % | 74.6 % (median 0.49) | 0.00 % |
+| One phrase and 3 passed turns of 2.5 s | 91.0 % (median 0.56) | 0.42 % | 94.4 % (median 0.64) | 0.14 % |
+
+- A profile of one phrase passes the owner's free speech about one time in four less often. This matches the live drops.
+- A few turns of the owner's free speech in the profile give most of it back, and other voices pass less often than with the varied profile.
+
+The build: a wake turn that passed the check by 0.05 or more over its limit, with 1.5 s of speech or more, adds its embedding to the profile of its microphone (`VoiceProfile.learnedTurns`, at most 10, the oldest goes first). The check of a whole turn compares with the mean of the 5 phrases and the learned turns, each with the same weight. The gate on the phrase alone keeps the 5 phrases. Only a wake turn teaches: its phrase passed the gate, so a follow-up turn of another voice cannot. A new teach step starts with no learned turns. voice.json holds the embeddings only, no audio.
+

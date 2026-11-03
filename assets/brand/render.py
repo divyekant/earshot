@@ -7,7 +7,7 @@ Usage (from assets/brand):
 Outputs:
     AppIcon.svg, AppIcon.icns, AppIcon.iconset/, AppIcon.appiconset/,
     mark.svg, mark.png, glyph.svg, glyph.png,
-    logo.svg, logo.png, logo-dark.svg, logo-dark.png, preview.png
+    logo.svg, logo.png, logo-dark.svg, logo-dark.png, social-preview.png, preview.png
 """
 
 import argparse
@@ -24,12 +24,10 @@ HERE = Path(__file__).resolve().parent
 SRC = HERE / "src"
 
 # Colors. README.md lists the same values.
-BG_TOP = "#3A2FA8"
-BG_BOTTOM = "#0E0B2E"
-BAR_BOTTOM = "#C4BAFF"
-CURSOR_TOP = "#FFD978"
-CURSOR_BOTTOM = "#FF9A3C"
-INK = "#14112E"  # wordmark on a light background
+BG_TOP = "#2C2C29"
+BG_BOTTOM = "#0C0C0B"
+EAR = "#F2F2EE"  # the stroke color in src/mark.svg
+INK = "#161615"  # wordmark on a light background
 
 # macOS icon sizes: (point size, scale).
 ICON_SIZES = [(16, 1), (16, 2), (32, 1), (32, 2), (128, 1), (128, 2), (256, 1), (256, 2), (512, 1), (512, 2)]
@@ -66,18 +64,11 @@ def defs(shadow: bool) -> str:
  <radialGradient id="highlight" cx="0.3" cy="0.12" r="0.75">
   <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.18"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
  </radialGradient>
- <linearGradient id="bar" gradientUnits="userSpaceOnUse" x1="0" y1="286" x2="0" y2="738">
-  <stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="{BAR_BOTTOM}"/>
- </linearGradient>
- <linearGradient id="cursor" x1="0" y1="0" x2="0" y2="1">
-  <stop offset="0" stop-color="{CURSOR_TOP}"/><stop offset="1" stop-color="{CURSOR_BOTTOM}"/>
- </linearGradient>
- <filter id="cursor-glow" x="-150%" y="-20%" width="400%" height="140%"><feGaussianBlur stdDeviation="16"/></filter>
  <clipPath id="tile-clip"><path d="{TILE}"/></clipPath>"""
     if shadow:
         out += """
  <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
-  <feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#0B0630" flood-opacity="0.35"/>
+  <feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#000000" flood-opacity="0.35"/>
  </filter>"""
     return out
 
@@ -115,10 +106,8 @@ def mark_svg() -> str:
 
 def glyph_svg(color: str = "currentColor") -> str:
     """The mark alone in one color, for UI use (menu bar, window header)."""
-    mark = (SRC / "mark.svg").read_text()
-    mark = mark.replace('fill="url(#bar)"', f'fill="{color}"').replace('fill="url(#cursor)"', f'fill="{color}"')
-    mark = "\n".join(line for line in mark.splitlines() if "cursor-glow" not in line)
-    return svg_doc(472, 452, "276 286 472 452", mark)
+    mark = (SRC / "mark.svg").read_text().replace(f'stroke="{EAR}"', f'stroke="{color}"')
+    return svg_doc(410, 562, "306 231 410 562", mark)
 
 
 def build_wordmark(font_path: Path) -> None:
@@ -216,21 +205,37 @@ def main() -> None:
     (HERE / "mark.png").write_bytes(png(mark, 512))
 
     (HERE / "glyph.svg").write_text(glyph_svg())
-    (HERE / "glyph.png").write_bytes(png(glyph_svg("#000000"), 236, 226))
+    (HERE / "glyph.png").write_bytes(png(glyph_svg("#000000"), 205, 281))
 
     for name, color in (("logo", INK), ("logo-dark", "#FFFFFF")):
         svg, w, h = logo(color)
         (HERE / f"{name}.svg").write_text(svg)
         (HERE / f"{name}.png").write_bytes(png(svg, w * 2, h * 2))
 
+    write_social_preview()
     write_preview(icon)
+
+
+def write_social_preview() -> None:
+    """social-preview.png, 1280 x 640: the dark logo on the page color of the web site.
+    Upload it in the GitHub repository settings, under Social preview."""
+    svg, lw, lh = logo("#FFFFFF")
+    w, h = 1280, 640
+    s = 640 / lw
+    inner = (
+        f'<rect width="{w}" height="{h}" fill="{BG_BOTTOM}"/>'
+        f'<g transform="translate({(w - lw * s) / 2} {(h - lh * s) / 2}) scale({s})">'
+        + svg[svg.index(">") + 1:svg.rindex("</svg>")]
+        + "</g>"
+    )
+    (HERE / "social-preview.png").write_bytes(png(svg_doc(w, h, f"0 0 {w} {h}", inner), w, h))
 
 
 def write_preview(icon: str) -> None:
     """One image for review: icon at several sizes, logo on light and dark."""
     w, h = 1600, 1000
-    sheet = Image.new("RGBA", (w, h), "#F4F3F8")
-    sheet.paste(Image.new("RGBA", (w, 270), "#100D26"), (0, h - 270))
+    sheet = Image.new("RGBA", (w, h), "#F4F4F1")
+    sheet.paste(Image.new("RGBA", (w, 270), "#0C0C0B"), (0, h - 270))
     x = 50
     for px in (512, 256, 128, 64, 32, 16):
         im = Image.open(io.BytesIO(png(icon, px)))
@@ -240,8 +245,8 @@ def write_preview(icon: str) -> None:
         svg, lw, lh = logo(color)
         im = Image.open(io.BytesIO(png(svg, int(lw * 0.75), int(lh * 0.75))))
         sheet.alpha_composite(im, (60, y))
-    for i, color in enumerate(("#14112E", "#FFFFFF")):
-        im = Image.open(io.BytesIO(png(glyph_svg(color), 118, 113)))
+    for i, color in enumerate((INK, "#FFFFFF")):
+        im = Image.open(io.BytesIO(png(glyph_svg(color), 82, 112)))
         sheet.alpha_composite(im, (1400, 578 + i * 270))
     sheet.convert("RGB").save(HERE / "preview.png")
 
