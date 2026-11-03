@@ -85,6 +85,25 @@ final class CommandPipeline {
     /// into the focused field (the owner's choice, R-NV-4). One turn only. Nil when not armed.
     private(set) var armedUntil: Date?
     static let armedSeconds: TimeInterval = 5
+    /// A chain of commands that stopped at a step (I-28). The next turn within `chainAnswerSeconds` can answer it:
+    /// "go on" (skip the step and run the rest), "stop", "yes" (run the best guess), or the step again in new words.
+    /// dk (2026-11-03): ask first when a step fails.
+    struct PendingChain {
+        var steps: [String]
+        /// The index of the step that stopped.
+        var failed: Int
+        /// The router's best guess for an unsure step, and its tier.
+        var guess: (Intent, RouterTier)?
+        var until: Date
+    }
+    private(set) var pendingChain: PendingChain?
+    static let chainAnswerSeconds: TimeInterval = 10
+    /// The wait after a step, before earshot reads the screen again. After "open <app>", earshot first waits until
+    /// the app is in front, for at most `chainFrontWaitMs`.
+    static let chainSettleMs = 400
+    static let chainFrontWaitMs = 2000
+    /// The sleep, for the tests.
+    var sleepMs: (Int) async -> Void = { ms in try? await Task.sleep(nanoseconds: UInt64(max(0, ms)) * 1_000_000) }
     /// The clock, for the tests.
     var now: () -> Date = Date.init
     /// The screenshot picker (D-10). Nil is off, the default (ScreenPickerFactory.make).
@@ -177,6 +196,15 @@ final class CommandPipeline {
         let front = frontBundleID().flatMap { $0 == ownBundleID ? nil : $0 }
         var context = RouteContext(apps: rows, names: known, frontBundleID: front, screen: withMenus(screen, front: front))
 
+        // The answer to a chain that stopped at a step (I-28). In always-on mode, only in the owner's checked voice.
+        if let chain = pendingChain {
+            pendingChain = nil
+            if started <= chain.until, mode != .alwaysOn || ownerVoice,
+               let record = await answerChain(chain, text, mode: mode, ownerVoice: ownerVoice, context: context, rows: rows,
+                                              stages: stages, clock) {
+                return record
+            }
+        }
         // A bare "type" armed this turn: its words go into the focused field, unless its first sentence is a command.
         // A command word later in the text is text. One turn only. A voice that the wake check dropped never
         // reaches this point, so it does not disarm.
@@ -192,6 +220,14 @@ final class CommandPipeline {
            started <= t.at.addingTimeInterval(Self.continueTypingSeconds),
            !CommandRouter.startsWithCommand(text, context: context) {
             return await typeArmed(text, mode: mode, context: context, rows: rows, stages: stages, clock, continues: true)
+        }
+
+        // A chain of commands in one sentence (I-28): each step in order, each on a new screen read.
+        let cutClock = Stopwatch()
+        let steps = CommandRouter.steps(text, context: context)
+        if steps.count > 1 {
+            stages["steps.cut"] = cutClock.ms
+            return await runChain(steps, from: 0, heard: text, mode: mode, context: context, rows: rows, stages: stages, clock)
         }
 
         let routeClock = Stopwatch()
@@ -395,6 +431,161 @@ final class CommandPipeline {
         lastTyped = nil
         sentThisTurn = out.ok
         return (out.ok, note + " · " + out.note)
+    }
+
+    // MARK: - A chain of commands (I-28)
+
+    /// Runs the steps from `first` on, in order. Each step has its own route and its own safety checks, the same as one
+    /// command. After each step, earshot waits for the screen to settle and reads it again. If a step is not a
+    /// command, is not sure, is blocked or fails, the chain stops there and asks (PendingChain). Steps that ran stay done.
+    /// - `forced`: the intent of step `first`, from the owner's "yes" to the best guess. The action rules still check it.
+    private func runChain(_ steps: [String], from first: Int, heard: String, mode: InputMode, context: RouteContext,
+                          rows: [AppEntry], stages: [String: Double], _ clock: Stopwatch,
+                          forced: (Intent, RouterTier)? = nil) async -> ActivityRecord {
+        var stages = stages
+        guard steps.count <= CommandRouter.maxSteps else {
+            return done(heard: heard, intent: "none", tier: .rules, ok: false,
+                        note: "\(steps.count) steps: say at most \(CommandRouter.maxSteps) steps", stages: stages, clock)
+        }
+        var context = context
+        var ran: [String] = []
+        var lastTier = RouterTier.rules
+        for i in first..<steps.count {
+            let n = i + 1
+            let step = steps[i]
+            if i > first {
+                let c = Stopwatch()
+                context = await readContext(context)
+                stages["step\(n).screen"] = c.ms
+            }
+            let routed: RouteResult
+            if i == first, let forced {
+                routed = RouteResult(intent: forced.0, confidence: 1, tier: forced.1, ms: 0, why: "your yes to the best guess")
+            } else {
+                let c = Stopwatch()
+                routed = await router.route(step, context: context)
+                stages["step\(n).route"] = c.ms
+            }
+            let (intent, tier, confidence, why, sendAfter) = (routed.intent, routed.tier, routed.confidence, routed.why,
+                                                              routed.sendAfter)
+            lastTier = tier
+            let describe = IntentText.describe(intent, apps: rows, screen: context.screen)
+            let sensitive = context.screen.map { SafetyPolicy.sensitive(url: $0.url, elements: $0.elements) != nil } ?? false
+
+            var block: String?
+            var guess: (Intent, RouterTier)?
+            if intent == .none {
+                block = "not a command (\(why))"
+            } else if confidence < SafetyPolicy.minimumConfidence {
+                block = "not sure (\(why))"
+                if !sensitive { guess = (intent, tier) }
+            } else if intent == .send, mode == .alwaysOn {
+                // dk's rule (D-12): in always-on mode, only "send" alone sends.
+                block = "say \"send\" on its own to send"
+            }
+            if let block {
+                return stopChain(steps, at: i, guess: guess, heard: heard, ran: ran, describe: describe, reason: block,
+                                 tier: tier, stages: stages, clock, why: why)
+            }
+
+            let types = Self.types(intent)
+            if types { pauseAlwaysOn(true) }
+            let command = CommandInfo(mode: mode, tier: tier, spokenTarget: CommandRouter.spokenTarget(step))
+            let outcome = await actions.run(intent, context: context, command: command)
+            if types { pauseAlwaysOn(false) }
+            for (k, v) in outcome.stages { stages["step\(n).action.\(k)"] = v }
+            if intent == .send { lastTyped = nil; sentThisTurn = outcome.ok }
+            if types, outcome.ok { noteTyped(mode: mode) }
+            var (ok, note) = (outcome.ok, outcome.note)
+            if sendAfter, types, outcome.ok {
+                (ok, note) = await sendAfterTyping(mode: mode, note: note, context: context, stages: &stages)
+            }
+            guard ok else {
+                return stopChain(steps, at: i, guess: nil, heard: heard, ran: ran, describe: describe, reason: note,
+                                 tier: tier, stages: stages, clock, why: why)
+            }
+            ran.append(describe + (note.isEmpty ? "" : " (\(note))"))
+            if i < steps.count - 1 { stages["step\(n).settle"] = await settle(after: intent, rows: rows) }
+        }
+        return done(heard: heard, intent: ran.joined(separator: " · then "), tier: lastTier, ok: true,
+                    note: "\(steps.count - first) step\(steps.count - first == 1 ? "" : "s") done", stages: stages, clock,
+                    why: "chain of \(steps.count) steps")
+    }
+
+    /// Stops a chain at step `i` and asks the owner (dk: "ask me first"). One fail sound for the chain.
+    private func stopChain(_ steps: [String], at i: Int, guess: (Intent, RouterTier)?, heard: String, ran: [String],
+                           describe: String, reason: String, tier: RouterTier, stages: [String: Double], _ clock: Stopwatch,
+                           why: String) -> ActivityRecord {
+        pendingChain = PendingChain(steps: steps, failed: i, guess: guess, until: now().addingTimeInterval(Self.chainAnswerSeconds))
+        var ask = "say \"go on\", \"stop\" or the step again"
+        if guess != nil { ask += ", or \"yes\" for: \(describe)" }
+        let note = "step \(i + 1) of \(steps.count) stopped: \(reason) · \(ask)"
+        let intent = ran.isEmpty ? "none" : ran.joined(separator: " · then ")
+        return done(heard: heard, intent: intent, tier: tier, ok: false, note: note, stages: stages, clock,
+                    why: "chain of \(steps.count) steps, step \(i + 1): \(why)")
+    }
+
+    /// The answer to a chain that stopped. Nil if the words are a new command: the normal path takes them.
+    private func answerChain(_ chain: PendingChain, _ text: String, mode: InputMode, ownerVoice: Bool, context: RouteContext,
+                             rows: [AppEntry], stages: [String: Double], _ clock: Stopwatch) async -> ActivityRecord? {
+        var words = SafetyPolicy.normalize(text).split(separator: " ").map(String.init)
+        while let f = words.first, ["ok", "okay", "yeah", "please", "uh", "um", "hey"].contains(f), words.count > 1 { words.removeFirst() }
+        while let l = words.last, ["please", "then", "now"].contains(l), words.count > 1 { words.removeLast() }
+        let phrase = words.joined(separator: " ")
+        let rest = chain.failed + 1
+        if ["go on", "skip", "skip it", "skip that", "continue", "next", "keep going"].contains(phrase) {
+            guard rest < chain.steps.count else {
+                return done(heard: text, intent: "none", tier: .rules, ok: true, note: "no steps left", stages: stages, clock)
+            }
+            return await runChain(chain.steps, from: rest, heard: text, mode: mode, context: context, rows: rows,
+                                  stages: stages, clock)
+        }
+        if ["stop", "stop it", "cancel", "no", "never mind", "nevermind"].contains(phrase) {
+            return done(heard: text, intent: "none", tier: .rules, ok: true,
+                        note: "chain stopped at step \(chain.failed + 1) of \(chain.steps.count)", stages: stages, clock)
+        }
+        if ["yes", "yes please", "do it", "yep", "yeah", "ok", "okay", "sure"].contains(phrase), let guess = chain.guess {
+            return await runChain(chain.steps, from: chain.failed, heard: text, mode: mode, context: context, rows: rows,
+                                  stages: stages, clock, forced: guess)
+        }
+        // The last step again: an ordinary command (and an always-on "send" alone keeps its own rule, D-12).
+        guard rest < chain.steps.count else { return nil }
+        // The step again in new words, then the rest.
+        var steps = chain.steps
+        steps.replaceSubrange(chain.failed...chain.failed, with: CommandRouter.steps(text, context: context))
+        return await runChain(steps, from: chain.failed, heard: text, mode: mode, context: context, rows: rows,
+                              stages: stages, clock)
+    }
+
+    /// The context with a new screen read and the front app now. earshot's own window is never a target.
+    private func readContext(_ context: RouteContext) async -> RouteContext {
+        var c = context
+        let seen = await actions.screen()
+        let front = frontBundleID().flatMap { $0 == ownBundleID ? nil : $0 }
+        c.frontBundleID = front
+        c.screen = withMenus(seen?.bundleID == ownBundleID ? nil : seen, front: front)
+        return c
+    }
+
+    /// Waits after a step, so that the next step reads the new screen. Returns the wait in ms.
+    private func settle(after intent: Intent, rows: [AppEntry]) async -> Double {
+        let c = Stopwatch()
+        switch intent {
+        case .openApp(let id), .openChat(let id, _, _):
+            if let bundle = rows.first(where: { $0.id == id })?.bundleID {
+                var waited = 0
+                while frontBundleID() != bundle, waited < Self.chainFrontWaitMs {
+                    await sleepMs(100)
+                    waited += 100
+                }
+            }
+            await sleepMs(Self.chainSettleMs)
+        case .typeText, .typeInto, .send:
+            await sleepMs(100)
+        default:
+            await sleepMs(Self.chainSettleMs)
+        }
+        return c.ms
     }
 
     /// The reason to block an always-on "send", or nil (D-12, R-ON-5). It sends only if all are true:

@@ -6,6 +6,14 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+### Added
+
+- Several commands in one sentence, for example "click on Projects, click on New, type hello and send". earshot runs the steps in order and reads the screen again before each step. Each step has its own safety checks. If a step fails or earshot is not sure, earshot stops and asks: say "go on", "stop", or the step again within 10 s. At most 10 steps. In always-on mode, a chain never sends (I-28, R-NV-5, R-SP-2, D-12).
+
+### Fixed
+
+- "Here at least …" (the wake phrase heard wrong), "I want to …" and "go ahead and …" at the start of a command no longer stop the command (I-29).
+
 ## [0.2.0] - 2026-11-03
 
 This release adds the wake phrase and owner voice check for always-on mode, dictation into the focused field, "type" then the text, and "send" said alone after earshot types a message. It also adds sound cues for listen and result. With Parakeet, earshot uses about 700 MB less memory.
