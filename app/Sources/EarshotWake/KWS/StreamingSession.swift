@@ -1,5 +1,5 @@
 // Copied from soniqo/speech-swift (Apache-2.0), Sources/SpeechWakeWord/StreamingSession.swift at a57702e.
-// earshot changes: 16-bit floats through Half (vImage), because Float16 does not exist on Intel Macs; the frameSink hook for the enrolment; no AudioCommon import. License: LICENSES/Apache-2.0.txt.
+// earshot changes: 16-bit floats through Half (vImage), because Float16 does not exist on Intel Macs; the frameSink hook for the enrolment; the near-miss count pass-through (D-11); no AudioCommon import. License: LICENSES/Apache-2.0.txt.
 import CoreML
 import Foundation
 
@@ -104,6 +104,15 @@ public final class WakeWordSession {
     /// earshot: if this is set, each encoder frame goes to the closure, and the keyword search does not run.
     /// The voice enrolment uses it to read which tokens the model hears for the owner's wake phrase.
     var frameSink: (([Float]) -> Void)?
+
+    /// earshot (D-11): the piece count of the phrase for the near-miss count of the decoder. 0 turns it off.
+    var nearMissLength: Int {
+        get { kwsDecoder.nearMissLength }
+        set { kwsDecoder.nearMissLength = newValue }
+    }
+
+    /// earshot (D-11): the near misses since the last call. Only a count and the best part of the phrase.
+    func takeNearMisses() -> (count: Int, best: Double) { kwsDecoder.takeNearMisses() }
 
     // Per-frame mel features buffered for the encoder sliding window. Stores
     // only frames that have not yet been consumed by an encoder chunk.

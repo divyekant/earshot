@@ -53,11 +53,12 @@ public enum SpeechEngines {
 
 /// Uses `primary`. If `primary` fails in `prepare`, it uses the fallback engine.
 /// So a broken model file never stops voice commands.
-public final class FallbackSpeechEngine: TurnSpeechEngine, PrerollControl, @unchecked Sendable {
+public final class FallbackSpeechEngine: TurnSpeechEngine, PrerollControl, PhraseHintControl, @unchecked Sendable {
     private let lock = NSLock()
     private var current: SpeechEngine
     private var makeFallback: (() -> SpeechEngine)?
     private var partial: (@Sendable (String) -> Void)?
+    private var hints: [String] = []
     /// The error of the primary engine, if the fallback engine is in use.
     public private(set) var fallbackReason: String?
 
@@ -93,6 +94,7 @@ public final class FallbackSpeechEngine: TurnSpeechEngine, PrerollControl, @unch
                 guard let make = makeFallback else { return nil }
                 let next = make()
                 next.onPartial = partial
+                (next as? PhraseHintControl)?.setPhraseHints(hints)
                 (next as? SpeechTimingReporting)?.reason = "fallback: \(error)"
                 current = next
                 makeFallback = nil
@@ -106,6 +108,11 @@ public final class FallbackSpeechEngine: TurnSpeechEngine, PrerollControl, @unch
 
     public func begin() throws { try active.begin() }
     public func setNextPreroll(seconds: Double) { (active as? PrerollControl)?.setNextPreroll(seconds: seconds) }
+    /// The fallback engine gets the same hints if it takes over.
+    public func setPhraseHints(_ phrases: [String]) {
+        let engine = lock.withLock { () -> SpeechEngine in hints = phrases; return current }
+        (engine as? PhraseHintControl)?.setPhraseHints(phrases)
+    }
     public func end() async throws -> Utterance { try await active.end() }
     public func cancelTurn() { (active as? TurnSpeechEngine)?.cancelTurn() }
     public func shutdown() { (active as? TurnSpeechEngine)?.shutdown() }

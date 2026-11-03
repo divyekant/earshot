@@ -57,7 +57,7 @@ public struct AutoPolicy: Sendable {
 ///   and Parakeet stops with no decode. So a slow Parakeet never makes the owner wait.
 /// - Until Parakeet is loaded (about 15 s), Apple makes the text.
 /// `lastTiming.why` tells which engine ran and why.
-public final class AutoSpeechEngine: TurnSpeechEngine, PrerollControl, @unchecked Sendable {
+public final class AutoSpeechEngine: TurnSpeechEngine, PrerollControl, PhraseHintControl, @unchecked Sendable {
     public let parakeet: ParakeetEngine
     public let apple: TurnSpeechEngine
     public var policy = AutoPolicy()
@@ -110,6 +110,9 @@ public final class AutoSpeechEngine: TurnSpeechEngine, PrerollControl, @unchecke
         (apple as? PrerollControl)?.setNextPreroll(seconds: seconds)
         parakeet.setNextPreroll(seconds: seconds)
     }
+
+    /// Apple takes the hints. Parakeet has no context input, so the text strip removes the phrase from its text.
+    public func setPhraseHints(_ phrases: [String]) { (apple as? PhraseHintControl)?.setPhraseHints(phrases) }
 
     public func begin() throws {
         let (start, why) = policy.tryParakeet(loaded: lock.withLock { parakeetReady }, pressure: pressure())

@@ -86,7 +86,7 @@ public final class WakeModels: @unchecked Sendable {
         let specs = Self.keywords(phrase: phrase, spelled: spelled, learned: learned)
         guard !specs.isEmpty else { throw WakeError("The wake phrase has no words.") }
         return try PhraseListener(models: self, phrase: phrase, keywords: specs, profile: profile,
-                                  voiceThreshold: voiceThreshold)
+                                  voiceThreshold: voiceThreshold, nearMissLength: spelled.count)
     }
 
     /// Makes the owner's voice profile from the enrolment phrases (16 kHz mono, one phrase in each clip).

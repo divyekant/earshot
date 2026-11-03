@@ -17,11 +17,40 @@ public struct WakeHit: Sendable, Equatable {
     public var voiceScore: Double?
     /// True if the voice matches the enrolled voice, or if no voice is enrolled.
     public var isOwner: Bool
+    /// Nil if the wake started the turn. If the owner said the phrase again in a follow-up turn, the time from the
+    /// start of that turn to the wake, in seconds.
+    public var inTurnAfterSeconds: Double?
 
-    public init(phrase: String, prerollSeconds: Double, phraseEndSeconds: Double = 0, voiceScore: Double?, isOwner: Bool) {
+    public init(phrase: String, prerollSeconds: Double, phraseEndSeconds: Double = 0, voiceScore: Double?, isOwner: Bool,
+                inTurnAfterSeconds: Double? = nil) {
         self.phrase = phrase; self.prerollSeconds = prerollSeconds; self.phraseEndSeconds = phraseEndSeconds
-        self.voiceScore = voiceScore; self.isOwner = isOwner
+        self.voiceScore = voiceScore; self.isOwner = isOwner; self.inTurnAfterSeconds = inTurnAfterSeconds
     }
+
+    /// The end of the phrase in seconds from the start of the turn: negative if the phrase ended before the turn
+    /// started (the speech engine heard it in the preroll).
+    public var phraseEndInTurn: Double { (inTurnAfterSeconds ?? 0) - phraseEndSeconds }
+}
+
+/// Partial matches of the wake phrase that did not fire (D-11). Only a count and the best part of the phrase:
+/// no audio and no text.
+public struct NearMisses: Sendable, Equatable {
+    /// The number of near misses.
+    public var count: Int
+    /// The largest part of the phrase pieces that matched, 0 to 1. 1 means all pieces matched, but the acoustic
+    /// score was below the threshold.
+    public var best: Double
+
+    public init(count: Int, best: Double) { self.count = count; self.best = best }
+
+    /// Adds other near misses to these.
+    public mutating func add(_ other: NearMisses) { count += other.count; best = max(best, other.best) }
+}
+
+/// A speech engine that can take words to expect, such as the wake phrase (D-11). Apple speech then spells them
+/// right more often. An engine that cannot use them ignores them.
+public protocol PhraseHintControl: AnyObject {
+    func setPhraseHints(_ phrases: [String])
 }
 
 /// Listens for the wake phrase in 16 kHz mono audio, and checks the voice.
@@ -35,6 +64,12 @@ public protocol WakeListener: AnyObject {
     var voiceThreshold: Double { get }
     /// Starts again with no audio, for example after a turn.
     func reset()
+    /// The near misses since the last call, or nil if there were none. Then it starts to count again.
+    func takeNearMisses() -> NearMisses?
+}
+
+public extension WakeListener {
+    func takeNearMisses() -> NearMisses? { nil }
 }
 
 /// A speech engine that can start the next turn further back than its usual 250 ms preroll (D-11).
@@ -135,6 +170,27 @@ public enum WakePhrase {
         let rest = tokens.dropFirst(best.end + 1).joined(separator: " ")
         return rest.trimmingCharacters(in: CharacterSet.punctuationCharacters.union(.whitespaces))
             .isEmpty ? "" : String(rest.drop(while: { $0.isPunctuation || $0.isWhitespace }))
+    }
+
+    /// A piece that starts less than this before the phrase end from the spotter stays as a command word.
+    /// The phrase end from the spotter tends to be late: the spotter marks a piece when it decides, and the speech
+    /// engine starts a little after the wake. So a word said right after the phrase can start before the estimate.
+    public static let cutMarginSeconds = 0.15
+
+    /// Removes the wake phrase by time (D-11): the first pieces that start before the end of the phrase, less a margin.
+    /// The start of a piece is its sure edge. An engine can let the end of a word run until the next word starts.
+    /// - Parameters:
+    ///   - words: the pieces of the transcript with their times, from the start of the turn.
+    ///   - phraseEnd: the end of the phrase, in seconds from the start of the turn (`WakeHit.phraseEndInTurn`).
+    /// - Returns: the text after the phrase. Nil if there are no times, or if no piece is before the phrase end.
+    ///   Then use `strip`, which matches the text.
+    public static func cut(_ words: [TimedWord], phraseEnd: Double, margin: Double = cutMarginSeconds) -> String? {
+        guard !words.isEmpty else { return nil }
+        let rest = words.drop(while: { $0.start < phraseEnd - margin })
+        guard rest.count < words.count else { return nil }
+        let text = rest.map(\.text).joined()
+        let clean = text.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
+        return String(clean.drop(while: { $0.isPunctuation || $0.isWhitespace }))
     }
 
     /// The Levenshtein distance of two short strings.

@@ -158,8 +158,24 @@ public struct Utterance: Sendable {
     public var engine: String
     /// From the end of speech (or key release) to the final text.
     public var ms: Double
+    /// The pieces of `text` with their audio times, if the engine gives them (Apple SpeechTranscriber). Else empty.
+    public var words: [TimedWord]
 
-    public init(text: String, engine: String, ms: Double) { self.text = text; self.engine = engine; self.ms = ms }
+    public init(text: String, engine: String, ms: Double, words: [TimedWord] = []) {
+        self.text = text; self.engine = engine; self.ms = ms; self.words = words
+    }
+}
+
+/// One piece of a transcript (about one word) with its audio time (D-11).
+/// The times are seconds from the start of the turn (`SpeechEngine.begin`). Audio from before the start
+/// (the preroll) has negative times.
+public struct TimedWord: Sendable, Equatable {
+    /// The text as the engine wrote it, with its spaces and punctuation. The pieces joined give the transcript.
+    public var text: String
+    public var start: Double
+    public var end: Double
+
+    public init(text: String, start: Double, end: Double) { self.text = text; self.start = start; self.end = end }
 }
 
 public struct ActionOutcome: Codable, Sendable {

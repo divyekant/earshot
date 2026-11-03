@@ -28,6 +28,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - A tab or window title with a word such as "transfer" no longer blocks a switch to that tab. Bookmarks and History menu items are no longer click targets (R-NV-5, R-MT-1).
 - A change in the Manage window to the wake phrase, the mode, the hold key or the speech engine now works at once. Before, it worked only after the next restart of earshot (R-ON-1, R-ON-4).
 - Always-on mode removes the wake phrase also when speech to text writes it as other words, for example "Here, at least" for "hey atlas". Before, the command failed (R-ON-1, D-11).
+- Always-on mode removes the wake phrase by its audio time with Apple speech, so a misheard form such as "Yeah, let's" for "hey atlas" no longer reaches the router. If you say the phrase again in the 5 s after a command, earshot now hears it. Apple speech gets the phrase as a hint. The log counts near misses of the phrase, with no audio and no text (R-ON-1, R-ON-3, R-MD-1, D-11).
 
 ## [0.1.0] - 2026-11-02
 
