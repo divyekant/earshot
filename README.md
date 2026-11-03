@@ -70,7 +70,14 @@ App support is data, not code. earshot reads the menus, sidebars and search resu
 
 If you have a code signing identity, the script uses it. If you do not have one, the script signs the app ad hoc. With an ad-hoc signature, macOS asks for the permissions again after each rebuild.
 
-To update the installed app to the latest `develop`, run `scripts/update-app.sh`. The script builds `origin/develop` in a separate worktree, runs the release tests, quits earshot, copies the new build over `app/build/Earshot.app` and opens it again. Your checkout does not change. `--no-test` skips the tests.
+To update the installed app to the latest `develop` with no clicks, run `scripts/update-app.sh`:
+
+1. The script builds `origin/develop` in a separate worktree (`~/Library/Caches/earshot/develop`). Your checkout does not change.
+2. It runs the release tests and checks the new build: the signature, the designated requirement, the icon, CTranscribe and the rpaths.
+3. It waits until earshot was idle for 2 minutes, then quits earshot.
+4. It keeps the old app in `app/build/old-<time>.zip`, copies the new build over `app/build/Earshot.app` and opens it again.
+
+If the new build does not start, the script puts back the old app. If the installed app is already on the `develop` commit, the script does nothing. `--dry-run` shows the steps and changes nothing. `--skip-tests`, `--now` (no idle wait) and `--force` (install again) change the steps. `EARSHOT_APP` sets another installed app. The log goes to `~/Library/Logs/earshot-mem/`.
 
 ## Set up
 
