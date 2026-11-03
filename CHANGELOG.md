@@ -24,6 +24,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 ### Fixed
 
 - After "type" or after typing, a long sentence that starts within the 5 s window now counts, even if it ends later. Before, a 10 s sentence after "type" was not typed (R-NV-4, R-ON-5, D-12).
+- "Yeah, actually let's send" now sends like "send", and "Here, let's open Slack" opens Slack by the rules. The router drops more spoken fillers at the start of a command ("actually", "just", "right", and "here" as the first word) (R-NV-5, R-SP-2).
 - With the Parakeet engine, earshot uses about 700 MB less memory. transcribe.cpp 0.4.1 maps the model file instead of a copy in app memory, so macOS can drop the pages under pressure, and Hex and earshot share them (R-MD-3, E2).
 - "Type <text> and send" no longer types the words "and send". The router removes a trailing send phrase from the text and tells the app with `sendAfter`. Only an explicit send can press Send (R-NV-5).
 - A bare command word such as "type" or "open" no longer presses a menu item that sounds like it. A bare "type" now tells the app that the next turn is the text. "Yeah, let's open the Slack" now opens Slack by the rules (R-NV-5, R-SP-2).
