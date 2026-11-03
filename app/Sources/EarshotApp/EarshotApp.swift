@@ -93,6 +93,12 @@ final class AppController: ObservableObject {
     }
 
     /// Plays the start sound, if "Play sounds" is on. It restarts the sound if it still plays.
+    /// The length of a system sound in seconds, or 0 for none. The always-on detector ignores the audio for that time.
+    nonisolated static func seconds(of sound: FeedbackSound?) -> Double {
+        guard let sound else { return 0 }
+        return NSSound(named: sound.systemName)?.duration ?? 0
+    }
+
     func playStartSound() {
         guard settings.playSounds, let s = startSound else { return }
         if s.isPlaying { s.stop() }
@@ -267,7 +273,9 @@ final class AppController: ObservableObject {
             pipeline.pendingWake = nil
             // Log the voice score of a dropped follow-up turn, for the voice threshold (no text).
             if why.hasPrefix(WakeTrigger.otherVoice) || why.hasPrefix(WakeTrigger.tooShort) {
-                pipeline.droppedFollowUp(why, seconds: (input?.alwaysOn as? WakeTrigger)?.lastFollowUpSeconds)
+                let trigger = input?.alwaysOn as? WakeTrigger
+                pipeline.droppedFollowUp(why, seconds: trigger?.lastFollowUpSeconds)
+                if pipeline.playSounds { trigger?.mute(seconds: Self.seconds(of: .failed)) }
             }
             Task { await pipeline.cancel() }
         }
@@ -277,14 +285,18 @@ final class AppController: ObservableObject {
             Task { @MainActor in
                 let record = await pipeline.finish(mode: mode)
                 // After an always-on command, the owner's voice can give the next one with no wake phrase.
-                if mode == .alwaysOn, !record.heard.isEmpty { input?.commandFinished(expectsText: pipeline.expectsText) }
+                if mode == .alwaysOn, !record.heard.isEmpty {
+                    input?.commandFinished(expectsText: pipeline.expectsText, soundSeconds: Self.seconds(of: pipeline.lastSound))
+                }
                 // A command can change which items are enabled ("Copy" after "select all"). Read again for the next one.
                 if let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier { menus.refresh(front) }
             }
         }
         if let trigger = input.alwaysOn as? WakeTrigger {
-            trigger.onWake = { [weak self] hit in
+            trigger.onWake = { [weak self, weak trigger] hit in
                 self?.playStartSound()
+                // The Tink must not count as the start or the end of the command after the phrase.
+                if self?.settings.playSounds == true { trigger?.mute(seconds: Self.seconds(of: .start)) }
                 // The speech engine must start at the phrase: the spotter fires after the phrase ends.
                 // A phrase in a follow-up turn comes when the engine runs already: no new preroll.
                 if hit.inTurnAfterSeconds == nil {
@@ -293,7 +305,10 @@ final class AppController: ObservableObject {
                 pipeline.pendingWake = hit
                 if self?.settings.showFeedback == true { feedback.show("Listening…", ok: true) }
             }
-            trigger.onRejected = { hit in pipeline.rejectedWake(hit, threshold: threshold) }
+            trigger.onRejected = { [weak trigger] hit in
+                pipeline.rejectedWake(hit, threshold: threshold)
+                if pipeline.playSounds { trigger?.mute(seconds: Self.seconds(of: .failed)) }
+            }
             trigger.onNearMisses = { misses in pipeline.nearMisses(misses) }
         }
         pipeline.pauseAlwaysOn = { [weak input] paused in

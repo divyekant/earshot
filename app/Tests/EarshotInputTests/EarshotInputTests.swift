@@ -582,6 +582,50 @@ final class WakeTriggerTests: XCTestCase {
         XCTAssertLessThan(short, 2.5, "the 700 ms pause ends a command turn: \(short) s")
     }
 
+    /// Live test: a result sound right after a command became a follow-up turn (dropped as another voice). The
+    /// detector ignores the sound, and the follow-up window starts when the sound ends.
+    func testResultSoundOpensNoFollowUpTurn() {
+        let listener = FakeListener()
+        listener.hitAfterSamples = 16000
+        let (t, mic, rec) = make(listener)
+        let first = rec.expect("stop", self)
+        mic.emit(quiet, ms: 1000)
+        mic.emit(speech, ms: 500)
+        mic.emit(quiet, ms: 700)
+        wait(for: [first], timeout: 2)
+        t.openFollowUp(afterSeconds: 0.8)
+        mic.emit(speech, ms: 700)   // the result sound, as loud as speech
+        mic.emit(quiet, ms: 300)
+        let second = rec.expect("stop", self, count: 2)
+        mic.emit(speech, ms: 1000)  // the owner's next command, in the window after the sound
+        mic.emit(quiet, ms: 700)
+        wait(for: [second], timeout: 3)
+        XCTAssertEqual(rec.log, ["wake", "start", "stop", "start", "stop"], "the sound opened no turn; the command did")
+        let seconds = t.lastFollowUpSeconds ?? 0
+        XCTAssertLessThan(seconds, 2.2, "the sound is not part of the follow-up turn: \(seconds) s")
+        t.stop()
+    }
+
+    func testMuteOpensNoTurnInTheWindow() {
+        let listener = FakeListener()
+        listener.hitAfterSamples = 16000
+        let (t, mic, rec) = make(listener)
+        let first = rec.expect("stop", self)
+        mic.emit(quiet, ms: 1000)
+        mic.emit(speech, ms: 500)
+        mic.emit(quiet, ms: 700)
+        wait(for: [first], timeout: 2)
+        t.openFollowUp()
+        t.mute(seconds: 1.0)
+        mic.emit(speech, ms: 900)
+        mic.emit(quiet, ms: 800)
+        let done = expectation(description: "audio fed")
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.3) { done.fulfill() }
+        wait(for: [done], timeout: 2)
+        XCTAssertEqual(rec.log, ["wake", "start", "stop"], "a muted sound opens no turn")
+        t.stop()
+    }
+
     func testNearMissesAreReported() {
         let listener = FakeListener()
         var config = WakeConfig()
