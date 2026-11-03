@@ -14,7 +14,8 @@ The page has no build step and no third-party requests. The fonts are in `fonts/
 | `motion.js` | Page motion: the headline entrance, section reveals, the privacy wave that goes flat as you scroll, and phrases that retype on hover. It does nothing if the reader asks for reduced motion. |
 | `field.js` | The animated background: a dot field with waves that move out from the headline and the pointer, like sound. It pauses when the tab is hidden. With reduced motion, the dots are still. |
 | `fonts/` | Schibsted Grotesk (variable) and JetBrains Mono, as WOFF2 files, with their SIL Open Font License 1.1 texts. |
-| `assets/` | Copies of `mark.svg` and `mark.png` from `assets/brand/` for the browser icon, and `og.png` (1200 × 630) for link previews. |
+| `assets/` | `ear.svg` and `ear.png`: the ear logo, drawn to match the menu bar icon of the app. `og.png` (1200 × 630) for link previews. |
+| `clips/` | One short muted loop for each example group (`.mp4`, H.264) and a poster image (`.jpg`). The clips are cut from a recording of the hero film. |
 
 The page draws the one-color mark from `assets/brand/glyph.svg` inline. If the brand files change, update `site/` in the same pull request.
 

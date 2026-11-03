@@ -76,7 +76,7 @@ code { font-size: 0.86em; }
 @media (max-width: 860px) { .menubar nav { display: none; } .menubar-gh { margin-left: auto; } }
 
 .wordmark { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; font-weight: 700; letter-spacing: -0.02em; font-size: 17px; }
-.glyph { width: 18px; height: 17px; fill: currentColor; }
+.glyph { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; }
 
 /* Buttons: keys with a short travel. */
 .actions { display: flex; gap: 12px; flex-wrap: wrap; }
@@ -141,9 +141,9 @@ h1 { font-size: clamp(3rem, 7.6vw, 6.25rem); line-height: 0.94; letter-spacing: 
 .mbar-item { color: var(--ink); padding: 2px 8px; margin: 0 -8px; border-radius: 5px; }
 .mbar-item.open { background: var(--ink); color: var(--paper); }
 .mbar-right { margin-left: auto; display: flex; gap: 16px; align-items: center; color: var(--ink-2); }
-.mbar-glyph { width: 15px; height: 14px; fill: var(--ink); transition: transform 200ms var(--ease); }
+.mbar-glyph { width: 16px; height: 16px; fill: none; stroke: var(--ink); stroke-width: 2.2; stroke-linecap: round; transition: transform 200ms var(--ease); }
 .mbar-glyph.live { animation: live 0.8s ease-in-out infinite; }
-@keyframes live { 50% { transform: scaleY(0.6); } }
+@keyframes live { 50% { transform: scale(1.18); } }
 .menu { position: absolute; top: 28px; left: 112px; width: 200px; padding: 6px; background: var(--white); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 18px 36px -12px rgba(0, 0, 0, 0.8); display: grid; opacity: 0; transform: translateY(-6px) scale(0.98); transform-origin: top left; transition: opacity 160ms ease-out, transform 220ms var(--ease); pointer-events: none; }
 .menu.open { opacity: 1; transform: none; }
 .menu span { padding: 5px 10px; border-radius: 6px; }
@@ -237,7 +237,7 @@ h1 { font-size: clamp(3rem, 7.6vw, 6.25rem); line-height: 0.94; letter-spacing: 
 @keyframes ripple { from { opacity: 0.9; transform: scale(0.4); } to { opacity: 0; transform: scale(3.6); } }
 .note { position: absolute; right: 18px; top: 42px; z-index: 9; display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-radius: 12px; background: rgba(242, 242, 238, 0.96); color: var(--paper); font-size: 14.5px; box-shadow: 0 16px 30px -14px rgba(0, 0, 0, 0.8); opacity: 0; transform: translateY(-8px); transition: opacity 240ms, transform 420ms var(--ease); }
 .note.show { opacity: 1; transform: none; }
-.note-glyph { width: 14px; height: 13px; fill: var(--paper); }
+.note-glyph { width: 16px; height: 16px; fill: none; stroke: var(--paper); stroke-width: 2.3; stroke-linecap: round; }
 
 .film-cap { margin-top: 14px; font-size: 14px; color: var(--ink-2); }
 
@@ -256,7 +256,6 @@ section h2 { font-size: clamp(2.1rem, 4.8vw, 3.8rem); line-height: 1.0; letter-s
 
 .scenes { margin-top: clamp(32px, 4vw, 56px); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 48px 64px; }
 @media (max-width: 860px) { .scenes { grid-template-columns: 1fr; } }
-.scene h3 { font-size: 15px; font-weight: 600; color: var(--ink-2); margin-bottom: 6px; }
 .phrases { list-style: none; margin: 0; padding: 0; display: grid; gap: 22px; }
 .phrases li { padding: 0; }
 .phrases q { display: block; quotes: "“" "”"; font-size: clamp(1.3rem, 2.1vw, 1.7rem); font-weight: 600; letter-spacing: -0.025em; line-height: 1.2; margin-bottom: 4px; }
@@ -375,3 +374,13 @@ h2[data-reveal] { transition: clip-path 1000ms var(--ease); clip-path: inset(0 0
 .field { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }
 .win { border-color: transparent; }
 .screen { border-color: rgba(255, 255, 255, 0.06); }
+
+/* What to say: one clip and its phrases on each row. */
+.uses { margin-top: clamp(40px, 5vw, 72px); display: grid; gap: clamp(64px, 8vw, 120px); }
+.use { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: clamp(28px, 4vw, 64px); align-items: center; }
+.use:nth-child(even) { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); }
+.use:nth-child(even) .clip { order: 2; }
+.use > * { min-width: 0; }
+.clip { display: block; width: 100%; max-width: 100%; aspect-ratio: 1183 / 790; border-radius: 16px; background: var(--paper-2); box-shadow: 0 40px 80px -40px rgba(0, 0, 0, 0.9); }
+.use h3 { font-size: clamp(24px, 2.6vw, 34px); letter-spacing: -0.03em; line-height: 1.08; margin-bottom: 24px; }
+@media (max-width: 860px) { .use, .use:nth-child(even) { grid-template-columns: 1fr; } .use:nth-child(even) .clip { order: 0; } }

@@ -21,8 +21,8 @@
   }
 
   // 2. Reveals: only for elements below the first screen at load.
-  var revealSel = "section h2, .section-lede, .race, .table-wrap, .warning, .term, .start-grid > div:first-child";
-  var staggerSel = ".shifts, .scenes, .facts, .rules, .needs";
+  var revealSel = "section h2, .section-lede, .race, .table-wrap, .warning, .term, .start-grid > div:first-child, .clip, .use h3";
+  var staggerSel = ".shifts, .phrases, .facts, .rules, .needs";
   var marks = [];
   Array.prototype.forEach.call(document.querySelectorAll(revealSel), function (el) {
     if (el.closest(".hero")) return; el.setAttribute("data-reveal", ""); marks.push(el);
@@ -87,7 +87,20 @@
     }).observe(cv);
   }
 
-  // 4. Phrases: point at a phrase and it is "said" again.
+  // 4. Clips play only while they are on screen.
+  var clips = document.querySelectorAll("video.clip");
+  if (window.IntersectionObserver) {
+    var vo = new IntersectionObserver(function (es) {
+      es.forEach(function (e) {
+        var v = e.target;
+        if (e.isIntersecting) { v.preload = "auto"; var p = v.play(); if (p && p.catch) p.catch(function () {}); }
+        else v.pause();
+      });
+    }, { threshold: 0.35 });
+    Array.prototype.forEach.call(clips, function (v) { vo.observe(v); });
+  }
+
+  // 5. Phrases: point at a phrase and it is "said" again.
   Array.prototype.forEach.call(document.querySelectorAll(".phrases li"), function (li) {
     var q = li.querySelector("q"); if (!q) return;
     var full = q.textContent, timer = null;

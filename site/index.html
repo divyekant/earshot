@@ -12,9 +12,9 @@
 <meta property="og:url" content="https://earshot.divyekant.com/">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="icon" type="image/svg+xml" href="assets/mark.svg">
-<link rel="icon" type="image/png" href="assets/mark.png">
-<link rel="apple-touch-icon" href="assets/mark.png">
+<link rel="icon" type="image/svg+xml" href="assets/ear.svg">
+<link rel="icon" type="image/png" href="assets/ear.png">
+<link rel="apple-touch-icon" href="assets/ear.png">
 <link rel="preload" href="fonts/schibsted-grotesk-wght.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="style.css">
 </head>
@@ -23,12 +23,9 @@
 <canvas class="field" id="field" aria-hidden="true"></canvas>
 
 <svg class="sprite" aria-hidden="true">
-  <symbol id="glyph" viewBox="276 286 472 452">
-    <rect x="276" y="437" width="70" height="150" rx="35"/>
-    <rect x="384" y="367" width="70" height="290" rx="35"/>
-    <rect x="492" y="307" width="70" height="410" rx="35"/>
-    <rect x="600" y="387" width="70" height="250" rx="35"/>
-    <rect x="708" y="286" width="40" height="452" rx="20"/>
+  <symbol id="glyph" viewBox="0 0 24 24">
+    <path d="M6.5 9.6C6.5 5.9 9.3 3 12.9 3C16.6 3 19.4 5.9 19.4 9.5C19.4 12.3 17.9 13.7 16.5 15C15.3 16.1 14.7 16.9 14.5 18.5C14.2 20.5 12.8 21.6 11.1 21.6C9.6 21.6 8.4 20.7 7.9 19.3"/>
+    <path d="M9.9 9.7C9.9 7.8 11.3 6.3 13 6.3C14.8 6.3 16.1 7.7 16.1 9.4C16.1 10.7 15.3 11.4 14.4 11.8C13.4 12.2 12.9 13 12.9 14"/>
   </symbol>
 </svg>
 
@@ -206,40 +203,69 @@
 <section id="say" class="say" aria-labelledby="say-title">
   <div class="wrap">
     <h2 id="say-title">What to say</h2>
-    <div class="scenes">
-      <div class="scene">
-        <h3>Messages</h3>
-        <ul class="phrases">
-          <li><q>Slack Ravi, running late</q><span>Opens the chat with Ravi and types the message. It does not send.</span></li>
-          <li><q>WhatsApp Mom</q><span>Opens the chat and puts the cursor in the box. Then you talk.</span></li>
-          <li><q>Send</q><span>Sends what earshot just typed. Only when you say it.</span></li>
-        </ul>
-      </div>
-      <div class="scene">
-        <h3>The web</h3>
-        <ul class="phrases">
-          <li><q>Open hn.com</q><span>Opens the address in your browser.</span></li>
-          <li><q>Search for flights to Lisbon</q><span>Types into the search field of the page.</span></li>
-          <li><q>Open the second result</q><span>Clicks the second result on the page.</span></li>
-          <li><q>Scroll down</q> <span>Also “go to the top” and “go back”.</span></li>
-        </ul>
-      </div>
-      <div class="scene">
-        <h3>Any app</h3>
-        <ul class="phrases">
-          <li><q>Open Zoom</q><span>Opens or brings up any app that you approved.</span></li>
-          <li><q>Select all</q><span>Presses the item in the app’s Edit menu.</span></li>
-          <li><q>Click Share</q><span>Clicks the button with that label in the front window.</span></li>
-          <li><q>Show numbers</q><span>Numbers every item you can click. Then say “click 7”.</span></li>
-        </ul>
-      </div>
-      <div class="scene">
-        <h3>Writing</h3>
-        <ul class="phrases">
-          <li><q>Hi Sam, the deck is ready</q><span>With the key held, plain words go into the focused text field.</span></li>
-          <li><q>Type</q><span>The next sentence, with pauses, goes into the field as text, also in always-on mode.</span></li>
-        </ul>
-      </div>
+    <p class="section-lede">Short, plain commands. Each clip shows earshot doing one of them.</p>
+
+    <div class="uses">
+      <article class="use">
+        <video class="clip" src="clips/chat.mp4" poster="clips/chat.jpg" muted loop playsinline preload="none" aria-label="Clip: Slack Ravi, running late, then send."></video>
+        <div class="use-text">
+          <h3>Message anyone, in any chat app</h3>
+          <ul class="phrases">
+            <li><q>Slack Ravi, running late</q><span>Opens the chat with Ravi and types the message. It does not send.</span></li>
+            <li><q>WhatsApp Mom</q><span>Opens the chat and puts the cursor in the box. Then you talk.</span></li>
+            <li><q>iMessage Sam, landed safely</q><span>The same command works in Messages.</span></li>
+            <li><q>Send</q><span>Sends what earshot just typed, only because you said it.</span></li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="use">
+        <video class="clip" src="clips/web.mp4" poster="clips/web.jpg" muted loop playsinline preload="none" aria-label="Clip: search for trains to Lisbon, then open the second result."></video>
+        <div class="use-text">
+          <h3>Use the web without the mouse</h3>
+          <ul class="phrases">
+            <li><q>Open hn.com</q><span>Opens the address in your browser.</span></li>
+            <li><q>Search for trains to Lisbon</q><span>Types into the search field of the page.</span></li>
+            <li><q>Open the second result</q><span>Clicks the result by its position.</span></li>
+            <li><q>Click Pull requests</q><span>Clicks the link by its label, even if you say it a little wrong.</span></li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="use">
+        <video class="clip" src="clips/menu.mp4" poster="clips/menu.jpg" muted loop playsinline preload="none" aria-label="Clip: select all in Notes, through the Edit menu."></video>
+        <div class="use-text">
+          <h3>Say any menu item, in any app</h3>
+          <ul class="phrases">
+            <li><q>Select all</q><span>Finds Select All in the Edit menu and presses it.</span></li>
+            <li><q>Export as PDF</q><span>Works for the items in the app’s own menus.</span></li>
+            <li><q>Open Zoom</q><span>Opens or brings up any app that you approved.</span></li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="use">
+        <video class="clip" src="clips/numbers.mp4" poster="clips/numbers.jpg" muted loop playsinline preload="none" aria-label="Clip: show numbers, then click 7."></video>
+        <div class="use-text">
+          <h3>Click things that have no name</h3>
+          <ul class="phrases">
+            <li><q>Show numbers</q><span>Puts a number on each item that you can click.</span></li>
+            <li><q>Click 7</q><span>Clicks item 7.</span></li>
+            <li><q>Click Share</q><span>Or name the button, if it has a label.</span></li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="use">
+        <video class="clip" src="clips/dictate.mp4" poster="clips/dictate.jpg" muted loop playsinline preload="none" aria-label="Clip: dictation into a new mail."></video>
+        <div class="use-text">
+          <h3>Write by talking</h3>
+          <ul class="phrases">
+            <li><q>Hi Sam, the deck is ready</q><span>Hold the key and talk. Plain words go into the text field that has the focus.</span></li>
+            <li><q>Type</q><span>Then say a long sentence, with pauses. earshot waits and types all of it, also in always-on mode.</span></li>
+          </ul>
+        </div>
+      </article>
     </div>
   </div>
 </section>
