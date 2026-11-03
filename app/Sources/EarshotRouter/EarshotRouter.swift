@@ -98,6 +98,12 @@ public struct CommandRouter: Router {
         sentences(text).contains { isCommandSentence($0, apps: context.apps) }
     }
 
+    /// True if the FIRST sentence is a command. Dictation after "type" uses it: a command word later in the text,
+    /// for example an app name, is text (live test: a dictated sentence that named "earshot" opened a Slack channel).
+    public static func startsWithCommand(_ text: String, context: RouteContext) -> Bool {
+        sentences(text).first.map { isCommandSentence($0, apps: context.apps) } ?? false
+    }
+
     /// The sentences of the words, split after ".", "!", "?" or "…" and a space.
     static func sentences(_ text: String) -> [Substring] {
         var out: [Substring] = []
