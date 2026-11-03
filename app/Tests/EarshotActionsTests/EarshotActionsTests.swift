@@ -274,12 +274,21 @@ final class ActionRunnerTests: XCTestCase {
         var shown: Bool { Clock.ms(since: t0) >= fieldShowsAtMs }
         /// The number of focus checks after the field showed.
         var pollsAfterShown = 0
+        /// The number of focus checks after the first set-focus call.
+        var pollsAfterSet = 0
+        /// The number of scans that found the field.
+        var scansFound = 0
         func focused() -> (String?, Bool, Bool) {
             if shown { pollsAfterShown += 1 }
+            if focusSets > 0 { pollsAfterSet += 1 }
             if shown && (takesFocusOnItsOwn || focusedField) { return ("to-field", true, false) }
             return ("message-box", false, true)  // the focus stays in the message box of the open chat
         }
-        func newField() -> String? { shown ? "to-field" : nil }
+        func newField() -> String? {
+            guard shown else { return nil }
+            scansFound += 1
+            return "to-field"
+        }
         func setFocus(_ f: String) { focusSets += 1; if acceptsAXFocus { focusedField = true } }
     }
 
@@ -296,10 +305,19 @@ final class ActionRunnerTests: XCTestCase {
         let runner = EarshotActionRunner(store: nil)
         let fake = FakeSwitcher(showsAt: 200, ownFocus: false, acceptsAX: true)
         let (field, _, stats) = await runner.waitForSwitcherField(scanDelayMs: 0, focused: fake.focused, newField: fake.newField, setFocus: fake.setFocus)
+        let ms = Clock.ms(since: fake.t0)
+        print("EARSHOT_BENCH fake switcher AX focus: \(ms) ms (field at 200 ms), \(stats.polls) polls")
         XCTAssertEqual(field, "to-field")
-        XCTAssertGreaterThanOrEqual(fake.focusSets, 1)
         XCTAssertTrue(stats.setFocus)
-        XCTAssertLessThan(Clock.ms(since: fake.t0), 330)
+        // The behaviour: the first scan that finds the field sets the focus once.
+        XCTAssertEqual(fake.scansFound, 1)
+        XCTAssertEqual(fake.focusSets, 1)
+        // The focus check right after the set ends the wait. No sleep, no second set.
+        XCTAssertEqual(fake.pollsAfterSet, 1)
+        // The field showed, then at most one scan interval of polls ran before the scan found it.
+        XCTAssertLessThanOrEqual(fake.pollsAfterShown, 2 + SwitcherTiming.scanMs / SwitcherTiming.pollMs)
+        // A wall-time bound with margin for a busy CI runner. The checks above carry the exact behaviour.
+        XCTAssertLessThan(ms, 200 + Double(SwitcherTiming.scanMs) + 200)
     }
 
     func testFocusStaysInMessageBoxTypesNothing() async {
