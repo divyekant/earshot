@@ -68,6 +68,10 @@ final class AppController: ObservableObject {
     private var wakeState = "The wake phrase models load when you turn on always-on mode."
     /// The download part, 0 to 1, while the models download.
     private let wakeProgress = Counter()
+    /// The microphone of the running wake listener: its voice profile is the profile of this microphone (E6).
+    private var listenerMic: InputDevice?
+    /// Starts always-on again with the right voice profile when the default microphone changes.
+    private var micWatcher: InputDeviceWatcher?
     /// Reads the name cache at start and every 8 minutes (NameIndex.maxAge is 10 minutes). Read only.
     private var warmer: NameWarmer?
     /// The menu items of the front app. Read when an app comes to the front and after each command, never in a command.
@@ -263,24 +267,23 @@ final class AppController: ObservableObject {
         let listener = makeWakeListener()
         let input = InputTriggers.make(settings, wake: listener)
         let pipeline = self.pipeline, menus = self.menus, feedback = self.feedback
-        let threshold = settings.voiceThreshold
+        let gate = settings.voiceGate
         input.onStart = { [weak self, weak input] in
             // The start sound first, before any other work (hold key; a wake plays it in onWake).
             if input?.current == .hold { self?.playStartSound() }
             if let problem = pipeline.begin() { self?.feedback.show(problem, ok: false) }
         }
-        input.onCancel = { [weak input] why in
-            pipeline.pendingWake = nil
-            // Log the voice score of a dropped follow-up turn, for the voice threshold (no text).
+        input.onCancel = { why in
+            // Log the voice score of a turn that the voice check dropped, for the limits (no text).
             if why.hasPrefix(WakeTrigger.otherVoice) || why.hasPrefix(WakeTrigger.tooShort) {
-                let trigger = input?.alwaysOn as? WakeTrigger
-                pipeline.droppedFollowUp(why, seconds: trigger?.lastFollowUpSeconds)
+                pipeline.droppedTurn(why)
             }
+            pipeline.pendingWake = nil
+            pipeline.turnVoice = nil
             Task { await pipeline.cancel() }
         }
         input.onStop = { [weak input] in
             let mode = input?.current ?? .hold
-            pipeline.followUpVoiceScore = (input?.alwaysOn as? WakeTrigger)?.lastFollowUpVoiceScore
             Task { @MainActor in
                 let record = await pipeline.finish(mode: mode)
                 // After an always-on command, the owner's voice can give the next one with no wake phrase.
@@ -304,7 +307,8 @@ final class AppController: ObservableObject {
                 pipeline.pendingWake = hit
                 if self?.settings.showFeedback == true { feedback.show("Listening…", ok: true) }
             }
-            trigger.onRejected = { hit in pipeline.rejectedWake(hit, threshold: threshold) }
+            trigger.onRejected = { hit in pipeline.rejectedWake(hit, threshold: gate) }
+            trigger.onTurnVoice = { voice in pipeline.turnVoice = voice }
             trigger.onNearMisses = { misses in pipeline.nearMisses(misses) }
             trigger.onTurnCheck = { check in pipeline.turnCheck(check) }
         }
@@ -324,9 +328,18 @@ final class AppController: ObservableObject {
     private func makeWakeListener() -> WakeListener? {
         guard settings.mode == .alwaysOn else { return nil }
         guard let wake else { loadWakeModels(); return nil }
+        watchMicrophone()
+        let mic = InputDevice.current
+        listenerMic = mic
+        let book = store.voiceBook
+        let profile = book.profile(forMic: mic?.id)
+        if let profile, let mic, !book.hasProfile(forMic: mic.id) {
+            NSLog("earshot wake: no voice profile for the microphone \"%@\"; the profile of \"%@\" is used",
+                  mic.name, profile.micName ?? "an unknown microphone")
+        }
         do {
-            return try wake.listener(phrase: settings.wakePhrase, profile: store.voiceProfile,
-                                     voiceThreshold: settings.voiceThreshold)
+            // The phrase alone only has to pass the gate. The voice of the whole turn decides at its end (E6).
+            return try wake.listener(phrase: settings.wakePhrase, profile: profile, voiceThreshold: settings.voiceGate)
         } catch {
             wakeState = "The wake phrase did not start: \(error.localizedDescription)"
             status = wakeState
@@ -368,13 +381,38 @@ final class AppController: ObservableObject {
         }
     }
 
+    /// Starts the watch of the default microphone, one time.
+    private func watchMicrophone() {
+        guard micWatcher == nil else { return }
+        micWatcher = InputDeviceWatcher { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, self.settings.mode == .alwaysOn, self.input != nil else { return }
+                let mic = InputDevice.current
+                guard mic?.id != self.listenerMic?.id else { return }
+                NSLog("earshot wake: the microphone is now \"%@\": always-on starts again with its voice profile",
+                      mic?.name ?? "none")
+                self.startInput()
+            }
+        }
+    }
+
     /// One line for the management window: the models and the owner's voice.
     private func voiceStatus() -> String {
         var line = wakeLoad != nil && !WakeModels.isDownloaded(store: store.folder)
             ? "Downloading the wake phrase models: \(wakeProgress.value) %." : wakeState
-        if let profile = store.voiceProfile {
+        let mic = InputDevice.current
+        let book = store.voiceBook
+        if let profile = book.profile(forMic: mic?.id) {
             let date = profile.createdAt.formatted(date: .abbreviated, time: .omitted)
-            line += " Your voice: taught on \(date), \(profile.samples) phrases."
+            line += " Your voice: taught on \(date), \(profile.samples) phrases"
+            line += profile.micName.map { " with \"\($0)\"." } ?? "."
+            if let mic, !book.hasProfile(forMic: mic.id) {
+                line += " The microphone now is \"\(mic.name)\". Teach earshot again with it: the voice check is surer"
+                    + " on the microphone of the teach step."
+            }
+            if book.profiles.count > 1 {
+                line += " earshot keeps \(book.profiles.count) voice profiles, one for each microphone."
+            }
             if !profile.matches(phrase: settings.wakePhrase) {
                 line += " You taught it with \"\(profile.phrase)\". Teach it again with the new phrase for the best match."
             } else if profile.templates(for: settings.wakePhrase).count < 3 {
@@ -396,11 +434,17 @@ final class AppController: ObservableObject {
     /// Makes and saves the voice profile, then starts always-on again with it.
     private func teachVoice(phrase: String, clips: [[Float]]) async throws -> String {
         guard let wake else { throw WakeError("The wake phrase models are not ready yet. Turn on always-on mode and wait.") }
+        let mic = InputDevice.current
         let enrolment = try await Task.detached(priority: .userInitiated) { try wake.enrol(phrase: phrase, clips: clips) }.value
-        try store.saveVoiceProfile(enrolment.profile)
-        let scores = enrolment.takeScores.map { String(format: "%.2f", $0) }.joined(separator: ", ")
-        NSLog("earshot wake: enrolment for \"%@\": %ld of %ld phrases give a template, take scores %@", phrase,
-              enrolment.templatesKept, enrolment.takeScores.count, scores)
+        // The profile belongs to the microphone of the teach step. It replaces only the profile of that microphone.
+        var profile = enrolment.profile
+        profile.micID = mic?.id
+        profile.micName = mic?.name
+        try store.saveVoiceProfile(profile)
+        let record = pipeline.voiceTaught(phrase: phrase, mic: mic?.name, takeScores: enrolment.takeScores,
+                                          templatesKept: enrolment.templatesKept, selfScore: profile.selfScore,
+                                          profiles: store.voiceBook.profiles.count)
+        NSLog("earshot wake: %@", record.note)
         if settings.mode == .alwaysOn { startInput() }
         return enrolment.summary
     }

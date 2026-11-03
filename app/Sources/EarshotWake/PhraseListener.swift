@@ -147,6 +147,11 @@ final class PhraseListener: WakeListener {
 
     func turnScore(_ samples: [Float]) -> Double? { models.turnScore(samples) }
 
+    func voiceCheck(_ samples: [Float]) -> (score: Double, seconds: Double)? {
+        guard let profile else { return nil }
+        return try? models.voiceCheck(samples, profile: profile)
+    }
+
     func reset() {
         ring.removeAll(keepingCapacity: true)
         ringStart = 0

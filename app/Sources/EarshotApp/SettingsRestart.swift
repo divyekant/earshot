@@ -24,7 +24,8 @@ struct SettingsRestart: OptionSet, Equatable {
         }
         if new.mode != old.mode || new.holdKeyCode != old.holdKeyCode || new.holdKeyIsModifierOnly != old.holdKeyIsModifierOnly
             || new.holdKeyModifiers != old.holdKeyModifiers || new.wakePhrase != old.wakePhrase
-            || new.voiceThreshold != old.voiceThreshold {
+            || new.voiceThreshold != old.voiceThreshold || new.voiceGate != old.voiceGate
+            || new.turnVoiceThreshold != old.turnVoiceThreshold {
             parts.insert(.input)
         }
         return parts
