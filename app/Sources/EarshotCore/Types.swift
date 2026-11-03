@@ -131,11 +131,14 @@ public struct RouteResult: Sendable {
     /// True only for a bare "type" with no text (intent .none). The app can then type the next turn
     /// into the focused text field. Nothing else sets it.
     public var awaitsText: Bool
+    /// True only if the owner said a send phrase after the text ("type see you soon and send"). The router removes
+    /// the phrase from the text. The app decides if it presses Send. Only `.send` and this flag can lead to a send (R-NV-5).
+    public var sendAfter: Bool
 
     public init(intent: Intent, confidence: Double, tier: RouterTier, ms: Double, why: String = "", alternatives: [Intent] = [],
-                awaitsText: Bool = false) {
+                awaitsText: Bool = false, sendAfter: Bool = false) {
         self.intent = intent; self.confidence = confidence; self.tier = tier; self.ms = ms
-        self.why = why; self.alternatives = alternatives; self.awaitsText = awaitsText
+        self.why = why; self.alternatives = alternatives; self.awaitsText = awaitsText; self.sendAfter = sendAfter
     }
 }
 

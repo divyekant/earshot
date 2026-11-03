@@ -21,6 +21,8 @@ struct RulesDecision {
     var heardApp: String?
     /// True only for a bare "type" (RouteResult.awaitsText).
     var awaitsText = false
+    /// True only if a trailing send phrase was removed from the text of the intent (RouteResult.sendAfter).
+    var sendAfter = false
 }
 
 /// Opens a chat or an app. Ported from probe E1Router (E1, section 6). It knows no app and no person in advance.
