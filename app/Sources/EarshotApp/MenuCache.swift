@@ -11,13 +11,20 @@ import Foundation
 /// starts, the command acts on that app (live test: "type …" with the Manage window in front).
 final class FrontTracker: @unchecked Sendable {
     let own: String?
+    /// The bundle id of the front app. The tests give a fixed one, so that they do not depend on the real front app.
+    private let frontBundleID: () -> String?
     private let lock = NSLock()
     private var last: NSRunningApplication?
 
-    init(own: String?, current: NSRunningApplication? = NSWorkspace.shared.frontmostApplication) {
+    init(own: String?, current: NSRunningApplication? = NSWorkspace.shared.frontmostApplication,
+         frontBundleID: @escaping () -> String? = { NSWorkspace.shared.frontmostApplication?.bundleIdentifier }) {
         self.own = own
+        self.frontBundleID = frontBundleID
         if let current { activated(current) }
     }
+
+    /// The bundle id of the last other app, for the tests.
+    var lastBundleID: String? { lock.withLock { last?.bundleIdentifier } }
 
     /// Called on NSWorkspace.didActivateApplication.
     func activated(_ app: NSRunningApplication) {
@@ -29,7 +36,7 @@ final class FrontTracker: @unchecked Sendable {
     /// Returns the time in ms, or nil if earshot was not in front. With no other app, earshot stays in front,
     /// and the pipeline then ignores earshot's own window.
     func restore(waitMs: Double = 500) async -> Double? {
-        guard let own, NSWorkspace.shared.frontmostApplication?.bundleIdentifier == own else { return nil }
+        guard let own, frontBundleID() == own else { return nil }
         let clock = Stopwatch()
         guard let app = lock.withLock({ last }), !app.isTerminated else { return clock.ms }
         app.activate()
