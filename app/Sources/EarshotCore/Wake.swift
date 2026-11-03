@@ -116,13 +116,21 @@ public struct TurnCheck: Sendable, Equatable {
     }
 }
 
-/// A speech engine that can start the next turn further back than its usual 250 ms preroll (D-11).
+/// A speech engine that can start the next turn further back than its usual 450 ms preroll (D-11).
 /// The wake phrase fires about 0.3 to 0.5 s after the phrase ends, so the engine must reach back to the start of
 /// the phrase. Else it loses the first words of the command.
 public protocol PrerollControl: AnyObject {
     /// The next `begin` gives the engine this much audio from before it, up to the audio that the engine keeps
     /// (3 s). Later turns use the usual preroll again.
     func setNextPreroll(seconds: Double)
+}
+
+/// A speech engine that can change the real audio it still records after the end of the next turn
+/// (`TailPad.captureSeconds`, 200 ms for the hold key). An always-on turn ends after a pause that the detector
+/// already heard, so it needs no more audio: the pipeline sets 0 and saves the wait (R-ON-1, R-SP-1).
+public protocol CaptureControl: AnyObject {
+    /// The next `end` waits this long for audio, then adds the tail silence. Later turns use the usual value again.
+    func setNextCapture(seconds: Double)
 }
 
 /// The sound pattern of one teach take: the encoder frames of the spotter model for the spoken part of the phrase

@@ -133,6 +133,7 @@ E2 (section 6.2) chose Parakeet by a small margin: 1 command in 126, on `say` vo
 - macOS moved the 890 MB of Parakeet weights out of memory between commands (the app's resident memory fell from 746 MB to about 100 MB). Each decode then read them back from swap.
 - So "auto" uses Apple and does not load Parakeet. The setting "Parakeet" uses Parakeet for a command only when a warm-up run at the key press shows that the weights are in memory and the memory pressure is normal. Else Apple makes the text, so Parakeet never makes the owner wait.
 - Each command logs the engine and the reason (`SpeechTiming.why`) and the stages `speech.tail`, `speech.wait` and `speech.decode`.
+- Edges of a hold-key turn (Hex study, I-1): the engine gets 450 ms of audio from before the key press, and records 200 ms more real audio after the release, then adds 300 ms of silence. Hex measured 10 of 10 last words kept with 0 to 200 ms after the release, and 7 of 10 with 100 ms less. The 200 ms wait is in `speech.tail`. An always-on turn ends on a pause that the detector heard, so it waits 0 ms (`CaptureControl`).
 
 Both engines miss the same names, so the router must also match names by sound.
 
