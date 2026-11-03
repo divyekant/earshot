@@ -1,0 +1,17 @@
+[project]
+name = "wakebench"
+version = "0.1.0"
+description = "earshot E5 wake bench: audio templates against the keyword spotter"
+requires-python = ">=3.12"
+dependencies = [
+    "kaldi-native-fbank>=1.22.5",
+    "numba>=0.68.1",
+    "numpy>=2.5.4",
+    "onnx>=1.23.2",
+    "onnxruntime>=1.31.1",
+    "piper-tts>=1.8.0",
+    "scipy>=1.18.1",
+    "sentencepiece>=0.2.2",
+    "sherpa-onnx>=2.0.1",
+    "soundfile>=0.14.0",
+]

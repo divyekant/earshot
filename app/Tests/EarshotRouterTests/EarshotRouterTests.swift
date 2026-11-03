@@ -797,8 +797,8 @@ final class EarshotRouterTests: XCTestCase {
         let into = await route("type see you soon into steer this thread and send", boxes(focused: nil))
         XCTAssertEqual(into.intent, .typeInto(elementID: "e2", text: "see you soon"), into.why)
         XCTAssertTrue(into.sendAfter)
-        let chat = await route("message Francis see you soon and send")
-        XCTAssertEqual(chat.intent, .openChat(appID: "messages", target: "Francis", text: "see you soon"), chat.why)
+        let chat = await route("message Felix see you soon and send")
+        XCTAssertEqual(chat.intent, .openChat(appID: "messages", target: "Felix", text: "see you soon"), chat.why)
         XCTAssertTrue(chat.sendAfter)
         // Not a send phrase: a word such as "sender", or "send" inside the text.
         for (said, text) in [("type a note for the sender", "a note for the sender"), ("type I will send it", "I will send it")] {
