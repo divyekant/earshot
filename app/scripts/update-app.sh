@@ -103,7 +103,7 @@ if [ "$dry" = 1 ]; then
     plan "check out ${new:0:7} in $tree"
     if [ "$tests" = 1 ]; then plan "run: nice -n 10 swift test -c release -Xswiftc -enable-testing"; fi
     plan "build $staging with build-app.sh, then check the signature, the designated requirement, AppIcon, CTranscribe and the rpaths"
-    if [ "$wait_idle" = 1 ]; then plan "wait until $activity is 2 minutes old (at most 10 minutes)"; fi
+    if [ "$wait_idle" = 1 ]; then plan "wait until the last turn in $activity is 2 minutes old (at most 10 minutes)"; fi
     if running; then plan "quit earshot (pid $(pids | paste -sd' ' -))"; fi
     plan "zip $app to $builds/old-<time>.zip and keep the newest 3 zips"
     plan "copy the staging build into $app, unregister the staging copy, and open $app"
@@ -148,12 +148,19 @@ bundle_id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$staging/Co
 log "Checks passed: signature, designated requirement, AppIcon, CTranscribe $want, rpaths"
 
 # 5. Idle guard: do not quit in the middle of a turn or a test.
+# Only a real turn counts: a record with a speech stage. In always-on mode, room sounds that the voice check
+# rejects also write records, every few seconds, and must not keep the update waiting.
+last_turn_age() {
+    local at
+    at="$(tail -n 500 "$activity" | { grep -E '"speech(\.[a-z]+)?":' || true; } | tail -1 | sed -E 's/.*"at":([0-9]+).*/\1/')"
+    if [ -z "$at" ]; then echo 99999; else echo $(( $(date +%s) - at - 978307200 )); fi
+}
 if [ "$wait_idle" = 1 ] && running && [ -f "$activity" ]; then
     for i in $(seq 0 60); do
-        age=$(( $(date +%s) - $(stat -f %m "$activity") ))
+        age=$(last_turn_age)
         [ "$age" -ge 120 ] && break
-        [ "$i" = 60 ] && fail "earshot is in use (last activity ${age} s ago). Run the script again later, or use --now."
-        [ "$i" = 0 ] && log "earshot was used ${age} s ago. Waiting until it is idle for 2 minutes."
+        [ "$i" = 60 ] && fail "earshot is in use (last turn ${age} s ago). Run the script again later, or use --now."
+        [ "$i" = 0 ] && log "The last turn was ${age} s ago. Waiting until it is idle for 2 minutes."
         sleep 10
     done
 fi

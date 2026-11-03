@@ -243,6 +243,12 @@ final class CommandPipeline {
            !CommandRouter.startsWithCommand(text, context: context) {
             return await typeArmed(text, mode: mode, context: context, rows: rows, stages: stages, clock, continues: true)
         }
+        // Why a turn after an always-on typing did not go on with the text. For the log: no words (R-ON-1).
+        if mode == .alwaysOn, lastTypedAlwaysOn, let t = lastTyped,
+           let miss = Self.goOnMiss(lastTyped: t, front: front, started: started,
+                                    command: CommandRouter.startsWithCommand(text, context: context)) {
+            speechSummary += (speechSummary.isEmpty ? "" : " · ") + "go-on: no, " + miss
+        }
 
         // A chain of commands in one sentence (I-28): each step in order, each on a new screen read.
         let cutClock = Stopwatch()
@@ -480,6 +486,16 @@ final class CommandPipeline {
         if body != nil, outcome.ok { (ok, note) = await sendAfterTyping(mode: mode, note: note, context: context, stages: &stages) }
         return done(heard: heard, intent: "Type \(words) word\(words == 1 ? "" : "s")", tier: .rules, ok: ok,
                     note: note, stages: stages, clock, why: continues ? "goes on with the last typing" : "armed by \"type\"")
+    }
+
+    /// The reason a turn does not go on with the last always-on typing, or nil if it does.
+    static func goOnMiss(lastTyped t: (at: Date, app: String?), front: String?, started: Date, command: Bool) -> String? {
+        let late = started.timeIntervalSince(t.at)
+        if t.app == nil { return "no app of the last typing" }
+        if t.app != front { return "another app in front" }
+        if late > continueTypingSeconds { return String(format: "started %.1f s after the typing (limit %.0f s)", late, continueTypingSeconds) }
+        if command { return "the first sentence starts with a command" }
+        return nil
     }
 
     /// Records a typing that worked, with the front app, for an always-on "send" alone (D-12).
