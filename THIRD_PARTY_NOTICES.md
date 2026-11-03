@@ -18,8 +18,8 @@ If you give a copy of a built `Earshot.app` to other people, include the transcr
 
 - Project: https://github.com/soniqo/speech-swift, commit `a57702e`
 - License: Apache-2.0. The full text is in `LICENSES/Apache-2.0.txt`. The project has no NOTICE file.
-- Use: the keyword spotter code (`Sources/SpeechWakeWord`) and the speaker embedding code (`Sources/SpeechVAD`, Core ML path only) run the wake phrase and the voice check of always-on mode (D-11).
-- The copied files are in `app/Sources/EarshotWake/KWS` and `app/Sources/EarshotWake/Voice`. Each file names its source file and the earshot changes in its first lines. earshot does not depend on the speech-swift package.
+- Use: the keyword spotter code (`Sources/SpeechWakeWord`) and the speaker embedding code (`Sources/SpeechVAD`, Core ML path only) run the wake phrase and the voice check of always-on mode (D-11). The turn model code (`Sources/SpeechVAD/SmartTurn.swift`, Core ML path only) checks the end of an always-on turn (R-ON-1).
+- The copied files are in `app/Sources/EarshotWake/KWS`, `app/Sources/EarshotWake/Voice` and `app/Sources/EarshotWake/Turn`. Each file names its source file and the earshot changes in its first lines. earshot does not depend on the speech-swift package.
 
 ## Not included
 
@@ -35,6 +35,7 @@ earshot downloads these model files from Hugging Face one time, when the owner t
 
 - Keyword spotter: icefall KWS Zipformer (gigaspeech fine-tune, 3.49M parameters), from `pkufool/keyword-spotting-models`. Core ML conversion: https://huggingface.co/aufklarer/KWS-Zipformer-3M-CoreML-INT8 at revision `45929a2`. License: Apache-2.0.
 - Voice model: WeSpeaker ResNet34-LM, trained on VoxCeleb, from https://huggingface.co/pyannote/wespeaker-voxceleb-resnet34-LM. Core ML conversion: https://huggingface.co/aufklarer/WeSpeaker-ResNet34-LM-CoreML at revision `b358f33` (the conversion card says MIT). The source weights are CC BY 4.0. Credit: WeSpeaker (https://github.com/wenet-e2e/wespeaker) and VoxCeleb (https://www.robots.ox.ac.uk/~vgg/data/voxceleb/).
+- Turn model (optional): Smart Turn v3.2 by Daily (https://github.com/pipecat-ai/smart-turn), BSD-2-Clause. Core ML conversion: https://huggingface.co/aufklarer/Smart-Turn-v3.2-CoreML at revision `75f0697` (about 17 MB). If the download fails, the end silence alone ends a turn.
 - If you give these model files to other people, keep these credits with them.
 
 ### Apple frameworks
