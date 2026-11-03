@@ -7,7 +7,7 @@ earshot uses the parts in this file. Each part has its own license. The earshot 
 ### transcribe.cpp
 
 - Project: https://github.com/handy-computer/transcribe.cpp
-- Version: 0.3.1, prebuilt `TranscribeCpp.xcframework`
+- Version: 0.4.1, prebuilt `TranscribeCpp.xcframework`
 - License: MIT
 - Use: runs the Parakeet speech model on the Mac.
 - Swift Package Manager downloads the framework at build time and checks its SHA-256 sum (`app/Package.swift`). `app/scripts/build-app.sh` copies `CTranscribe.framework` into the app bundle.

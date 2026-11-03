@@ -38,11 +38,12 @@ targets.append(.executableTarget(name: "EarshotApp", dependencies: appDependenci
 // T7: tests of the command path in EarshotApp, with fake engines and runners.
 let appTestDependencies: [Target.Dependency] = ["EarshotApp", "EarshotCore"] + moduleDependencies
 targets.append(.testTarget(name: "EarshotAppTests", dependencies: appTestDependencies, path: "Tests/EarshotAppTests"))
-// transcribe.cpp 0.3.1 (MIT), prebuilt for Apple platforms. SwiftPM checks the SHA-256 sum of the file.
+// transcribe.cpp 0.4.1 (MIT), prebuilt for Apple platforms. SwiftPM checks the SHA-256 sum of the file.
+// From 0.4.0 it maps the model file by default, so the weights are clean file pages and not app memory.
 targets.append(.binaryTarget(
     name: "TranscribeCpp",
-    url: "https://github.com/handy-computer/transcribe.cpp/releases/download/v0.3.1/TranscribeCpp.xcframework.zip",
-    checksum: "9fbd7fa74bf2cf903ee291d3fa98a02c5bd1cf07dda6adbc4f64c3a68be287ca"
+    url: "https://github.com/handy-computer/transcribe.cpp/releases/download/v0.4.1/TranscribeCpp.xcframework.zip",
+    checksum: "fb5646e564036a6c49659e3efcf72eb567af20da31b8569045c9a08181d35126"
 ))
 for name in modules {
     let deps: [Target.Dependency] = ["EarshotCore"] + (extraDependencies[name] ?? [])

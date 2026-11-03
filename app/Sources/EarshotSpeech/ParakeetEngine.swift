@@ -4,8 +4,12 @@ import EarshotCore
 import Foundation
 
 /// Parakeet speech to text through transcribe.cpp (MIT), on the Mac with Metal (R-MD-1, E2).
-/// It reads the model file in place (for example the GGUF file of Hex) and keeps it loaded:
-/// the load takes about 14 s and about 890 MB (E2, section 5.4).
+/// It reads the model file in place (for example the GGUF file of Hex) and keeps it loaded.
+/// transcribe.cpp 0.4 maps the file (the default load parameters): the weights are clean file pages.
+/// macOS can drop them under memory pressure and read them from the file again, with no swap. They do not count
+/// in the app footprint, and an app that maps the same file (Hex) shares the same pages.
+/// With 0.3.1, the load copied about 700 MB of weights into app memory (memory study 2026-11-03, R-MD-3).
+/// The file must not change in place while the model is loaded. A changed page stops the app (SIGBUS).
 /// The model weights are CC BY 4.0 (NVIDIA Parakeet). Credit them in the app's About text.
 public final class ParakeetEngine: TurnSpeechEngine, PrerollControl, @unchecked Sendable {
     public static let engineID = "parakeet"
