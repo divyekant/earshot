@@ -143,6 +143,39 @@ final class WakeModelRunTests: XCTestCase {
         }
     }
 
+    /// D-11: the spotter's auto reset every 1.5 s cleared the beam in the middle of a phrase. The bench feeds the same
+    /// clips at 6 offsets, so that the phrase falls on each part of the reset grid, with the upstream rule and with the
+    /// hold. It prints the hits and the false wakes of both rules for the pull request.
+    func testResetHoldBench() async throws {
+        let models = try await loadModels()
+        let offsets = stride(from: 0, to: 16000 * 3 / 2, by: 4000).map { $0 }   // 0 to 1.25 s, in 0.25 s steps
+        func count(_ clips: [[Float]], hold: Int) throws -> Int {
+            var n = 0
+            for clip in clips {
+                for offset in offsets {
+                    let listener = try models.listener(phrase: "hey jarvis", profile: nil, voiceThreshold: 0.45)
+                    (listener as? PhraseListener)?.resetHoldFrames = hold
+                    if !hits(listener, [Float](repeating: 0, count: offset) + clip).isEmpty { n += 1 }
+                }
+            }
+            return n
+        }
+        var positives: [[Float]] = []
+        for text in ["Hey Jarvis, open Notes.", "Okay, so, hey Jarvis, open Notes."] {
+            for rate in [170, 210] { positives.append(try say(text, rate: rate)) }
+        }
+        let negatives = try ["Open Notes and close the door.", "Hey, are you there?", "Her shot was great, nice job.",
+                             "Hey, I was thinking about the jar of jam.", "They travel a lot, hey, it is nice."].map { try say($0) }
+        let hold = WakeWordSession.defaultResetHoldFrames
+        let heldHits = try count(positives, hold: hold), upstreamHits = try count(positives, hold: 0)
+        let heldFalse = try count(negatives, hold: hold), upstreamFalse = try count(negatives, hold: 0)
+        let p = positives.count * offsets.count, n = negatives.count * offsets.count
+        print("reset hold bench: hits \(heldHits)/\(p) with the hold (\(hold) frames), \(upstreamHits)/\(p) with the upstream reset; "
+              + "false wakes \(heldFalse)/\(n) with the hold, \(upstreamFalse)/\(n) with the upstream reset")
+        XCTAssertGreaterThanOrEqual(heldHits, upstreamHits, "the hold must not lose a wake")
+        XCTAssertLessThanOrEqual(heldFalse, upstreamFalse, "the hold must not add a false wake")
+    }
+
     func testSpotterSpeed() async throws {
         let models = try await loadModels()
         let listener = try models.listener(phrase: "hey jarvis", profile: nil, voiceThreshold: 0.45)

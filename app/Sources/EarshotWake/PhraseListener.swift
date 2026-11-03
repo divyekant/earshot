@@ -40,6 +40,13 @@ final class PhraseListener: WakeListener {
         session.nearMissLength = nearMissLength
     }
 
+    /// The longest wait of the spotter's auto reset while a guess is inside the phrase, in 40 ms frames (D-11).
+    /// For the bench: 0 is the upstream rule.
+    var resetHoldFrames: Int {
+        get { session.resetHoldFrames }
+        set { session.resetHoldFrames = newValue }
+    }
+
     /// The near misses since the last call: a count and the best part of the phrase. No audio and no text (D-11).
     func takeNearMisses() -> NearMisses? {
         let (count, best) = session.takeNearMisses()

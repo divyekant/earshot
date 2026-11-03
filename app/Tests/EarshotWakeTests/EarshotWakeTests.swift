@@ -182,6 +182,24 @@ final class NearMissTests: XCTestCase {
         XCTAssertEqual(m.best, 0.75, accuracy: 1e-9)
     }
 
+    // D-11: the auto reset cleared the beam in the middle of a phrase, so the phrase was lost.
+    func testPhraseAcrossTheResetPointWakesWithTheHold() {
+        let quiet = [Int](repeating: 0, count: 8)
+        let held = decoder(autoResetSeconds: 0.4)   // a reset every 10 frames
+        held.resetHoldFrames = 5
+        XCTAssertEqual(run(held, quiet + [1, 2, 3, 4, 0, 0]), 1, "the reset waits while the phrase is open")
+
+        let upstream = decoder(autoResetSeconds: 0.4)
+        XCTAssertEqual(run(upstream, quiet + [1, 2, 3, 4, 0, 0]), 0, "with no hold, the reset at frame 10 loses 1 2")
+    }
+
+    func testResetHoldHasALimit() {
+        let d = decoder(autoResetSeconds: 0.4)
+        d.resetHoldFrames = 5
+        // 1 2, then quiet past the hold: the reset comes at frame 15, so 3 4 later is no phrase.
+        XCTAssertEqual(run(d, [Int](repeating: 0, count: 8) + [1, 2] + [Int](repeating: 0, count: 5) + [3, 4, 0, 0]), 0)
+    }
+
     func testNoLengthCountsNothing() {
         let d = decoder()
         d.nearMissLength = 0
