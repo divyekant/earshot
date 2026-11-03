@@ -307,6 +307,7 @@ final class AppController: ObservableObject {
             trigger.onRejected = { hit in pipeline.rejectedWake(hit, threshold: threshold) }
             trigger.onNearMisses = { misses in pipeline.nearMisses(misses) }
             trigger.onTurnCheck = { check in pipeline.turnCheck(check) }
+            trigger.onTurnEnd = { end in pipeline.turnEnd(end) }
         }
         pipeline.pauseAlwaysOn = { [weak input] paused in
             DispatchQueue.main.async { input?.setAlwaysOnPaused(paused) }

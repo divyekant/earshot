@@ -90,6 +90,33 @@ public extension WakeListener {
     func turnScore(_ samples: [Float]) -> Double? { nil }
 }
 
+/// How an always-on turn ended (R-ON-1, I-2). For the log: numbers only, no audio and no text.
+public struct TurnEnd: Sendable, Equatable {
+    public enum Rule: String, Sendable {
+        /// Quiet frames at the room level for the end silence.
+        case quiet
+        /// No speech frame for the end silence plus `softEndExtraMs` (noise that changes, or a soft voice).
+        case soft
+        /// The turn model heard the end of the turn at a pause.
+        case model
+        /// The wake phrase with no command after it, for the grace time.
+        case grace
+        /// The longest turn (15 s for a command turn, 60 s for dictation).
+        case limit
+    }
+    public var rule: Rule
+    /// The end silence that applied to this turn, in ms (550, 1200 for dictation, or the wait after the model).
+    public var endSilenceMs: Double
+    /// The quiet time at the end (frames with no speech), in ms.
+    public var silenceMs: Double
+    /// The length of the turn, in ms.
+    public var turnMs: Double
+
+    public init(rule: Rule, endSilenceMs: Double, silenceMs: Double, turnMs: Double) {
+        self.rule = rule; self.endSilenceMs = endSilenceMs; self.silenceMs = silenceMs; self.turnMs = turnMs
+    }
+}
+
 /// One check of the turn model at a pause (R-ON-1, I-2). For the log: numbers only, no audio and no text.
 public struct TurnCheck: Sendable, Equatable {
     public enum Decision: String, Sendable {

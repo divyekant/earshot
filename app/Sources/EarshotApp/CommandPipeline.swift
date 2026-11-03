@@ -353,6 +353,18 @@ final class CommandPipeline {
         turnChecks.append(Self.turnCheckSummary(check))
     }
 
+    /// Keeps how the turn ended (the rule and the end silence), for the same note. It comes with or without the
+    /// turn model, so the log shows each end (R-ON-1, I-2).
+    func turnEnd(_ end: TurnEnd) {
+        turnChecks.append(Self.turnEndSummary(end))
+    }
+
+    /// The log text of a turn end, for example "end quiet: 560 ms quiet of 550 ms, turn 2140 ms".
+    static func turnEndSummary(_ end: TurnEnd) -> String {
+        String(format: "end %@: %.0f ms quiet of %.0f ms, turn %.0f ms",
+               end.rule.rawValue, end.silenceMs, end.endSilenceMs, end.turnMs)
+    }
+
     /// The log text of one turn check, for example "P 0.82 after 300 ms quiet: end, model 3.5 ms".
     static func turnCheckSummary(_ check: TurnCheck) -> String {
         let p = check.probability.map { String(format: "%.2f", $0) } ?? "none"

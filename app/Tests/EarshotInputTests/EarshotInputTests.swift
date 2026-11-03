@@ -311,6 +311,28 @@ final class SpeechDetectorTests: XCTestCase {
         XCTAssertEqual(run(&d, -65, ms: 40), [.end])
     }
 
+    // R-ON-1, I-2: the detector keeps how each turn ended, for the log.
+    func testLastEndNamesTheRule() {
+        var d = openTurn(checks: false)
+        XCTAssertEqual(run(&d, -65, ms: 560), [.end])
+        XCTAssertEqual(d.lastEnd?.rule, .quiet)
+        XCTAssertEqual(d.lastEnd?.endSilenceMs, 550)
+        XCTAssertEqual(d.lastEnd?.silenceMs ?? 0, 560, accuracy: 20)
+
+        XCTAssertEqual(run(&d, -25, ms: 500), [.start])
+        var events: [SpeechEvent] = []
+        for i in 0..<100 { if let e = d.feed(db: i % 2 == 0 ? -58 : -66) { events.append(e) } }
+        XCTAssertEqual(events, [.end])
+        XCTAssertEqual(d.lastEnd?.rule, .soft)
+
+        var m = openTurn()
+        _ = run(&m, -65, ms: 300)
+        XCTAssertTrue(m.takePauseCheck())
+        XCTAssertEqual(m.endTurnNow(), .end)
+        XCTAssertEqual(m.lastEnd?.rule, .model)
+        XCTAssertEqual(m.lastEnd?.silenceMs ?? 0, 300, accuracy: 0.001)
+    }
+
     // With no turn model, no check is due and the end silence alone ends the turn, as before.
     func testNoPauseCheckWithoutATurnModel() {
         var d = openTurn(checks: false)
@@ -765,6 +787,21 @@ final class WakeTriggerTests: XCTestCase {
         wait(for: [stop], timeout: 2)
         XCTAssertEqual(rec.log, ["wake", "start", "stop"])
         XCTAssertEqual(checks, [])
+        t.stop()
+    }
+
+    // R-ON-1, I-2: each turn that goes to the pipeline reports how it ended, also with no turn model.
+    func testTurnEndIsReportedBeforeTheStop() {
+        let listener = FakeListener()
+        listener.hitAfterSamples = 16000
+        let (t, mic, rec) = make(listener)
+        t.onTurnEnd = { end in rec.add("end \(end.rule.rawValue)") }
+        let stop = rec.expect("stop", self)
+        mic.emit(quiet, ms: 1000)
+        mic.emit(speech, ms: 600)
+        mic.emit(quiet, ms: 800)
+        wait(for: [stop], timeout: 2)
+        XCTAssertEqual(rec.log, ["wake", "start", "end quiet", "stop"])
         t.stop()
     }
 
