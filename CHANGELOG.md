@@ -6,16 +6,23 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+### Changed
+
+- In always-on mode, the voice of your whole turn now decides, not the wake phrase alone. A longer turn gives a surer score: the limit is 0.35 up to 1 s of speech, and goes up to 0.42 at 2 s. The phrase must still score 0.35 to start a turn. A turn that fails the check is dropped with no note (R-ON-3, R-ON-5, D-11, D-12).
+- earshot now keeps one voice profile for each microphone (up to 4). Teach earshot your voice one time on each microphone. When you change the default microphone, always-on uses the profile of that microphone. Your old profile stays (R-ON-3).
+- In always-on mode, earshot no longer shows "not sure it was your voice" or plays the failed sound when the voice check drops a wake phrase or a follow-up turn. Other voices, a TV and room sounds set them off too often. The activity log keeps the voice score of each dropped turn (R-ON-3, R-FB-1).
+
+### Fixed
+
+- A result sound no longer starts a follow-up turn in always-on mode: the follow-up window opens when the sound ends, and the detector ignores earshot's own sounds. When earshot waits for your words (after "type", or after a typing), it plays no result sound, so you can go on talking at once (R-ON-1, R-FB-1).
+- In always-on mode, a soft end of a word, or speech from a quieter microphone, no longer counts as the pause that ends your turn. A dictated text longer than 15 s is no longer lost: it ends at 60 s with its words (R-ON-1, I-2, I-26).
+- With the hold key, earshot keeps more audio at both edges: 450 ms before the key press (was 250 ms) and 200 ms after the release (was 100 ms). So a first or last word said on the key edge is not lost. In always-on mode, the end of a turn no longer waits for more audio, which saves 100 ms (R-SP-1, R-ON-1, I-1).
+- "Here at least …" (the wake phrase heard wrong), "I want to …" and "go ahead and …" at the start of a command no longer stop the command (I-29).
+
 ### Added
 
 - In always-on mode, a small turn model (Smart Turn v3.2, about 17 MB, one download) listens at the first pause. If it hears that you finished, the turn ends after 300 ms of quiet. If it hears a pause in a sentence, the turn waits up to 2 s (3 s for dictation). No audio leaves the Mac. If the model is not available, the pause rule works as before (R-ON-1, R-MD-1, I-2).
 - Several commands in one sentence, for example "click on Projects, click on New, type hello and send". earshot runs the steps in order and reads the screen again before each step. Each step has its own safety checks. If a step fails or earshot is not sure, earshot stops and asks: say "go on", "stop", or the step again within 10 s. At most 10 steps. In always-on mode, a chain never sends (I-28, R-NV-5, R-SP-2, D-12).
-
-### Fixed
-
-- A result sound no longer starts a follow-up turn in always-on mode: the follow-up window opens when the sound ends, and the detector ignores earshot's own sounds. When earshot waits for your words (after "type", or after a typing), it plays no result sound, so you can go on talking at once. When the wake phrase is heard but the voice check rejects it, earshot now shows "not sure it was your voice" and plays the failed sound (R-ON-1, R-ON-3, R-FB-1).
-- In always-on mode, a soft end of a word, or speech from a quieter microphone, no longer counts as the pause that ends your turn. A dictated text longer than 15 s is no longer lost: it ends at 60 s with its words (R-ON-1, I-2, I-26).
-- "Here at least …" (the wake phrase heard wrong), "I want to …" and "go ahead and …" at the start of a command no longer stop the command (I-29).
 
 ## [0.2.0] - 2026-11-03
 

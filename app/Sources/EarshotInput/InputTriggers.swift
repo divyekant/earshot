@@ -9,7 +9,11 @@ public enum InputTriggers {
     public static func make(_ settings: EarshotSettings, wake: WakeListener? = nil) -> InputSwitch {
         let hold = HoldKeyTrigger(settings: settings)
         var alwaysOn: InputTrigger?
-        if settings.mode == .alwaysOn, let wake { alwaysOn = WakeTrigger(listener: wake) }
+        if settings.mode == .alwaysOn, let wake {
+            var config = WakeConfig()
+            config.voice = settings.voiceRule
+            alwaysOn = WakeTrigger(listener: wake, config: config)
+        }
         return InputSwitch(hold: hold, alwaysOn: alwaysOn)
     }
 }

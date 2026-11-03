@@ -3,7 +3,8 @@ import Foundation
 
 /// Reads the microphone, converts the audio to the format of one engine, and passes it on
 /// only between `begin` and `end`. No audio is saved, and no audio leaves the Mac (R-MD-1).
-/// It gives the last 250 ms before `begin`, so that the first word is not lost (E0).
+/// It gives the last 450 ms before `begin`, so that the first word is not lost (E0). Hex measured 450 ms: a key press
+/// often comes after the first sound of the word.
 /// It keeps the last 3 s in memory, for a turn that the wake phrase opens: that turn starts at the phrase (D-11).
 final class MicrophoneFeed: @unchecked Sendable {
     let format: AVAudioFormat
@@ -17,9 +18,10 @@ final class MicrophoneFeed: @unchecked Sendable {
     private var deliver: ((AVAudioPCMBuffer) -> Void)?
     private var preroll: Preroll<AVAudioPCMBuffer>
     private var nextPreroll: Double?
+    private var nextCapture: Double?
     private var running = false
 
-    init(format: AVAudioFormat, prerollSeconds: Double = 0.25) {
+    init(format: AVAudioFormat, prerollSeconds: Double = 0.45) {
         self.format = format
         self.prerollSeconds = prerollSeconds
         preroll = Preroll(limitFrames: Int64(format.sampleRate * max(prerollSeconds, Self.keepSeconds)))
@@ -28,6 +30,11 @@ final class MicrophoneFeed: @unchecked Sendable {
     /// The next `begin` gives this much audio from before it (at most `keepSeconds`). Then the usual preroll again.
     func setNextPreroll(seconds: Double) {
         lock.withLock { nextPreroll = min(max(seconds, prerollSeconds), Self.keepSeconds) }
+    }
+
+    /// The next `end(captureSeconds:)` waits this long instead (always-on: 0). Then the usual value again.
+    func setNextCapture(seconds: Double) {
+        lock.withLock { nextCapture = max(0, seconds) }
     }
 
     /// Opens the microphone. macOS shows the microphone indicator while it is open.
@@ -70,6 +77,7 @@ final class MicrophoneFeed: @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         let seconds = nextPreroll ?? prerollSeconds
         nextPreroll = nil
+        nextCapture = nil
         var frames: AVAudioFrameCount = 0
         for b in preroll.drainLast(frames: Int64(format.sampleRate * seconds)) {
             frames += b.frameLength
@@ -81,6 +89,10 @@ final class MicrophoneFeed: @unchecked Sendable {
 
     /// Waits `captureSeconds` so that the last audio block arrives, then calls `end()`.
     func end(captureSeconds: Double) async {
+        let captureSeconds = lock.withLock { () -> Double in
+            defer { nextCapture = nil }
+            return nextCapture ?? captureSeconds
+        }
         if captureSeconds > 0 { try? await Task.sleep(nanoseconds: UInt64(captureSeconds * 1e9)) }
         end()
     }

@@ -15,7 +15,8 @@ public struct WakeHit: Sendable, Equatable {
     public var phraseEndSeconds: Double
     /// The voice score (cosine similarity to the enrolled voice, -1 to 1). Nil if no voice is enrolled.
     public var voiceScore: Double?
-    /// True if the voice matches the enrolled voice, or if no voice is enrolled.
+    /// True if the voice of the phrase reaches the gate of the voice check, or if no voice is enrolled (E6). Then the
+    /// turn starts, and the voice of the whole turn decides at its end.
     public var isOwner: Bool
     /// Nil if the wake started the turn. If the owner said the phrase again in a follow-up turn, the time from the
     /// start of that turn to the wake, in seconds.
@@ -36,6 +37,77 @@ public struct WakeHit: Sendable, Equatable {
     /// The end of the phrase in seconds from the start of the turn: negative if the phrase ended before the turn
     /// started (the speech engine heard it in the preroll).
     public var phraseEndInTurn: Double { (inTurnAfterSeconds ?? 0) - phraseEndSeconds }
+}
+
+/// The limits of the owner voice check (R-ON-3, D-11). A longer clip gives a surer score, so the check of a whole
+/// turn uses a higher limit than the check of a short clip (E6: 26 real speakers, `docs/experiments/E6-voice-check.md`).
+/// - The phrase alone starts a turn if its score is `gate` or more. A lower score is another voice: nothing starts.
+/// - At the end of the turn, the voice of the whole turn decides. Up to `shortSeconds` of speech, it must score
+///   `short` or more. From `turnSeconds`, it must score `turn` or more. Between them, the limit goes up in a line.
+///   A step at one length cut the owner's pass rate at that length (E6: 97 % to 92 % near, 58 % to 37 % far).
+public struct VoiceRule: Sendable, Equatable {
+    /// The lowest score of the phrase alone that starts a turn.
+    public var gate: Double
+    /// The limit for a clip of `shortSeconds` of speech or less.
+    public var short: Double
+    /// The limit for a clip of `turnSeconds` of speech or more.
+    public var turn: Double
+    /// The speech length, in seconds, up to which `short` applies.
+    public var shortSeconds: Double
+    /// The speech length, in seconds, from which `turn` applies.
+    public var turnSeconds: Double
+
+    /// The gate stays at 0.35, not 0.10 (the E6 bench value): in the live run of 2026-11-03, room sounds matched the
+    /// phrase templates every 4 to 6 s for 2 minutes, with voice scores of 0.17 to 0.29. A lower gate would start a
+    /// turn for many of them. The owner's wakes on the same microphone scored 0.58 to 0.73.
+    public init(gate: Double = 0.35, short: Double = 0.35, turn: Double = 0.42, shortSeconds: Double = 1.0,
+                turnSeconds: Double = 2.0) {
+        self.gate = gate; self.short = short; self.turn = turn
+        self.shortSeconds = shortSeconds; self.turnSeconds = max(turnSeconds, shortSeconds)
+    }
+
+    /// The limit for a clip with this much speech, in seconds.
+    public func limit(seconds: Double) -> Double {
+        if seconds <= shortSeconds { return short }
+        if seconds >= turnSeconds { return turn }
+        return short + (turn - short) * (seconds - shortSeconds) / (turnSeconds - shortSeconds)
+    }
+}
+
+/// The voice check at the end of an always-on turn (R-ON-3, D-11, D-12). It holds no audio and no text.
+public struct TurnVoice: Sendable, Equatable {
+    /// The turn that the check is for.
+    public enum Kind: String, Sendable { case wake, followUp }
+    public var kind: Kind
+    /// The score that decided: the score of the turn, or of the phrase if the check of the turn did not run.
+    public var score: Double
+    /// The speech that the voice model scored, in seconds: the turn with its quiet parts cut. 0 if the phrase decided.
+    public var seconds: Double
+    /// The audio of the turn, in seconds.
+    public var audioSeconds: Double
+    /// The limit that the score had to reach.
+    public var limit: Double
+    /// True if the voice is the owner's. An always-on "send" needs it (D-12).
+    public var passed: Bool
+    /// True if the score of the turn decided. False if the score of the phrase decided.
+    public var byTurn: Bool
+    /// The time of the check, in milliseconds.
+    public var ms: Double
+
+    public init(kind: Kind, score: Double, seconds: Double, audioSeconds: Double, limit: Double, passed: Bool,
+                byTurn: Bool = true, ms: Double = 0) {
+        self.kind = kind; self.score = score; self.seconds = seconds; self.audioSeconds = audioSeconds
+        self.limit = limit; self.passed = passed; self.byTurn = byTurn; self.ms = ms
+    }
+
+    /// One part of a log line, for example "turn voice 0.51 (speech 1.84 s, audio 2.60 s, needs 0.42, 9 ms)".
+    public var summary: String {
+        guard byTurn else {
+            return String(format: "phrase voice %.2f (turn not checked, audio %.2f s, needs %.2f)", score, audioSeconds, limit)
+        }
+        return String(format: "turn voice %.2f (speech %.2f s, audio %.2f s, needs %.2f, %.0f ms)",
+                      score, seconds, audioSeconds, limit, ms)
+    }
 }
 
 /// Partial matches of the wake phrase that did not fire (D-11). Only a count and the best part of the phrase, or the
@@ -72,9 +144,12 @@ public protocol PhraseHintControl: AnyObject {
 public protocol WakeListener: AnyObject {
     /// Feeds 16 kHz mono samples, in order. Returns a hit when the phrase ends.
     func feed(_ samples: [Float]) -> WakeHit?
-    /// The voice score of a whole turn, for a turn in the follow-up window. Nil if no voice is enrolled.
+    /// The voice score of a clip. Nil if no voice is enrolled.
     func voiceScore(_ samples: [Float]) -> Double?
-    /// The lowest score that counts as the owner's voice.
+    /// The voice score of a whole turn and its speech length in seconds, after the quiet parts are cut.
+    /// Nil if no voice is enrolled.
+    func voiceCheck(_ samples: [Float]) -> (score: Double, seconds: Double)?
+    /// The lowest score of the phrase that starts a turn (the gate of `VoiceRule`). `WakeHit.isOwner` uses it.
     var voiceThreshold: Double { get }
     /// Starts again with no audio, for example after a turn.
     func reset()
@@ -88,6 +163,10 @@ public protocol WakeListener: AnyObject {
 public extension WakeListener {
     func takeNearMisses() -> NearMisses? { nil }
     func turnScore(_ samples: [Float]) -> Double? { nil }
+    /// The score of `voiceScore`, with the length of all the samples.
+    func voiceCheck(_ samples: [Float]) -> (score: Double, seconds: Double)? {
+        voiceScore(samples).map { ($0, Double(samples.count) / 16000) }
+    }
 }
 
 /// One check of the turn model at a pause (R-ON-1, I-2). For the log: numbers only, no audio and no text.
@@ -116,13 +195,21 @@ public struct TurnCheck: Sendable, Equatable {
     }
 }
 
-/// A speech engine that can start the next turn further back than its usual 250 ms preroll (D-11).
+/// A speech engine that can start the next turn further back than its usual 450 ms preroll (D-11).
 /// The wake phrase fires about 0.3 to 0.5 s after the phrase ends, so the engine must reach back to the start of
 /// the phrase. Else it loses the first words of the command.
 public protocol PrerollControl: AnyObject {
     /// The next `begin` gives the engine this much audio from before it, up to the audio that the engine keeps
     /// (3 s). Later turns use the usual preroll again.
     func setNextPreroll(seconds: Double)
+}
+
+/// A speech engine that can change the real audio it still records after the end of the next turn
+/// (`TailPad.captureSeconds`, 200 ms for the hold key). An always-on turn ends after a pause that the detector
+/// already heard, so it needs no more audio: the pipeline sets 0 and saves the wait (R-ON-1, R-SP-1).
+public protocol CaptureControl: AnyObject {
+    /// The next `end` waits this long for audio, then adds the tail silence. Later turns use the usual value again.
+    func setNextCapture(seconds: Double)
 }
 
 /// The sound pattern of one teach take: the encoder frames of the spotter model for the spoken part of the phrase
@@ -164,11 +251,17 @@ public struct VoiceProfile: Codable, Equatable, Sendable {
     /// spelling. Nil in a profile from before the templates: then the spelled spotter listens until the owner teaches
     /// earshot again.
     public var templates: [WakeTemplate]?
+    /// The ID of the microphone of the enrolment (the Core Audio device UID), or nil in an older profile.
+    /// The voice and the templates match best on the same microphone (E6, live run 2026-11-03).
+    public var micID: String?
+    /// The name of that microphone, for the management window.
+    public var micName: String?
 
     public init(phrase: String, embedding: [Float], keywordTokens: [[String]], samples: Int, selfScore: Double,
-                createdAt: Date = Date(), templates: [WakeTemplate]? = nil) {
+                createdAt: Date = Date(), templates: [WakeTemplate]? = nil, micID: String? = nil, micName: String? = nil) {
         self.phrase = phrase; self.embedding = embedding; self.keywordTokens = keywordTokens
         self.samples = samples; self.selfScore = selfScore; self.createdAt = createdAt; self.templates = templates
+        self.micID = micID; self.micName = micName
     }
 
     /// The templates for this phrase, or an empty list if the profile has none or belongs to another phrase.
@@ -182,6 +275,41 @@ public struct VoiceProfile: Codable, Equatable, Sendable {
 
     /// True if the profile belongs to this phrase. A new phrase keeps the voice, but loses the learned tokens.
     public func matches(phrase other: String) -> Bool { WakePhrase.words(phrase) == WakePhrase.words(other) }
+}
+
+/// The owner's voice profiles: one for each microphone (E6). The owner teaches earshot one time on each microphone.
+/// It holds no audio. It stays on the Mac in `voice.json` (R-MD-1).
+public struct VoiceBook: Codable, Equatable, Sendable {
+    /// The profiles, oldest first. At most `maxProfiles`.
+    public var profiles: [VoiceProfile]
+    /// The most profiles that the book keeps. A new microphone after that replaces the oldest profile.
+    public static let maxProfiles = 4
+
+    public init(profiles: [VoiceProfile] = []) { self.profiles = profiles }
+
+    /// The newest profile, or nil.
+    public var newest: VoiceProfile? { profiles.max { $0.createdAt < $1.createdAt } }
+
+    /// The profile for the microphone: the profile taught on it, else the newest profile. Nil if the book is empty.
+    public func profile(forMic id: String?) -> VoiceProfile? {
+        if let id, let same = profiles.filter({ $0.micID == id }).max(by: { $0.createdAt < $1.createdAt }) { return same }
+        return newest
+    }
+
+    /// True if a profile was taught on this microphone.
+    public func hasProfile(forMic id: String?) -> Bool {
+        guard let id else { return false }
+        return profiles.contains { $0.micID == id }
+    }
+
+    /// The book with the new profile. It replaces the profile of the same microphone, and the oldest profiles
+    /// after `maxProfiles`.
+    public func adding(_ profile: VoiceProfile) -> VoiceBook {
+        var kept = profiles.filter { $0.micID != profile.micID }
+        kept.append(profile)
+        kept.sort { $0.createdAt < $1.createdAt }
+        return VoiceBook(profiles: Array(kept.suffix(Self.maxProfiles)))
+    }
 }
 
 /// The wake phrase text rules.
@@ -284,12 +412,20 @@ public enum WakePhrase {
 }
 
 extension Store {
-    /// The owner's voice profile, or nil if the owner did not teach earshot the voice.
-    public var voiceProfile: VoiceProfile? { load(VoiceProfile.self, VoiceProfile.fileName) }
+    /// The owner's voice profiles. Empty if the owner did not teach earshot the voice.
+    /// A `voice.json` from before the book holds one profile: the book then has that profile.
+    public var voiceBook: VoiceBook {
+        if let book = load(VoiceBook.self, VoiceProfile.fileName) { return book }
+        if let one = load(VoiceProfile.self, VoiceProfile.fileName) { return VoiceBook(profiles: [one]) }
+        return VoiceBook()
+    }
 
-    /// Saves the profile. Nil deletes the file.
+    /// The newest voice profile, or nil if the owner did not teach earshot the voice.
+    public var voiceProfile: VoiceProfile? { voiceBook.newest }
+
+    /// Adds the profile to the book: it replaces the profile of the same microphone. Nil deletes all profiles.
     public func saveVoiceProfile(_ profile: VoiceProfile?) throws {
-        if let profile { try save(profile, VoiceProfile.fileName); return }
+        if let profile { try save(voiceBook.adding(profile), VoiceProfile.fileName); return }
         let url = folder.appendingPathComponent(VoiceProfile.fileName)
         if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
     }
