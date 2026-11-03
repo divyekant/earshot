@@ -152,13 +152,23 @@ public struct CommandRouter: Router {
     /// The rules answer, with no tier 2. Synchronous and on the Mac.
     /// Words at the start that are not part of the command: "Yeah, let's open the Slack" gives "open the Slack".
     static let leadFillers: Set<String> = fillers.union(["yeah", "yep", "yes", "lets", "let", "us", "alright", "well",
-                                                         "hey", "can", "could", "you", "would"])
+                                                         "hey", "can", "could", "you", "would", "actually", "basically",
+                                                         "just"])
 
     /// The raw words with the lead fillers removed. Case and punctuation stay.
     static func dropLeadFillers(_ text: String) -> String {
         let tokens = Tokens(text)
         var lead = 0
-        while lead < tokens.count - 1, leadFillers.contains(tokens.words[lead]) { lead += 1 }
+        func isFiller(_ i: Int) -> Bool {
+            let w = tokens.words[i]
+            if leadFillers.contains(w) { return true }
+            // "Here" at the very start is most often the end of a wake phrase ("hey atlas" heard as "Here").
+            if i == 0, w == "here" { return true }
+            // "right" is a filler, but not in "right click".
+            if w == "right", tokens.words[i + 1] != "click" { return true }
+            return false
+        }
+        while lead < tokens.count - 1, isFiller(lead) { lead += 1 }
         return lead == 0 ? text : tokens.raw(lead..<tokens.count)
     }
 
