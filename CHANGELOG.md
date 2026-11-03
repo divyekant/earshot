@@ -19,6 +19,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - In always-on mode, a soft end of a word, or speech from a quieter microphone, no longer counts as the pause that ends your turn. A dictated text longer than 15 s is no longer lost: it ends at 60 s with its words (R-ON-1, I-2, I-26).
 - With the hold key, earshot keeps more audio at both edges: 450 ms before the key press (was 250 ms) and 200 ms after the release (was 100 ms). So a first or last word said on the key edge is not lost. In always-on mode, the end of a turn no longer waits for more audio, which saves 100 ms (R-SP-1, R-ON-1, I-1).
 - "Here at least …" (the wake phrase heard wrong), "I want to …" and "go ahead and …" at the start of a command no longer stop the command (I-29).
+- A browser tab title no longer holds its "Memory usage - N MB" note, so "click on x.com" matches the tab name. One common word, such as "all", no longer matches a channel name such as "all-team" by its first part (I-28, R-MT-1).
 
 ### Added
 
