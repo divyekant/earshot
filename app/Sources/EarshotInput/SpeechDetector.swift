@@ -1,3 +1,4 @@
+import EarshotCore
 import Foundation
 
 /// What the speech detector reports.
