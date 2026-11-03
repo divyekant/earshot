@@ -104,6 +104,91 @@ final class WakeTests: XCTestCase {
         XCTAssertNil(store.voiceProfile)
         XCTAssertNoThrow(try store.saveVoiceProfile(nil), "deleting a missing profile is not an error")
     }
+
+    // E6: one voice profile for each microphone.
+    private func profile(_ mic: String?, at seconds: Double, x: Float = 1) -> VoiceProfile {
+        VoiceProfile(phrase: "hey atlas", embedding: [x, 0], keywordTokens: [], samples: 5, selfScore: 0.8,
+                     createdAt: Date(timeIntervalSince1970: seconds), micID: mic, micName: mic.map { "Mic \($0)" })
+    }
+
+    func testVoiceBookKeepsOneProfileForEachMicrophone() {
+        var book = VoiceBook()
+        XCTAssertNil(book.profile(forMic: "usb"))
+        book = book.adding(profile("built-in", at: 100))
+        book = book.adding(profile("usb", at: 200))
+        XCTAssertEqual(book.profiles.count, 2)
+        XCTAssertEqual(book.profile(forMic: "built-in")?.micID, "built-in", "the profile of the microphone in use")
+        XCTAssertEqual(book.profile(forMic: "usb")?.micID, "usb")
+        XCTAssertEqual(book.profile(forMic: "headset")?.micID, "usb", "a new microphone uses the newest profile")
+        XCTAssertEqual(book.profile(forMic: nil)?.micID, "usb")
+        XCTAssertTrue(book.hasProfile(forMic: "usb"))
+        XCTAssertFalse(book.hasProfile(forMic: "headset"))
+        XCTAssertFalse(book.hasProfile(forMic: nil))
+
+        // A new teach step on the same microphone replaces its profile only.
+        book = book.adding(profile("built-in", at: 300, x: 0.5))
+        XCTAssertEqual(book.profiles.count, 2)
+        XCTAssertEqual(book.profile(forMic: "built-in")?.embedding, [0.5, 0])
+        XCTAssertEqual(book.newest?.micID, "built-in")
+    }
+
+    func testVoiceBookKeepsAtMostFourProfiles() {
+        var book = VoiceBook()
+        for i in 0..<6 { book = book.adding(profile("mic\(i)", at: Double(i))) }
+        XCTAssertEqual(book.profiles.count, VoiceBook.maxProfiles)
+        XCTAssertEqual(book.profiles.map(\.micID), ["mic2", "mic3", "mic4", "mic5"], "the oldest profiles go")
+    }
+
+    func testOldVoiceFileBecomesABookOfOne() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let store = Store(folder: folder)
+        // voice.json from before the book: one profile, with no microphone.
+        let old = profile(nil, at: 100)
+        try store.save(old, VoiceProfile.fileName)
+        XCTAssertEqual(store.voiceBook.profiles, [old])
+        XCTAssertEqual(store.voiceProfile, old)
+        // A teach step on a microphone keeps the old profile beside the new one.
+        try store.saveVoiceProfile(profile("usb", at: 200))
+        XCTAssertEqual(store.voiceBook.profiles.map(\.micID), [nil, "usb"])
+        XCTAssertEqual(store.voiceBook.profile(forMic: "usb")?.micName, "Mic usb")
+        try store.saveVoiceProfile(nil)
+        XCTAssertTrue(store.voiceBook.profiles.isEmpty, "forget deletes all profiles")
+    }
+
+    // E6: the limit of the voice check goes up with the speech length, in a line from 1 s to 2 s.
+    func testVoiceRuleLimitGoesUpWithTheLength() {
+        let rule = VoiceRule(gate: 0.1, short: 0.35, turn: 0.42)
+        XCTAssertEqual(rule.limit(seconds: 0.4), 0.35)
+        XCTAssertEqual(rule.limit(seconds: 1.0), 0.35)
+        XCTAssertEqual(rule.limit(seconds: 1.5), 0.385, accuracy: 1e-9)
+        XCTAssertEqual(rule.limit(seconds: 2.0), 0.42)
+        XCTAssertEqual(rule.limit(seconds: 9.0), 0.42)
+        let flat = VoiceRule(short: 0.35, turn: 0.42, shortSeconds: 1.5, turnSeconds: 1.5)
+        XCTAssertEqual(flat.limit(seconds: 1.4), 0.35)
+        XCTAssertEqual(flat.limit(seconds: 1.5), 0.35)
+        XCTAssertEqual(flat.limit(seconds: 1.6), 0.42, "no division by zero when the two lengths are the same")
+    }
+
+    func testVoiceRuleComesFromTheSettings() throws {
+        var s = EarshotSettings()
+        XCTAssertEqual(s.voiceRule, VoiceRule(gate: 0.35, short: 0.35, turn: 0.42))
+        s.voiceGate = 0.2
+        s.voiceThreshold = 0.33
+        s.turnVoiceThreshold = 0.45
+        XCTAssertEqual(s.voiceRule, VoiceRule(gate: 0.2, short: 0.33, turn: 0.45))
+        // A settings.json from before E6 has no gate and no turn limit: the defaults fill them in.
+        let old = #"{"mode":"alwaysOn","voiceThreshold":0.33}"#
+        let read = try JSONDecoder().decode(EarshotSettings.self, from: Data(old.utf8))
+        XCTAssertEqual(read.voiceRule, VoiceRule(gate: 0.35, short: 0.33, turn: 0.42))
+    }
+
+    func testTurnVoiceSummary() {
+        let turn = TurnVoice(kind: .wake, score: 0.514, seconds: 1.84, audioSeconds: 2.6, limit: 0.42, passed: true, ms: 9.2)
+        XCTAssertEqual(turn.summary, "turn voice 0.51 (speech 1.84 s, audio 2.60 s, needs 0.42, 9 ms)")
+        let phrase = TurnVoice(kind: .wake, score: 0.41, seconds: 0, audioSeconds: 1.2, limit: 0.35, passed: true, byTurn: false)
+        XCTAssertEqual(phrase.summary, "phrase voice 0.41 (turn not checked, audio 1.20 s, needs 0.35)")
+    }
     // D-11: remove the phrase by time. Live test 2026-11-02: 3 follow-up turns began with "Yeah, let's" for the phrase
     // said again. The edit distance to "heyatlas" is 5, so the text strip kept it.
     private func w(_ text: String, _ start: Double, _ end: Double) -> TimedWord { TimedWord(text: text, start: start, end: end) }

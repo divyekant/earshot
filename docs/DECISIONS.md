@@ -205,6 +205,21 @@ Second live test on the owner's Mac (2026-11-02, develop `e6f0ba8`, phrase "hey 
 - livekit-wakeword stays "Not now": it needs a training run for each phrase.
 - A live check on the owner's voice must confirm the bench numbers and the limit 0.33.
 
+**Change on 2026-11-03 (E6, [experiments/E6-voice-check.md](experiments/E6-voice-check.md)):** after a change to a USB microphone, the owner's wake scores fell from 0.73 to 0.10 to 0.40, and the voice check rejected the owner. E6 measured the voice model on 26 real speakers (Mini LibriSpeech). Zero padding of short clips is not the cause: zero, repeat and no padding are the same within about 2 points. Short audio and distance are.
+
+| Rule (E6 bench, phrase 0.8 s, turn 2.5 s) | Owner, near | Owner, far | Other voices, near | Other voices, far |
+|---|---|---|---|---|
+| Phrase alone, 0.35 (before) | 91 % | 31 % | 0.99 % | 0.32 % |
+| Phrase gate 0.10, then the whole turn at 0.42 | 99 % | 73 % | 0.52 % | 0.24 % |
+
+The owner chose "Turn check and one print per mic" on a card.
+
+- At the end of an always-on turn, the voice of the whole turn decides. The limit goes up with the speech length: 0.35 up to 1 s, then a line up to 0.42 at 2 s. A step at one length cut the owner's pass rate there (E6 length sweep). Follow-up turns use the same rule, so "send" alone still needs 0.35 (D-12).
+- The gate on the phrase alone stays at 0.35, not the 0.10 of the bench. In the live run of 2026-11-03, room sounds matched the phrase templates every 4 to 6 s for 2 minutes, with voice scores of 0.17 to 0.29. A gate of 0.10 would start a turn, with the start sound, for many of them. The owner's wakes on the same microphone scored 0.58 to 0.73. The gate is a setting (`voiceGate`). Lower it only after the false template matches stop.
+- earshot keeps one voice profile for each microphone (at most 4), keyed by the Core Audio UID of the default input device. Always-on uses the profile of the microphone in use, and starts again when the default input device changes.
+- A dropped turn shows no note and plays no sound (PR #92). The log keeps the scores.
+- Rejected: max or top-2 over the 5 takes instead of the mean (no gain on the bench); repeat padding (no gain).
+
 ## D-12. "send" alone after typing, in always-on mode
 
 Date: 2026-11-03.
@@ -219,7 +234,7 @@ The owner chose this on a card: in always-on mode, earshot never sent, so a dict
 
 **Decision:**
 - In always-on mode, "send" alone (the router's send phrases, after lead fillers) sends only if all are true:
-  - the voice of the turn was checked as the owner's: a wake in the owner's voice, or a follow-up turn with a voice score above the threshold;
+  - the voice of the turn was checked as the owner's: the voice of the whole turn passed the limit for its length (E6, change to D-11 on 2026-11-03). Before E6, the voice of the phrase alone counted for a wake turn;
   - earshot typed into a box within 5 s (typeText, typeInto, armed typing, or openChat with text);
   - the front app is the app of the typing.
 - Each typing allows one send.

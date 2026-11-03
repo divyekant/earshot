@@ -30,6 +30,11 @@ public struct WakeConfig: Sendable, Equatable {
     public var turnWaitMs: Double = 2000
     /// The same for a dictation turn. Hex's "patient" preset used 3 s.
     public var dictationTurnWaitMs: Double = 3000
+    /// The limits of the owner voice check (E6). The phrase alone must pass `voice.gate` to start a turn. At the end
+    /// of the turn, the voice of the whole turn decides.
+    public var voice = VoiceRule()
+    /// The voice check uses the first this many seconds of a turn. A long dictation does not need more.
+    public var voiceCheckMaxSeconds: Double = 8
 
     public init() {}
 }
@@ -38,13 +43,16 @@ public struct WakeConfig: Sendable, Equatable {
 ///
 /// 1. It listens for the wake phrase (`WakeListener`). Speech without the phrase never reaches the speech engine,
 ///    so earshot keeps no text of talk that is not for it.
-/// 2. If a voice is enrolled, the voice of the phrase must match it. Else `onRejected` reports the wake, and
-///    nothing starts.
-/// 3. The turn ends after the command and a short quiet time.
+/// 2. If a voice is enrolled, the voice of the phrase must reach `config.voice.gate` (E6). Else `onRejected`
+///    reports the wake, and nothing starts.
+/// 3. The turn ends after the command and a short quiet time. Then the voice of the whole turn, from the phrase to
+///    the end, must reach the limit of `config.voice` for its length. Else the turn is dropped (`onCancel` with
+///    `otherVoice`). A whole turn gives a surer score than the phrase alone.
 /// 4. For `followUpSeconds` after a command (`openFollowUp()`), speech in the owner's voice starts a turn
-///    with no phrase. Its voice is checked at the end of the turn.
+///    with no phrase. Its voice is checked at the end of the turn, with the same rule.
 /// 5. In the first `followTurnWakeSeconds` of a follow-up turn, the spotter still listens. If the owner says the
 ///    phrase again, the turn becomes a wake turn: `onWake` comes with `inTurnAfterSeconds`, and no second `onStart`.
+/// 6. `onTurnVoice` gives the result of each voice check, right before `onStop` or `onCancel`.
 ///
 /// Run every command from this trigger with mode `.alwaysOn`, so that SafetyPolicy blocks risky presses and
 /// Send (R-ON-5). Callbacks run on the main thread.
@@ -58,8 +66,11 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
     /// The wake phrase opened a turn. It comes right before `onStart`. The speech engine must start
     /// `hit.prerollSeconds` back, so that it hears the phrase and the words after it.
     public var onWake: ((WakeHit) -> Void)?
-    /// The wake phrase was heard, but the voice did not match. Nothing started. For the log: it has no text.
+    /// The wake phrase was heard, but the voice of the phrase did not reach the gate. Nothing started. For the log:
+    /// it has no text.
     public var onRejected: ((WakeHit) -> Void)?
+    /// The voice check at the end of a turn. It comes right before `onStop` or `onCancel` of that turn.
+    public var onTurnVoice: ((TurnVoice) -> Void)?
     /// Partial matches of the phrase that did not fire, since the last report. For the log: a count and the best
     /// part of the phrase only. No audio and no text (D-11).
     public var onNearMisses: ((NearMisses) -> Void)?
@@ -98,8 +109,13 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
     private var recentLevels: [Double] = []
     /// The last samples, for the start of a follow-up turn.
     private var recentSamples: [Float] = []
-    /// The samples of a follow-up turn, for the voice check.
+    /// The samples of the open turn, for the voice check: at most `voiceCheckMaxSeconds`. A wake turn starts at
+    /// the phrase.
     private var turnSamples: [Float] = []
+    /// All the samples of the open turn, also after `voiceCheckMaxSeconds`.
+    private var turnSampleCount = 0
+    /// The wake of the open turn, or nil for a follow-up turn.
+    private var turnWake: WakeHit?
     /// The value of `clock` at the start of the turn.
     private var turnStartClock = 0
     /// The last 8.5 s of the open turn (wake or follow-up), for the turn model. It is dropped at the end of the turn.
@@ -111,7 +127,8 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
     static let rate = 16000
     private var frameSamples: Int { Int(Double(Self.rate) * config.detector.frameMs / 1000) }
     private static let keepLevelFrames = 150
-    private static let keepSamples = 16000 / 2
+    /// The audio kept from before a turn: the phrase of a wake turn starts up to about 2.5 s back.
+    private static let keepSamples = 16000 * 3
 
     public init(listener: WakeListener, config: WakeConfig = WakeConfig(), source: SampleSource = MicrophoneSamples()) {
         self.listener = listener
@@ -199,16 +216,19 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
         nextTurnLongPause = false
     }
 
-    /// The audio length of the last follow-up turn at its voice check, in seconds. For the log of a dropped turn.
-    public private(set) var lastFollowUpSeconds: Double?
+    /// The result of the last voice check, or nil if no check ran (no voice is enrolled, or the follow-up turn was
+    /// too short). Use it on `queue` or after the turn ended.
+    public private(set) var lastTurnVoice: TurnVoice?
 
     /// Feeds samples. It runs on `queue`.
     func feed(_ samples: [Float]) {
         guard running, !paused, !samples.isEmpty else { return }
         clock += samples.count
         remember(samples)
-        if state == .followTurn { turnSamples.append(contentsOf: samples) }
-        if inTurn { keepTurnAudio(samples) }
+        if inTurn {
+            addTurnSamples(samples)
+            keepTurnAudio(samples)
+        }
 
         // The spotter listens between turns, and at the start of a follow-up turn. Else the speech engine has the audio.
         var hit: WakeHit?
@@ -260,19 +280,24 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
             state = .followTurn
             turnStartClock = clock
             // The turn starts a little before the detector saw it, as the speech engine's preroll does.
-            turnSamples = Array(recentSamples.suffix(Self.rate / 4))
+            startTurnSamples(Array(recentSamples.suffix(Self.rate / 4)), wake: nil)
             turnAudio = turnSamples
             deliver(.start)
-        case (.wakeTurn, .end), (.wakeTurn, .drop):
-            if event == .end { reportEnd() }
+        case (.wakeTurn, .end):
+            let (samples, count, wake) = (turnSamples, turnSampleCount, turnWake)
+            finishTurn()
+            let result = verdict(.wake, samples, audioSamples: count, phrase: wake)
+            if result == .end { reportEnd() }
+            deliver(result, voice: lastTurnVoice)
+        case (.wakeTurn, .drop):
             finishTurn()
             deliver(event)
         case (.followTurn, .end):
-            let samples = turnSamples
+            let (samples, count) = (turnSamples, turnSampleCount)
             finishTurn()
-            let verdict = followUpVerdict(samples)
-            if verdict == .end { reportEnd() }
-            deliver(verdict)
+            let result = followUpVerdict(samples, audioSamples: count)
+            if result == .end { reportEnd() }
+            deliver(result, voice: lastTurnVoice)
         case (.followTurn, .drop):
             finishTurn()
             deliver(event)
@@ -281,22 +306,39 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
         }
     }
 
-    /// The voice score of the last follow-up turn that passed to the pipeline. Nil if no voice is enrolled, so no
-    /// check ran. An always-on "send" needs a checked voice (R-ON-5).
-    public private(set) var lastFollowUpVoiceScore: Double?
-
-    /// The voice check at the end of a follow-up turn.
-    private func followUpVerdict(_ samples: [Float]) -> SpeechEvent {
-        lastFollowUpVoiceScore = nil
-        let seconds = Double(samples.count) / Double(Self.rate)
-        lastFollowUpSeconds = seconds
+    /// The voice check at the end of a follow-up turn. A turn that is too short has no check: it is dropped.
+    private func followUpVerdict(_ samples: [Float], audioSamples: Int) -> SpeechEvent {
+        let seconds = Double(audioSamples) / Double(Self.rate)
         guard seconds >= config.minimumFollowUpSeconds else {
+            lastTurnVoice = nil
             return .drop(String(format: "\(Self.tooShort) (%.2f s)", seconds))
         }
-        guard let score = listener.voiceScore(samples) else { return .end }
-        lastFollowUpVoiceScore = score
-        if score >= listener.voiceThreshold { return .end }
-        return .drop(String(format: "\(Self.otherVoice) (%.2f)", score))
+        return verdict(.followUp, samples, audioSamples: audioSamples, phrase: nil)
+    }
+
+    /// The voice check at the end of a turn (E6): the voice of the whole turn, with the limit for its speech length.
+    /// It sets `lastTurnVoice`. If the check does not run (no voice is enrolled, or the model failed), a wake turn
+    /// keeps the score of its phrase, with the short limit. With no score at all, the turn goes on unchecked: an
+    /// always-on "send" then stays blocked (D-12).
+    private func verdict(_ kind: TurnVoice.Kind, _ samples: [Float], audioSamples: Int, phrase: WakeHit?) -> SpeechEvent {
+        let rule = config.voice
+        let audio = Double(audioSamples) / Double(Self.rate)
+        let start = DispatchTime.now().uptimeNanoseconds
+        let check = samples.isEmpty ? nil : listener.voiceCheck(samples)
+        let ms = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
+        if let check {
+            let limit = rule.limit(seconds: check.seconds)
+            lastTurnVoice = TurnVoice(kind: kind, score: check.score, seconds: check.seconds, audioSeconds: audio,
+                                      limit: limit, passed: check.score >= limit, ms: ms)
+        } else if let score = phrase?.voiceScore {
+            lastTurnVoice = TurnVoice(kind: kind, score: score, seconds: 0, audioSeconds: audio, limit: rule.short,
+                                      passed: score >= rule.short, byTurn: false, ms: ms)
+        } else {
+            lastTurnVoice = nil
+            return .end
+        }
+        guard let voice = lastTurnVoice, !voice.passed else { return .end }
+        return .drop(String(format: "\(Self.otherVoice) (%.2f)", voice.score))
     }
 
     /// The start of the cancel reason when the voice of a follow-up turn is not the owner's voice.
@@ -316,8 +358,11 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
         setTurnEndSilence()
         openAfterPhrase(hit)
         state = .wakeTurn
-        // The turn model hears the phrase too: it is the start of the turn.
-        turnAudio = recentSamples
+        // The voice check and the turn model hear the turn from the start of the phrase. The spotter fires after
+        // the phrase ended. The audio before the phrase is not part of the turn.
+        let back = min(recentSamples.count, Int(hit.prerollSeconds * Double(Self.rate)))
+        startTurnSamples(Array(recentSamples.suffix(back)), wake: hit)
+        turnAudio = turnSamples
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             self.onWake?(hit)
@@ -326,15 +371,16 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
     }
 
     /// The owner said the phrase again at the start of a follow-up turn (D-11). The turn becomes a wake turn, so the
-    /// pipeline removes the phrase by its time, and the voice of the phrase counts as the voice check.
-    /// If the voice does not match, the turn stays a follow-up turn, and its voice is checked at the end.
+    /// pipeline removes the phrase by its time. The voice of the whole turn is checked at the end, as for a wake turn.
+    /// If the voice of the phrase does not reach the gate, the turn stays a follow-up turn.
     private func wakeInFollowTurn(_ hit: WakeHit) {
         guard hit.isOwner else { return }
         var hit = hit
         hit.inTurnAfterSeconds = Double(clock - turnStartClock) / Double(Self.rate)
         openAfterPhrase(hit)
         state = .wakeTurn
-        turnSamples.removeAll()
+        // The samples of the turn stay: they hold the phrase.
+        turnWake = hit
         // The speech engine runs already: no new preroll and no second start.
         DispatchQueue.main.async { [weak self] in self?.onWake?(hit) }
     }
@@ -365,9 +411,28 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
         detector.endSilenceOverrideMs = nil
         detector.dictationTurn = false
         state = .idle
-        turnSamples.removeAll()
+        clearTurnSamples()
         turnAudio.removeAll()
         listener.reset()
+    }
+
+    private func startTurnSamples(_ samples: [Float], wake: WakeHit?) {
+        lastTurnVoice = nil
+        turnSamples = samples
+        turnSampleCount = samples.count
+        turnWake = wake
+    }
+
+    private func addTurnSamples(_ samples: [Float]) {
+        turnSampleCount += samples.count
+        let room = Int(config.voiceCheckMaxSeconds * Double(Self.rate)) - turnSamples.count
+        if room > 0 { turnSamples.append(contentsOf: samples.prefix(room)) }
+    }
+
+    private func clearTurnSamples() {
+        turnSamples.removeAll()
+        turnSampleCount = 0
+        turnWake = nil
     }
 
     /// Ends an open turn from the outside. Returns `.drop` if a turn was open.
@@ -378,7 +443,7 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
         detector.dictationTurn = false
         nextTurnLongPause = false
         state = .idle
-        turnSamples.removeAll()
+        clearTurnSamples()
         turnAudio.removeAll()
         pending.removeAll()
         listener.reset()
@@ -427,9 +492,12 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
         if recentSamples.count > Self.keepSamples * 2 { recentSamples.removeFirst(recentSamples.count - Self.keepSamples) }
     }
 
-    private func deliver(_ event: SpeechEvent) {
+    /// Calls the callback of the event on the main thread. `voice` comes first, in the same block, so that the app
+    /// has the voice check of the turn when the turn ends.
+    private func deliver(_ event: SpeechEvent, voice: TurnVoice? = nil) {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
+            if let voice { self.onTurnVoice?(voice) }
             switch event {
             case .start: self.onStart?()
             case .end: self.onStop?()

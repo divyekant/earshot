@@ -18,12 +18,16 @@ final class OwnerSendTests: XCTestCase {
         return (p, engine, runner)
     }
 
-    /// One turn. `voice` is the follow-up voice score that the trigger gives (nil: no check ran).
+    /// One turn. `voice` is the voice score of the turn that the trigger gives (nil: no check ran). It passed the
+    /// check: a turn that failed the check does not reach the pipeline.
     @discardableResult
     private func say(_ p: CommandPipeline, _ e: TextEngine, _ text: String, _ mode: InputMode = .alwaysOn,
                      voice: Double? = 0.6) async -> ActivityRecord {
         e.text = text
-        p.followUpVoiceScore = mode == .alwaysOn ? voice : nil
+        p.turnVoice = mode == .alwaysOn ? voice.map {
+            TurnVoice(kind: p.pendingWake == nil ? .followUp : .wake, score: $0, seconds: 0.5, audioSeconds: 0.9,
+                      limit: 0.35, passed: true)
+        } : nil
         return await p.finish(mode: mode)
     }
 
@@ -54,8 +58,30 @@ final class OwnerSendTests: XCTestCase {
         await say(p, e, "type the blue fox jumps")
         clock += 2
         p.pendingWake = WakeHit(phrase: "hey atlas", prerollSeconds: 1.5, voiceScore: 0.62, isOwner: true)
-        await say(p, e, "send", voice: nil)
+        await say(p, e, "send", voice: 0.58)
         XCTAssertEqual(sends(runner.runs).count, 1)
+    }
+
+    /// E6: the phrase alone is no longer the voice check. A wake turn with no check of the turn does not send.
+    func testWakeTurnWithNoTurnCheckDoesNotSend() async {
+        let (p, e, runner) = make()
+        await say(p, e, "type the blue fox jumps")
+        clock += 2
+        p.pendingWake = WakeHit(phrase: "hey atlas", prerollSeconds: 1.5, voiceScore: 0.62, isOwner: true)
+        let r = await say(p, e, "send", voice: nil)
+        XCTAssertTrue(sends(runner.runs).isEmpty)
+        XCTAssertTrue(r.note.contains("voice not checked"), r.note)
+    }
+
+    func testFailedCheckDoesNotSend() async {
+        let (p, e, runner) = make()
+        await say(p, e, "type the blue fox jumps")
+        clock += 1
+        e.text = "send"
+        p.turnVoice = TurnVoice(kind: .followUp, score: 0.2, seconds: 0.5, audioSeconds: 0.9, limit: 0.35, passed: false)
+        let r = await p.finish(mode: .alwaysOn)
+        XCTAssertTrue(sends(runner.runs).isEmpty, "only the trigger drops such a turn; the pipeline still blocks the send")
+        XCTAssertTrue(r.note.contains("voice not checked"), r.note)
     }
 
     func testTooLate() async {
