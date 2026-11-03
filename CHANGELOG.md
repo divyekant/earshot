@@ -6,6 +6,10 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-03
+
+This release adds the wake phrase and owner voice check for always-on mode, dictation into the focused field, "type" then the text, and "send" said alone after earshot types a message. With Parakeet, earshot uses about 700 MB less memory.
+
 ### Added
 
 - In always-on mode, "send" said alone, in your voice, within 5 s after earshot typed a message, now sends it. Anything else still needs the hold key to send. "Type X and send" never types the word "send": with the hold key, it types and sends; in always-on mode, it types only (R-ON-5, R-NV-5, D-12).
@@ -58,5 +62,6 @@ The first public release. earshot is early software. Expect bugs and changes to 
 
 - earshot never presses Send, or does another action that cannot be undone, without an explicit command (R-NV-5, R-ON-5).
 
-[Unreleased]: https://github.com/divyekant/earshot/compare/v0.1.0...develop
+[Unreleased]: https://github.com/divyekant/earshot/compare/v0.2.0...develop
+[0.2.0]: https://github.com/divyekant/earshot/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/divyekant/earshot/releases/tag/v0.1.0
