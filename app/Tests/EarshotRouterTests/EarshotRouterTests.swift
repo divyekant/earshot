@@ -816,6 +816,20 @@ final class EarshotRouterTests: XCTestCase {
         XCTAssertEqual(CommandRouter.withoutTrailingSend("see you soon, send."), "see you soon")
     }
 
+    func testMoreLeadFillers() async {
+        // D-12: only "send" with fillers is the send intent.
+        for said in ["Yeah, actually let's send", "okay so send", "Right, send.", "um, just send it", "Here, send"] {
+            await expect(said, .send)
+        }
+        let more = await route("Yeah, actually let's send the report to the team")
+        XCTAssertNotEqual(more.intent, .send, more.why)
+        await expect("Here, let's open Slack", .openApp(appID: "slack"))
+        XCTAssertEqual(CommandRouter.dropLeadFillers("Here, let's open Slack"), "open Slack")
+        // "here" counts only at the start, and "right" is not a filler in "right click".
+        XCTAssertEqual(CommandRouter.dropLeadFillers("open here"), "open here")
+        XCTAssertEqual(CommandRouter.dropLeadFillers("right click the file"), "right click the file")
+    }
+
     func testE2NoCommand() async {
         let r = await route("what a lovely day", news)
         XCTAssertEqual(r.intent, .none)
