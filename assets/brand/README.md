@@ -4,10 +4,10 @@ This folder holds the earshot app icon and logo.
 
 ## The mark
 
-The mark is four voice bars, then an amber text cursor.
+The mark is an ear, drawn as one white stroke on a near-black tile.
 
-- The voice bars: earshot listens when you hold the key.
-- The cursor: earshot puts the cursor in the message box. It never sends.
+- The ear is the same shape as the menu bar icon and the logo of the web site.
+- The colors are the colors of the web site: white on near-black.
 
 The tile is a superellipse (n = 5), the shape of a macOS icon.
 
@@ -21,21 +21,23 @@ The tile is a superellipse (n = 5), the shape of a macOS icon.
 | `AppIcon.svg` | Icon master, 1024 × 1024. |
 | `mark.svg`, `mark.png` | The tile with the mark, no shadow, cropped to the tile, 512 × 512. |
 | `glyph.svg`, `glyph.png` | The mark alone in one color (`currentColor` in the SVG), for the window header or the menu bar. |
+| `social-preview.png` | GitHub social preview, 1280 × 640. Upload it in the repository settings, under Social preview. |
 | `logo.svg`, `logo.png` | Tile and wordmark, for a light background. |
 | `logo-dark.svg`, `logo-dark.png` | Tile and wordmark, for a dark background. |
 | `preview.png` | Review sheet with all sizes. |
-| `src/mark.svg` | Source of the mark (1024 canvas, tile at 100,100, 824 wide). It uses the gradients that `render.py` defines. |
+| `src/mark.svg` | Source of the mark (1024 canvas, tile at 100,100, 824 wide). The ear uses a 24-unit grid, scaled by 27. |
 | `src/wordmark.svg` | "earshot" as outlines. |
 
 ## Colors
 
 | Name | Value |
 |---|---|
-| Tile top | `#3A2FA8` |
-| Tile bottom | `#0E0B2E` |
-| Voice bars | `#FFFFFF` to `#C4BAFF` |
-| Cursor | `#FFD978` to `#FF9A3C` |
-| Ink (wordmark on light) | `#14112E` |
+| Tile top | `#2C2C29` |
+| Tile bottom | `#0C0C0B` |
+| Ear | `#F2F2EE` |
+| Ink (wordmark on light) | `#161615` |
+
+`app/Sources/EarshotUI/Brand.swift` uses the same colors and the same ear curves.
 
 ## Rebuild
 
