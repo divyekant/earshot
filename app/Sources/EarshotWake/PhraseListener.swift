@@ -145,6 +145,8 @@ final class PhraseListener: WakeListener {
         return try? models.voiceScore(samples, profile: profile)
     }
 
+    func turnScore(_ samples: [Float]) -> Double? { models.turnScore(samples) }
+
     func reset() {
         ring.removeAll(keepingCapacity: true)
         ringStart = 0

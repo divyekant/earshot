@@ -21,6 +21,15 @@ public struct WakeConfig: Sendable, Equatable {
     public var followTurnWakeSeconds: Double = 2.5
     /// The trigger reports the near misses of the spotter after this much audio, at a wake and at stop (D-11).
     public var nearMissReportSeconds: Double = 60
+    /// The turn model (Smart Turn v3.2) checks the turn at the first pause (`DetectorConfig.pauseCheckMs`). A
+    /// probability at or above this value ends the turn at once. 0.5 is the default of the model card; the log of
+    /// each check (`onTurnCheck`) gives the value for the owner's own turns.
+    public var turnThreshold: Double = 0.5
+    /// If the model hears a pause inside the turn, the turn ends only after this much quiet (a command turn).
+    /// Smart Turn's own pipeline and Hex used 2 s.
+    public var turnWaitMs: Double = 2000
+    /// The same for a dictation turn. Hex's "patient" preset used 3 s.
+    public var dictationTurnWaitMs: Double = 3000
 
     public init() {}
 }
@@ -54,6 +63,8 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
     /// Partial matches of the phrase that did not fire, since the last report. For the log: a count and the best
     /// part of the phrase only. No audio and no text (D-11).
     public var onNearMisses: ((NearMisses) -> Void)?
+    /// One check of the turn model at a pause. For the log: numbers only (R-ON-1, I-2).
+    public var onTurnCheck: ((TurnCheck) -> Void)?
 
     public let config: WakeConfig
     private let listener: WakeListener
@@ -88,6 +99,9 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
     private var turnSamples: [Float] = []
     /// The value of `clock` at the start of the turn.
     private var turnStartClock = 0
+    /// The last 8.5 s of the open turn (wake or follow-up), for the turn model. It is dropped at the end of the turn.
+    private var turnAudio: [Float] = []
+    private static let keepTurnSamples = 16000 * 17 / 2
     /// The value of `clock` at the last near-miss report.
     private var nearMissClock = 0
 
@@ -101,6 +115,8 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
         self.config = config
         self.source = source
         detector = SpeechDetector(config: config.detector)
+        // Each pause asks the listener. A listener with no turn model answers nil, and the end silence counts.
+        detector.pauseChecks = true
     }
 
     public func start() throws {
@@ -139,13 +155,32 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
 
     /// A command finished. For `followUpSeconds`, the owner's voice can give the next command with no phrase.
     /// With `longPause`, the next turn in the window (a follow-up or a wake) ends after `dictationEndSilenceMs`.
-    public func openFollowUp(longPause: Bool = false) {
+    /// `afterSeconds`: the length of a result sound that plays now. The detector ignores the sound, and the window
+    /// starts when the sound ends (live test: a result sound became a follow-up turn, dropped as another voice).
+    public func openFollowUp(longPause: Bool = false, afterSeconds: Double = 0) {
         queue.async { [self] in
             guard running, !paused, state == .idle else { return }
-            state = .followUp(until: clock + Int(config.followUpSeconds * Double(Self.rate)))
+            muteLocked(afterSeconds)
+            let after = Int(max(0, afterSeconds) * Double(Self.rate))
+            state = .followUp(until: clock + after + Int(config.followUpSeconds * Double(Self.rate)))
             nextTurnLongPause = longPause
         }
     }
+
+    /// The detector ignores the audio for `seconds` from now: earshot plays a sound, and the microphone hears it.
+    /// The detector does not change in that time, so the sound opens no turn, ends no turn, and moves no noise floor.
+    /// The spotter and the speech engine still get the audio.
+    public func mute(seconds: Double) {
+        queue.async { [self] in muteLocked(seconds) }
+    }
+
+    private func muteLocked(_ seconds: Double) {
+        guard seconds > 0 else { return }
+        muteUntilClock = max(muteUntilClock, clock + Int(seconds * Double(Self.rate)))
+    }
+
+    /// The sample clock until which the detector ignores the audio (`mute`).
+    private var muteUntilClock = 0
 
     /// True if the next turn in the follow-up window uses the long end silence.
     private var nextTurnLongPause = false
@@ -154,7 +189,10 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
     private func setTurnEndSilence() {
         var open = false
         if case .followUp = state { open = true }
-        detector.endSilenceOverrideMs = open && nextTurnLongPause ? config.dictationEndSilenceMs : nil
+        let dictation = open && nextTurnLongPause
+        detector.endSilenceOverrideMs = dictation ? config.dictationEndSilenceMs : nil
+        // A dictation turn can be long. Its length limit ends it with its text (DetectorConfig.dictationMaximumTurnMs).
+        detector.dictationTurn = dictation
         nextTurnLongPause = false
     }
 
@@ -167,6 +205,7 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
         clock += samples.count
         remember(samples)
         if state == .followTurn { turnSamples.append(contentsOf: samples) }
+        if inTurn { keepTurnAudio(samples) }
 
         // The spotter listens between turns, and at the start of a follow-up turn. Else the speech engine has the audio.
         var hit: WakeHit?
@@ -181,6 +220,7 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
             offset += frame
             recentLevels.append(db)
             if let event = level(db) { events.append(event) }
+            if let event = pauseCheck() { events.append(event) }
         }
         pending.removeFirst(offset)
         if recentLevels.count > Self.keepLevelFrames * 2 { recentLevels.removeFirst(recentLevels.count - Self.keepLevelFrames) }
@@ -200,6 +240,7 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
 
     /// Feeds one level to the detector. Between turns, only the follow-up window can open a turn.
     private func level(_ db: Double) -> SpeechEvent? {
+        if clock < muteUntilClock { return nil }
         switch state {
         case .idle:
             detector.track(db: db)
@@ -217,6 +258,7 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
             turnStartClock = clock
             // The turn starts a little before the detector saw it, as the speech engine's preroll does.
             turnSamples = Array(recentSamples.suffix(Self.rate / 4))
+            turnAudio = turnSamples
             deliver(.start)
         case (.wakeTurn, .end), (.wakeTurn, .drop):
             finishTurn()
@@ -268,6 +310,8 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
         setTurnEndSilence()
         openAfterPhrase(hit)
         state = .wakeTurn
+        // The turn model hears the phrase too: it is the start of the turn.
+        turnAudio = recentSamples
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             self.onWake?(hit)
@@ -295,10 +339,12 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
         let frameMs = config.detector.frameMs
         let after = max(0, Int(hit.phraseEndSeconds * 1000 / frameMs) - 5)  // 100 ms after the phrase, as frames
         let threshold = detector.thresholdDb
+        let quiet = detector.quietDb
         let tail = recentLevels.suffix(after)
         let loud = tail.filter { $0 >= threshold }.count
         let heard = loud >= config.detector.startFrames
-        let quietFrames = tail.reversed().prefix(while: { $0 < threshold }).count
+        // Only quiet frames count toward the end silence, as in the turn (SpeechDetector.quietDb).
+        let quietFrames = tail.reversed().prefix(while: { $0 <= quiet }).count
         detector.open(heardSpeech: heard, quietMs: heard ? Double(quietFrames) * frameMs : 0, graceMs: config.graceMs)
     }
 
@@ -311,8 +357,10 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
 
     private func finishTurn() {
         detector.endSilenceOverrideMs = nil
+        detector.dictationTurn = false
         state = .idle
         turnSamples.removeAll()
+        turnAudio.removeAll()
         listener.reset()
     }
 
@@ -321,12 +369,45 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
         let open = inTurn
         _ = detector.reset()
         detector.endSilenceOverrideMs = nil
+        detector.dictationTurn = false
         nextTurnLongPause = false
         state = .idle
         turnSamples.removeAll()
+        turnAudio.removeAll()
         pending.removeAll()
         listener.reset()
         return open ? .drop("input stopped") : nil
+    }
+
+    /// Asks the turn model at the first pause of the turn (R-ON-1, I-2). A high probability ends the turn now. A low
+    /// one keeps the turn open up to the wait time, so a pause in a sentence does not cut it. With no model, nothing
+    /// changes. The idea comes from Hex's Smart Turn experiment (anomalyco/hex f748282, MIT).
+    private func pauseCheck() -> SpeechEvent? {
+        guard inTurn, detector.takePauseCheck() else { return nil }
+        let start = DispatchTime.now().uptimeNanoseconds
+        let probability = listener.turnScore(turnAudio)
+        let runMs = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
+        guard let probability else { return nil }
+        let dictation = detector.dictationTurn
+        let silenceMs = detector.pauseMs
+        let done = probability >= config.turnThreshold
+        var event: SpeechEvent?
+        if done {
+            event = detector.endTurnNow()
+        } else {
+            detector.answerPauseCheck(waitMs: dictation ? config.dictationTurnWaitMs : config.turnWaitMs)
+        }
+        let check = TurnCheck(probability: probability, silenceMs: silenceMs, decision: done ? .end : .wait,
+                              runMs: runMs, dictation: dictation)
+        DispatchQueue.main.async { [weak self] in self?.onTurnCheck?(check) }
+        return event
+    }
+
+    private func keepTurnAudio(_ samples: [Float]) {
+        turnAudio.append(contentsOf: samples)
+        if turnAudio.count > Self.keepTurnSamples + Self.rate {
+            turnAudio.removeFirst(turnAudio.count - Self.keepTurnSamples)
+        }
     }
 
     private func remember(_ samples: [Float]) {

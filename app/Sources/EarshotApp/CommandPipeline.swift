@@ -67,6 +67,12 @@ final class CommandPipeline {
     /// A short sound for each result, if `playSounds`. The app plays a system sound (NSSound).
     var playSound: ((FeedbackSound) -> Void)?
     var playSounds = true
+    /// The result sound of the last record, if one played. The app mutes the always-on detector for its length.
+    private(set) var lastSound: FeedbackSound?
+    /// True if typing worked in this turn. When earshot waits for the owner's words next (after "type", or after a
+    /// typing), it plays no result sound and mutes nothing: the note on screen is the cue, and the owner may go on
+    /// talking at once (go-on typing, the text after "type", or "send").
+    private var typedThisTurn = false
     /// True if a send worked in this turn, for the "sent" sound.
     private var sentThisTurn = false
     /// The start of the open turn (begin()). The armed window and the send window test the start of the next turn,
@@ -112,6 +118,8 @@ final class CommandPipeline {
     var jevScreenBudgetMs = 1500
     /// The speech engine's line for the log of the current command (engine, why, audio length).
     private var speechSummary = ""
+    /// The turn model checks of the open always-on turn, for its log note (R-ON-1, I-2).
+    private var turnChecks: [String] = []
 
     init(engine: SpeechEngine, router: Router, actions: CommandActions, names: NameFinder,
          apps: @escaping () -> [AppEntry], allNames: @escaping () async -> [NameEntry],
@@ -123,12 +131,14 @@ final class CommandPipeline {
     /// The input opened a turn (key down, or speech start in always-on).
     func begin() -> String? {
         turnStartedAt = now()
+        turnChecks = []
         do { try engine.begin(); return nil } catch { return "speech did not start: \(error)" }
     }
 
     /// The input dropped the turn. The text is not used.
     func cancel() async {
         turnStartedAt = nil
+        turnChecks = []
         _ = try? await engine.end()
     }
 
@@ -141,12 +151,15 @@ final class CommandPipeline {
         turnStartedAt = nil
         expectsText = false
         sentThisTurn = false
+        typedThisTurn = false
         speechSummary = ""  // a speech error must not show the line of the last command
         var stages: [String: Double] = [:]
         let wake = mode == .alwaysOn ? pendingWake : nil
         pendingWake = nil
         let followScore = followUpVoiceScore
         followUpVoiceScore = nil
+        let checks = turnChecks
+        turnChecks = []
         // The voice of an always-on turn was checked: a wake in the owner's voice, or a follow-up with a score.
         let ownerVoice = mode == .alwaysOn && (wake.map { $0.voiceScore != nil && $0.isOwner } ?? (followScore != nil))
         var text: String
@@ -174,6 +187,9 @@ final class CommandPipeline {
             if let wake {
                 speechSummary = Self.wakeSummary(wake) + ", phrase removed " + removed.how
                     + (speechSummary.isEmpty ? "" : " · " + speechSummary)
+            }
+            if !checks.isEmpty {
+                speechSummary += (speechSummary.isEmpty ? "" : " · ") + "turn: " + checks.joined(separator: "; ")
             }
         }
         guard !text.isEmpty else { return done(heard: "", intent: "none", tier: .none, ok: false, note: "no words", stages: stages, clock, quiet: true) }
@@ -364,6 +380,20 @@ final class CommandPipeline {
         return record
     }
 
+    /// Keeps one check of the turn model at a pause (R-ON-1, I-2): numbers only, no audio and no text. The record of
+    /// the turn shows the checks in its speech note, so each check does not make a record of its own. The log gives
+    /// the threshold for the owner's own turns.
+    func turnCheck(_ check: TurnCheck) {
+        turnChecks.append(Self.turnCheckSummary(check))
+    }
+
+    /// The log text of one turn check, for example "P 0.82 after 300 ms quiet: end, model 3.5 ms".
+    static func turnCheckSummary(_ check: TurnCheck) -> String {
+        let p = check.probability.map { String(format: "%.2f", $0) } ?? "none"
+        return String(format: "P %@ after %.0f ms quiet: %@%@, model %.1f ms",
+                      p, check.silenceMs, check.decision.rawValue, check.dictation ? " (dictation)" : "", check.runMs)
+    }
+
     /// The log line of a wake: the voice score, or that no voice is enrolled.
     static func wakeSummary(_ wake: WakeHit) -> String {
         var voice = wake.voiceScore.map { String(format: "voice %.2f", $0) } ?? "voice not checked (not taught)"
@@ -384,6 +414,9 @@ final class CommandPipeline {
         let note = String(format: "wake phrase in another voice (score %@, needs %.2f)", score, threshold)
         let record = ActivityRecord(heard: "", intent: "none", tier: .none, ok: false, note: note, stages: [:])
         try? log?.append(record)
+        // The phrase matched: say so, so that the owner knows earshot heard it (live test, 19:06).
+        if showFeedback { feedback?.show("✗ not sure it was your voice: say \"\(wakePhrase), …\"", ok: false) }
+        if playSounds { playSound?(.failed) }
         return record
     }
 
@@ -418,6 +451,7 @@ final class CommandPipeline {
     private func noteTyped(mode: InputMode) {
         lastTyped = (now(), frontBundleID().flatMap { $0 == ownBundleID ? nil : $0 })
         lastTypedAlwaysOn = mode == .alwaysOn
+        typedThisTurn = true
         if mode == .alwaysOn { expectsText = true }
     }
 
@@ -662,7 +696,12 @@ final class CommandPipeline {
         if showFeedback, !quiet {
             feedback?.show(ok ? "→ \(intent)" : "✗ \(note)", ok: ok)
         }
-        if playSounds, !quiet { playSound?(ok ? (sentThisTurn ? .sent : .done) : .failed) }
+        lastSound = nil
+        if playSounds, !quiet, !(ok && !sentThisTurn && (typedThisTurn || expectsText)) {
+            let sound: FeedbackSound = ok ? (sentThisTurn ? .sent : .done) : .failed
+            playSound?(sound)
+            lastSound = sound
+        }
         return record
     }
 

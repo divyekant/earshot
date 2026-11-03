@@ -124,6 +124,20 @@ final class CommandPipelineTests: XCTestCase {
         XCTAssertNil(p.pendingWake, "one wake is for one turn")
     }
 
+    // R-ON-1, I-2: the turn model checks go into the note of the turn record, not into records of their own.
+    func testTurnChecksGoToTheTurnNote() async {
+        let (p, _, _) = make("hey jarvis open notes")
+        p.wakePhrase = "hey jarvis"
+        _ = p.begin()
+        p.turnCheck(TurnCheck(probability: 0.12, silenceMs: 300, decision: .wait, runMs: 3.46, dictation: false))
+        p.turnCheck(TurnCheck(probability: 0.81, silenceMs: 300, decision: .end, runMs: 3.5, dictation: true))
+        let r = await p.finish(mode: .alwaysOn)
+        XCTAssertTrue(r.note.contains("turn: P 0.12 after 300 ms quiet: wait, model 3.5 ms; "
+                                      + "P 0.81 after 300 ms quiet: end (dictation), model 3.5 ms"), r.note)
+        let next = await p.finish(mode: .alwaysOn)
+        XCTAssertFalse(next.note.contains("turn: "), "the checks are for one turn: \(next.note)")
+    }
+
     // D-11, live test 2026-11-02: the owner said the phrase again in a follow-up turn, and Apple speech wrote it as
     // "Yeah, let's". The text strip kept it. The cut by time removes it.
     func testRepeatedPhraseIsCutByTime() async {
@@ -212,6 +226,33 @@ final class CommandPipelineTests: XCTestCase {
         // dk: "I do not know if send works". A dropped turn shows a note and the failed sound.
         XCTAssertEqual(note.shown.first?.0, "✗ not sure it was your voice: say \"hey atlas, …\"")
         XCTAssertEqual(sounds, [.failed])
+    }
+
+    /// Live test (19:06): the phrase matched, but the voice check said "another voice", and nothing showed it.
+    func testRejectedWakeShowsANoteAndTheFailedSound() {
+        let (p, _, runner) = make("")
+        let note = NoteRecorder()
+        p.feedback = note
+        var sounds: [FeedbackSound] = []
+        p.playSound = { sounds.append($0) }
+        p.wakePhrase = "hey atlas"
+        let r = p.rejectedWake(WakeHit(phrase: "hey atlas", prerollSeconds: 1, voiceScore: 0.25, isOwner: false), threshold: 0.35)
+        XCTAssertTrue(r.note.contains("0.25"), r.note)
+        XCTAssertEqual(r.heard, "")
+        XCTAssertTrue(runner.runs.isEmpty)
+        XCTAssertEqual(note.shown.first?.0, "✗ not sure it was your voice: say \"hey atlas, …\"")
+        XCTAssertEqual(sounds, [.failed])
+    }
+
+    func testLastSoundIsKeptForTheMute() async {
+        let (p, e, _) = make("open notes")
+        p.playSound = { _ in }
+        _ = await p.finish(mode: .hold)
+        XCTAssertEqual(p.lastSound, .done)
+        p.playSounds = false
+        e.text = "open notes"
+        _ = await p.finish(mode: .hold)
+        XCTAssertNil(p.lastSound, "no sound, so no mute")
     }
 
     func testResultSounds() async {
