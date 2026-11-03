@@ -441,3 +441,20 @@ final class ActionRunnerTests: XCTestCase {
         }
     }
 }
+
+/// The always-on "send" alone after typing (D-12, R-ON-5). Return is pressed only by ActionRunner.send, which asks
+/// sendBlock first. Made-up text only.
+final class OwnerSendRuleTests: XCTestCase {
+    func testOnlyTheSendPathPressesReturn() {
+        // Return is pressed only by ActionRunner.send, which asks sendBlock first.
+        let info = { (owner: Bool) in CommandInfo(mode: .alwaysOn, tier: .rules, spokenTarget: "send", ownerSendAfterTyping: owner) }
+        XCTAssertEqual(ActionRules.sendBlock(command: info(false), inMessageBox: true, boxText: "made up", sensitive: nil),
+                       "blocked: send needs the hold key")
+        XCTAssertNil(ActionRules.sendBlock(command: info(true), inMessageBox: true, boxText: "made up", sensitive: nil))
+        XCTAssertNotNil(ActionRules.sendBlock(command: info(true), inMessageBox: false, boxText: "made up", sensitive: nil))
+        XCTAssertNotNil(ActionRules.sendBlock(command: info(true), inMessageBox: true, boxText: "", sensitive: nil))
+        XCTAssertNotNil(ActionRules.sendBlock(command: info(true), inMessageBox: true, boxText: "made up", sensitive: "a password field"))
+        var jev = info(true); jev.tier = .jev
+        XCTAssertNotNil(ActionRules.sendBlock(command: jev, inMessageBox: true, boxText: "made up", sensitive: nil))
+    }
+}

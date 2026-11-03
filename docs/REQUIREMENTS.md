@@ -32,7 +32,7 @@ The owner described this flow:
 | R-ON-2 | earshot acts only on speech that is for it: speech after the wake phrase, or a follow-up command in the owner's voice up to 5 s after a command. Talk to a person in the room or in a call does not start a command (D-11). | Must (final) |
 | R-ON-3 | earshot ignores voices that are not the owner's voice, for example TV, calls and other people. The owner teaches earshot the voice with 5 wake phrases. Until the owner does this, any voice can wake earshot, and the management window says so (D-11). | Must |
 | R-ON-4 | A push-to-talk key is available. Use it in the first version, and keep it as a fallback. | Must (MVP) |
-| R-ON-5 | A false trigger must not cause an action that cannot be undone, for example a sent message. | Must |
+| R-ON-5 | A false trigger must not cause an action that cannot be undone, for example a sent message. One narrow exception (D-12): in always-on mode, "send" alone, in the checked voice of the owner, within 5 s after earshot typed in the same app, sends. | Must |
 
 ### 3.2 Speed
 
@@ -50,7 +50,7 @@ The owner described this flow:
 | R-NV-2 | earshot opens the conversation, channel or contact that the owner names, for example "Slack Ravi". | Must |
 | R-NV-3 | earshot puts the focus in the main text box of that screen. | Must |
 | R-NV-4 | earshot enters dictated text in the focused text box. A command can include the text: "Slack Ravi, running late". With the hold key, words with no command word are dictation. After a bare "type", the next turn within 5 s is dictation, also in always-on mode (in the owner's voice). Dictation never presses Return. | Must |
-| R-NV-5 | earshot does not press Send unless the owner says so, for example "send" or "click Send". | Must |
+| R-NV-5 | earshot does not press Send unless the owner says so, for example "send" or "click Send". A trailing "and send" after text is a send command, never text: with the hold key, earshot types and then sends; in always-on mode, it types only. | Must |
 | R-NV-6 | First apps to support: Slack, WhatsApp, Messages, Mail. | Must |
 | R-NV-7 | "Open <web address>" opens the address in the default browser, for example "open hn.com" or "go to news dot ycombinator dot com". earshot opens only http and https addresses, and presses no key. | Should |
 

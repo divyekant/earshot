@@ -45,7 +45,7 @@ earshot uses one model for all apps. A command is one verb and one target.
 | type | `typeText`, `typeInto`, the text of `openChat` | "type see you at five", "search for voice control" |
 | scroll | `scroll` | "scroll down", "go to the top" |
 | back | `back` | "go back" |
-| send | `send` | "send" (hold key only, R-NV-5) |
+| send | `send` | "send" (hold key; in always-on, only "send" alone after typing, D-12, R-NV-5) |
 
 "Show numbers" and "hide numbers" are display helpers for press.
 
@@ -127,7 +127,7 @@ Both engines miss the same names, so the router must also match names by sound.
 
 The wake phrase decides (D-11). The first design had a text gate with no wake word (a prefix rule, a follow-up window and a call context). It passed common command words in normal talk, and it had no voice check. D-11 removed it.
 
-The safety rule stays: actions that cannot be undone, such as Send, need the hold key. A false wake can only focus, open or type (`ActionRules.sendBlock`).
+The safety rule stays: actions that cannot be undone, such as Send, need the hold key. A false wake can only focus, open or type (`ActionRules.sendBlock`). One narrow exception (D-12): in always-on mode, "send" alone sends if the voice of the turn was checked as the owner's (a wake in the owner's voice, or a follow-up turn with a voice score), earshot typed within 5 s, and the same app is in front. The pipeline checks this and sets `CommandInfo.ownerSendAfterTyping`; `sendBlock` then also checks the message box, the box text, the tier and the page.
 
 ### 3.4 Router: "System 1" (R-SP-2, R-MD-2)
 
