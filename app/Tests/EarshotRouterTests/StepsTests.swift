@@ -72,6 +72,16 @@ final class StepsTests: XCTestCase {
         if case .openChat(let app, _, _) = chat.intent { XCTAssertEqual(app, "messages") } else { XCTFail(chat.why) }
     }
 
+    // Live test, 2026-11-03: the common word "all" matched the channel "all-team" by its first part.
+    func testOneCommonWordDoesNotMatchAChannelByItsFirstPart() async {
+        var context = Fixtures.context
+        context.names.append(NameEntry(appID: "slack", name: "all-team", source: .sidebar))
+        let r = await CommandRouter().route("Just do all the items, not just this", context: context)
+        if case .openChat(_, let target, _) = r.intent { XCTAssertNotEqual(target, "all-team", r.why) }
+        let named = await CommandRouter().route("message all-team on Slack", context: context)
+        if case .openChat(_, let target, _) = named.intent { XCTAssertEqual(target, "all-team") } else { XCTFail(named.why) }
+    }
+
     func testStepsLatency() {
         let s = "click on this, click on that, open Notes and Calendar, type this and press send"
         var ms: [Double] = []

@@ -183,7 +183,10 @@ enum ChatRouter {
             var bestGram: Gram?
             for full in ([entry.name] + entry.aliases).map(TextKit.key) where !full.isEmpty {
                 let parts = TextKit.words(entry.name)
-                let firstName = parts.count >= 2 && full == TextKit.key(entry.name) ? parts[0] : ""
+                // The first name counts alone only for a name of words with spaces ("Prakash Iyer"). A channel name
+                // such as "all-team" is one name: the common word "all" must not match it (live test, 2026-11-03).
+                let spaced = entry.name.split(whereSeparator: \.isWhitespace).count >= 2
+                let firstName = spaced && parts.count >= 2 && full == TextKit.key(entry.name) ? parts[0] : ""
                 for g in grams where g.text.count >= 3 || g.text == full {
                     var t = TextKit.similarity(g.text, full)
                     if !firstName.isEmpty { t = max(t, 0.95 * TextKit.similarity(g.text, firstName)) }

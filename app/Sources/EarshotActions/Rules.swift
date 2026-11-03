@@ -65,10 +65,13 @@ enum ActionText {
         return String(view)
     }
 
-    /// Removes e-mail addresses and cuts long labels.
+    /// Removes e-mail addresses and a browser's memory note, and cuts long labels.
+    /// A browser tab title can end with its hover note "- Memory usage - 547 MB" (live test, 2026-11-03).
     static func cleanLabel(_ s: String) -> String {
         let squashed = squash(s).replacingOccurrences(of: #"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"#, with: "[email]",
                                                       options: .regularExpression)
+            .replacingOccurrences(of: #"(?i)\s*[-–—]\s*memory usage\s*[-–—:]\s*[\d.,]+\s*[kmg]b\s*$"#, with: "",
+                                  options: .regularExpression)
         return squashed.count > 100 ? String(squashed.prefix(100)) : squashed
     }
 }

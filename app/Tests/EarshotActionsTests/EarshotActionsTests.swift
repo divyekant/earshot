@@ -234,6 +234,10 @@ final class ActionRulesTests: XCTestCase {
     func testCleanLabel() {
         XCTAssertEqual(ActionText.cleanLabel("Mail ravi@example.com now"), "Mail [email] now")
         XCTAssertEqual(ActionText.cleanLabel(String(repeating: "a", count: 150)).count, 100)
+        // A browser tab title with its hover note (live test, 2026-11-03).
+        XCTAssertEqual(ActionText.cleanLabel("(1) Home / X - Memory usage - 547 MB"), "(1) Home / X")
+        XCTAssertEqual(ActionText.cleanLabel("Docs - Memory usage - 1.2 GB"), "Docs")
+        XCTAssertEqual(ActionText.cleanLabel("Memory usage report"), "Memory usage report")
     }
 }
 
