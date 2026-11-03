@@ -33,8 +33,12 @@ public struct DetectorConfig: Sendable, Equatable {
     /// With a turn model (`pauseChecks`): after this much time with no speech frame, the trigger asks the model if
     /// the turn is done. The 300 ms comes from Hex's Smart Turn experiment (anomalyco/hex f748282, MIT).
     public var pauseCheckMs: Double = 300
-    /// No check before this much speech in the turn (Hex: 200 ms).
+    /// No check before this much speech in the turn (Hex: 200 ms). After the wake phrase, only the speech after
+    /// the phrase counts: the model hears "hey atlas" alone as a finished turn (live test 2026-11-03, P 0.96-0.99).
     public var pauseCheckMinimumSpeechMs: Double = 200
+    /// After the wake phrase, the command starts only after this much speech (in total, not in a row). Less
+    /// speech is a sound, a breath or the end of the phrase: the turn keeps the grace time for the command.
+    public var commandStartMs: Double = 200
     /// Frames above the threshold in a row before `start`. 3 frames of 20 ms is 60 ms.
     public var startFrames: Int = 3
     /// Quiet after speech that ends the turn. Commands have short pauses, for example after "Slack Ravi,".
@@ -81,6 +85,10 @@ public struct SpeechDetector: Sendable {
     public var dictationTurn = false
     /// How the last turn ended, for the log. Nil before the first end, and after a drop.
     public private(set) var lastEnd: TurnEnd?
+    /// Speech since the command started, for the pause check. The wake phrase does not count.
+    private var checkSpeechMs: Double = 0
+    /// Speech after the wake phrase while the turn waits for the command.
+    private var commandLoudMs: Double = 0
     /// True if the trigger has a turn model. Then each pause gives one check (`takePauseCheck`).
     public var pauseChecks = false
     /// The end silence of this pause, after the turn model heard a pause inside the turn. Nil: the usual end silence.
@@ -116,6 +124,7 @@ public struct SpeechDetector: Sendable {
             guard loudRun >= config.startFrames else { return nil }
             inTurn = true
             speechMs = Double(loudRun) * config.frameMs
+            checkSpeechMs = speechMs
             turnMs = speechMs
             quietMs = 0
             softMs = 0
@@ -126,10 +135,13 @@ public struct SpeechDetector: Sendable {
 
         turnMs += config.frameMs
         if awaitingCommand {
-            // After the wake phrase: wait for the command. A short pause after the phrase is normal.
-            loudRun = loud ? loudRun + 1 : 0
-            if loudRun >= config.startFrames {
+            // After the wake phrase: wait for the command. A short pause after the phrase is normal. A short sound
+            // (the start sound's echo, a breath) does not start the command: the speech in total must reach
+            // `commandStartMs`. Live test 2026-11-03: a pause after the phrase lost the command 7 times.
+            if loud { commandLoudMs += config.frameMs }
+            if commandLoudMs >= config.commandStartMs {
                 awaitingCommand = false
+                checkSpeechMs = commandLoudMs
                 quietMs = 0
                 softMs = 0
                 loudRun = 0
@@ -151,12 +163,13 @@ public struct SpeechDetector: Sendable {
         // Measure against the floor before this frame moved it. The floor moves little in one frame.
         let quiet = level <= quietDbBefore
         if loud {
-            speechMs += config.frameMs; quietMs = 0; softMs = 0
+            speechMs += config.frameMs; checkSpeechMs += config.frameMs; quietMs = 0; softMs = 0
             pauseChecked = false; pauseCheckDue = false; pauseWaitMs = nil
         } else {
             softMs += config.frameMs
             quietMs = quiet ? quietMs + config.frameMs : 0
-            if pauseChecks, !pauseChecked, softMs >= config.pauseCheckMs, speechMs >= config.pauseCheckMinimumSpeechMs {
+            if pauseChecks, !pauseChecked, softMs >= config.pauseCheckMs,
+               checkSpeechMs >= config.pauseCheckMinimumSpeechMs {
                 pauseChecked = true
                 pauseCheckDue = true
             }
@@ -252,6 +265,8 @@ public struct SpeechDetector: Sendable {
         waitForQuiet = false
         awaitingCommand = !heardSpeech
         self.graceMs = graceMs
+        commandLoudMs = 0
+        checkSpeechMs = 0
         self.quietMs = max(0, quietMs)
         softMs = self.quietMs
         pauseChecked = false; pauseCheckDue = false; pauseWaitMs = nil

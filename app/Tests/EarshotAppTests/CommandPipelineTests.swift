@@ -136,6 +136,23 @@ final class CommandPipelineTests: XCTestCase {
         XCTAssertEqual(engine.captures, [0])
     }
 
+    // Live test 2026-11-03: a go-on was missed with no reason in the log. The note now names the reason.
+    func testGoOnMissNamesTheReason() {
+        let t0 = Date(timeIntervalSince1970: 1000)
+        let typed: (at: Date, app: String?) = (t0, "com.example.notes")
+        XCTAssertNil(CommandPipeline.goOnMiss(lastTyped: typed, front: "com.example.notes", started: t0.addingTimeInterval(2),
+                                              command: false))
+        XCTAssertEqual(CommandPipeline.goOnMiss(lastTyped: typed, front: "com.example.notes",
+                                                started: t0.addingTimeInterval(2), command: true),
+                       "the first sentence starts with a command")
+        XCTAssertEqual(CommandPipeline.goOnMiss(lastTyped: typed, front: "com.example.other",
+                                                started: t0.addingTimeInterval(1), command: false),
+                       "another app in front")
+        XCTAssertEqual(CommandPipeline.goOnMiss(lastTyped: typed, front: "com.example.notes",
+                                                started: t0.addingTimeInterval(3.4), command: false),
+                       "started 3.4 s after the typing (limit 3 s)")
+    }
+
     // R-ON-1, I-2: the turn model checks go into the note of the turn record, not into records of their own.
     func testTurnChecksGoToTheTurnNote() async {
         let (p, _, _) = make("hey jarvis open notes")
