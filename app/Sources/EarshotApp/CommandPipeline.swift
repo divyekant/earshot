@@ -57,6 +57,9 @@ final class CommandPipeline {
     /// within `sendAfterTypingSeconds`, in the same app (the owner's choice, D-12, R-ON-5).
     private(set) var lastTyped: (at: Date, app: String?)?
     static let sendAfterTypingSeconds: TimeInterval = 5
+    /// The start of the open turn (begin()). The armed window and the send window test the start of the next turn,
+    /// so a long sentence that starts in time still counts (live test: a 9.7 s sentence after "type" was lost).
+    private var turnStartedAt: Date?
     /// The number of chat apps whose names were not ready within the names budget in this command.
     var namesNotReady: () -> Int = { 0 }
     /// The cached menu items of an app as screen elements (MenuCache.cached). It must not read: a menu read takes up to 1 s.
@@ -88,16 +91,23 @@ final class CommandPipeline {
 
     /// The input opened a turn (key down, or speech start in always-on).
     func begin() -> String? {
+        turnStartedAt = now()
         do { try engine.begin(); return nil } catch { return "speech did not start: \(error)" }
     }
 
     /// The input dropped the turn. The text is not used.
-    func cancel() async { _ = try? await engine.end() }
+    func cancel() async {
+        turnStartedAt = nil
+        _ = try? await engine.end()
+    }
 
     /// The input closed the turn (key up, or end of speech). Runs the whole command, and returns the log record.
     @discardableResult
     func finish(mode: InputMode) async -> ActivityRecord {
         let clock = Stopwatch()
+        // A finish with no begin (the tests, the Test tab) starts now.
+        let started = turnStartedAt ?? now()
+        turnStartedAt = nil
         speechSummary = ""  // a speech error must not show the line of the last command
         var stages: [String: Double] = [:]
         let wake = mode == .alwaysOn ? pendingWake : nil
@@ -157,7 +167,7 @@ final class CommandPipeline {
         // One turn only. A voice that the wake check dropped never reaches this point, so it does not disarm.
         if let until = armedUntil {
             armedUntil = nil
-            if now() <= until, !CommandRouter.hasCommandWord(text, context: context) {
+            if started <= until, !CommandRouter.hasCommandWord(text, context: context) {
                 return await typeArmed(text, mode: mode, context: context, rows: rows, stages: stages, clock)
             }
         }
@@ -240,7 +250,7 @@ final class CommandPipeline {
         // voice of the owner, within 5 s after earshot typed in the same app (D-12). The action rules check it again.
         var ownerSend = false
         if mode == .alwaysOn, intent == .send {
-            if let block = Self.alwaysOnSendBlock(ownerVoice: ownerVoice, lastTyped: lastTyped, now: now(), front: front) {
+            if let block = Self.alwaysOnSendBlock(ownerVoice: ownerVoice, lastTyped: lastTyped, now: started, front: front) {
                 return done(heard: text, intent: describe, tier: result.tier, ok: false, note: block, stages: stages, clock, why: why)
             }
             ownerSend = true

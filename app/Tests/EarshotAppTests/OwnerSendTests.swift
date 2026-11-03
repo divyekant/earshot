@@ -137,4 +137,26 @@ final class OwnerSendTests: XCTestCase {
         XCTAssertEqual(runner.runs.first?.0, .typeText("the blue fox jumps"))
         XCTAssertEqual(runner.runs.last?.0, .send)
     }
+
+    /// The send window also tests the start of the "send" turn.
+    func testSendTurnThatStartsInTheWindowSends() async {
+        let (p, e, runner) = make()
+        await say(p, e, "type the blue fox jumps")
+        clock += 4
+        _ = p.begin()
+        clock += 2
+        await say(p, e, "send")
+        XCTAssertEqual(sends(runner.runs).count, 1)
+    }
+
+    func testSendTurnThatStartsAfterTheWindowIsBlocked() async {
+        let (p, e, runner) = make()
+        await say(p, e, "type the blue fox jumps")
+        clock += 5.5
+        _ = p.begin()
+        clock += 0.5
+        let r = await say(p, e, "send")
+        XCTAssertTrue(sends(runner.runs).isEmpty)
+        XCTAssertTrue(r.note.contains("too late"), r.note)
+    }
 }
