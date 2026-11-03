@@ -51,8 +51,9 @@ final class CommandPipeline {
     /// The wake of the open always-on turn, for the log and to remove the phrase by time (D-11). Nil for a hold-key
     /// turn, and for a follow-up turn in which the owner did not say the phrase again.
     var pendingWake: WakeHit?
-    /// The voice score of the follow-up turn that ends now (WakeTrigger.lastFollowUpVoiceScore). Nil if no check ran.
-    var followUpVoiceScore: Double?
+    /// The voice check of the always-on turn that ends now (WakeTrigger.onTurnVoice), for the log and for an
+    /// always-on "send" (D-12). Nil if no check ran: no voice is enrolled, or the turn was too short.
+    var turnVoice: TurnVoice?
     /// The last typing that worked: the time and the front app. In always-on mode, "send" alone may follow it
     /// within `sendAfterTypingSeconds`, in the same app (the owner's choice, D-12, R-ON-5).
     private(set) var lastTyped: (at: Date, app: String?)?
@@ -91,6 +92,25 @@ final class CommandPipeline {
     /// into the focused field (the owner's choice, R-NV-4). One turn only. Nil when not armed.
     private(set) var armedUntil: Date?
     static let armedSeconds: TimeInterval = 5
+    /// A chain of commands that stopped at a step (I-28). The next turn within `chainAnswerSeconds` can answer it:
+    /// "go on" (skip the step and run the rest), "stop", "yes" (run the best guess), or the step again in new words.
+    /// dk (2026-11-03): ask first when a step fails.
+    struct PendingChain {
+        var steps: [String]
+        /// The index of the step that stopped.
+        var failed: Int
+        /// The router's best guess for an unsure step, and its tier.
+        var guess: (Intent, RouterTier)?
+        var until: Date
+    }
+    private(set) var pendingChain: PendingChain?
+    static let chainAnswerSeconds: TimeInterval = 10
+    /// The wait after a step, before earshot reads the screen again. After "open <app>", earshot first waits until
+    /// the app is in front, for at most `chainFrontWaitMs`.
+    static let chainSettleMs = 400
+    static let chainFrontWaitMs = 2000
+    /// The sleep, for the tests.
+    var sleepMs: (Int) async -> Void = { ms in try? await Task.sleep(nanoseconds: UInt64(max(0, ms)) * 1_000_000) }
     /// The clock, for the tests.
     var now: () -> Date = Date.init
     /// The screenshot picker (D-10). Nil is off, the default (ScreenPickerFactory.make).
@@ -113,6 +133,8 @@ final class CommandPipeline {
     func begin() -> String? {
         turnStartedAt = now()
         turnChecks = []
+        // The voice check of a turn comes at its end. A check that is still here belongs to an older turn.
+        turnVoice = nil
         do { try engine.begin(); return nil } catch { return "speech did not start: \(error)" }
     }
 
@@ -137,14 +159,18 @@ final class CommandPipeline {
         var stages: [String: Double] = [:]
         let wake = mode == .alwaysOn ? pendingWake : nil
         pendingWake = nil
-        let followScore = followUpVoiceScore
-        followUpVoiceScore = nil
+        let voice = mode == .alwaysOn ? turnVoice : nil
+        turnVoice = nil
         let checks = turnChecks
         turnChecks = []
-        // The voice of an always-on turn was checked: a wake in the owner's voice, or a follow-up with a score.
-        let ownerVoice = mode == .alwaysOn && (wake.map { $0.voiceScore != nil && $0.isOwner } ?? (followScore != nil))
+        // The voice of the always-on turn passed the check (E6). A turn that failed it does not reach here.
+        let ownerVoice = voice?.passed == true
+        // The check ran before the turn ended, so its time is part of the command path (E6).
+        if let voice, voice.byTurn { stages["voice.turn"] = (voice.ms * 10).rounded() / 10 }
         var text: String
         var words: [TimedWord] = []
+        // An always-on turn ended on a pause that the detector heard: no more audio to wait for (R-ON-1, R-SP-1).
+        if mode == .alwaysOn { (engine as? CaptureControl)?.setNextCapture(seconds: 0) }
         do {
             let heard = try await engine.end()
             text = heard.text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -165,13 +191,12 @@ final class CommandPipeline {
             // voice (D-11). So the text is for earshot. The speech engine starts before the phrase: remove it.
             let removed = Self.removePhrase(text, words: words, wake: wake, phrase: wakePhrase)
             text = removed.text
-            if let wake {
-                speechSummary = Self.wakeSummary(wake) + ", phrase removed " + removed.how
-                    + (speechSummary.isEmpty ? "" : " · " + speechSummary)
-            }
-            if !checks.isEmpty {
-                speechSummary += (speechSummary.isEmpty ? "" : " · ") + "turn: " + checks.joined(separator: "; ")
-            }
+            var parts: [String] = []
+            if let wake { parts.append(Self.wakeSummary(wake) + ", phrase removed " + removed.how) }
+            parts.append(voice?.summary ?? "voice not checked")
+            if !speechSummary.isEmpty { parts.append(speechSummary) }
+            if !checks.isEmpty { parts.append("turn: " + checks.joined(separator: "; ")) }
+            speechSummary = parts.joined(separator: " · ")
         }
         guard !text.isEmpty else { return done(heard: "", intent: "none", tier: .none, ok: false, note: "no words", stages: stages, clock, quiet: true) }
 
@@ -193,6 +218,15 @@ final class CommandPipeline {
         let front = frontBundleID().flatMap { $0 == ownBundleID ? nil : $0 }
         var context = RouteContext(apps: rows, names: known, frontBundleID: front, screen: withMenus(screen, front: front))
 
+        // The answer to a chain that stopped at a step (I-28). In always-on mode, only in the owner's checked voice.
+        if let chain = pendingChain {
+            pendingChain = nil
+            if started <= chain.until, mode != .alwaysOn || ownerVoice,
+               let record = await answerChain(chain, text, mode: mode, ownerVoice: ownerVoice, context: context, rows: rows,
+                                              stages: stages, clock) {
+                return record
+            }
+        }
         // A bare "type" armed this turn: its words go into the focused field, unless its first sentence is a command.
         // A command word later in the text is text. One turn only. A voice that the wake check dropped never
         // reaches this point, so it does not disarm.
@@ -209,6 +243,22 @@ final class CommandPipeline {
            !CommandRouter.startsWithCommand(text, context: context) {
             return await typeArmed(text, mode: mode, context: context, rows: rows, stages: stages, clock, continues: true)
         }
+        // Why a turn after an always-on typing did not go on with the text. For the log: no words (R-ON-1).
+        if mode == .alwaysOn, lastTypedAlwaysOn, let t = lastTyped,
+           let miss = Self.goOnMiss(lastTyped: t, front: front, started: started,
+                                    command: CommandRouter.startsWithCommand(text, context: context)) {
+            speechSummary += (speechSummary.isEmpty ? "" : " · ") + "go-on: no, " + miss
+        }
+
+        // A chain of commands in one sentence (I-28): each step in order, each on a new screen read.
+        let cutClock = Stopwatch()
+        let steps = CommandRouter.steps(text, context: context)
+        if steps.count > 1 {
+            stages["steps.cut"] = cutClock.ms
+            return await runChain(steps, from: 0, heard: text, mode: mode, context: context, rows: rows, stages: stages, clock)
+        }
+        // One step with its send phrase made "and send" ("type hi, click send"): route that form.
+        if let one = steps.first, one != text { text = one }
 
         let routeClock = Stopwatch()
         var result = await router.route(text, context: context)
@@ -329,6 +379,20 @@ final class CommandPipeline {
         return (WakePhrase.strip(text, phrase: phrase, afterWake: wake != nil), "by text")
     }
 
+    /// Logs a teach step of the owner's voice (R-ON-3, E6): the phrase, the microphone, and the scores of the takes.
+    /// No audio and no text of speech.
+    @discardableResult
+    func voiceTaught(phrase: String, mic: String?, takeScores: [Double], templatesKept: Int, selfScore: Double,
+                     profiles: Int) -> ActivityRecord {
+        let takes = takeScores.map { String(format: "%.2f", $0) }.joined(separator: ", ")
+        let note = String(format: "voice taught: \"%@\" on %@, %ld of %ld phrases give a template, take scores %@, "
+                          + "voice self score %.2f, %ld voice profile%@", phrase, mic.map { "\"\($0)\"" } ?? "an unknown microphone",
+                          templatesKept, takeScores.count, takes, selfScore, profiles, profiles == 1 ? "" : "s")
+        let record = ActivityRecord(heard: "", intent: "none", tier: .none, ok: true, note: note, stages: [:])
+        try? log?.append(record)
+        return record
+    }
+
     /// Logs the partial matches of the wake phrase that did not fire (D-11), for the next test of the phrase.
     /// The record has only a count and the best part of the phrase: no audio and no text.
     @discardableResult
@@ -351,6 +415,18 @@ final class CommandPipeline {
         turnChecks.append(Self.turnCheckSummary(check))
     }
 
+    /// Keeps how the turn ended (the rule and the end silence), for the same note. It comes with or without the
+    /// turn model, so the log shows each end (R-ON-1, I-2).
+    func turnEnd(_ end: TurnEnd) {
+        turnChecks.append(Self.turnEndSummary(end))
+    }
+
+    /// The log text of a turn end, for example "end quiet: 560 ms quiet of 550 ms, turn 2140 ms".
+    static func turnEndSummary(_ end: TurnEnd) -> String {
+        String(format: "end %@: %.0f ms quiet of %.0f ms, turn %.0f ms",
+               end.rule.rawValue, end.silenceMs, end.endSilenceMs, end.turnMs)
+    }
+
     /// The log text of one turn check, for example "P 0.82 after 300 ms quiet: end, model 3.5 ms".
     static func turnCheckSummary(_ check: TurnCheck) -> String {
         let p = check.probability.map { String(format: "%.2f", $0) } ?? "none"
@@ -370,17 +446,18 @@ final class CommandPipeline {
         return String(format: "wake \"%@\", %@, preroll %.2f s", wake.phrase, voice, wake.prerollSeconds)
     }
 
-    /// Logs a wake phrase in a voice that is not the owner's (R-ON-3). Nothing ran. The record has no text,
-    /// because the speech engine did not run.
+    /// Logs a wake phrase in a voice that is not the owner's (R-ON-3): the voice of the phrase did not reach the gate.
+    /// Nothing ran. The record has no text, because the speech engine did not run. It shows no note and plays no
+    /// sound: other voices and room sounds set it off too often (live test, 2026-11-03). The log keeps the scores.
     @discardableResult
     func rejectedWake(_ wake: WakeHit, threshold: Double) -> ActivityRecord {
         let score = wake.voiceScore.map { String(format: "%.2f", $0) } ?? "none"
-        let note = String(format: "wake phrase in another voice (score %@, needs %.2f)", score, threshold)
+        var note = String(format: "wake phrase in another voice (score %@, needs %.2f)", score, threshold)
+        if let match = wake.matchScore {
+            note += String(format: ", match %.2f, worst part %.2f", match, wake.matchWorst ?? -1)
+        }
         let record = ActivityRecord(heard: "", intent: "none", tier: .none, ok: false, note: note, stages: [:])
         try? log?.append(record)
-        // The phrase matched: say so, so that the owner knows earshot heard it (live test, 19:06).
-        if showFeedback { feedback?.show("✗ not sure it was your voice: say \"\(wakePhrase), …\"", ok: false) }
-        if playSounds { playSound?(.failed) }
         return record
     }
 
@@ -411,6 +488,16 @@ final class CommandPipeline {
                     note: note, stages: stages, clock, why: continues ? "goes on with the last typing" : "armed by \"type\"")
     }
 
+    /// The reason a turn does not go on with the last always-on typing, or nil if it does.
+    static func goOnMiss(lastTyped t: (at: Date, app: String?), front: String?, started: Date, command: Bool) -> String? {
+        let late = started.timeIntervalSince(t.at)
+        if t.app == nil { return "no app of the last typing" }
+        if t.app != front { return "another app in front" }
+        if late > continueTypingSeconds { return String(format: "started %.1f s after the typing (limit %.0f s)", late, continueTypingSeconds) }
+        if command { return "the first sentence starts with a command" }
+        return nil
+    }
+
     /// Records a typing that worked, with the front app, for an always-on "send" alone (D-12).
     private func noteTyped(mode: InputMode) {
         lastTyped = (now(), frontBundleID().flatMap { $0 == ownBundleID ? nil : $0 })
@@ -429,6 +516,161 @@ final class CommandPipeline {
         lastTyped = nil
         sentThisTurn = out.ok
         return (out.ok, note + " · " + out.note)
+    }
+
+    // MARK: - A chain of commands (I-28)
+
+    /// Runs the steps from `first` on, in order. Each step has its own route and its own safety checks, the same as one
+    /// command. After each step, earshot waits for the screen to settle and reads it again. If a step is not a
+    /// command, is not sure, is blocked or fails, the chain stops there and asks (PendingChain). Steps that ran stay done.
+    /// - `forced`: the intent of step `first`, from the owner's "yes" to the best guess. The action rules still check it.
+    private func runChain(_ steps: [String], from first: Int, heard: String, mode: InputMode, context: RouteContext,
+                          rows: [AppEntry], stages: [String: Double], _ clock: Stopwatch,
+                          forced: (Intent, RouterTier)? = nil) async -> ActivityRecord {
+        var stages = stages
+        guard steps.count <= CommandRouter.maxSteps else {
+            return done(heard: heard, intent: "none", tier: .rules, ok: false,
+                        note: "\(steps.count) steps: say at most \(CommandRouter.maxSteps) steps", stages: stages, clock)
+        }
+        var context = context
+        var ran: [String] = []
+        var lastTier = RouterTier.rules
+        for i in first..<steps.count {
+            let n = i + 1
+            let step = steps[i]
+            if i > first {
+                let c = Stopwatch()
+                context = await readContext(context)
+                stages["step\(n).screen"] = c.ms
+            }
+            let routed: RouteResult
+            if i == first, let forced {
+                routed = RouteResult(intent: forced.0, confidence: 1, tier: forced.1, ms: 0, why: "your yes to the best guess")
+            } else {
+                let c = Stopwatch()
+                routed = await router.route(step, context: context)
+                stages["step\(n).route"] = c.ms
+            }
+            let (intent, tier, confidence, why, sendAfter) = (routed.intent, routed.tier, routed.confidence, routed.why,
+                                                              routed.sendAfter)
+            lastTier = tier
+            let describe = IntentText.describe(intent, apps: rows, screen: context.screen)
+            let sensitive = context.screen.map { SafetyPolicy.sensitive(url: $0.url, elements: $0.elements) != nil } ?? false
+
+            var block: String?
+            var guess: (Intent, RouterTier)?
+            if intent == .none {
+                block = "not a command (\(why))"
+            } else if confidence < SafetyPolicy.minimumConfidence {
+                block = "not sure (\(why))"
+                if !sensitive { guess = (intent, tier) }
+            } else if intent == .send, mode == .alwaysOn {
+                // dk's rule (D-12): in always-on mode, only "send" alone sends.
+                block = "say \"send\" on its own to send"
+            }
+            if let block {
+                return stopChain(steps, at: i, guess: guess, heard: heard, ran: ran, describe: describe, reason: block,
+                                 tier: tier, stages: stages, clock, why: why)
+            }
+
+            let types = Self.types(intent)
+            if types { pauseAlwaysOn(true) }
+            let command = CommandInfo(mode: mode, tier: tier, spokenTarget: CommandRouter.spokenTarget(step))
+            let outcome = await actions.run(intent, context: context, command: command)
+            if types { pauseAlwaysOn(false) }
+            for (k, v) in outcome.stages { stages["step\(n).action.\(k)"] = v }
+            if intent == .send { lastTyped = nil; sentThisTurn = outcome.ok }
+            if types, outcome.ok { noteTyped(mode: mode) }
+            var (ok, note) = (outcome.ok, outcome.note)
+            if sendAfter, types, outcome.ok {
+                (ok, note) = await sendAfterTyping(mode: mode, note: note, context: context, stages: &stages)
+            }
+            guard ok else {
+                return stopChain(steps, at: i, guess: nil, heard: heard, ran: ran, describe: describe, reason: note,
+                                 tier: tier, stages: stages, clock, why: why)
+            }
+            ran.append(describe + (note.isEmpty ? "" : " (\(note))"))
+            if i < steps.count - 1 { stages["step\(n).settle"] = await settle(after: intent, rows: rows) }
+        }
+        return done(heard: heard, intent: ran.joined(separator: " · then "), tier: lastTier, ok: true,
+                    note: "\(steps.count - first) step\(steps.count - first == 1 ? "" : "s") done", stages: stages, clock,
+                    why: "chain of \(steps.count) steps")
+    }
+
+    /// Stops a chain at step `i` and asks the owner (dk: "ask me first"). One fail sound for the chain.
+    private func stopChain(_ steps: [String], at i: Int, guess: (Intent, RouterTier)?, heard: String, ran: [String],
+                           describe: String, reason: String, tier: RouterTier, stages: [String: Double], _ clock: Stopwatch,
+                           why: String) -> ActivityRecord {
+        pendingChain = PendingChain(steps: steps, failed: i, guess: guess, until: now().addingTimeInterval(Self.chainAnswerSeconds))
+        var ask = "say \"go on\", \"stop\" or the step again"
+        if guess != nil { ask += ", or \"yes\" for: \(describe)" }
+        let note = "step \(i + 1) of \(steps.count) stopped: \(reason) · \(ask)"
+        let intent = ran.isEmpty ? "none" : ran.joined(separator: " · then ")
+        return done(heard: heard, intent: intent, tier: tier, ok: false, note: note, stages: stages, clock,
+                    why: "chain of \(steps.count) steps, step \(i + 1): \(why)")
+    }
+
+    /// The answer to a chain that stopped. Nil if the words are a new command: the normal path takes them.
+    private func answerChain(_ chain: PendingChain, _ text: String, mode: InputMode, ownerVoice: Bool, context: RouteContext,
+                             rows: [AppEntry], stages: [String: Double], _ clock: Stopwatch) async -> ActivityRecord? {
+        var words = SafetyPolicy.normalize(text).split(separator: " ").map(String.init)
+        while let f = words.first, ["ok", "okay", "yeah", "please", "uh", "um", "hey"].contains(f), words.count > 1 { words.removeFirst() }
+        while let l = words.last, ["please", "then", "now"].contains(l), words.count > 1 { words.removeLast() }
+        let phrase = words.joined(separator: " ")
+        let rest = chain.failed + 1
+        if ["go on", "skip", "skip it", "skip that", "continue", "next", "keep going"].contains(phrase) {
+            guard rest < chain.steps.count else {
+                return done(heard: text, intent: "none", tier: .rules, ok: true, note: "no steps left", stages: stages, clock)
+            }
+            return await runChain(chain.steps, from: rest, heard: text, mode: mode, context: context, rows: rows,
+                                  stages: stages, clock)
+        }
+        if ["stop", "stop it", "cancel", "no", "never mind", "nevermind"].contains(phrase) {
+            return done(heard: text, intent: "none", tier: .rules, ok: true,
+                        note: "chain stopped at step \(chain.failed + 1) of \(chain.steps.count)", stages: stages, clock)
+        }
+        if ["yes", "yes please", "do it", "yep", "yeah", "ok", "okay", "sure"].contains(phrase), let guess = chain.guess {
+            return await runChain(chain.steps, from: chain.failed, heard: text, mode: mode, context: context, rows: rows,
+                                  stages: stages, clock, forced: guess)
+        }
+        // The last step again: an ordinary command (and an always-on "send" alone keeps its own rule, D-12).
+        guard rest < chain.steps.count else { return nil }
+        // The step again in new words, then the rest.
+        var steps = chain.steps
+        steps.replaceSubrange(chain.failed...chain.failed, with: CommandRouter.steps(text, context: context))
+        return await runChain(steps, from: chain.failed, heard: text, mode: mode, context: context, rows: rows,
+                              stages: stages, clock)
+    }
+
+    /// The context with a new screen read and the front app now. earshot's own window is never a target.
+    private func readContext(_ context: RouteContext) async -> RouteContext {
+        var c = context
+        let seen = await actions.screen()
+        let front = frontBundleID().flatMap { $0 == ownBundleID ? nil : $0 }
+        c.frontBundleID = front
+        c.screen = withMenus(seen?.bundleID == ownBundleID ? nil : seen, front: front)
+        return c
+    }
+
+    /// Waits after a step, so that the next step reads the new screen. Returns the wait in ms.
+    private func settle(after intent: Intent, rows: [AppEntry]) async -> Double {
+        let c = Stopwatch()
+        switch intent {
+        case .openApp(let id), .openChat(let id, _, _):
+            if let bundle = rows.first(where: { $0.id == id })?.bundleID {
+                var waited = 0
+                while frontBundleID() != bundle, waited < Self.chainFrontWaitMs {
+                    await sleepMs(100)
+                    waited += 100
+                }
+            }
+            await sleepMs(Self.chainSettleMs)
+        case .typeText, .typeInto, .send:
+            await sleepMs(100)
+        default:
+            await sleepMs(Self.chainSettleMs)
+        }
+        return c.ms
     }
 
     /// The reason to block an always-on "send", or nil (D-12, R-ON-5). It sends only if all are true:
@@ -451,17 +693,21 @@ final class CommandPipeline {
         return e
     }
 
-    /// Logs a follow-up turn that earshot dropped because the voice is not the owner's (R-ON-3). Nothing ran.
-    /// The record has no text: the words were not the owner's.
+    /// Logs an always-on turn that earshot dropped because the voice of the turn is not the owner's, or because a
+    /// follow-up turn was too short for the check (R-ON-3, E6). Nothing ran. The record has no text: the words were
+    /// not the owner's. It uses and clears `turnVoice` and `pendingWake`.
+    /// It shows no note and plays no sound: other voices, a TV and room sounds set it off too often (live test,
+    /// 2026-11-03). The log keeps the scores and the lengths.
     @discardableResult
-    func droppedFollowUp(_ why: String, seconds: Double? = nil) -> ActivityRecord {
-        let length = seconds.map { String(format: ", audio %.2f s", $0) } ?? ""
-        let record = ActivityRecord(heard: "", intent: "none", tier: .none, ok: false, note: "follow-up dropped: \(why)\(length)",
-                                    stages: [:])
+    func droppedTurn(_ why: String) -> ActivityRecord {
+        let voice = turnVoice, wake = pendingWake
+        turnVoice = nil
+        pendingWake = nil
+        var note = (voice?.kind == .wake || wake != nil ? "wake turn" : "follow-up") + " dropped: " + why
+        if let wake { note += " · " + Self.wakeSummary(wake) }
+        if let voice { note += " · " + voice.summary }
+        let record = ActivityRecord(heard: "", intent: "none", tier: .none, ok: false, note: note, stages: [:])
         try? log?.append(record)
-        // The owner may have spoken: say so, and how to go on (dk: "I do not know if send works").
-        if showFeedback { feedback?.show("✗ not sure it was your voice: say \"\(wakePhrase), …\"", ok: false) }
-        if playSounds { playSound?(.failed) }
         return record
     }
 

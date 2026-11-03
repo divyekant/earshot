@@ -5,6 +5,24 @@ import XCTest
 @testable import EarshotSpeech
 
 final class PiecesTests: XCTestCase {
+    // Hex study (I-1): the hold-key edges are 450 ms before the press and 200 ms after the release.
+    func testHoldKeyEdges() {
+        XCTAssertEqual(MicrophoneFeed(format: AudioUtil.parakeetFormat).prerollSeconds, 0.45)
+        XCTAssertEqual(TailPad.captureSeconds, 0.2)
+    }
+
+    // An always-on turn sets 0 for the next end only. The end after it waits the usual time again.
+    func testNextCaptureIsForOneEnd() async {
+        let feed = MicrophoneFeed(format: AudioUtil.parakeetFormat)
+        feed.setNextCapture(seconds: 0)
+        var start = DispatchTime.now().uptimeNanoseconds
+        await feed.end(captureSeconds: 0.3)
+        XCTAssertLessThan(Double(DispatchTime.now().uptimeNanoseconds - start) / 1e6, 150, "no wait after setNextCapture(0)")
+        start = DispatchTime.now().uptimeNanoseconds
+        await feed.end(captureSeconds: 0.3)
+        XCTAssertGreaterThanOrEqual(Double(DispatchTime.now().uptimeNanoseconds - start) / 1e6, 290, "the usual wait again")
+    }
+
     func testPrerollKeepsOnlyTheLimit() {
         var p = Preroll<Int>(limitFrames: 250)
         for i in 0..<10 { p.add(i, frames: 100) }

@@ -69,7 +69,8 @@ final class ArmedDictationTests: XCTestCase {
         let r = await say(p, e, "made up secret words", .alwaysOn)
         XCTAssertTrue(runner.runs.isEmpty)
         // A password field makes the page a sign-in page (SafetyPolicy.sensitive), so that reason comes first.
-        XCTAssertEqual(r.note, "type: a sign-in, code or payment page")
+        // The always-on log line also says that no check of the turn voice ran (E6).
+        XCTAssertEqual(r.note, "type: a sign-in, code or payment page · speech: voice not checked")
     }
 
     func testNoFocusedFieldLogsTheReason() async {
@@ -79,7 +80,7 @@ final class ArmedDictationTests: XCTestCase {
         let r = await say(p, e, "the blue fox jumps", .alwaysOn)
         XCTAssertTrue(runner.runs.isEmpty)
         XCTAssertFalse(r.ok)
-        XCTAssertEqual(r.note, "type: no focused text field")
+        XCTAssertEqual(r.note, "type: no focused text field · speech: voice not checked")
     }
 
     func testCommandWordInTheArmedTurnRunsAsACommand() async {

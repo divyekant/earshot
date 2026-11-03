@@ -49,3 +49,20 @@ The script does these steps in order:
 | `eval_far.py` | The spotter and the templates on the far-field commands |
 | `analyse.py` | Hit rate, false wakes, sound-alikes and delay for each method |
 | `run_all.sh` | All steps in order |
+
+## Voice check bench (E6)
+
+These scripts measure the owner voice check. The record is [E6](../../docs/experiments/E6-voice-check.md). They use the same tools (`uv sync`) and a `voice/` folder in the data folder.
+
+| Folder | Content | Source |
+|---|---|---|
+| `voice/wespeaker.onnx` | WeSpeaker ResNet34-LM in ONNX, the twin of the app's Core ML voice model | [Wespeaker/wespeaker-voxceleb-resnet34-LM](https://huggingface.co/Wespeaker/wespeaker-voxceleb-resnet34-LM), file `voxceleb_resnet34_LM.onnx` (CC BY 4.0) |
+| `voice/LibriSpeech/dev-clean-2/` | Mini LibriSpeech, 26 speakers | [openslr.org/31](https://www.openslr.org/31), file `dev-clean-2.tar.gz` (CC BY 4.0) |
+
+| File | What it does |
+|---|---|
+| `voice_bench.py` | The mel features and the trim of the app, and the padding study: zero, repeat and no padding; mean, max and top-2 of the takes |
+| `voice_joint.py` | The phrase as a gate, then the whole turn as the decision |
+| `voice_lengths.py` | The owner and other voices at each speech length, for the limit line |
+
+Run each one with `uv run python <file>`. Each run takes about 10 to 20 minutes on one CPU.

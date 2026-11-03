@@ -91,6 +91,24 @@ final class WakePartsTests: XCTestCase {
         XCTAssertNil(SpeechTrim.span(quiet))
     }
 
+    /// E6: the voice check of a whole turn scores the speech, not the pause between the phrase and the command.
+    func testCondensedCutsLongPausesInside() {
+        let quiet = [Float](repeating: 0.0005, count: 8000)                       // 500 ms
+        let tone = (0..<8000).map { Float(sin(Double($0) * 0.1) * 0.1) }           // 500 ms
+        let shortPause = [Float](repeating: 0.0005, count: 3200)                  // 200 ms: it stays
+        let longPause = [Float](repeating: 0.0005, count: 16000)                  // 1 s: it becomes 300 ms
+        let turn = quiet + tone + shortPause + tone + longPause + tone + quiet
+        let out = SpeechTrim.condensed(turn)
+        // 3 tones, the short pause, 300 ms of the long pause, and 150 ms at each end, to the 20 ms frame.
+        let expected = 3 * 8000 + 3200 + 4800 + 2 * 2400
+        XCTAssertEqual(Double(out.count), Double(expected), accuracy: 2 * 320)
+        XCTAssertLessThan(out.count, SpeechTrim.trim(turn).count - 10000, "the long pause is cut")
+        XCTAssertEqual(SpeechTrim.condensed(tone + tone).count, SpeechTrim.trim(tone + tone).count,
+                       "with no long pause, it is the same as trim")
+        XCTAssertTrue(SpeechTrim.condensed(quiet).isEmpty)
+        XCTAssertTrue(SpeechTrim.condensed([]).isEmpty)
+    }
+
     func testTemplateCutFollowsTheSpeech() {
         // 100 frames of 40 ms. The take has 0.3 s of quiet before it (WakeTemplates.leadSamples).
         let frames = (0..<100).map { [Float](repeating: Float($0), count: 4) }

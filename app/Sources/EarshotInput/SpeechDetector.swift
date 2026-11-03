@@ -1,8 +1,9 @@
+import EarshotCore
 import Foundation
 
 /// What the speech detector reports.
 public enum SpeechEvent: Sendable, Equatable {
-    /// Speech started. Start to listen. The speech engine keeps 250 ms of audio before `begin`, so the first word is kept.
+    /// Speech started. Start to listen. The speech engine keeps 450 ms of audio before `begin`, so the first word is kept.
     case start
     /// The turn ended: speech, then `endSilence` of quiet. Stop, and use the text.
     case end
@@ -32,8 +33,12 @@ public struct DetectorConfig: Sendable, Equatable {
     /// With a turn model (`pauseChecks`): after this much time with no speech frame, the trigger asks the model if
     /// the turn is done. The 300 ms comes from Hex's Smart Turn experiment (anomalyco/hex f748282, MIT).
     public var pauseCheckMs: Double = 300
-    /// No check before this much speech in the turn (Hex: 200 ms).
+    /// No check before this much speech in the turn (Hex: 200 ms). After the wake phrase, only the speech after
+    /// the phrase counts: the model hears "hey atlas" alone as a finished turn (live test 2026-11-03, P 0.96-0.99).
     public var pauseCheckMinimumSpeechMs: Double = 200
+    /// After the wake phrase, the command starts only after this much speech (in total, not in a row). Less
+    /// speech is a sound, a breath or the end of the phrase: the turn keeps the grace time for the command.
+    public var commandStartMs: Double = 200
     /// Frames above the threshold in a row before `start`. 3 frames of 20 ms is 60 ms.
     public var startFrames: Int = 3
     /// Quiet after speech that ends the turn. Commands have short pauses, for example after "Slack Ravi,".
@@ -78,6 +83,12 @@ public struct SpeechDetector: Sendable {
     /// True if the open turn holds dictated text. It uses `config.dictationMaximumTurnMs`, and the limit ends the turn
     /// with its text. The wake trigger sets it at the start of a turn, with `endSilenceOverrideMs`.
     public var dictationTurn = false
+    /// How the last turn ended, for the log. Nil before the first end, and after a drop.
+    public private(set) var lastEnd: TurnEnd?
+    /// Speech since the command started, for the pause check. The wake phrase does not count.
+    private var checkSpeechMs: Double = 0
+    /// Speech after the wake phrase while the turn waits for the command.
+    private var commandLoudMs: Double = 0
     /// True if the trigger has a turn model. Then each pause gives one check (`takePauseCheck`).
     public var pauseChecks = false
     /// The end silence of this pause, after the turn model heard a pause inside the turn. Nil: the usual end silence.
@@ -113,6 +124,7 @@ public struct SpeechDetector: Sendable {
             guard loudRun >= config.startFrames else { return nil }
             inTurn = true
             speechMs = Double(loudRun) * config.frameMs
+            checkSpeechMs = speechMs
             turnMs = speechMs
             quietMs = 0
             softMs = 0
@@ -123,10 +135,13 @@ public struct SpeechDetector: Sendable {
 
         turnMs += config.frameMs
         if awaitingCommand {
-            // After the wake phrase: wait for the command. A short pause after the phrase is normal.
-            loudRun = loud ? loudRun + 1 : 0
-            if loudRun >= config.startFrames {
+            // After the wake phrase: wait for the command. A short pause after the phrase is normal. A short sound
+            // (the start sound's echo, a breath) does not start the command: the speech in total must reach
+            // `commandStartMs`. Live test 2026-11-03: a pause after the phrase lost the command 7 times.
+            if loud { commandLoudMs += config.frameMs }
+            if commandLoudMs >= config.commandStartMs {
                 awaitingCommand = false
+                checkSpeechMs = commandLoudMs
                 quietMs = 0
                 softMs = 0
                 loudRun = 0
@@ -135,6 +150,7 @@ public struct SpeechDetector: Sendable {
                 if quietMs >= graceMs {
                     // No command after the phrase. End, not drop: the command can be in the audio before the
                     // wake ("hey jarvis, stop" said fast). The speech engine has it, and an empty text does nothing.
+                    lastEnd = TurnEnd(rule: .grace, endSilenceMs: graceMs, silenceMs: quietMs, turnMs: turnMs)
                     inTurn = false
                     awaitingCommand = false
                     quietMs = 0
@@ -147,12 +163,13 @@ public struct SpeechDetector: Sendable {
         // Measure against the floor before this frame moved it. The floor moves little in one frame.
         let quiet = level <= quietDbBefore
         if loud {
-            speechMs += config.frameMs; quietMs = 0; softMs = 0
+            speechMs += config.frameMs; checkSpeechMs += config.frameMs; quietMs = 0; softMs = 0
             pauseChecked = false; pauseCheckDue = false; pauseWaitMs = nil
         } else {
             softMs += config.frameMs
             quietMs = quiet ? quietMs + config.frameMs : 0
-            if pauseChecks, !pauseChecked, softMs >= config.pauseCheckMs, speechMs >= config.pauseCheckMinimumSpeechMs {
+            if pauseChecks, !pauseChecked, softMs >= config.pauseCheckMs,
+               checkSpeechMs >= config.pauseCheckMinimumSpeechMs {
                 pauseChecked = true
                 pauseCheckDue = true
             }
@@ -160,6 +177,8 @@ public struct SpeechDetector: Sendable {
 
         if dictationTurn {
             if turnMs >= config.dictationMaximumTurnMs {
+                lastEnd = TurnEnd(rule: .limit, endSilenceMs: endSilenceOverrideMs ?? config.endSilenceMs,
+                                  silenceMs: softMs, turnMs: turnMs)
                 inTurn = false
                 quietMs = 0
                 softMs = 0
@@ -168,10 +187,12 @@ public struct SpeechDetector: Sendable {
         } else if turnMs >= config.maximumTurnMs { return forcedStop() }
         let endSilence = pauseWaitMs ?? endSilenceOverrideMs ?? config.endSilenceMs
         if quietMs >= endSilence || softMs >= endSilence + config.softEndExtraMs {
+            lastEnd = TurnEnd(rule: quietMs >= endSilence ? .quiet : .soft, endSilenceMs: endSilence,
+                              silenceMs: softMs, turnMs: turnMs)
             inTurn = false
             quietMs = 0
             softMs = 0
-            if speechMs < config.minimumSpeechMs { return .drop("speech shorter than \(Int(config.minimumSpeechMs)) ms") }
+            if speechMs < config.minimumSpeechMs { lastEnd = nil; return .drop("speech shorter than \(Int(config.minimumSpeechMs)) ms") }
             return .end
         }
         return nil
@@ -196,6 +217,8 @@ public struct SpeechDetector: Sendable {
     /// The turn model heard the end of the turn: ends the open turn now. Returns nil if no turn is open.
     public mutating func endTurnNow() -> SpeechEvent? {
         guard inTurn, !awaitingCommand else { return nil }
+        lastEnd = TurnEnd(rule: .model, endSilenceMs: pauseWaitMs ?? endSilenceOverrideMs ?? config.endSilenceMs,
+                          silenceMs: softMs, turnMs: turnMs)
         inTurn = false
         quietMs = 0
         softMs = 0
@@ -242,6 +265,8 @@ public struct SpeechDetector: Sendable {
         waitForQuiet = false
         awaitingCommand = !heardSpeech
         self.graceMs = graceMs
+        commandLoudMs = 0
+        checkSpeechMs = 0
         self.quietMs = max(0, quietMs)
         softMs = self.quietMs
         pauseChecked = false; pauseCheckDue = false; pauseWaitMs = nil

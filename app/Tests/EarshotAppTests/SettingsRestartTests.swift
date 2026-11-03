@@ -21,6 +21,8 @@ final class SettingsRestartTests: XCTestCase {
     func testWakeSettingsRestartTheInput() {
         XCTAssertEqual(change { $0.wakePhrase = "hey atlas" }, .input)
         XCTAssertEqual(change { $0.voiceThreshold = 0.5 }, .input)
+        XCTAssertEqual(change { $0.voiceGate = 0.2 }, .input, "E6: the gate of the phrase")
+        XCTAssertEqual(change { $0.turnVoiceThreshold = 0.45 }, .input, "E6: the limit of a whole turn")
         XCTAssertEqual(change { $0.mode = .alwaysOn }, .input)
         XCTAssertEqual(change { $0.holdKeyCode = 58 }, .input)
     }
