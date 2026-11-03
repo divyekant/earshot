@@ -162,13 +162,15 @@ public final class WakeModels: @unchecked Sendable {
         }
     }
 
-    /// The voice check of a whole turn against a profile (E6): the cosine similarity, -1 to 1, and the speech that the
-    /// model scored, in seconds. The quiet parts are cut first (`SpeechTrim.condensed`).
-    public func voiceCheck(_ samples: [Float], profile: VoiceProfile) throws -> (score: Double, seconds: Double) {
+    /// The voice check of a whole turn against a profile (E6): the cosine similarity, -1 to 1, the speech that the
+    /// model scored, in seconds, its level, and the embedding of the turn. The quiet parts are cut first
+    /// (`SpeechTrim.condensed`).
+    public func voiceCheck(_ samples: [Float], profile: VoiceProfile) throws -> VoiceCheck {
         let clip = SpeechTrim.condensed(samples)
         let input = clip.isEmpty ? samples : clip
         let embedding = try locked { try voice.embed(input) }
-        return (VoiceModel.cosine(embedding, profile.embedding), Double(input.count) / 16000)
+        return VoiceCheck(score: VoiceModel.cosine(embedding, profile.embedding), seconds: Double(input.count) / 16000,
+                          embedding: embedding, level: SpeechTrim.level(input))
     }
 
     /// The voice score of a clip against a profile: the cosine similarity, -1 to 1.

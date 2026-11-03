@@ -386,9 +386,11 @@ final class FakeListener: WakeListener, @unchecked Sendable {
         return nil
     }
     func voiceScore(_ samples: [Float]) -> Double? { score }
-    func voiceCheck(_ samples: [Float]) -> (score: Double, seconds: Double)? {
+    /// The voice embedding that `voiceCheck` reports.
+    var embedding: [Float] = []
+    func voiceCheck(_ samples: [Float]) -> VoiceCheck? {
         checked.append(samples.count)
-        return score.map { ($0, checkSeconds ?? Double(samples.count) / 16000) }
+        return score.map { VoiceCheck(score: $0, seconds: checkSeconds ?? Double(samples.count) / 16000, embedding: embedding) }
     }
     func reset() { resets += 1; fed = 0 }
     /// The near misses for the next `takeNearMisses()`.
@@ -659,6 +661,79 @@ final class WakeTriggerTests: XCTestCase {
         XCTAssertEqual(wakeTurn(score: 0.40, speechSeconds: 2.5), ["wake", "start", "cancel: not the owner's voice (0.40)"],
                        "a long turn needs 0.42")
         XCTAssertEqual(wakeTurn(score: 0.43, speechSeconds: 2.5), ["wake", "start", "stop"])
+    }
+
+    /// E6, section 8: a wake turn in the owner's voice passes, then a follow-up turn has `score` against the profile,
+    /// `seconds` of speech, and the voice `goOn`. The voice of the wake turn is (1, 0, 0).
+    private func followUpAfterAWake(score: Double, seconds: Double, goOn: [Float], waitFirst: Double = 0)
+        -> (log: [String], voice: TurnVoice?) {
+        let listener = FakeListener()
+        listener.hitAfterSamples = 16000
+        listener.embedding = [1, 0, 0]
+        let (t, mic, rec) = make(listener)
+        let first = rec.expect("stop", self)
+        mic.emit(quiet, ms: 1000)
+        mic.emit(speech, ms: 600)
+        mic.emit(quiet, ms: 800)
+        wait(for: [first], timeout: 2)
+        if waitFirst > 0 {
+            // The window closes with no turn. Then a new window opens, for example after a hold-key command.
+            t.openFollowUp()
+            mic.emit(quiet, ms: Int(waitFirst * 1000))
+        }
+        listener.score = score
+        listener.checkSeconds = seconds
+        listener.embedding = goOn
+        let ended = expectation(description: "follow-up ended")
+        t.onStop = { rec.add("stop"); ended.fulfill() }
+        t.onCancel = { why in rec.add("cancel: \(why)"); ended.fulfill() }
+        t.openFollowUp()
+        mic.emit(speech, ms: 1000)
+        mic.emit(quiet, ms: 700)
+        wait(for: [ended], timeout: 2)
+        let voice = t.lastTurnVoice
+        t.stop()
+        return (rec.log, voice)
+    }
+
+    // Live test 2026-11-03: a go-on part of the owner's dictation scored 0.23 against the profile (needs 0.42).
+    func testFollowUpNearTheLastTurnPasses() {
+        let (log, voice) = followUpAfterAWake(score: 0.23, seconds: 2.8, goOn: [0.9, 0.3, 0])
+        XCTAssertEqual(log, ["wake", "start", "stop", "start", "stop"])
+        XCTAssertEqual(voice?.kind, .followUp)
+        XCTAssertEqual(voice?.passed, true)
+        XCTAssertEqual(voice?.byLastTurn, true)
+        XCTAssertEqual(voice?.lastTurnScore ?? 0, 0.949, accuracy: 0.001)
+        XCTAssertEqual(voice?.lastTurnLimit, 0.45)
+        XCTAssertTrue(voice?.summary.hasSuffix(", last turn 0.95 (needs 0.45, passed)") == true, voice?.summary ?? "")
+    }
+
+    func testOtherVoiceIsNotNearTheLastTurn() {
+        let (log, voice) = followUpAfterAWake(score: 0.23, seconds: 2.8, goOn: [0, 1, 0])
+        XCTAssertEqual(log.last, "cancel: not the owner's voice (0.23)")
+        XCTAssertEqual(voice?.passed, false)
+        XCTAssertEqual(voice?.lastTurnScore ?? -1, 0, accuracy: 1e-9)
+    }
+
+    // D-12: a short clip, for example "send" alone, must pass the profile.
+    func testShortFollowUpNeedsTheProfile() {
+        let (log, voice) = followUpAfterAWake(score: 0.23, seconds: 0.8, goOn: [0.9, 0.3, 0])
+        XCTAssertEqual(log.last, "cancel: not the owner's voice (0.23)")
+        XCTAssertEqual(voice?.byLastTurn, false)
+        XCTAssertNotNil(voice?.lastTurnScore, "the log still has the score")
+    }
+
+    func testLastTurnGoesWhenTheWindowCloses() {
+        let (log, voice) = followUpAfterAWake(score: 0.23, seconds: 2.8, goOn: [0.9, 0.3, 0], waitFirst: 5.2)
+        XCTAssertEqual(log.last, "cancel: not the owner's voice (0.23)")
+        XCTAssertNil(voice?.lastTurnScore)
+    }
+
+    func testFollowUpThatPassesTheProfileNeedsNoLastTurn() {
+        let (log, voice) = followUpAfterAWake(score: 0.6, seconds: 2.8, goOn: [0, 1, 0])
+        XCTAssertEqual(log.last, "stop")
+        XCTAssertEqual(voice?.passed, true)
+        XCTAssertEqual(voice?.byLastTurn, false)
     }
 
     func testTurnVoiceComesBeforeTheStop() {

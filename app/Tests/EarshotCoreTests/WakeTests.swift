@@ -188,6 +188,27 @@ final class WakeTests: XCTestCase {
         XCTAssertEqual(turn.summary, "turn voice 0.51 (speech 1.84 s, audio 2.60 s, needs 0.42, 9 ms)")
         let phrase = TurnVoice(kind: .wake, score: 0.41, seconds: 0, audioSeconds: 1.2, limit: 0.35, passed: true, byTurn: false)
         XCTAssertEqual(phrase.summary, "phrase voice 0.41 (turn not checked, audio 1.20 s, needs 0.35)")
+        // E6, section 8: the level of the speech and the check against the last turn.
+        let goOn = TurnVoice(kind: .followUp, score: 0.23, seconds: 2.8, audioSeconds: 3.28, limit: 0.42, passed: true,
+                             ms: 33, level: -31.4, lastTurnScore: 0.712, lastTurnLimit: 0.45, byLastTurn: true)
+        XCTAssertEqual(goOn.summary, "turn voice 0.23 (speech 2.80 s, audio 3.28 s, level -31 dB, needs 0.42, 33 ms), "
+                       + "last turn 0.71 (needs 0.45, passed)")
+        var missed = goOn
+        missed.byLastTurn = false
+        missed.passed = false
+        missed.lastTurnScore = 0.2
+        XCTAssertTrue(missed.summary.hasSuffix(", last turn 0.20 (needs 0.45)"), missed.summary)
+    }
+
+    func testLastTurnRuleAndSimilarity() {
+        let rule = VoiceRule()
+        XCTAssertEqual(rule.lastTurn, 0.45)
+        XCTAssertEqual(rule.lastTurnMinSeconds, 1.0, "\"send\" alone has less speech: it must pass the profile (D-12)")
+        let check = VoiceCheck(score: 0.3, seconds: 2, embedding: [3, 4])
+        XCTAssertEqual(check.similarity(to: [4, 3]) ?? 0, 0.96, accuracy: 1e-9)
+        XCTAssertNil(check.similarity(to: [1, 2, 3]), "a different length")
+        XCTAssertNil(VoiceCheck(score: 0.3, seconds: 2).similarity(to: [1, 2]), "no embedding")
+        XCTAssertNil(check.similarity(to: [0, 0]))
     }
     // D-11: remove the phrase by time. Live test 2026-11-02: 3 follow-up turns began with "Yeah, let's" for the phrase
     // said again. The edit distance to "heyatlas" is 5, so the text strip kept it.

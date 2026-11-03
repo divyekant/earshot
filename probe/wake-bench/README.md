@@ -64,5 +64,6 @@ These scripts measure the owner voice check. The record is [E6](../../docs/exper
 | `voice_bench.py` | The mel features and the trim of the app, and the padding study: zero, repeat and no padding; mean, max and top-2 of the takes |
 | `voice_joint.py` | The phrase as a gate, then the whole turn as the decision |
 | `voice_lengths.py` | The owner and other voices at each speech length, for the limit line |
+| `voice_session.py` | A short follow-up turn against the owner's last passed turn, and against the profile |
 
 Run each one with `uv run python <file>`. Each run takes about 10 to 20 minutes on one CPU.

@@ -56,14 +56,25 @@ public struct VoiceRule: Sendable, Equatable {
     public var shortSeconds: Double
     /// The speech length, in seconds, from which `turn` applies.
     public var turnSeconds: Double
+    /// A follow-up turn that misses the limit passes if its voice scores this much or more against the voice of the
+    /// owner's last turn that passed (E6, section 8). The last turn has the same microphone, room and way of speech.
+    /// Live test 2026-11-03: two go-on parts of the owner's dictation, right after earshot typed, scored 0.23 and
+    /// 0.25 against the profile, which holds the wake phrase only.
+    public var lastTurn: Double
+    /// The check against the last turn needs this much speech, in seconds. A shorter clip, for example "send" alone,
+    /// must pass the profile (D-12).
+    public var lastTurnMinSeconds: Double
 
     /// The gate stays at 0.35, not 0.10 (the E6 bench value): in the live run of 2026-11-03, room sounds matched the
     /// phrase templates every 4 to 6 s for 2 minutes, with voice scores of 0.17 to 0.29. A lower gate would start a
     /// turn for many of them. The owner's wakes on the same microphone scored 0.58 to 0.73.
+    /// The bench for `lastTurn` (E6, section 8): at 0.45 and 1.0 s, the owner passes more often far from the
+    /// microphone (66 % to 95 % at 2.8 s), and other voices pass 0.1 to 0.5 points more often.
     public init(gate: Double = 0.35, short: Double = 0.35, turn: Double = 0.42, shortSeconds: Double = 1.0,
-                turnSeconds: Double = 2.0) {
+                turnSeconds: Double = 2.0, lastTurn: Double = 0.45, lastTurnMinSeconds: Double = 1.0) {
         self.gate = gate; self.short = short; self.turn = turn
         self.shortSeconds = shortSeconds; self.turnSeconds = max(turnSeconds, shortSeconds)
+        self.lastTurn = lastTurn; self.lastTurnMinSeconds = lastTurnMinSeconds
     }
 
     /// The limit for a clip with this much speech, in seconds.
@@ -93,20 +104,67 @@ public struct TurnVoice: Sendable, Equatable {
     public var byTurn: Bool
     /// The time of the check, in milliseconds.
     public var ms: Double
+    /// The level of the speech that the model scored, in dB of full scale. Nil if it is not known.
+    public var level: Double?
+    /// The score against the voice of the owner's last turn that passed (`VoiceRule.lastTurn`). Nil if there was no
+    /// such turn in the follow-up window, or for a wake turn.
+    public var lastTurnScore: Double?
+    /// The limit for `lastTurnScore`.
+    public var lastTurnLimit: Double
+    /// True if the turn missed `limit` and passed by `lastTurnScore`.
+    public var byLastTurn: Bool
 
     public init(kind: Kind, score: Double, seconds: Double, audioSeconds: Double, limit: Double, passed: Bool,
-                byTurn: Bool = true, ms: Double = 0) {
+                byTurn: Bool = true, ms: Double = 0, level: Double? = nil, lastTurnScore: Double? = nil,
+                lastTurnLimit: Double = 0, byLastTurn: Bool = false) {
         self.kind = kind; self.score = score; self.seconds = seconds; self.audioSeconds = audioSeconds
         self.limit = limit; self.passed = passed; self.byTurn = byTurn; self.ms = ms
+        self.level = level; self.lastTurnScore = lastTurnScore; self.lastTurnLimit = lastTurnLimit
+        self.byLastTurn = byLastTurn
     }
 
-    /// One part of a log line, for example "turn voice 0.51 (speech 1.84 s, audio 2.60 s, needs 0.42, 9 ms)".
+    /// One part of a log line, for example "turn voice 0.51 (speech 1.84 s, audio 2.60 s, level -31 dB, needs 0.42,
+    /// 9 ms)", then ", last turn 0.68 (needs 0.45, passed)" if the check against the last turn ran.
     public var summary: String {
         guard byTurn else {
             return String(format: "phrase voice %.2f (turn not checked, audio %.2f s, needs %.2f)", score, audioSeconds, limit)
         }
-        return String(format: "turn voice %.2f (speech %.2f s, audio %.2f s, needs %.2f, %.0f ms)",
-                      score, seconds, audioSeconds, limit, ms)
+        let levelText = level.map { String(format: ", level %.0f dB", $0) } ?? ""
+        var text = String(format: "turn voice %.2f (speech %.2f s, audio %.2f s", score, seconds, audioSeconds)
+            + levelText + String(format: ", needs %.2f, %.0f ms)", limit, ms)
+        if let last = lastTurnScore {
+            text += String(format: ", last turn %.2f (needs %.2f", last, lastTurnLimit) + (byLastTurn ? ", passed)" : ")")
+        }
+        return text
+    }
+}
+
+/// The result of one voice check of a turn (E6). It holds no audio.
+public struct VoiceCheck: Sendable, Equatable {
+    /// The cosine similarity to the profile, -1 to 1.
+    public var score: Double
+    /// The speech that the model scored, in seconds, after the quiet parts are cut.
+    public var seconds: Double
+    /// The voice embedding of the turn, to compare the next follow-up turn with it. Empty if it is not known.
+    public var embedding: [Float]
+    /// The level of the scored speech, in dB of full scale. Nil if it is not known.
+    public var level: Double?
+
+    public init(score: Double, seconds: Double, embedding: [Float] = [], level: Double? = nil) {
+        self.score = score; self.seconds = seconds; self.embedding = embedding; self.level = level
+    }
+
+    /// The cosine similarity, -1 to 1, of this voice and another embedding. Nil if one of them is empty, or if
+    /// the lengths are not the same.
+    public func similarity(to other: [Float]) -> Double? {
+        guard !embedding.isEmpty, embedding.count == other.count else { return nil }
+        var dot = 0.0, a = 0.0, b = 0.0
+        for i in embedding.indices {
+            let x = Double(embedding[i]), y = Double(other[i])
+            dot += x * y; a += x * x; b += y * y
+        }
+        guard a > 0, b > 0 else { return nil }
+        return dot / (a.squareRoot() * b.squareRoot())
     }
 }
 
@@ -146,9 +204,9 @@ public protocol WakeListener: AnyObject {
     func feed(_ samples: [Float]) -> WakeHit?
     /// The voice score of a clip. Nil if no voice is enrolled.
     func voiceScore(_ samples: [Float]) -> Double?
-    /// The voice score of a whole turn and its speech length in seconds, after the quiet parts are cut.
-    /// Nil if no voice is enrolled.
-    func voiceCheck(_ samples: [Float]) -> (score: Double, seconds: Double)?
+    /// The voice check of a whole turn: the score, the speech length after the quiet parts are cut, and the voice
+    /// embedding of the turn. Nil if no voice is enrolled.
+    func voiceCheck(_ samples: [Float]) -> VoiceCheck?
     /// The lowest score of the phrase that starts a turn (the gate of `VoiceRule`). `WakeHit.isOwner` uses it.
     var voiceThreshold: Double { get }
     /// Starts again with no audio, for example after a turn.
@@ -163,9 +221,9 @@ public protocol WakeListener: AnyObject {
 public extension WakeListener {
     func takeNearMisses() -> NearMisses? { nil }
     func turnScore(_ samples: [Float]) -> Double? { nil }
-    /// The score of `voiceScore`, with the length of all the samples.
-    func voiceCheck(_ samples: [Float]) -> (score: Double, seconds: Double)? {
-        voiceScore(samples).map { ($0, Double(samples.count) / 16000) }
+    /// The score of `voiceScore`, with the length of all the samples and no embedding.
+    func voiceCheck(_ samples: [Float]) -> VoiceCheck? {
+        voiceScore(samples).map { VoiceCheck(score: $0, seconds: Double(samples.count) / 16000) }
     }
 }
 

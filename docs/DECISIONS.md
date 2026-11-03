@@ -218,6 +218,7 @@ The owner chose "Turn check and one print per mic" on a card.
 - The gate on the phrase alone stays at 0.35, not the 0.10 of the bench. In the live run of 2026-11-03, room sounds matched the phrase templates every 4 to 6 s for 2 minutes, with voice scores of 0.17 to 0.29. A gate of 0.10 would start a turn, with the start sound, for many of them. The owner's wakes on the same microphone scored 0.58 to 0.73. The gate is a setting (`voiceGate`). Lower it only after the false template matches stop.
 - earshot keeps one voice profile for each microphone (at most 4), keyed by the Core Audio UID of the default input device. Always-on uses the profile of the microphone in use, and starts again when the default input device changes.
 - A dropped turn shows no note and plays no sound (PR #92). The log keeps the scores.
+- A follow-up turn with 1 s of speech or more that misses the limit also passes at 0.45 or more against the voice of the owner's last turn that passed the profile (E6, section 8). Live test 2026-11-03: two go-on parts of the owner's dictation scored 0.23 and 0.25 against the profile and were dropped. On the bench, at 2.8 s far from the microphone, the owner passes 95 % of the time (was 66 %), and other voices 0.78 % (was 0.25 %). "send" alone stays on the profile (D-12).
 - Rejected: max or top-2 over the 5 takes instead of the mean (no gain on the bench); repeat padding (no gain).
 
 ## D-12. "send" alone after typing, in always-on mode

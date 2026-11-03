@@ -103,3 +103,51 @@ An always-on "send" needs a turn that passed the check (D-12). "send" alone has 
 - Find why room sounds match the templates every 4 to 6 s, from the match scores in the next live log. Then the gate can go lower.
 - Measure the time of the turn check on the Mac (the log line gives it).
 - A teach step on each microphone is one manual step. The status line in Manage > General asks for it when the microphone has no profile.
+
+## 8. Live run on 2a77d03, and the check against the last turn (2026-11-03, 04:28 to 04:35 UTC)
+
+HyperX SoloCast. The owner did not teach earshot again on this build, so the old profile (one microphone, 5 takes of the wake phrase) was in use.
+
+| Event | Voice score | Template match score |
+|---|---|---|
+| 13 accepted wakes | 0.41 to 0.74 | 0.15 to 0.30 |
+| Real turns, checked on the whole turn | 0.43 to 0.73 (for example 0.65 at 1.81 s of speech, 0.53 at 7.25 s, 0.49 at 0.88 s) | |
+| 44 rejected wakes (room sounds, a video) | 0.14 to 0.33 (median 0.24) | 0.22 to 0.31 (median 0.25) |
+| 2 go-on parts of the owner's dictation, right after earshot typed | 0.23 (2.80 s of speech, needs 0.42) and 0.25 (1.43 s, needs 0.38) | |
+
+- The gate of 0.35 held: the highest rejected wake scored 0.33, and the lowest owner wake 0.41. The margin is small.
+- The match scores of the rejected wakes overlap the owner's. Only the voice check separates them.
+- No rejected wake showed a note or played a sound (#92).
+- The two go-on parts were the fault. They were the owner's own voice, and the rest of the text was lost.
+
+Why the go-on parts scored low is not sure, because earshot keeps no audio. The owner's other turns in the same minutes scored 0.43 to 0.73. Candidates: the end of a long dictated sentence is spoken lower and faster; the profile holds the wake phrase only, so it matches free speech less well; a sound in the room during the part. The log line now gives the speech level of each check, to test the first candidate.
+
+The fix does not depend on the cause. The voice of the owner's last turn that passed has the same microphone, room and way of speech. A follow-up turn that misses the limit also passes if its voice scores 0.45 or more against that turn (`VoiceRule.lastTurn`). Rules:
+
+- Only a follow-up turn. A wake turn has the phrase and its gate.
+- Only with 1 s of speech or more. "send" alone must pass the profile (D-12).
+- Only a pass by the profile gives the next reference. A chain of passes by the last turn cannot drift from the owner's voice.
+- The trigger keeps the embedding only, no audio. It drops it when the follow-up window closes, at stop, and for a turn that starts more than 30 s of heard audio after it.
+
+### 8.1 Bench (`voice_session.py`)
+
+23 speakers of Mini LibriSpeech with a chapter that is long enough. For each speaker, from one chapter: the last turn is a 7.25 s window, the profile is 5 takes of 0.7 to 1.0 s, and the tests are windows of 1.4 s and 2.8 s (269 owner clips and 5918 other-voice clips in each case). Far: the same room for all clips (section 3).
+
+| Clip | Profile with the line, owner | Profile with the line, other voices | Profile or last turn at 0.45, owner | Profile or last turn at 0.45, other voices |
+|---|---|---|---|---|
+| Near, 1.4 s | 98.1 % | 0.83 % | 98.9 % | 0.95 % |
+| Near, 2.8 s | 99.3 % | 0.46 % | 99.3 % | 0.74 % |
+| Far, 1.4 s | 56.1 % | 1.00 % | 71.0 % | 1.08 % |
+| Far, 2.8 s | 66.5 % | 0.25 % | 95.2 % | 0.78 % |
+
+| Score against the last turn | Owner, median | Other voices, median | Other voices, 99th percentile |
+|---|---|---|---|
+| Near, 1.4 s | 0.65 | 0.07 | 0.38 |
+| Near, 2.8 s | 0.75 | 0.08 | 0.40 |
+| Far, 1.4 s | 0.45 | 0.08 | 0.37 |
+| Far, 2.8 s | 0.60 | 0.09 | 0.43 |
+
+At 0.40, other voices pass 1.2 % to 1.8 % of the time. At 0.50, the owner passes less often far from the microphone. 0.45 is the limit.
+
+The bench profile holds free speech. The owner's profile holds the wake phrase only, so for the owner the gain of the last-turn check is likely larger than the bench shows. The next live log gives the last-turn score of each follow-up turn.
+
