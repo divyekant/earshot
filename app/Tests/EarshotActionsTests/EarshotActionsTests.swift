@@ -374,19 +374,28 @@ final class ActionRunnerTests: XCTestCase {
         let view = Frame(x: 0, y: 100, w: 1200, h: 700)
         var scrolledAt: UInt64?
         var readsAfterMove = 0  // frame reads after the frame moved into view
+        var seenAt: UInt64?     // the time of the read that saw the frame in view
         let t0 = Clock.nowNs()
         let f = await runner.scrollIntoView(perform: { scrolledAt = Clock.nowNs() }, frame: {
             guard let s = scrolledAt, Clock.ms(since: s) >= 60 else { return Frame(x: 20, y: 1400, w: 200, h: 20) }
             readsAfterMove += 1
+            seenAt = Clock.nowNs()
             return Frame(x: 20, y: 400, w: 200, h: 20)
         }, view: view)
         let ms = Clock.ms(since: t0)
-        print("EARSHOT_BENCH fake scroll into view: \(ms) ms (frame moves at 60 ms)")
+        let afterSeen = seenAt.map { Clock.ms(since: $0) } ?? .infinity
+        print("EARSHOT_BENCH fake scroll into view: \(ms) ms (frame moves at 60 ms), \(afterSeen) ms after the read that saw it")
         XCTAssertEqual(f, Frame(x: 20, y: 400, w: 200, h: 20))
         // The behaviour: the first frame read after the move ends the wait. No later read.
         XCTAssertEqual(readsAfterMove, 1)
-        // A wall-time bound with margin for a busy CI runner. The check above carries the exact behaviour.
-        XCTAssertLessThan(ms, 60 + 100)
+        // The wait reads the frame at the poll interval, so it sees the move within one poll.
+        XCTAssertLessThanOrEqual(SwitcherTiming.pollMs, 20)
+        // No sleep after the read that saw the frame: the wait returns at once.
+        XCTAssertLessThan(afterSeen, 30)
+        // The wait ended on the move, before the time-out. A tighter wall bound (60 + 100 ms) failed on the GitHub
+        // macOS runner (161.6 ms and 180.9 ms), because short sleeps overshoot there. The checks above carry the
+        // exact behaviour, and they do not depend on the runner's sleep time.
+        XCTAssertLessThan(ms, Double(ScrollTiming.limitMs))
     }
 
     /// The frame never comes into view: nil at the time limit, so earshot does not click.
