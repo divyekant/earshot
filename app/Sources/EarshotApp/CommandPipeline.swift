@@ -51,6 +51,12 @@ final class CommandPipeline {
     /// The wake of the open always-on turn, for the log and to remove the phrase by time (D-11). Nil for a hold-key
     /// turn, and for a follow-up turn in which the owner did not say the phrase again.
     var pendingWake: WakeHit?
+    /// The voice score of the follow-up turn that ends now (WakeTrigger.lastFollowUpVoiceScore). Nil if no check ran.
+    var followUpVoiceScore: Double?
+    /// The last typing that worked: the time and the front app. In always-on mode, "send" alone may follow it
+    /// within `sendAfterTypingSeconds`, in the same app (the owner's choice, D-12, R-ON-5).
+    private(set) var lastTyped: (at: Date, app: String?)?
+    static let sendAfterTypingSeconds: TimeInterval = 5
     /// The number of chat apps whose names were not ready within the names budget in this command.
     var namesNotReady: () -> Int = { 0 }
     /// The cached menu items of an app as screen elements (MenuCache.cached). It must not read: a menu read takes up to 1 s.
@@ -96,6 +102,10 @@ final class CommandPipeline {
         var stages: [String: Double] = [:]
         let wake = mode == .alwaysOn ? pendingWake : nil
         pendingWake = nil
+        let followScore = followUpVoiceScore
+        followUpVoiceScore = nil
+        // The voice of an always-on turn was checked: a wake in the owner's voice, or a follow-up with a score.
+        let ownerVoice = mode == .alwaysOn && (wake.map { $0.voiceScore != nil && $0.isOwner } ?? (followScore != nil))
         var text: String
         var words: [TimedWord] = []
         do {
@@ -192,12 +202,17 @@ final class CommandPipeline {
         if mode == .hold, result.intent == .none, !sensitive, Self.dictationField(context.screen) != nil,
            !CommandRouter.hasCommandWord(text, context: context) {
             why += " · dictation into the focused field"
+            // A trailing "and send" is never text (router contract): type the rest, then send with the hold key.
+            let body = CommandRouter.withoutTrailingSend(text)
             pauseAlwaysOn(true)
-            let outcome = await actions.run(.typeText(text), context: context, command: CommandInfo(mode: .hold, tier: .rules))
+            let outcome = await actions.run(.typeText(body ?? text), context: context, command: CommandInfo(mode: .hold, tier: .rules))
             pauseAlwaysOn(false)
             for (k, ms) in outcome.stages { stages["action." + k] = ms }
-            return done(heard: text, intent: IntentText.describe(.typeText(text), apps: rows, screen: context.screen),
-                        tier: .rules, ok: outcome.ok, note: outcome.note, stages: stages, clock, why: why)
+            if outcome.ok { noteTyped() }
+            var (ok, note) = (outcome.ok, outcome.note)
+            if body != nil, outcome.ok { (ok, note) = await sendAfterTyping(mode: .hold, note: note, context: context, stages: &stages) }
+            return done(heard: text, intent: IntentText.describe(.typeText(body ?? text), apps: rows, screen: context.screen),
+                        tier: .rules, ok: ok, note: note, stages: stages, clock, why: why)
         }
         // The screenshot fallback (D-10): one picture to Jev, only for a hold-key press with no sure target that the
         // rules did not block. The click path checks the label again at the tier .jev, so a risky label stays blocked.
@@ -221,10 +236,14 @@ final class CommandPipeline {
         }
 
         let intent = result.intent
+        // A false wake must never send (R-ON-5, R-NV-5). In always-on mode, "send" alone sends only in the checked
+        // voice of the owner, within 5 s after earshot typed in the same app (D-12). The action rules check it again.
+        var ownerSend = false
         if mode == .alwaysOn, intent == .send {
-            // A false wake must never send (R-ON-5, R-NV-5). The action rules block it too (ActionRules.sendBlock).
-            return done(heard: text, intent: describe, tier: result.tier, ok: false, note: "send needs the hold key",
-                        stages: stages, clock, why: why)
+            if let block = Self.alwaysOnSendBlock(ownerVoice: ownerVoice, lastTyped: lastTyped, now: now(), front: front) {
+                return done(heard: text, intent: describe, tier: result.tier, ok: false, note: block, stages: stages, clock, why: why)
+            }
+            ownerSend = true
         }
         if intent == .none {
             return done(heard: text, intent: "none", tier: result.tier, ok: false, note: "not a command", stages: stages, clock, why: why)
@@ -232,11 +251,19 @@ final class CommandPipeline {
 
         let types = Self.types(intent)
         if types { pauseAlwaysOn(true) }
-        let command = CommandInfo(mode: mode, tier: result.tier, spokenTarget: CommandRouter.spokenTarget(text))
+        let command = CommandInfo(mode: mode, tier: result.tier, spokenTarget: CommandRouter.spokenTarget(text),
+                                  ownerSendAfterTyping: ownerSend)
         let outcome = await actions.run(intent, context: context, command: command)
         if types { pauseAlwaysOn(false) }
         for (k, v) in outcome.stages { stages["action." + k] = v }
-        return done(heard: text, intent: describe, tier: result.tier, ok: outcome.ok, note: outcome.note, stages: stages, clock, why: why)
+        if intent == .send { lastTyped = nil }
+        if types, outcome.ok { noteTyped() }
+        var (ok, note) = (outcome.ok, outcome.note)
+        // "type X and send" (RouteResult.sendAfter): the router removed the send words. Type, then send.
+        if result.sendAfter, types, outcome.ok {
+            (ok, note) = await sendAfterTyping(mode: mode, note: note, context: context, stages: &stages)
+        }
+        return done(heard: text, intent: describe, tier: result.tier, ok: ok, note: note, stages: stages, clock, why: why)
     }
 
     /// Removes the wake phrase from the text of an always-on turn (D-11).
@@ -302,13 +329,46 @@ final class CommandPipeline {
             let why = sensitive ? "a sign-in, code or payment page" : "no focused text field"
             return done(heard: heard, intent: "none", tier: .rules, ok: false, note: "type: \(why)", stages: stages, clock)
         }
+        // A trailing "and send" is never text (router contract).
+        let body = CommandRouter.withoutTrailingSend(text)
         pauseAlwaysOn(true)
         // The real mode of the turn, so that a mode rule of the action module also holds here.
-        let outcome = await actions.run(.typeText(text), context: context, command: CommandInfo(mode: mode, tier: .rules))
+        let outcome = await actions.run(.typeText(body ?? text), context: context, command: CommandInfo(mode: mode, tier: .rules))
         pauseAlwaysOn(false)
         for (k, ms) in outcome.stages { stages["action." + k] = ms }
-        return done(heard: heard, intent: "Type \(words) word\(words == 1 ? "" : "s")", tier: .rules, ok: outcome.ok,
-                    note: outcome.note, stages: stages, clock, why: "armed by \"type\"")
+        if outcome.ok { noteTyped() }
+        var (ok, note) = (outcome.ok, outcome.note)
+        if body != nil, outcome.ok { (ok, note) = await sendAfterTyping(mode: mode, note: note, context: context, stages: &stages) }
+        return done(heard: heard, intent: "Type \(words) word\(words == 1 ? "" : "s")", tier: .rules, ok: ok,
+                    note: note, stages: stages, clock, why: "armed by \"type\"")
+    }
+
+    /// Records a typing that worked, with the front app, for an always-on "send" alone (D-12).
+    private func noteTyped() {
+        lastTyped = (now(), frontBundleID().flatMap { $0 == ownBundleID ? nil : $0 })
+    }
+
+    /// After "… and send": with the hold key, send now through the normal send rules. In always-on mode, type
+    /// only: the owner says "send" on its own (D-12).
+    private func sendAfterTyping(mode: InputMode, note: String, context: RouteContext,
+                                 stages: inout [String: Double]) async -> (Bool, String) {
+        guard mode == .hold else { return (true, note + " · say \"send\" on its own to send") }
+        let out = await actions.run(.send, context: context, command: CommandInfo(mode: .hold, tier: .rules, spokenTarget: "send"))
+        for (k, ms) in out.stages { stages["send." + k] = ms }
+        lastTyped = nil
+        return (out.ok, note + " · " + out.note)
+    }
+
+    /// The reason to block an always-on "send", or nil (D-12, R-ON-5). It sends only if all are true:
+    /// the voice of the turn was checked as the owner's, earshot typed within `sendAfterTypingSeconds`, and the front
+    /// app is the app of the typing.
+    static func alwaysOnSendBlock(ownerVoice: Bool, lastTyped: (at: Date, app: String?)?, now: Date, front: String?) -> String? {
+        let rule = "send needs the hold key, or \"send\" alone in your voice within 5 s after earshot typed"
+        guard ownerVoice else { return rule + " (voice not checked)" }
+        guard let t = lastTyped else { return rule }
+        guard now.timeIntervalSince(t.at) <= sendAfterTypingSeconds else { return rule + " (too late)" }
+        guard t.app != nil, t.app == front else { return rule + " (another app is in front)" }
+        return nil
     }
 
     /// The focused text field for dictation: ScreenSnapshot.focusedID (set only for an editable field), and not a

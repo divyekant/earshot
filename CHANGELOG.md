@@ -8,6 +8,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Added
 
+- In always-on mode, "send" said alone, in your voice, within 5 s after earshot typed a message, now sends it. Anything else still needs the hold key to send. "Type X and send" never types the word "send": with the hold key, it types and sends; in always-on mode, it types only (R-ON-5, R-NV-5, D-12).
 - earshot runs on Intel Macs and on macOS 14 and 15. On these Macs, it uses Apple on-device dictation for speech. No audio leaves the Mac (R-MD-1).
 - "Jev sees the screen" now works in the app: an unsure hold-key click that was not blocked can ask Jev with one picture of the front window. It is off by default (R-MD-1, R-NV-5, D-10).
 - With the hold key, words with no command word go into the focused text field, for example "Hi, this is a test" after "click the message box". Never into a password field, never on a sign-in, code or payment page, never in always-on mode, and never with Return (R-NV-4, R-NV-5, R-ON-5).
@@ -22,6 +23,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Fixed
 
+- "Type <text> and send" no longer types the words "and send". The router removes a trailing send phrase from the text and tells the app with `sendAfter`. Only an explicit send can press Send (R-NV-5).
 - A bare command word such as "type" or "open" no longer presses a menu item that sounds like it. A bare "type" now tells the app that the next turn is the text. "Yeah, let's open the Slack" now opens Slack by the rules (R-NV-5, R-SP-2).
 - "Type X" with no box name and no focus types into the message box, not into a search field. "Search for X" still uses the search field. "Click refresh" finds the "Reload" button through a small table of UI word pairs. A pair match is never an exact match, so it never presses a risky label (R-SP-1, R-NV-5).
 - If earshot's own Manage window is in front, a voice command now acts on the app that was in front before it. earshot never acts on its own window by voice (R-NV-5).

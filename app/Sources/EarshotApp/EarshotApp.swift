@@ -237,11 +237,12 @@ final class AppController: ObservableObject {
         input.onCancel = { why in
             pipeline.pendingWake = nil
             // Log the voice score of a dropped follow-up turn, for the voice threshold (no text).
-            if why.hasPrefix(WakeTrigger.otherVoice) { pipeline.droppedFollowUp(why) }
+            if why.hasPrefix(WakeTrigger.otherVoice) || why.hasPrefix(WakeTrigger.tooShort) { pipeline.droppedFollowUp(why) }
             Task { await pipeline.cancel() }
         }
         input.onStop = { [weak input] in
             let mode = input?.current ?? .hold
+            pipeline.followUpVoiceScore = (input?.alwaysOn as? WakeTrigger)?.lastFollowUpVoiceScore
             Task { @MainActor in
                 let record = await pipeline.finish(mode: mode)
                 // After an always-on command, the owner's voice can give the next one with no wake phrase.

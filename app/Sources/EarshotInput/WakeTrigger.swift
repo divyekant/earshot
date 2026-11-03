@@ -213,18 +213,27 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
         }
     }
 
+    /// The voice score of the last follow-up turn that passed to the pipeline. Nil if no voice is enrolled, so no
+    /// check ran. An always-on "send" needs a checked voice (R-ON-5).
+    public private(set) var lastFollowUpVoiceScore: Double?
+
     /// The voice check at the end of a follow-up turn.
     private func followUpVerdict(_ samples: [Float]) -> SpeechEvent {
-        guard Double(samples.count) >= config.minimumFollowUpSeconds * Double(Self.rate) else {
-            return .drop("follow-up too short for a voice check")
+        lastFollowUpVoiceScore = nil
+        let seconds = Double(samples.count) / Double(Self.rate)
+        guard seconds >= config.minimumFollowUpSeconds else {
+            return .drop(String(format: "\(Self.tooShort) (%.2f s)", seconds))
         }
         guard let score = listener.voiceScore(samples) else { return .end }
+        lastFollowUpVoiceScore = score
         if score >= listener.voiceThreshold { return .end }
         return .drop(String(format: "\(Self.otherVoice) (%.2f)", score))
     }
 
     /// The start of the cancel reason when the voice of a follow-up turn is not the owner's voice.
     public static let otherVoice = "not the owner's voice"
+    /// The start of the cancel reason when a follow-up turn is too short for a voice check.
+    public static let tooShort = "follow-up too short for a voice check"
 
     private func wake(_ hit: WakeHit) {
         reportNearMisses()

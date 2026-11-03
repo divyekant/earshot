@@ -204,3 +204,26 @@ Second live test on the owner's Mac (2026-11-02, develop `e6f0ba8`, phrase "hey 
 - The voice check, the time cut of the phrase and the follow-up turn do not change.
 - livekit-wakeword stays "Not now": it needs a training run for each phrase.
 - A live check on the owner's voice must confirm the bench numbers and the limit 0.33.
+
+## D-12. "send" alone after typing, in always-on mode
+
+Date: 2026-11-03.
+
+The owner chose this on a card: in always-on mode, earshot never sent, so a dictated message needed the hold key to send. The wake phrase and the owner voice check (D-11) make a false send much less likely than before.
+
+| Option | Result | Reason |
+|---|---|---|
+| Send stays hold-key only | Rejected by the owner | It breaks a hands-free message. |
+| "send" alone after typing, in the owner's checked voice | Chosen | Narrow: it needs a recent typing, the same app and a checked voice. |
+| Any "send" in always-on | Rejected | A false wake or another voice could send. |
+
+**Decision:**
+- In always-on mode, "send" alone (the router's send phrases, after lead fillers) sends only if all are true:
+  - the voice of the turn was checked as the owner's: a wake in the owner's voice, or a follow-up turn with a voice score above the threshold;
+  - earshot typed into a box within 5 s (typeText, typeInto, armed typing, or openChat with text);
+  - the front app is the app of the typing.
+- Each typing allows one send.
+- `ActionRules.sendBlock` keeps all its other checks: the tier, the message box, a box with text, and no sign-in, code or payment page.
+- Anything else in always-on mode stays blocked: "send needs the hold key".
+- A trailing "and send" after text is never typed. With the hold key, earshot types and then sends. In always-on mode, it types only, and the note says to say "send" on its own.
+- If no voice is enrolled, no voice check runs, so always-on never sends.
