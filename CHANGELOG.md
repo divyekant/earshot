@@ -6,6 +6,10 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+### Fixed
+
+- In always-on mode, a soft end of a word, or speech from a quieter microphone, no longer counts as the pause that ends your turn. A dictated text longer than 15 s is no longer lost: it ends at 60 s with its words (R-ON-1, I-2, I-26).
+
 ## [0.2.0] - 2026-11-03
 
 This release adds the wake phrase and owner voice check for always-on mode, dictation into the focused field, "type" then the text, and "send" said alone after earshot types a message. It also adds sound cues for listen and result. With Parakeet, earshot uses about 700 MB less memory.
