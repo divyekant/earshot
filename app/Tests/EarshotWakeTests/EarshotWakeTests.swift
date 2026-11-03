@@ -120,3 +120,72 @@ final class ModelFilesTests: XCTestCase {
         XCTAssertThrowsError(try ModelPack.check(url, against: badSize, pack: "test"))
     }
 }
+
+// D-11: the near-miss count of the spotter, with a fake joiner. Token 0 is the blank. The phrase is 1 2 3 4.
+final class NearMissTests: XCTestCase {
+    private func decoder(autoResetSeconds: Double = 5) -> StreamingKwsDecoder {
+        let graph = ContextGraph(contextScore: 1.0, acThreshold: 0.5)
+        graph.build(tokenIds: [[1, 2, 3, 4]], phrases: ["test"], boosts: [0], thresholds: [0])
+        let d = StreamingKwsDecoder(decoderFn: { _ in [0] }, joinerFn: { frame, _ in frame.map { $0 * 10 } },
+                                    contextGraph: graph, blankId: 0, contextSize: 2, beam: 1, numTrailingBlanks: 1,
+                                    frameShiftSeconds: 0.04, autoResetSeconds: autoResetSeconds)
+        d.nearMissLength = 4
+        return d
+    }
+
+    /// One frame for each token: the joiner gives that token the top score.
+    private func run(_ d: StreamingKwsDecoder, _ tokens: [Int]) -> Int {
+        var emissions = 0
+        for token in tokens {
+            var frame = [Float](repeating: 0, count: 6)
+            frame[token] = 1
+            emissions += d.step(encoderFrame: frame).count
+        }
+        return emissions
+    }
+
+    private let blanks = [Int](repeating: 0, count: 30)
+
+    func testPartialMatchThatFallsBackIsANearMiss() {
+        let d = decoder()
+        XCTAssertEqual(run(d, [1, 0, 2, 0, 3, 0, 5] + blanks), 0)
+        let m = d.takeNearMisses()
+        XCTAssertEqual(m.count, 1)
+        XCTAssertEqual(m.best, 0.75, accuracy: 1e-9, "3 of the 4 pieces matched")
+        XCTAssertEqual(d.takeNearMisses().count, 0, "take starts the count again")
+    }
+
+    func testFullMatchIsNoNearMiss() {
+        let d = decoder()
+        XCTAssertEqual(run(d, [1, 2, 3, 4, 0, 0] + blanks), 1)
+        XCTAssertEqual(d.takeNearMisses().count, 0)
+    }
+
+    func testFallBackRightBeforeAWakeIsNoNearMiss() {
+        // The top hypothesis can fall back for a short time in a real wake. The cooldown keeps it out of the count.
+        let d = decoder()
+        XCTAssertEqual(run(d, [1, 2, 3, 5, 1, 2, 3, 4, 0, 0] + blanks), 1)
+        XCTAssertEqual(d.takeNearMisses().count, 0)
+    }
+
+    func testShortPartialMatchIsNoNearMiss() {
+        let d = decoder()
+        XCTAssertEqual(run(d, [1, 5] + blanks), 0)
+        XCTAssertEqual(d.takeNearMisses().count, 0, "1 of 4 pieces is less than half")
+    }
+
+    func testAutoResetInAPartialMatchIsANearMiss() {
+        let d = decoder(autoResetSeconds: 0.4)   // 10 frames
+        XCTAssertEqual(run(d, [1, 2, 3] + blanks + blanks), 0)
+        let m = d.takeNearMisses()
+        XCTAssertEqual(m.count, 1)
+        XCTAssertEqual(m.best, 0.75, accuracy: 1e-9)
+    }
+
+    func testNoLengthCountsNothing() {
+        let d = decoder()
+        d.nearMissLength = 0
+        XCTAssertEqual(run(d, [1, 2, 3, 5] + blanks), 0)
+        XCTAssertEqual(d.takeNearMisses().count, 0)
+    }
+}

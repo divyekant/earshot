@@ -12,11 +12,12 @@ import XCTest
 final class TextEngine: SpeechEngine {
     let id = "fake"
     var text = ""
+    var words: [TimedWord] = []
     var began = 0
     var onPartial: (@Sendable (String) -> Void)?
     func prepare() async throws {}
     func begin() throws { began += 1 }
-    func end() async throws -> Utterance { Utterance(text: text, engine: id, ms: 1) }
+    func end() async throws -> Utterance { Utterance(text: text, engine: id, ms: 1, words: words) }
 }
 
 final class DryRunner: CommandActions {
@@ -121,6 +122,56 @@ final class CommandPipelineTests: XCTestCase {
         let r = await p.finish(mode: .alwaysOn)
         XCTAssertTrue(r.note.contains("wake \"hey jarvis\", voice 0.71"), r.note)
         XCTAssertNil(p.pendingWake, "one wake is for one turn")
+    }
+
+    // D-11, live test 2026-11-02: the owner said the phrase again in a follow-up turn, and Apple speech wrote it as
+    // "Yeah, let's". The text strip kept it. The cut by time removes it.
+    func testRepeatedPhraseIsCutByTime() async {
+        let (p, engine, runner) = make("Yeah, let's open notes")
+        engine.words = [TimedWord(text: "Yeah, ", start: -0.1, end: 0.15), TimedWord(text: "let's ", start: 0.15, end: 0.45),
+                        TimedWord(text: "open ", start: 0.7, end: 0.95), TimedWord(text: "notes", start: 0.95, end: 1.3)]
+        p.wakePhrase = "hey atlas"
+        p.pendingWake = WakeHit(phrase: "hey atlas", prerollSeconds: 1.3, phraseEndSeconds: 0.4, voiceScore: 0.6,
+                                isOwner: true, inTurnAfterSeconds: 0.9)
+        let r = await p.finish(mode: .alwaysOn)
+        XCTAssertTrue(r.ok, r.note)
+        XCTAssertEqual(r.heard, "open notes")
+        XCTAssertEqual(runner.runs.first?.0, .openApp(appID: "notes"))
+        XCTAssertTrue(r.note.contains("again in a follow-up turn at 0.90 s"), r.note)
+        XCTAssertTrue(r.note.contains("phrase removed by time at 0.50 s"), r.note)
+    }
+
+    func testTextStripRemovesWhatTheTimeCutLeft() {
+        // The phrase end came a little early: the last word of the phrase is after the cut.
+        let words = [TimedWord(text: "Hey ", start: -1.0, end: -0.7), TimedWord(text: "Atlas, ", start: -0.6, end: -0.2),
+                     TimedWord(text: "open ", start: 0.0, end: 0.3), TimedWord(text: "notes", start: 0.3, end: 0.7)]
+        let hit = WakeHit(phrase: "hey atlas", prerollSeconds: 1.5, phraseEndSeconds: 0.5, voiceScore: 0.6, isOwner: true)
+        let r = CommandPipeline.removePhrase("Hey Atlas, open notes", words: words, wake: hit, phrase: "hey atlas")
+        XCTAssertEqual(r.text, "open notes")
+        XCTAssertEqual(r.how, "by time at -0.50 s")
+        let search = [TimedWord(text: "Hey ", start: -1.0, end: -0.7), TimedWord(text: "Atlas ", start: -0.7, end: -0.4),
+                      TimedWord(text: "search ", start: 0.0, end: 0.3), TimedWord(text: "for ", start: 0.3, end: 0.4),
+                      TimedWord(text: "atlas", start: 0.4, end: 0.8)]
+        XCTAssertEqual(CommandPipeline.removePhrase("Hey Atlas search for atlas", words: search, wake: hit, phrase: "hey atlas").text,
+                       "search for atlas", "a word of the phrase later in the command stays")
+    }
+
+    func testNoTimesUsesTheTextStrip() {
+        let hit = WakeHit(phrase: "hey jarvis", prerollSeconds: 1.4, phraseEndSeconds: 0.4, voiceScore: 0.7, isOwner: true)
+        let r = CommandPipeline.removePhrase("Hey Jarvis, open notes", words: [], wake: hit, phrase: "hey jarvis")
+        XCTAssertEqual(r.text, "open notes")
+        XCTAssertEqual(r.how, "by text", "Parakeet and dictation give no word times")
+        XCTAssertEqual(CommandPipeline.removePhrase("Hey Jarvis, open notes", words: [], wake: nil, phrase: "hey jarvis").text,
+                       "open notes", "a follow-up turn with no wake: the text strip")
+    }
+
+    func testNearMissesAreLoggedWithNoText() {
+        let (p, _, runner) = make("")
+        let r = p.nearMisses(NearMisses(count: 3, best: 0.8))
+        XCTAssertEqual(r.heard, "", "no audio and no text (D-11)")
+        XCTAssertEqual(r.note, "wake phrase near misses: 3, best 80 % of the phrase pieces")
+        XCTAssertFalse(r.ok)
+        XCTAssertTrue(runner.runs.isEmpty)
     }
 
     func testRejectedWakeIsLoggedWithNoText() {

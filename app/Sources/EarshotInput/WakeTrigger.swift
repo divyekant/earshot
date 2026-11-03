@@ -12,6 +12,12 @@ public struct WakeConfig: Sendable, Equatable {
     /// A follow-up turn with less audio than this has no voice check: the score is not sure on short audio.
     /// It is dropped instead.
     public var minimumFollowUpSeconds: Double = 0.5
+    /// In a follow-up turn, the spotter keeps on for this long from the start of the turn. If the owner says the
+    /// phrase again in this time, the turn becomes a wake turn (D-11). Live test 2026-11-02: 3 follow-up turns started
+    /// with the phrase again, heard as "Yeah, let's".
+    public var followTurnWakeSeconds: Double = 2.5
+    /// The trigger reports the near misses of the spotter after this much audio, at a wake and at stop (D-11).
+    public var nearMissReportSeconds: Double = 60
 
     public init() {}
 }
@@ -25,6 +31,8 @@ public struct WakeConfig: Sendable, Equatable {
 /// 3. The turn ends after the command and a short quiet time.
 /// 4. For `followUpSeconds` after a command (`openFollowUp()`), speech in the owner's voice starts a turn
 ///    with no phrase. Its voice is checked at the end of the turn.
+/// 5. In the first `followTurnWakeSeconds` of a follow-up turn, the spotter still listens. If the owner says the
+///    phrase again, the turn becomes a wake turn: `onWake` comes with `inTurnAfterSeconds`, and no second `onStart`.
 ///
 /// Run every command from this trigger with mode `.alwaysOn`, so that SafetyPolicy blocks risky presses and
 /// Send (R-ON-5). Callbacks run on the main thread.
@@ -40,6 +48,9 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
     public var onWake: ((WakeHit) -> Void)?
     /// The wake phrase was heard, but the voice did not match. Nothing started. For the log: it has no text.
     public var onRejected: ((WakeHit) -> Void)?
+    /// Partial matches of the phrase that did not fire, since the last report. For the log: a count and the best
+    /// part of the phrase only. No audio and no text (D-11).
+    public var onNearMisses: ((NearMisses) -> Void)?
 
     public let config: WakeConfig
     private let listener: WakeListener
@@ -72,6 +83,10 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
     private var recentSamples: [Float] = []
     /// The samples of a follow-up turn, for the voice check.
     private var turnSamples: [Float] = []
+    /// The value of `clock` at the start of the turn.
+    private var turnStartClock = 0
+    /// The value of `clock` at the last near-miss report.
+    private var nearMissClock = 0
 
     static let rate = 16000
     private var frameSamples: Int { Int(Double(Self.rate) * config.detector.frameMs / 1000) }
@@ -104,6 +119,7 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
         source.stop()
         let event = queue.sync { () -> SpeechEvent? in
             running = false
+            reportNearMisses()
             return endTurn()
         }
         if let event { deliver(event) }
@@ -133,9 +149,9 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
         remember(samples)
         if state == .followTurn { turnSamples.append(contentsOf: samples) }
 
-        // The spotter listens only between turns. In a turn, the speech engine has the audio.
+        // The spotter listens between turns, and at the start of a follow-up turn. Else the speech engine has the audio.
         var hit: WakeHit?
-        if !inTurn { hit = listener.feed(samples) }
+        if !inTurn || spotsInFollowTurn { hit = listener.feed(samples) }
 
         pending.append(contentsOf: samples)
         let frame = frameSamples
@@ -153,9 +169,15 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
         for event in events { handle(event) }
         if let hit { wake(hit) }
         if case .followUp(let until) = state, clock >= until { state = .idle }
+        if Double(clock - nearMissClock) >= config.nearMissReportSeconds * Double(Self.rate) { reportNearMisses() }
     }
 
     private var inTurn: Bool { state == .wakeTurn || state == .followTurn }
+
+    /// True in the first `followTurnWakeSeconds` of a follow-up turn.
+    private var spotsInFollowTurn: Bool {
+        state == .followTurn && Double(clock - turnStartClock) <= config.followTurnWakeSeconds * Double(Self.rate)
+    }
 
     /// Feeds one level to the detector. Between turns, only the follow-up window can open a turn.
     private func level(_ db: Double) -> SpeechEvent? {
@@ -172,6 +194,7 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
         switch (state, event) {
         case (.followUp, .start):
             state = .followTurn
+            turnStartClock = clock
             // The turn starts a little before the detector saw it, as the speech engine's preroll does.
             turnSamples = Array(recentSamples.suffix(Self.rate / 4))
             deliver(.start)
@@ -204,12 +227,39 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
     public static let otherVoice = "not the owner's voice"
 
     private func wake(_ hit: WakeHit) {
+        reportNearMisses()
+        if state == .followTurn { return wakeInFollowTurn(hit) }
         guard !inTurn else { return }
         guard hit.isOwner else {
             listener.reset()
             DispatchQueue.main.async { [weak self] in self?.onRejected?(hit) }
             return
         }
+        openAfterPhrase(hit)
+        state = .wakeTurn
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.onWake?(hit)
+            self.onStart?()
+        }
+    }
+
+    /// The owner said the phrase again at the start of a follow-up turn (D-11). The turn becomes a wake turn, so the
+    /// pipeline removes the phrase by its time, and the voice of the phrase counts as the voice check.
+    /// If the voice does not match, the turn stays a follow-up turn, and its voice is checked at the end.
+    private func wakeInFollowTurn(_ hit: WakeHit) {
+        guard hit.isOwner else { return }
+        var hit = hit
+        hit.inTurnAfterSeconds = Double(clock - turnStartClock) / Double(Self.rate)
+        openAfterPhrase(hit)
+        state = .wakeTurn
+        turnSamples.removeAll()
+        // The speech engine runs already: no new preroll and no second start.
+        DispatchQueue.main.async { [weak self] in self?.onWake?(hit) }
+    }
+
+    /// Opens the turn after the phrase, with a grace time for the command if the owner did not speak after it yet.
+    private func openAfterPhrase(_ hit: WakeHit) {
         // Did the owner speak after the phrase already? The spotter fires about 0.3 to 0.5 s after the phrase.
         let frameMs = config.detector.frameMs
         let after = max(0, Int(hit.phraseEndSeconds * 1000 / frameMs) - 5)  // 100 ms after the phrase, as frames
@@ -219,12 +269,13 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
         let heard = loud >= config.detector.startFrames
         let quietFrames = tail.reversed().prefix(while: { $0 < threshold }).count
         detector.open(heardSpeech: heard, quietMs: heard ? Double(quietFrames) * frameMs : 0, graceMs: config.graceMs)
-        state = .wakeTurn
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            self.onWake?(hit)
-            self.onStart?()
-        }
+    }
+
+    /// Sends the near misses of the spotter since the last report, if there are some.
+    private func reportNearMisses() {
+        nearMissClock = clock
+        guard let misses = listener.takeNearMisses() else { return }
+        DispatchQueue.main.async { [weak self] in self?.onNearMisses?(misses) }
     }
 
     private func finishTurn() {

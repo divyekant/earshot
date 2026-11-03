@@ -1,3 +1,5 @@
+import CoreMedia
+import Speech
 import EarshotCore
 import XCTest
 @testable import EarshotSpeech
@@ -68,6 +70,61 @@ final class PiecesTests: XCTestCase {
         // No final result for the last words: the volatile text stays.
         XCTAssertEqual(j.text, "open slack and")
     }
+
+    // D-11: the pieces keep their audio times, so that the pipeline can remove the wake phrase by time.
+    func testTimedTranscript() {
+        var j = TimedTranscript()
+        let open = TimedWord(text: "open ", start: 0.1, end: 0.4), slack = TimedWord(text: "Slack", start: 0.4, end: 0.8)
+        XCTAssertEqual(j.add("open ", words: [open], isFinal: false), "open ")
+        XCTAssertEqual(j.add("open Slack", words: [open, slack], isFinal: true), "open Slack")
+        let now = TimedWord(text: " now", start: 0.9, end: 1.1)
+        XCTAssertEqual(j.add(" now", words: [now], isFinal: false), "open Slack now")
+        XCTAssertEqual(j.words, [open, slack, now], "no final result for the last words: the volatile pieces stay")
+        XCTAssertEqual(j.add("", words: [], isFinal: true), "open Slack")
+        XCTAssertEqual(j.words, [open, slack])
+    }
+
+    func testTextWithNoTimesKeepsTheText() {
+        var j = TimedTranscript()
+        let open = TimedWord(text: "open ", start: 0.1, end: 0.4)
+        _ = j.add("open ", words: [open], isFinal: true)
+        XCTAssertEqual(j.add("Slack", words: [], isFinal: true), "open Slack", "the text never depends on the times")
+        XCTAssertEqual(j.words, [], "the pieces do not cover the text: no times, so the text strip decides")
+    }
+
+    func testWordTimesMustFitTheAudio() {
+        let a = TimedWord(text: "open ", start: 0.0, end: 0.3), b = TimedWord(text: "Notes", start: 0.3, end: 0.9)
+        XCTAssertTrue(TimedTranscript.plausible([], audioSeconds: 0))
+        XCTAssertTrue(TimedTranscript.plausible([a, b], audioSeconds: 1.0))
+        XCTAssertFalse(TimedTranscript.plausible([b, a], audioSeconds: 1.0), "out of order")
+        XCTAssertFalse(TimedTranscript.plausible([a, b], audioSeconds: 0.2), "after the end of the audio")
+        let shifted = [a, b].map { TimedWord(text: $0.text, start: $0.start + 100, end: $0.end + 100) }
+        XCTAssertFalse(TimedTranscript.plausible(shifted, audioSeconds: 1.0), "another time base")
+    }
+
+    #if compiler(>=6.2)
+    func testPiecesOfAnAppleResult() throws {
+        guard #available(macOS 26, *) else { throw XCTSkip("SpeechTranscriber needs macOS 26") }
+        func timed(_ text: String, _ start: Double, _ end: Double) -> AttributedString {
+            var a = AttributedString(text)
+            a.audioTimeRange = CMTimeRange(start: CMTime(seconds: start, preferredTimescale: 1000),
+                                           end: CMTime(seconds: end, preferredTimescale: 1000))
+            return a
+        }
+        var text = AttributedString(" ")
+        text += timed("Hey", 0.1, 0.3)
+        text += AttributedString(" ")
+        text += timed("Atlas,", 0.3, 0.7)
+        text += AttributedString(" ")
+        text += timed("open", 0.9, 1.2)
+        let pieces = AppleSpeechEngine.pieces(text)
+        XCTAssertEqual(pieces.map(\.text).joined(), String(text.characters), "the pieces joined give the text")
+        XCTAssertEqual(pieces.map(\.text), [" Hey ", "Atlas, ", "open"])
+        XCTAssertEqual(pieces.map(\.start), [0.1, 0.3, 0.9])
+        XCTAssertEqual(pieces.map(\.end), [0.3, 0.7, 1.2])
+        XCTAssertEqual(AppleSpeechEngine.pieces(AttributedString("no times")), [], "no times: no pieces")
+    }
+    #endif
 
     func testTextClean() {
         XCTAssertEqual(TextClean.clean("  open \n slack\t now  "), "open slack now")
@@ -188,6 +245,18 @@ final class FakeEngine: SpeechEngine {
     func end() async throws -> Utterance { Utterance(text: "text from \(id)", engine: id, ms: 1) }
 }
 
+final class HintEngine: SpeechEngine, PhraseHintControl {
+    let id: String
+    let fails: Bool
+    var hints: [String] = []
+    var onPartial: (@Sendable (String) -> Void)?
+    init(_ id: String, fails: Bool = false) { self.id = id; self.fails = fails }
+    func prepare() async throws { if fails { throw SpeechError("load failed") } }
+    func begin() throws {}
+    func end() async throws -> Utterance { Utterance(text: "", engine: id, ms: 1) }
+    func setPhraseHints(_ phrases: [String]) { hints = phrases }
+}
+
 final class FallbackTests: XCTestCase {
     func testPrimaryWorks() async throws {
         let e = FallbackSpeechEngine(primary: FakeEngine("parakeet"), fallback: { FakeEngine("apple") })
@@ -210,6 +279,19 @@ final class FallbackTests: XCTestCase {
         XCTAssertEqual(got.value, ["partial from apple"])
         let u = try await e.end()
         XCTAssertEqual(u.text, "text from apple")
+    }
+
+    // D-11: the wake phrase reaches the engine in use, and the fallback engine if it takes over.
+    func testPhraseHintsReachTheFallback() async throws {
+        let primary = HintEngine("apple", fails: true), fallback = HintEngine("apple-dictation")
+        let e = FallbackSpeechEngine(primary: primary, fallback: { fallback })
+        e.setPhraseHints(["hey atlas"])
+        XCTAssertEqual(primary.hints, ["hey atlas"])
+        try await e.prepare()
+        XCTAssertEqual(e.id, "apple-dictation")
+        XCTAssertEqual(fallback.hints, ["hey atlas"], "the fallback engine gets the hints when it takes over")
+        e.setPhraseHints([])
+        XCTAssertEqual(fallback.hints, [], "hold mode: no hints")
     }
 
     func testBothFailThrows() async {

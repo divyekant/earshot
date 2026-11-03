@@ -81,8 +81,13 @@ How a command flows (`EarshotInput/WakeTrigger.swift`):
 1. The spotter listens to 16 kHz audio. Between turns, nothing else runs. Speech without the phrase never reaches the speech engine.
 2. The spotter fires about 0.3 to 0.5 s after the phrase. If a voice is enrolled, the voice model scores the audio of the phrase. A low score stops here, and the log gets one line with no text.
 3. The speech engine starts at the start of the phrase. `MicrophoneFeed` keeps 3 s of audio, and `PrerollControl.setNextPreroll` gives the engine the phrase and every word after it.
-4. The turn ends after the command. The pipeline removes the phrase from the text (`WakePhrase.strip`), and the router runs as for the hold key. Apple speech can write the phrase as other words ("Here, at least" for "hey atlas"). So at the start of the text, the match may differ in up to half of the letters of the phrase.
-5. For 5 s after a command, speech in the owner's voice starts a turn with no phrase. The voice is checked at the end of the turn.
+4. The turn ends after the command. The pipeline removes the phrase, and the router runs as for the hold key.
+   - Apple SpeechTranscriber gives the audio time of each word (`.audioTimeRange`). The spotter gives the end of the phrase. The pipeline drops the first words that start more than 0.15 s before the phrase end (`WakePhrase.cut`). The start is the sure edge of a word, and the phrase end from the spotter tends to be a little late. So the spelling of the phrase does not matter ("Yeah, let's" for "hey atlas").
+   - Then the text match (`WakePhrase.strip`) removes what the time cut left, for example the last word of the phrase.
+   - With no word times (Parakeet, on-device dictation), the text match alone runs. Apple speech can write the phrase as other words ("Here, at least" for "hey atlas"). So at the start of the text, the match may differ in up to half of the letters of the phrase.
+   - Apple speech and dictation get the phrase as a hint (`contextualStrings`).
+5. For 5 s after a command, speech in the owner's voice starts a turn with no phrase. The voice is checked at the end of the turn. The spotter keeps on for the first 2.5 s of that turn. If the owner says the phrase again, the turn becomes a wake turn: the phrase is cut by time, and the voice of the phrase counts.
+6. The spotter counts near misses: the top guess matched half of the phrase pieces or more, then fell back with no wake, and no wake came in 1 s. The log gets the count and the best part of the phrase, every 60 s of audio and at each wake. It has no audio and no text.
 
 The enrolment (Manage > General > Teach earshot your voice) records 5 phrases. earshot keeps the mean embedding and, for a made-up name, the word pieces that the spotter heard, in `voice.json`. It keeps no audio.
 

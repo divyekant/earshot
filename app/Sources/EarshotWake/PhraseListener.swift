@@ -28,14 +28,22 @@ final class PhraseListener: WakeListener {
     /// The samples fed since the start of the session.
     private var total = 0
 
+    /// - Parameter nearMissLength: the piece count of the spelled phrase, for the near-miss log (D-11). 0 turns it off.
     init(models: WakeModels, phrase: String, keywords: [KeywordSpec], profile: VoiceProfile?,
-         voiceThreshold: Double) throws {
+         voiceThreshold: Double, nearMissLength: Int = 0) throws {
         self.models = models
         self.phrase = phrase
         self.profile = profile
         self.voiceThreshold = voiceThreshold
         let detector = try models.locked { try models.base.rebuildContextGraph(keywords: keywords) }
         session = try detector.createSession()
+        session.nearMissLength = nearMissLength
+    }
+
+    /// The near misses since the last call: a count and the best part of the phrase. No audio and no text (D-11).
+    func takeNearMisses() -> NearMisses? {
+        let (count, best) = session.takeNearMisses()
+        return count > 0 ? NearMisses(count: count, best: best) : nil
     }
 
     func feed(_ samples: [Float]) -> WakeHit? {

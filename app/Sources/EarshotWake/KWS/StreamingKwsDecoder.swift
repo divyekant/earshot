@@ -1,5 +1,5 @@
 // Copied from soniqo/speech-swift (Apache-2.0), Sources/SpeechWakeWord/StreamingKwsDecoder.swift at a57702e.
-// earshot changes: none. License: LICENSES/Apache-2.0.txt.
+// earshot changes: the near-miss count (D-11), marked "earshot:". License: LICENSES/Apache-2.0.txt.
 import Foundation
 
 /// A single keyword emission from the streaming decoder.
@@ -93,6 +93,21 @@ public final class StreamingKwsDecoder {
     private var t: Int = 0
     private var framesSinceEmission: Int = 0
 
+    // earshot (D-11): near misses. The top hypothesis matched at least half of the phrase pieces, then fell back
+    // with no emission. The decoder keeps only a count and the best part of the phrase: no audio and no tokens.
+    /// The piece count of the phrase. 0 turns the near-miss count off.
+    public var nearMissLength = 0
+    /// A near miss counts only if no emission comes in this many frames after it (1 s at 40 ms).
+    /// So a top hypothesis that changes for a short time in a real wake is not a near miss.
+    var nearMissCooldownFrames = 25
+    /// The deepest phrase piece of the top hypothesis since it last fell back.
+    private var missPeak = 0
+    /// A near miss that waits for the cooldown, with its part of the phrase.
+    private var missPending: Double?
+    private var missPendingFrames = 0
+    private var missCount = 0
+    private var missBest = 0.0
+
     public init(
         decoderFn: @escaping DecoderFn,
         joinerFn: @escaping JoinerFn,
@@ -150,6 +165,7 @@ public final class StreamingKwsDecoder {
     public func reset() {
         t = 0
         framesSinceEmission = 0
+        missPeak = 0   // earshot: a pending near miss stays until its cooldown ends.
         decCache.removeAll(keepingCapacity: true)
         let initYs = Array(repeating: -1, count: max(contextSize - 1, 0)) + [blankId]
         beamList = [
@@ -261,6 +277,7 @@ public final class StreamingKwsDecoder {
                             frameIndex: t
                         )
                     )
+                    missPending = nil   // earshot: the phrase fired, so the partial match before it is no miss.
                     reset()
                     t += 1
                     framesSinceEmission = 0
@@ -270,15 +287,49 @@ public final class StreamingKwsDecoder {
         }
 
         t += 1
+        trackNearMiss(level: top?.contextState.level ?? 0)
         if emissions.isEmpty {
             framesSinceEmission += 1
             if framesSinceEmission >= autoResetFrames {
+                noteNearMiss()
                 reset()
             }
         } else {
             framesSinceEmission = 0
         }
         return emissions
+    }
+
+    // MARK: - earshot: near misses (D-11)
+
+    /// Returns the near misses since the last call, and starts to count again.
+    /// `best` is the largest part of the phrase pieces that matched, 0 to 1.
+    public func takeNearMisses() -> (count: Int, best: Double) {
+        defer { missCount = 0; missBest = 0 }
+        return (missCount, missBest)
+    }
+
+    /// Follows the depth of the top hypothesis in the phrase. It runs once for each frame with no emission.
+    func trackNearMiss(level: Int) {
+        guard nearMissLength > 0 else { return }
+        if level < missPeak { noteNearMiss() }
+        missPeak = level
+        guard let pending = missPending else { return }
+        missPendingFrames += 1
+        if missPendingFrames >= nearMissCooldownFrames {
+            missCount += 1
+            missBest = max(missBest, pending)
+            missPending = nil
+        }
+    }
+
+    /// The top hypothesis fell back from `missPeak`. If it matched half of the phrase pieces or more, a near miss waits
+    /// for the cooldown.
+    private func noteNearMiss() {
+        guard nearMissLength > 0, missPeak * 2 >= nearMissLength else { return }
+        let part = min(1, Double(missPeak) / Double(nearMissLength))
+        missPending = max(missPending ?? 0, part)
+        missPendingFrames = 0
     }
 
     /// Convenience: iterate across a chunk of encoder frames ``[numFrames][joinerDim]``.

@@ -205,6 +205,7 @@ final class AppController: ObservableObject {
     /// Loads the speech model in the background. Parakeet takes about 15 s; commands before that get an error note.
     private func prepareEngine() {
         let engine = pipeline.engine
+        applyPhraseHints()
         status = "Loading speech (\(engineWhy))…"
         Task {
             do {
@@ -216,8 +217,16 @@ final class AppController: ObservableObject {
         }
     }
 
+    /// In always-on mode, the speech engine gets the wake phrase as context, so that Apple speech spells it right more
+    /// often (D-11). In hold mode, no hints.
+    private func applyPhraseHints() {
+        let hints = settings.mode == .alwaysOn ? [settings.wakePhrase] : []
+        (pipeline.engine as? PhraseHintControl)?.setPhraseHints(hints)
+    }
+
     private func startInput() {
         input?.stop()
+        applyPhraseHints()
         let listener = makeWakeListener()
         let input = InputTriggers.make(settings, wake: listener)
         let pipeline = self.pipeline, menus = self.menus, feedback = self.feedback
@@ -244,11 +253,15 @@ final class AppController: ObservableObject {
         if let trigger = input.alwaysOn as? WakeTrigger {
             trigger.onWake = { [weak self] hit in
                 // The speech engine must start at the phrase: the spotter fires after the phrase ends.
-                (pipeline.engine as? PrerollControl)?.setNextPreroll(seconds: hit.prerollSeconds)
+                // A phrase in a follow-up turn comes when the engine runs already: no new preroll.
+                if hit.inTurnAfterSeconds == nil {
+                    (pipeline.engine as? PrerollControl)?.setNextPreroll(seconds: hit.prerollSeconds)
+                }
                 pipeline.pendingWake = hit
                 if self?.settings.showFeedback == true { feedback.show("Listening…", ok: true) }
             }
             trigger.onRejected = { hit in pipeline.rejectedWake(hit, threshold: threshold) }
+            trigger.onNearMisses = { misses in pipeline.nearMisses(misses) }
         }
         pipeline.pauseAlwaysOn = { [weak input] paused in
             DispatchQueue.main.async { input?.setAlwaysOnPaused(paused) }

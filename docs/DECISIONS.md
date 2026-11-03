@@ -171,6 +171,14 @@ Live trial on the owner's Mac (2026-11-02, phrase "hey atlas", Apple speech, 15 
 | Commands that worked | 238 to 541 ms in total. |
 | Commands that failed | 7 began with a misheard form of the phrase ("Here, at least", "He at least"). The strict text match kept it, so the router found no command. The looser match at the start of the text removes it in 5 of the 7. |
 
+Second live test on the owner's Mac (2026-11-02, develop `e6f0ba8`, phrase "hey atlas", Apple speech):
+
+| Measure | Result |
+|---|---|
+| Wake turns | 4 of 4 fired in the owner's voice (0.53 to 0.66). |
+| Follow-up turns | 3 began with "Yeah, let's": the owner said the phrase again in the 5 s window. The spotter did not listen in a turn, so no wake came. |
+| Text match | The edit distance from "yeahlets" to "heyatlas" is 5. The loose limit is 4, so the text kept it. Result: one 2.6 s Jev and app search, and one lost "type". |
+
 **Decision:**
 - The keyword spotter (icefall KWS Zipformer, 3.49M parameters) listens for the phrase. The phrase is a setting. The default is "hey jarvis", because real words work best.
 - If the spelled phrase does not fire on the owner's enrolment phrases (a made-up name), the spotter also listens for the word pieces that it heard in them.
@@ -178,5 +186,6 @@ Live trial on the owner's Mac (2026-11-02, phrase "hey atlas", Apple speech, 15 
 - Speech without the phrase never reaches the speech engine. So earshot keeps no text of talk that is not for it. A wake in another voice, and a follow-up turn in another voice, are logged with the voice score and no text.
 - The speech engine starts at the phrase (a longer preroll), and the pipeline removes the phrase from the text. Speech to text can write a known phrase as other words, so the first words of the text may differ from the phrase in up to half of its letters.
 - For 5 s after a command, the owner's voice can give the next command with no phrase. The voice is checked at the end of that turn.
+- Remove the phrase by time, not by spelling, where the engine gives word times (Apple SpeechTranscriber). Keep the text match as the fallback. The spotter stays on in the first 2.5 s of a follow-up turn, so a phrase said again there becomes a wake. Log near misses as a count and the best part of the phrase only.
 - The safety rules do not change. Always-on never presses Send or a risky button (R-ON-5, `ActionRules.sendBlock`). The hold key stays (R-ON-4).
 - The models download one time from Hugging Face, at pinned revisions, with a SHA-256 check. No audio leaves the Mac (R-MD-1).

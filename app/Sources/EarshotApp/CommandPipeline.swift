@@ -48,7 +48,8 @@ final class CommandPipeline {
     var heardName: (String, RouteContext) -> (name: String, appID: String?)? = CommandRouter.heardName
     /// The wake phrase of always-on mode (settings.wakePhrase). The pipeline removes it from the start of the text.
     var wakePhrase = WakePhrase.defaultPhrase
-    /// The wake of the open always-on turn, for the log (D-11). Nil for a hold-key turn and a follow-up turn.
+    /// The wake of the open always-on turn, for the log and to remove the phrase by time (D-11). Nil for a hold-key
+    /// turn, and for a follow-up turn in which the owner did not say the phrase again.
     var pendingWake: WakeHit?
     /// The number of chat apps whose names were not ready within the names budget in this command.
     var namesNotReady: () -> Int = { 0 }
@@ -90,8 +91,11 @@ final class CommandPipeline {
         let wake = mode == .alwaysOn ? pendingWake : nil
         pendingWake = nil
         var text: String
+        var words: [TimedWord] = []
         do {
-            text = try await engine.end().text.trimmingCharacters(in: .whitespacesAndNewlines)
+            let heard = try await engine.end()
+            text = heard.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            words = heard.words
         } catch {
             return done(heard: "", intent: "none", tier: .none, ok: false, note: "speech error: \(error)", stages: stages, clock)
         }
@@ -106,8 +110,12 @@ final class CommandPipeline {
         if mode == .alwaysOn {
             // The trigger opens an always-on turn only on the wake phrase, or in the follow-up window in the owner's
             // voice (D-11). So the text is for earshot. The speech engine starts before the phrase: remove it.
-            if let wake { speechSummary = Self.wakeSummary(wake) + (speechSummary.isEmpty ? "" : " · " + speechSummary) }
-            text = WakePhrase.strip(text, phrase: wakePhrase, afterWake: wake != nil)
+            let removed = Self.removePhrase(text, words: words, wake: wake, phrase: wakePhrase)
+            text = removed.text
+            if let wake {
+                speechSummary = Self.wakeSummary(wake) + ", phrase removed " + removed.how
+                    + (speechSummary.isEmpty ? "" : " · " + speechSummary)
+            }
         }
         guard !text.isEmpty else { return done(heard: "", intent: "none", tier: .none, ok: false, note: "no words", stages: stages, clock, quiet: true) }
 
@@ -208,9 +216,36 @@ final class CommandPipeline {
         return done(heard: text, intent: describe, tier: result.tier, ok: outcome.ok, note: outcome.note, stages: stages, clock, why: why)
     }
 
+    /// Removes the wake phrase from the text of an always-on turn (D-11).
+    /// - With a wake and word times, it cuts by time: the words before the end of the phrase go, whatever the speech
+    ///   engine wrote for the phrase ("Yeah, let's" for "hey atlas"). Then the text strip removes what the cut left of
+    ///   a phrase, but it may not take a loose last word: the phrase was before the cut.
+    /// - Else, the text strip alone (Parakeet and dictation have no word times; a follow-up turn has no wake).
+    /// - Returns: the text, and how the phrase went, for the log ("by time at 0.42 s", "by text").
+    static func removePhrase(_ text: String, words: [TimedWord], wake: WakeHit?, phrase: String) -> (text: String, how: String) {
+        if let wake, let rest = WakePhrase.cut(words, phraseEnd: wake.phraseEndInTurn) {
+            let how = String(format: "by time at %.2f s", wake.phraseEndInTurn)
+            return (WakePhrase.strip(rest, phrase: phrase, afterWake: false), how)
+        }
+        return (WakePhrase.strip(text, phrase: phrase, afterWake: wake != nil), "by text")
+    }
+
+    /// Logs the partial matches of the wake phrase that did not fire (D-11), for the next test of the phrase.
+    /// The record has only a count and the best part of the phrase: no audio and no text.
+    @discardableResult
+    func nearMisses(_ misses: NearMisses) -> ActivityRecord {
+        let note = String(format: "wake phrase near misses: %ld, best %.0f %% of the phrase pieces", misses.count, misses.best * 100)
+        let record = ActivityRecord(heard: "", intent: "none", tier: .none, ok: false, note: note, stages: [:])
+        try? log?.append(record)
+        return record
+    }
+
     /// The log line of a wake: the voice score, or that no voice is enrolled.
     static func wakeSummary(_ wake: WakeHit) -> String {
         let voice = wake.voiceScore.map { String(format: "voice %.2f", $0) } ?? "voice not checked (not taught)"
+        if let after = wake.inTurnAfterSeconds {
+            return String(format: "wake \"%@\" again in a follow-up turn at %.2f s, %@", wake.phrase, after, voice)
+        }
         return String(format: "wake \"%@\", %@, preroll %.2f s", wake.phrase, voice, wake.prerollSeconds)
     }
 
