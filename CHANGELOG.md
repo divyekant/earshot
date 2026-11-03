@@ -8,7 +8,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [0.2.0] - 2026-11-03
 
-This release adds the wake phrase and owner voice check for always-on mode, dictation into the focused field, "type" then the text, and "send" said alone after earshot types a message. With Parakeet, earshot uses about 700 MB less memory.
+This release adds the wake phrase and owner voice check for always-on mode, dictation into the focused field, "type" then the text, and "send" said alone after earshot types a message. It also adds sound cues for listen and result. With Parakeet, earshot uses about 700 MB less memory.
 
 ### Added
 
