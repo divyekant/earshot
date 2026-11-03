@@ -33,11 +33,21 @@
     marks.push(el);
   });
   if (window.IntersectionObserver) {
+    // A clipped heading has no visible area, so watch its parent for it.
     var io = new IntersectionObserver(function (es) {
-      es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.remove("pre"); io.unobserve(e.target); } });
-    }, { threshold: 0.12, rootMargin: "0px 0px -8% 0px" });
+      es.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        e.target.classList.remove("pre");
+        (e.target.__marks || []).forEach(function (m) { m.classList.remove("pre"); });
+        io.unobserve(e.target);
+      });
+    }, { threshold: 0, rootMargin: "0px 0px -10% 0px" });
     marks.forEach(function (el) {
-      if (el.getBoundingClientRect().top > window.innerHeight) { el.classList.add("pre"); io.observe(el); }
+      if (el.getBoundingClientRect().top <= window.innerHeight) return;
+      el.classList.add("pre");
+      var watch = el.tagName === "H2" ? el.parentElement : el;
+      if (watch !== el) { (watch.__marks = watch.__marks || []).push(el); }
+      io.observe(watch);
     });
   }
 
