@@ -74,6 +74,30 @@ final class AppController: ObservableObject {
     let menus: MenuCache
     private var menuObserver: NSObjectProtocol?
     private var keyObserver: NSObjectProtocol?
+    /// The start sound, loaded once, so that it plays at once on key down or wake (dk: "as Hex does").
+    private let startSound: NSSound? = {
+        let s = NSSound(named: FeedbackSound.start.systemName)
+        s?.volume = FeedbackSound.start.volume
+        return s
+    }()
+
+    /// A silent copy of the start sound, played once at start: the first play opens the audio device (84-124 ms
+    /// cold, 20-31 ms after; a quiet probe on the owner's Mac, 2026-11-02).
+    private var warmUpSound: NSSound?
+
+    /// Opens the audio device with a silent play, so that the first real start sound is fast.
+    func warmUpStartSound() {
+        warmUpSound = startSound?.copy() as? NSSound
+        warmUpSound?.volume = 0
+        warmUpSound?.play()
+    }
+
+    /// Plays the start sound, if "Play sounds" is on. It restarts the sound if it still plays.
+    func playStartSound() {
+        guard settings.playSounds, let s = startSound else { return }
+        if s.isPlaying { s.stop() }
+        s.play()
+    }
 
     init() {
         let store = self.store
@@ -105,12 +129,15 @@ final class AppController: ObservableObject {
         }
         if let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier { menus.refresh(front) }
         applyJev()
+        warmUpStartSound()
         keyObserver = NotificationCenter.default.addObserver(forName: KeychainSecret.changed, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.applyJev() }
         }
         pipeline.feedback = feedback
         pipeline.log = ActivityLog(store: store)
         pipeline.showFeedback = settings.showFeedback
+        pipeline.playSounds = settings.playSounds
+        pipeline.playSound = { kind in DispatchQueue.main.async { NSSound(named: kind.systemName).map { $0.volume = kind.volume; $0.play() } } }
         pipeline.wakePhrase = settings.wakePhrase
         prepareEngine()
         startInput()
@@ -231,13 +258,17 @@ final class AppController: ObservableObject {
         let input = InputTriggers.make(settings, wake: listener)
         let pipeline = self.pipeline, menus = self.menus, feedback = self.feedback
         let threshold = settings.voiceThreshold
-        input.onStart = { [weak self] in
+        input.onStart = { [weak self, weak input] in
+            // The start sound first, before any other work (hold key; a wake plays it in onWake).
+            if input?.current == .hold { self?.playStartSound() }
             if let problem = pipeline.begin() { self?.feedback.show(problem, ok: false) }
         }
-        input.onCancel = { why in
+        input.onCancel = { [weak input] why in
             pipeline.pendingWake = nil
             // Log the voice score of a dropped follow-up turn, for the voice threshold (no text).
-            if why.hasPrefix(WakeTrigger.otherVoice) || why.hasPrefix(WakeTrigger.tooShort) { pipeline.droppedFollowUp(why) }
+            if why.hasPrefix(WakeTrigger.otherVoice) || why.hasPrefix(WakeTrigger.tooShort) {
+                pipeline.droppedFollowUp(why, seconds: (input?.alwaysOn as? WakeTrigger)?.lastFollowUpSeconds)
+            }
             Task { await pipeline.cancel() }
         }
         input.onStop = { [weak input] in
@@ -253,6 +284,7 @@ final class AppController: ObservableObject {
         }
         if let trigger = input.alwaysOn as? WakeTrigger {
             trigger.onWake = { [weak self] hit in
+                self?.playStartSound()
                 // The speech engine must start at the phrase: the spotter fires after the phrase ends.
                 // A phrase in a follow-up turn comes when the engine runs already: no new preroll.
                 if hit.inTurnAfterSeconds == nil {
@@ -373,6 +405,7 @@ final class AppController: ObservableObject {
         applied = new
         if settings != new { settings = new }
         pipeline.showFeedback = new.showFeedback
+        pipeline.playSounds = new.playSounds
         pipeline.wakePhrase = new.wakePhrase
         runner.options = ActionOptions(settings: new)
         if restart.contains(.jev) { applyJev() }

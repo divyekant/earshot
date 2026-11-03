@@ -221,6 +221,7 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
     private func followUpVerdict(_ samples: [Float]) -> SpeechEvent {
         lastFollowUpVoiceScore = nil
         let seconds = Double(samples.count) / Double(Self.rate)
+        lastFollowUpSeconds = seconds
         guard seconds >= config.minimumFollowUpSeconds else {
             return .drop(String(format: "\(Self.tooShort) (%.2f s)", seconds))
         }
@@ -229,6 +230,9 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
         if score >= listener.voiceThreshold { return .end }
         return .drop(String(format: "\(Self.otherVoice) (%.2f)", score))
     }
+
+    /// The audio length of the last follow-up turn at its voice check, in seconds. For the log of a dropped turn.
+    public private(set) var lastFollowUpSeconds: Double?
 
     /// The start of the cancel reason when the voice of a follow-up turn is not the owner's voice.
     public static let otherVoice = "not the owner's voice"

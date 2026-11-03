@@ -8,6 +8,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Added
 
+- A short system sound when earshot starts to listen (hold key down, or the wake phrase), and one for each result: done, sent, or failed (not sure, blocked). Turn them off with "Play sounds" in Manage > General. A follow-up turn that earshot drops because it is not sure of your voice now shows a note (R-FB-1).
 - In always-on mode, "send" said alone, in your voice, within 5 s after earshot typed a message, now sends it. Anything else still needs the hold key to send. "Type X and send" never types the word "send": with the hold key, it types and sends; in always-on mode, it types only (R-ON-5, R-NV-5, D-12).
 - earshot runs on Intel Macs and on macOS 14 and 15. On these Macs, it uses Apple on-device dictation for speech. No audio leaves the Mac (R-MD-1).
 - "Jev sees the screen" now works in the app: an unsure hold-key click that was not blocked can ask Jev with one picture of the front window. It is off by default (R-MD-1, R-NV-5, D-10).
