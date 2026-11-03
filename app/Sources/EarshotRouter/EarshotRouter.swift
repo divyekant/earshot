@@ -41,11 +41,13 @@ public struct CommandRouter: Router {
             if let i = await Self.ask(tier2, text, labels, budgetMs: tier2BudgetMs), i >= 0, i < d.options.count {
                 let intent = d.options[i].intent
                 return RouteResult(intent: intent, confidence: Self.tier2Confidence, tier: .jev, ms: ms(),
-                                   why: "tier 2: \(d.why)", alternatives: alternatives(intent))
+                                   why: "tier 2: \(d.why)", alternatives: alternatives(intent),
+                                   sendAfter: d.sendAfter && Self.hasText(intent))
             }
         }
         return RouteResult(intent: d.intent, confidence: Self.confidence(d), tier: Self.tier(d), ms: ms(),
-                           why: d.why, alternatives: alternatives(d.intent), awaitsText: d.awaitsText)
+                           why: d.why, alternatives: alternatives(d.intent), awaitsText: d.awaitsText,
+                           sendAfter: d.sendAfter && Self.hasText(d.intent))
     }
 
     /// The words that no known name explains, and the chat app that the owner named, if any.
@@ -157,7 +159,42 @@ public struct CommandRouter: Router {
     /// Words that can follow a bare command word: "click on", "go to". A second command word is a target: "click chat".
     static let bareWords: Set<String> = ["to", "on", "the", "in", "into", "a"]
 
+    // MARK: - A send phrase after the text
+
+    /// The words with a trailing send phrase removed: "type see you soon and send" gives "type see you soon".
+    /// The phrase needs "and", "then" or a comma before "send", so the text "I will send it" stays whole,
+    /// and "sender" is not "send". Nil if there is no such phrase, or if no words are left.
+    public static func withoutTrailingSend(_ text: String) -> String? {
+        let pattern = #"(?i)(\s*[,;]\s*|\s+)(?:(?:and|then|and then)\s+)send(?:\s+(?:it|this|that))?(?:\s+now)?[\s.!]*$|\s*[,;]\s*send(?:\s+(?:it|this|that))?(?:\s+now)?[\s.!]*$"#
+        guard let r = text.range(of: pattern, options: .regularExpression) else { return nil }
+        let rest = String(text[..<r.lowerBound]).trimmingCharacters(in: .whitespaces)
+        return TextKit.words(rest).isEmpty ? nil : rest
+    }
+
+    /// True for an intent that carries text: typeText, typeInto and openChat with text.
+    static func hasText(_ intent: Intent) -> Bool {
+        switch intent {
+        case .typeText(let t): return !t.isEmpty
+        case .typeInto(_, let t): return !t.isEmpty
+        case .openChat(_, _, let t): return !(t ?? "").isEmpty
+        default: return false
+        }
+    }
+
+    /// The rules answer. A trailing send phrase is never part of the text: the router routes the words without it,
+    /// and if the answer carries text, it sets sendAfter. Else it routes all the words as before.
     static func rules(_ spoken: String, context: RouteContext) -> RulesDecision {
+        if let rest = withoutTrailingSend(spoken) {
+            var d = rulesBody(rest, context: context)
+            if hasText(d.intent) || d.options.contains(where: { hasText($0.intent) }) {
+                d.sendAfter = true
+                return d
+            }
+        }
+        return rulesBody(spoken, context: context)
+    }
+
+    static func rulesBody(_ spoken: String, context: RouteContext) -> RulesDecision {
         let text = dropLeadFillers(fromCommandSentence(spoken, apps: context.apps))
         var words = TextKit.words(text)
         while let f = words.first, fillers.contains(f), words.count > 1 { words.removeFirst() }

@@ -783,6 +783,39 @@ final class EarshotRouterTests: XCTestCase {
         XCTAssertEqual(CommandRouter.dropLeadFillers("Yeah, let's open the Slack"), "open the Slack")
     }
 
+    // MARK: - A send phrase after the text (R-NV-5)
+
+    func testTrailingSendIsNeverText() async {
+        let focused = boxes()
+        for (said, text) in [("type see you soon and send", "see you soon"), ("type see you soon, send", "see you soon"),
+                             ("Type see you soon and send it.", "see you soon"), ("type see you soon then send", "see you soon"),
+                             ("type see you soon and then send now", "see you soon")] {
+            let r = await route(said, focused)
+            XCTAssertEqual(r.intent, .typeText(text), "\(said): \(r.why)")
+            XCTAssertTrue(r.sendAfter, said)
+        }
+        let into = await route("type see you soon into steer this thread and send", boxes(focused: nil))
+        XCTAssertEqual(into.intent, .typeInto(elementID: "e2", text: "see you soon"), into.why)
+        XCTAssertTrue(into.sendAfter)
+        let chat = await route("message Francis see you soon and send")
+        XCTAssertEqual(chat.intent, .openChat(appID: "messages", target: "Francis", text: "see you soon"), chat.why)
+        XCTAssertTrue(chat.sendAfter)
+        // Not a send phrase: a word such as "sender", or "send" inside the text.
+        for (said, text) in [("type a note for the sender", "a note for the sender"), ("type I will send it", "I will send it")] {
+            let r = await route(said, focused)
+            XCTAssertEqual(r.intent, .typeText(text), "\(said): \(r.why)")
+            XCTAssertFalse(r.sendAfter, said)
+        }
+        // "send" alone is still the send intent, and nothing else sets sendAfter.
+        let send = await route("send", focused)
+        XCTAssertEqual(send.intent, .send)
+        XCTAssertFalse(send.sendAfter)
+        let click = await route("click home and send", focused)
+        XCTAssertFalse(click.sendAfter, click.why)
+        XCTAssertNil(CommandRouter.withoutTrailingSend("and send"))
+        XCTAssertEqual(CommandRouter.withoutTrailingSend("see you soon, send."), "see you soon")
+    }
+
     func testE2NoCommand() async {
         let r = await route("what a lovely day", news)
         XCTAssertEqual(r.intent, .none)
