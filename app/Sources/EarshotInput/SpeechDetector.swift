@@ -18,14 +18,27 @@ public struct DetectorConfig: Sendable, Equatable {
     public var marginDb: Double = 12
     /// Speech must be louder than this, in dB full scale. Quiet rooms have a floor near -70 dB.
     public var minimumSpeechDb: Double = -50
+    /// In a turn, a frame counts as quiet only if it is at most this many dB above the noise floor. A frame between
+    /// the quiet level and the speech level (a soft word end, a quieter microphone) does not count toward the end
+    /// silence. The two levels come from Hex (anomalyco/hex, `SpeechFrames::is_quiet`, MIT): with one level, Hex
+    /// cut dictations when speech was only 8 dB above room noise (Hex issue 458).
+    public var quietMarginDb: Double = 4
+    /// In a turn, a frame below this level in dB full scale is always quiet. It is lower than `minimumSpeechDb`, so
+    /// speech from a quiet microphone keeps the turn open (Hex issue 841).
+    public var quietMinimumDb: Double = -70
+    /// A frame between the two levels can also be noise that changes (keys, a TV), not speech. So frames that are not
+    /// speech also end the turn after the end silence plus this time, as a fallback.
+    public var softEndExtraMs: Double = 1000
     /// Frames above the threshold in a row before `start`. 3 frames of 20 ms is 60 ms.
     public var startFrames: Int = 3
     /// Quiet after speech that ends the turn. Commands have short pauses, for example after "Slack Ravi,".
     public var endSilenceMs: Double = 550
     /// A turn with less speech than this is dropped.
     public var minimumSpeechMs: Double = 250
-    /// A turn stops at this length, for example when a TV plays.
+    /// A turn stops at this length, for example when a TV plays. The turn is dropped.
     public var maximumTurnMs: Double = 15000
+    /// The length limit of a dictation turn. At this limit the turn ends with its text: it is not dropped.
+    public var dictationMaximumTurnMs: Double = 60000
     /// How fast the noise floor follows a quieter level (0...1 for each frame). It follows a louder level 20 times slower.
     public var floorFallRate: Double = 0.2
 
@@ -45,6 +58,8 @@ public struct SpeechDetector: Sendable {
 
     private var loudRun = 0
     private var quietMs: Double = 0
+    /// The time since the last speech frame, quiet or not (for `DetectorConfig.softEndExtraMs`).
+    private var softMs: Double = 0
     private var speechMs: Double = 0
     private var turnMs: Double = 0
     /// After a forced stop, wait for quiet before the next turn. So a TV does not make turn after turn.
@@ -55,16 +70,23 @@ public struct SpeechDetector: Sendable {
     /// The end silence of the open turn, if not `config.endSilenceMs`. Dictation turns use a longer pause, so a
     /// natural pause does not cut a sentence in two. The wake trigger sets it at the start of a turn.
     public var endSilenceOverrideMs: Double?
+    /// True if the open turn holds dictated text. It uses `config.dictationMaximumTurnMs`, and the limit ends the turn
+    /// with its text. The wake trigger sets it at the start of a turn, with `endSilenceOverrideMs`.
+    public var dictationTurn = false
 
     public init(config: DetectorConfig = DetectorConfig()) { self.config = config }
 
     /// The level that counts as speech now.
     public var thresholdDb: Double { max(floorDb + config.marginDb, config.minimumSpeechDb) }
+    /// In a turn, a frame at or below this level is quiet. Between this level and `thresholdDb`, a frame keeps the turn
+    /// open but does not count as speech.
+    public var quietDb: Double { max(floorDb + config.quietMarginDb, config.quietMinimumDb) }
 
     /// Feeds the level of one frame, in dB full scale. Returns an event, or nil.
     public mutating func feed(db: Double) -> SpeechEvent? {
         let level = db.isFinite ? max(db, -120) : -120
         let loud = level >= thresholdDb
+        let quietDbBefore = quietDb
         adaptFloor(level, loud: loud)
 
         if !inTurn {
@@ -80,6 +102,7 @@ public struct SpeechDetector: Sendable {
             speechMs = Double(loudRun) * config.frameMs
             turnMs = speechMs
             quietMs = 0
+            softMs = 0
             loudRun = 0
             return .start
         }
@@ -91,6 +114,7 @@ public struct SpeechDetector: Sendable {
             if loudRun >= config.startFrames {
                 awaitingCommand = false
                 quietMs = 0
+                softMs = 0
                 loudRun = 0
             } else {
                 quietMs = loud ? 0 : quietMs + config.frameMs
@@ -106,12 +130,28 @@ public struct SpeechDetector: Sendable {
             if turnMs >= config.maximumTurnMs { return forcedStop() }
             return nil
         }
-        if loud { speechMs += config.frameMs; quietMs = 0 } else { quietMs += config.frameMs }
+        // Measure against the floor before this frame moved it. The floor moves little in one frame.
+        let quiet = level <= quietDbBefore
+        if loud {
+            speechMs += config.frameMs; quietMs = 0; softMs = 0
+        } else {
+            softMs += config.frameMs
+            quietMs = quiet ? quietMs + config.frameMs : 0
+        }
 
-        if turnMs >= config.maximumTurnMs { return forcedStop() }
-        if quietMs >= (endSilenceOverrideMs ?? config.endSilenceMs) {
+        if dictationTurn {
+            if turnMs >= config.dictationMaximumTurnMs {
+                inTurn = false
+                quietMs = 0
+                softMs = 0
+                return .end
+            }
+        } else if turnMs >= config.maximumTurnMs { return forcedStop() }
+        let endSilence = endSilenceOverrideMs ?? config.endSilenceMs
+        if quietMs >= endSilence || softMs >= endSilence + config.softEndExtraMs {
             inTurn = false
             quietMs = 0
+            softMs = 0
             if speechMs < config.minimumSpeechMs { return .drop("speech shorter than \(Int(config.minimumSpeechMs)) ms") }
             return .end
         }
@@ -128,7 +168,7 @@ public struct SpeechDetector: Sendable {
 
     /// Ends a turn from the outside. Returns `.drop` if a turn was open.
     public mutating func reset() -> SpeechEvent? {
-        defer { inTurn = false; awaitingCommand = false; loudRun = 0; quietMs = 0; waitForQuiet = false }
+        defer { inTurn = false; awaitingCommand = false; loudRun = 0; quietMs = 0; softMs = 0; waitForQuiet = false; dictationTurn = false }
         return inTurn ? .drop("input stopped") : nil
     }
 
@@ -155,6 +195,7 @@ public struct SpeechDetector: Sendable {
         awaitingCommand = !heardSpeech
         self.graceMs = graceMs
         self.quietMs = max(0, quietMs)
+        softMs = self.quietMs
         speechMs = config.minimumSpeechMs
         turnMs = 0
         loudRun = 0
@@ -170,11 +211,17 @@ public struct SpeechDetector: Sendable {
     }
 
     /// The level in dB full scale of float samples (RMS).
+    /// The mean of the frame (its DC offset) is removed first. Some microphones have a DC offset that is louder than
+    /// the speech, and then every frame has the same level (Hex issue 841).
     public static func db<C: Collection>(_ samples: C) -> Double where C.Element == Float {
         guard !samples.isEmpty else { return -120 }
+        let count = Double(samples.count)
+        var total: Double = 0
+        for s in samples { total += Double(s) }
+        let mean = total / count
         var sum: Double = 0
-        for s in samples { sum += Double(s) * Double(s) }
-        let rms = (sum / Double(samples.count)).squareRoot()
-        return rms > 0 ? max(20 * log10(rms), -120) : -120
+        for s in samples { let v = Double(s) - mean; sum += v * v }
+        let rms = (sum / count).squareRoot()
+        return rms > 0 && rms.isFinite ? max(20 * log10(rms), -120) : -120
     }
 }

@@ -197,8 +197,71 @@ final class SpeechDetectorTests: XCTestCase {
 
     func testDbOfSamples() {
         XCTAssertEqual(SpeechDetector.db([Float](repeating: 0, count: 10)), -120)
-        XCTAssertEqual(SpeechDetector.db([Float](repeating: 1, count: 10)), 0, accuracy: 0.001)
-        XCTAssertEqual(SpeechDetector.db([Float](repeating: 0.1, count: 10)), -20, accuracy: 0.001)
+        let square: [Float] = (0..<10).map { $0 % 2 == 0 ? 1 : -1 }
+        XCTAssertEqual(SpeechDetector.db(square), 0, accuracy: 0.001)
+        XCTAssertEqual(SpeechDetector.db(square.map { $0 * 0.1 }), -20, accuracy: 0.001)
+    }
+
+    /// Hex issue 841: a DC offset louder than the speech must not hide the speech.
+    func testDbRemovesTheDcOffset() {
+        XCTAssertEqual(SpeechDetector.db([Float](repeating: 0.5, count: 320)), -120, "a steady offset is not sound")
+        let square: [Float] = (0..<320).map { $0 % 2 == 0 ? 0.6 : 0.4 }
+        XCTAssertEqual(SpeechDetector.db(square), -20, accuracy: 0.001, "only the change around the offset counts")
+    }
+
+    // I-2: "I must speak fast". Frames between the quiet level and the speech level keep the turn open (Hex rule).
+    func testSoftWordEndKeepsTheTurn() {
+        var d = SpeechDetector()
+        _ = run(&d, -65, ms: 1000)
+        XCTAssertEqual(run(&d, -25, ms: 500), [.start])
+        // A soft end of a word or clause: 10 dB above the room, under the speech level (-53 dB here).
+        XCTAssertGreaterThan(-55, d.quietDb)
+        XCTAssertLessThan(-55, d.thresholdDb)
+        XCTAssertEqual(run(&d, -55, ms: 800), [], "a soft part is not the end silence")
+        XCTAssertEqual(run(&d, -25, ms: 300), [], "the sentence goes on in the same turn")
+        XCTAssertEqual(run(&d, -65, ms: 560), [.end], "quiet at the room level ends it after 550 ms")
+    }
+
+    // Hex issue 841: speech from a quiet microphone is often under -50 dB between the loud parts.
+    func testQuietMicrophoneKeepsTheTurn() {
+        var d = SpeechDetector()
+        _ = run(&d, -82, ms: 1000)
+        XCTAssertEqual(run(&d, -45, ms: 300), [.start])
+        XCTAssertEqual(d.quietDb, -70, accuracy: 0.5, "a quiet room uses the -70 dB quiet level")
+        XCTAssertEqual(run(&d, -56, ms: 900), [], "-56 dB is under the speech minimum, but not quiet")
+        XCTAssertEqual(run(&d, -45, ms: 200), [])
+        XCTAssertEqual(run(&d, -82, ms: 560), [.end])
+    }
+
+    // Noise that changes between the two levels (keys, a TV) must still end the turn: the fallback.
+    func testSoftNoiseEndsTheTurnAfterTheFallback() {
+        var d = SpeechDetector()
+        _ = run(&d, -65, ms: 1000)
+        XCTAssertEqual(run(&d, -25, ms: 500), [.start])
+        var events: [SpeechEvent] = []
+        for i in 0..<100 { if let e = d.feed(db: i % 2 == 0 ? -58 : -66) { events.append(e) } }
+        XCTAssertEqual(events, [.end], "ends after 550 ms + 1000 ms with no speech frame")
+        XCTAssertFalse(d.inTurn)
+    }
+
+    // I-26: a long dictation turn ends with its text at its limit. It is not dropped as a TV turn is.
+    func testLongDictationTurnEndsWithItsText() {
+        var d = SpeechDetector()
+        _ = run(&d, -65, ms: 500)
+        _ = d.feed(db: -20); _ = d.feed(db: -20)
+        XCTAssertEqual(d.feed(db: -20), .start)
+        d.dictationTurn = true
+        var events: [SpeechEvent] = []
+        // 20 s of speech: longer than the 15 s command limit.
+        for i in 0..<1000 { if let e = d.feed(db: i % 2 == 0 ? -20 : -24) { events.append(e) } }
+        XCTAssertEqual(events, [], "a dictation turn goes past 15 s")
+        var frames = 1000
+        while frames < 4000, events.isEmpty {
+            if let e = d.feed(db: frames % 2 == 0 ? -20 : -24) { events.append(e) }
+            frames += 1
+        }
+        XCTAssertEqual(events, [.end], "the 60 s limit ends the turn, with its text")
+        XCTAssertEqual(Double(frames + 3) * d.config.frameMs, 60000, accuracy: 40)
     }
 }
 
@@ -219,7 +282,9 @@ final class FakeSamples: SampleSource {
     func stop() { onSamples = nil }
     /// 0.0005 is about -66 dB (a quiet room). 0.05 is about -26 dB (speech).
     func emit(_ level: Float, ms: Int) {
-        for _ in 0..<(ms / 100) { onSamples?([Float](repeating: level, count: 1600)) }
+        // A square wave of this level: the detector removes a steady (DC) value, so constant samples are silence.
+        let block: [Float] = (0..<1600).map { $0 % 2 == 0 ? level : -level }
+        for _ in 0..<(ms / 100) { onSamples?(block) }
     }
 }
 

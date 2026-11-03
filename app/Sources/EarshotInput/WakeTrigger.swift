@@ -173,7 +173,10 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
     private func setTurnEndSilence() {
         var open = false
         if case .followUp = state { open = true }
-        detector.endSilenceOverrideMs = open && nextTurnLongPause ? config.dictationEndSilenceMs : nil
+        let dictation = open && nextTurnLongPause
+        detector.endSilenceOverrideMs = dictation ? config.dictationEndSilenceMs : nil
+        // A dictation turn can be long. Its length limit ends it with its text (DetectorConfig.dictationMaximumTurnMs).
+        detector.dictationTurn = dictation
         nextTurnLongPause = false
     }
 
@@ -315,10 +318,12 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
         let frameMs = config.detector.frameMs
         let after = max(0, Int(hit.phraseEndSeconds * 1000 / frameMs) - 5)  // 100 ms after the phrase, as frames
         let threshold = detector.thresholdDb
+        let quiet = detector.quietDb
         let tail = recentLevels.suffix(after)
         let loud = tail.filter { $0 >= threshold }.count
         let heard = loud >= config.detector.startFrames
-        let quietFrames = tail.reversed().prefix(while: { $0 < threshold }).count
+        // Only quiet frames count toward the end silence, as in the turn (SpeechDetector.quietDb).
+        let quietFrames = tail.reversed().prefix(while: { $0 <= quiet }).count
         detector.open(heardSpeech: heard, quietMs: heard ? Double(quietFrames) * frameMs : 0, graceMs: config.graceMs)
     }
 
@@ -331,6 +336,7 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
 
     private func finishTurn() {
         detector.endSilenceOverrideMs = nil
+        detector.dictationTurn = false
         state = .idle
         turnSamples.removeAll()
         listener.reset()
@@ -341,6 +347,7 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
         let open = inTurn
         _ = detector.reset()
         detector.endSilenceOverrideMs = nil
+        detector.dictationTurn = false
         nextTurnLongPause = false
         state = .idle
         turnSamples.removeAll()
