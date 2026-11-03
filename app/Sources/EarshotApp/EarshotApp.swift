@@ -275,7 +275,6 @@ final class AppController: ObservableObject {
             if why.hasPrefix(WakeTrigger.otherVoice) || why.hasPrefix(WakeTrigger.tooShort) {
                 let trigger = input?.alwaysOn as? WakeTrigger
                 pipeline.droppedFollowUp(why, seconds: trigger?.lastFollowUpSeconds)
-                if pipeline.playSounds { trigger?.mute(seconds: Self.seconds(of: .failed)) }
             }
             Task { await pipeline.cancel() }
         }
@@ -305,10 +304,7 @@ final class AppController: ObservableObject {
                 pipeline.pendingWake = hit
                 if self?.settings.showFeedback == true { feedback.show("Listening…", ok: true) }
             }
-            trigger.onRejected = { [weak trigger] hit in
-                pipeline.rejectedWake(hit, threshold: threshold)
-                if pipeline.playSounds { trigger?.mute(seconds: Self.seconds(of: .failed)) }
-            }
+            trigger.onRejected = { hit in pipeline.rejectedWake(hit, threshold: threshold) }
             trigger.onNearMisses = { misses in pipeline.nearMisses(misses) }
             trigger.onTurnCheck = { check in pipeline.turnCheck(check) }
         }

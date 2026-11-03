@@ -223,13 +223,14 @@ final class CommandPipelineTests: XCTestCase {
         XCTAssertTrue(r.note.contains("audio 0.92 s"), r.note)
         XCTAssertFalse(r.ok)
         XCTAssertTrue(runner.runs.isEmpty)
-        // dk: "I do not know if send works". A dropped turn shows a note and the failed sound.
-        XCTAssertEqual(note.shown.first?.0, "✗ not sure it was your voice: say \"hey atlas, …\"")
-        XCTAssertEqual(sounds, [.failed])
+        // Live test 2026-11-03: other voices and room sounds set off the note too often. The log alone keeps it.
+        XCTAssertTrue(note.shown.isEmpty, "\(note.shown)")
+        XCTAssertEqual(sounds, [])
     }
 
-    /// Live test (19:06): the phrase matched, but the voice check said "another voice", and nothing showed it.
-    func testRejectedWakeShowsANoteAndTheFailedSound() {
+    /// Live test 2026-11-03: the note "not sure it was your voice" showed for all sounds, not only the owner's voice.
+    /// A rejected wake is in the log only.
+    func testRejectedWakeShowsNoNoteAndPlaysNoSound() {
         let (p, _, runner) = make("")
         let note = NoteRecorder()
         p.feedback = note
@@ -240,8 +241,9 @@ final class CommandPipelineTests: XCTestCase {
         XCTAssertTrue(r.note.contains("0.25"), r.note)
         XCTAssertEqual(r.heard, "")
         XCTAssertTrue(runner.runs.isEmpty)
-        XCTAssertEqual(note.shown.first?.0, "✗ not sure it was your voice: say \"hey atlas, …\"")
-        XCTAssertEqual(sounds, [.failed])
+        XCTAssertTrue(note.shown.isEmpty, "\(note.shown)")
+        XCTAssertEqual(sounds, [])
+        XCTAssertNil(p.lastSound, "no sound, so nothing to mute")
     }
 
     func testLastSoundIsKeptForTheMute() async {
