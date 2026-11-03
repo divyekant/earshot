@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>earshot: voice control that stays on your Mac</title>
-<meta name="description" content="earshot is a local voice interface for macOS. Hold a key and say what you want. earshot finds the app, focuses the text box, types what you dictate and clicks what you name. Audio stays on your Mac.">
+<title>earshot: talk to any app on your Mac</title>
+<meta name="description" content="earshot is voice control for macOS. Say what you want and it opens the chat, clicks the link, picks the menu item or types your words, in under a second. Nothing you say leaves the Mac. Open source.">
 <meta name="theme-color" content="#F3F3F1">
-<meta property="og:title" content="earshot">
-<meta property="og:description" content="Voice control for macOS. Audio stays on your Mac. Open source, MIT License.">
+<meta property="og:title" content="earshot: talk to any app on your Mac">
+<meta property="og:description" content="Voice control for macOS that acts in under a second. Nothing you say leaves the Mac. Open source, MIT License.">
 <meta property="og:image" content="https://earshot.divyekant.com/assets/og.png">
 <meta property="og:url" content="https://earshot.divyekant.com/">
 <meta property="og:type" content="website">
@@ -34,8 +34,9 @@
   <div class="menubar-row">
     <a class="wordmark" href="#top"><svg class="glyph" aria-hidden="true"><use href="#glyph"/></svg>earshot</a>
     <nav aria-label="Sections">
-      <a href="#say">Commands</a>
-      <a href="#how">How it works</a>
+      <a href="#different">Why it is different</a>
+      <a href="#say">What to say</a>
+      <a href="#numbers">Test results</a>
       <a href="#privacy">Privacy</a>
       <a href="#start">Build</a>
     </nav>
@@ -47,82 +48,240 @@
 
 <section class="hero" aria-labelledby="hero-title">
   <div class="wrap">
-    <h1 id="hero-title">Hold a key.<br>Say what you want.<br>Your Mac does it.</h1>
+    <div class="hero-head">
+      <h1 id="hero-title">Talk to any app on your&nbsp;Mac.</h1>
+      <div class="hero-side">
+        <p class="promise">Say what you want. earshot opens the chat, clicks the link, picks the menu item or types your words. It acts in under a second, and nothing you say leaves the Mac.</p>
+        <div class="actions">
+          <a class="btn btn-ink" href="https://github.com/divyekant/earshot">Get the source</a>
+          <a class="btn btn-line" href="#different">Why it is different</a>
+        </div>
+      </div>
+    </div>
+  </div>
 
-    <div class="stage">
-      <div class="stage-key">
-        <button class="keycap" id="talk" type="button" aria-describedby="talk-help">
-          <span class="keycap-sym" aria-hidden="true">⌥</span>
-          <span class="keycap-name">option</span>
+  <div class="film-wrap">
+    <figure class="film" id="film" aria-label="Animation: spoken commands and what earshot does on a Mac screen. A simulation.">
+      <div class="voice">
+        <button class="key" id="talk" type="button" aria-label="Play the next command">
+          <span aria-hidden="true">⌥</span>
         </button>
-        <p class="stage-help" id="talk-help">Press and hold the key to hear the next command. This is a simulation. The page uses no microphone.</p>
+        <div class="voice-text">
+          <div class="wave" id="wave" aria-hidden="true"></div>
+          <p class="caption" id="caption" aria-live="polite">“Slack Ravi, running late”</p>
+        </div>
+        <ol class="chapters" id="chapters" aria-label="Commands in the film"></ol>
       </div>
 
-      <div class="stage-out" aria-live="polite">
-        <div class="wave" id="wave" aria-hidden="true"></div>
-        <p class="caption" id="caption">“Slack Ravi, running late”</p>
-        <dl class="log" id="log">
-          <div><dt>App</dt><dd>Slack</dd></div>
-          <div><dt>Target</dt><dd>Conversation with Ravi</dd></div>
-          <div><dt>Action</dt><dd>Focus the message box, type “running late”</dd></div>
-          <div><dt>Send</dt><dd>No. earshot waits for you to say “send”.</dd></div>
-        </dl>
-      </div>
-    </div>
+      <div class="screen" id="screen">
+        <div class="stage-inner" id="stage">
+          <div class="mbar">
+            <span class="mbar-app" id="mbar-app">Chat</span>
+            <span class="mbar-item">File</span>
+            <span class="mbar-item" id="m-edit">Edit</span>
+            <span class="mbar-item">View</span>
+            <span class="mbar-item">Window</span>
+            <span class="mbar-right"><svg class="mbar-glyph" id="mbar-glyph" aria-hidden="true"><use href="#glyph"/></svg><span>9:41</span></span>
+            <div class="menu" id="menu-edit">
+              <span>Undo</span><span>Redo</span><hr><span>Cut</span><span>Copy</span><span>Paste</span><span id="m-selectall">Select All</span>
+            </div>
+          </div>
 
-    <div class="hero-foot">
-      <p class="lede">earshot is a voice interface for macOS. It finds the app, focuses the text box, types what you dictate and clicks what you name. Speech and decisions stay on your Mac.</p>
-      <div class="actions">
-        <a class="btn btn-ink" href="https://github.com/divyekant/earshot">Get the source</a>
-        <a class="btn btn-line" href="#start">Build it</a>
+          <!-- Scene: chat -->
+          <div class="win w-chat" data-scene="chat">
+            <div class="win-top"><i></i><i></i><i></i><span>Slack</span></div>
+            <div class="chat">
+              <ul class="side">
+                <li># general</li><li># design</li><li class="gap"></li>
+                <li id="c-ravi">Ravi</li><li>Priya</li><li>Sam</li><li>Design team</li>
+              </ul>
+              <div class="pane">
+                <div class="pane-head" id="c-head">General</div>
+                <div class="msgs" id="c-msgs">
+                  <p class="msg"><b>Priya</b>Standup moved to 10:30.</p>
+                  <p class="msg"><b>Sam</b>Deck is in the shared folder.</p>
+                </div>
+                <div class="box" id="c-box"><span class="ph" id="c-ph">Message #general</span><span class="typed" id="c-typed"></span></div>
+                <span class="chip" id="c-chip">Not sent. Say “send”.</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Scene: web -->
+          <div class="win w-web" data-scene="web">
+            <div class="win-top"><i></i><i></i><i></i><span class="url">search.example</span></div>
+            <div class="web" id="w-results">
+              <div class="search" id="w-search"><span class="ph" id="w-ph">Search</span><span class="typed" id="w-typed"></span></div>
+              <ol class="results" id="w-list">
+                <li><b>Lisbon train times and tickets</b><i></i><i class="s"></i></li>
+                <li id="w-two"><b>Porto to Lisbon: every train today</b><i></i><i class="s"></i></li>
+                <li><b>Rail map of Portugal</b><i></i><i class="s"></i></li>
+                <li><b>Night trains from Madrid</b><i></i><i class="s"></i></li>
+              </ol>
+            </div>
+            <div class="web article" id="w-article">
+              <h4>Porto to Lisbon: every train today</h4>
+              <i></i><i></i><i class="s"></i><i></i><i class="s"></i>
+            </div>
+          </div>
+
+          <!-- Scene: menu -->
+          <div class="win w-doc" data-scene="menu">
+            <div class="win-top"><i></i><i></i><i></i><span>Notes</span></div>
+            <div class="doc" id="d-doc">
+              <p><span class="sel">Trip plan</span></p>
+              <p><span class="sel">Book the 08:39 train from Porto. Hotel near the river, two nights. Dinner with Sam on Friday.</span></p>
+              <p><span class="sel">Pack the charger for the demo laptop.</span></p>
+            </div>
+          </div>
+
+          <!-- Scene: numbers -->
+          <div class="win w-app" data-scene="numbers">
+            <div class="win-top"><i></i><i></i><i></i><span>Photos</span></div>
+            <div class="tools" id="n-tools">
+              <span class="tb">Back</span><span class="tb">Forward</span><span class="tb">Rotate</span><span class="tb">Crop</span><span class="tb">Share</span>
+            </div>
+            <div class="grid" id="n-grid">
+              <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+            </div>
+          </div>
+
+          <!-- Scene: dictation -->
+          <div class="win w-mail" data-scene="dictate">
+            <div class="win-top"><i></i><i></i><i></i><span>New message</span></div>
+            <div class="mail">
+              <p class="field"><span>To</span>Sam</p>
+              <p class="field"><span>Subject</span>Thursday</p>
+              <div class="body" id="m-body"><span class="typed" id="m-typed"></span></div>
+            </div>
+          </div>
+
+          <div class="ring" id="ring" aria-hidden="true"></div>
+          <div class="ripple" id="ripple" aria-hidden="true"></div>
+          <svg class="pointer" id="pointer" viewBox="0 0 20 28" aria-hidden="true"><path d="M2 2 L2 22 L7.5 17 L11 25.5 L14.2 24.1 L10.8 15.8 L18 15.6 Z"/></svg>
+          <div class="note" id="note" aria-hidden="true"><svg class="note-glyph"><use href="#glyph"/></svg><span id="note-text"></span></div>
+        </div>
       </div>
-    </div>
+      <figcaption class="film-cap">A simulation of earshot on a Mac. Hold the key, or click it, to go to the next command. The page uses no microphone.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section id="different" class="different" aria-labelledby="different-title">
+  <div class="wrap">
+    <h2 id="different-title">Not a voice assistant. A faster hand.</h2>
+    <p class="section-lede">Voice assistants answer questions. Dictation types words. earshot does the clicks and keystrokes between them, in the apps you already use.</p>
+
+    <ol class="shifts">
+      <li>
+        <h3>No AI model to wait for</h3>
+        <p>Small rules on your Mac decide each command in about 20&nbsp;ms. There is no AI model to wait for. A spoken web click lands 70 to 90&nbsp;ms after you stop talking.</p>
+      </li>
+      <li>
+        <h3>Works in apps it has never seen</h3>
+        <p>earshot reads the buttons, links, menus and sidebars of the front app through macOS accessibility. There is no plugin and no script for each app. If you can see the label, you can say it.</p>
+      </li>
+      <li>
+        <h3>Every menu item is a voice command</h3>
+        <p>Say “select all”, “export as PDF” or “new window” in any app. earshot finds the item in the app’s own menus and presses it.</p>
+      </li>
+      <li>
+        <h3>The web by name</h3>
+        <p>“Open the second result.” “Click Pull requests.” “Search for train times.” earshot reads the page in Chrome and acts on the link you name.</p>
+      </li>
+      <li>
+        <h3>Your words in any text box</h3>
+        <p>Hold the key and talk. Plain words go into the field that has the focus: a mail, a doc, a search box. Pause to think; earshot waits.</p>
+      </li>
+      <li>
+        <h3>Only your voice, only your phrase</h3>
+        <p>In always-on mode, earshot wakes on a phrase that you pick, in any language. It checks that the voice is yours, so the TV and other people cannot start a command.</p>
+      </li>
+    </ol>
   </div>
 </section>
 
 <section id="say" class="say" aria-labelledby="say-title">
   <div class="wrap">
-    <h2 id="say-title">Things you can say</h2>
-    <ul class="phrases">
-      <li><q>Slack Ravi, running late</q><span>Opens Slack, opens the conversation with Ravi, focuses the message box and types “running late”.</span></li>
-      <li><q>WhatsApp Mom</q><span>Opens the chat with Mom and focuses the message box. Then you dictate.</span></li>
-      <li><q>Open hn.com</q><span>Opens the web address in your browser.</span></li>
-      <li><q>Click Send</q><span>Clicks the button with the label “Send” in the front window.</span></li>
-      <li><q>Show numbers</q><span>Puts a number on each item that you can click. Then say “click 4”.</span></li>
-      <li><q>Type</q><span>Types your next sentence into the text field that has the focus.</span></li>
-    </ul>
-    <p class="aside">earshot has no script for each app. It reads the menus, sidebars and search results of your apps through macOS accessibility. You approve the apps that it can act in.</p>
+    <h2 id="say-title">What to say</h2>
+    <div class="scenes">
+      <div class="scene">
+        <h3>Messages</h3>
+        <ul class="phrases">
+          <li><q>Slack Ravi, running late</q><span>Opens the chat with Ravi and types the message. It does not send.</span></li>
+          <li><q>WhatsApp Mom</q><span>Opens the chat and puts the cursor in the box. Then you talk.</span></li>
+          <li><q>Send</q><span>Sends what earshot just typed. Only when you say it.</span></li>
+        </ul>
+      </div>
+      <div class="scene">
+        <h3>The web</h3>
+        <ul class="phrases">
+          <li><q>Open hn.com</q><span>Opens the address in your browser.</span></li>
+          <li><q>Search for flights to Lisbon</q><span>Types into the search field of the page.</span></li>
+          <li><q>Open the second result</q><span>Clicks the second result on the page.</span></li>
+          <li><q>Scroll down</q> <span>Also “go to the top” and “go back”.</span></li>
+        </ul>
+      </div>
+      <div class="scene">
+        <h3>Any app</h3>
+        <ul class="phrases">
+          <li><q>Open Zoom</q><span>Opens or brings up any app that you approved.</span></li>
+          <li><q>Select all</q><span>Presses the item in the app’s Edit menu.</span></li>
+          <li><q>Click Share</q><span>Clicks the button with that label in the front window.</span></li>
+          <li><q>Show numbers</q><span>Numbers every item you can click. Then say “click 7”.</span></li>
+        </ul>
+      </div>
+      <div class="scene">
+        <h3>Writing</h3>
+        <ul class="phrases">
+          <li><q>Hi Sam, the deck is ready</q><span>With the key held, plain words go into the focused text field.</span></li>
+          <li><q>Type</q><span>The next sentence, with pauses, goes into the field as text, also in always-on mode.</span></li>
+        </ul>
+      </div>
+    </div>
   </div>
 </section>
 
-<section id="how" class="how" aria-labelledby="how-title">
+<section id="numbers" class="numbers" aria-labelledby="numbers-title">
   <div class="wrap">
-    <h2 id="how-title">How a command runs</h2>
-    <ol class="pipe">
-      <li>
-        <h3>Hear</h3>
-        <p>Apple speech, or NVIDIA Parakeet if you give earshot the model file, turns your voice into text on the Mac.</p>
-      </li>
-      <li>
-        <h3>Decide</h3>
-        <p>Small rules find the app, the target and the action in about 300&nbsp;ms. No large AI agent runs in this step.</p>
-      </li>
-      <li>
-        <h3>Act</h3>
-        <p>earshot uses macOS accessibility to open, focus, type or click. Then it shows a short note with the result.</p>
-      </li>
-    </ol>
-
-    <div class="modes">
-      <div>
-        <h3>Hold key</h3>
-        <p>Hold the right Option key, speak, release. You can pick another key.</p>
+    <h2 id="numbers-title">Measured, not promised</h2>
+    <p class="section-lede">These results come from live tests on an Apple M4 Pro Mac mini. Each test is written up in the repository, with the method and every miss.</p>
+    <figure class="race" id="race" aria-label="Timing chart. From key release: final text at 52 ms, app in front at 75 ms, chat open at 470 ms, cursor in the message box at 571 ms. A web click lands 70 to 90 ms after speech ends.">
+      <div class="race-scale" aria-hidden="true"><span>0</span><span>250 ms</span><span>500 ms</span><span>750 ms</span><span>1 s</span></div>
+      <div class="race-row r1">
+        <p class="race-name">“Slack Ravi, running late”</p>
+        <div class="track">
+          <div class="bar" data-to="57.1"></div>
+          <span class="stop" data-at="5.2"><b>52 ms</b> text</span>
+          <span class="stop low" data-at="7.5"><b>75 ms</b> app</span>
+          <span class="stop left" data-at="47"><b>470 ms</b> chat open</span>
+          <span class="stop end" data-at="57.1"><b>571 ms</b> cursor in the box</span>
+        </div>
       </div>
-      <div>
-        <h3>Always on</h3>
-        <p>Off until you turn it on. earshot waits for a wake phrase, such as “hey jarvis”. Teach it your voice with five phrases, and other voices cannot start a command.</p>
+      <div class="race-row">
+        <p class="race-name">“Click Pull requests”</p>
+        <div class="track">
+          <div class="bar" data-to="9"></div>
+          <span class="stop end" data-at="9"><b>70–90 ms</b> clicked, after you stop talking</span>
+        </div>
       </div>
+      <figcaption>Medians from the live tests E0 and E2 on an Apple M4 Pro Mac mini.</figcaption>
+    </figure>
+    <div class="table-wrap">
+      <table class="lab">
+        <thead>
+          <tr><th scope="col">Test</th><th scope="col">Result</th><th scope="col">Report</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Voice to the cursor in the right Slack chat</td><td><b>571 ms</b> median, 11 of 11 reached</td><td><a href="https://github.com/divyekant/earshot/blob/main/docs/experiments/E0-viability.md">E0</a></td></tr>
+          <tr><td>Speech to final text, on the Mac</td><td><b>52 ms</b> median</td><td><a href="https://github.com/divyekant/earshot/blob/main/docs/experiments/E0-viability.md">E0</a></td></tr>
+          <tr><td>Commands routed to the right chat, from apps it read by itself</td><td><b>42 of 42</b>, no wrong chat, 20 ms median</td><td><a href="https://github.com/divyekant/earshot/blob/main/docs/experiments/E1-generic-router.md">E1</a></td></tr>
+          <tr><td>Voice clicks on four live web pages</td><td><b>45 of 45</b>, no wrong press, 24 ms median</td><td><a href="https://github.com/divyekant/earshot/blob/main/docs/experiments/E2-web-and-speech.md">E2</a></td></tr>
+          <tr><td>Read every button and link on a page</td><td><b>26 to 47 ms</b></td><td><a href="https://github.com/divyekant/earshot/blob/main/docs/experiments/E2-web-and-speech.md">E2</a></td></tr>
+        </tbody>
+      </table>
     </div>
+    <p class="fine">The router results with no miss use the optional cloud helper, Jev, for the commands that the rules were not sure of. With the rules alone, on the Mac: 40 of 42 chats and 42 of 45 web clicks.</p>
   </div>
 </section>
 
@@ -132,7 +291,7 @@
     <div class="facts">
       <p>earshot saves no audio. Speech recognition and every decision run on the Mac by default.</p>
       <p>One optional cloud helper, Jev, can answer when the rules are not sure. It is off by default. If you turn it on, earshot sends text only: the command words and a short list of labels on the screen.</p>
-      <p>The Jev key stays in the macOS Keychain. Your settings, app list and name list are JSON files in <code>~/Library/Application Support/earshot</code>.</p>
+      <p>The code is open source under the MIT License. Read it, build it and change it. Your settings, app list and name list are JSON files in <code>~/Library/Application Support/earshot</code>.</p>
     </div>
   </div>
 </section>
