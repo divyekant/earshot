@@ -144,7 +144,15 @@ final class AppController: ObservableObject {
             MainActor.assumeIsolated { self?.applyJev() }
         }
         pipeline.feedback = feedback
-        pipeline.log = ActivityLog(store: store)
+        let activityLog = ActivityLog(store: store)
+        pipeline.log = activityLog
+        // The log keeps 30 days (gap item 11): remove older records at start, then every 6 hours, off the main thread.
+        Task.detached(priority: .utility) {
+            while !Task.isCancelled {
+                try? activityLog.prune()
+                try? await Task.sleep(nanoseconds: 6 * 3_600 * 1_000_000_000)
+            }
+        }
         pipeline.showFeedback = settings.showFeedback
         pipeline.playSounds = settings.playSounds
         pipeline.playSound = { kind in DispatchQueue.main.async { NSSound(named: kind.systemName).map { $0.volume = kind.volume; $0.play() } } }
