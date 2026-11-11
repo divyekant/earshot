@@ -109,9 +109,10 @@ public func makeEmbedder(_ name: String, allowAssetRequest: Bool = false, modelF
     switch name {
     case "hash": return HashEmbedder()
     #if canImport(llama)
-    case "qwen3", "gemma":
+    case "qwen3", "gemma", "gemma2":
         guard let modelFile else { throw EmbedderError(description: "\(name) needs --model <file.gguf>") }
-        return try LlamaEmbedder(path: modelFile, spec: name == "qwen3" ? LlamaEmbedder.qwen3 : LlamaEmbedder.gemma, gpu: gpu)
+        let spec = name == "qwen3" ? LlamaEmbedder.qwen3 : (name == "gemma2" ? LlamaEmbedder.gemma2 : LlamaEmbedder.gemma)
+        return try LlamaEmbedder(path: modelFile, spec: spec, gpu: gpu)
     #endif
     #if canImport(NaturalLanguage)
     case "nl-sentence":
@@ -135,6 +136,7 @@ public func makeSearchModel(_ name: String, folder: URL) -> ModelHost? {
     switch name {
     case "gemma": spec = LlamaEmbedder.gemma; file = "embeddinggemma-300M-Q8_0.gguf"
     case "qwen3": spec = LlamaEmbedder.qwen3; file = "Qwen3-Embedding-0.6B-Q8_0.gguf"
+    case "gemma2": spec = LlamaEmbedder.gemma2; file = "embeddinggemma-2-Q8_0.gguf"
     default: return nil
     }
     let path = folder.appendingPathComponent("models").appendingPathComponent(file).path

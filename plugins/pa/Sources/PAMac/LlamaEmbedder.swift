@@ -25,6 +25,11 @@ public final class LlamaEmbedder: Embedder {
         id: "embeddinggemma-300m-q8_0",
         queryPrefix: "task: search result | query: ", passagePrefix: "title: none | text: ", endToken: false)
 
+    /// EmbeddingGemma 2 (Apache 2.0), text model only: the same prompts as EmbeddingGemma, mean pooling.
+    public static let gemma2 = Spec(
+        id: "embeddinggemma-2-q8_0",
+        queryPrefix: "task: search result | query: ", passagePrefix: "title: none | text: ", endToken: false)
+
     public let id: String
     public let dimension: Int
     let spec: Spec

@@ -1,7 +1,7 @@
 #!/bin/sh
 # Downloads one embedding model file of the PA plugin (phase 2, E10) at a fixed revision, and checks its SHA-256 sum.
 # The PA program has no network code: this script is the only download.
-# Usage: scripts/get-model.sh qwen3|gemma <folder>
+# Usage: scripts/get-model.sh qwen3|gemma|gemma2 <folder>
 set -eu
 
 name="${1:?name: qwen3 or gemma}"
@@ -19,6 +19,13 @@ case "$name" in
     revision="0f741b5a6585bd53aeb15cd1372c56f2a0f65e12"
     file="embeddinggemma-300M-Q8_0.gguf"
     sha="b5ce9d77a3fc4b3b39ccb5643c36777911cc4eb46a66962eadfa3f5f60490d63"
+    ;;
+  gemma2)
+    # EmbeddingGemma 2 (Apache 2.0): the text model only. The image and audio part (mmproj) is not downloaded.
+    repo="ggml-org/embeddinggemma-2-GGUF"
+    revision="6ea3e3a309d12a4779cfda98b8c19800d2d5da71"
+    file="embeddinggemma-2-Q8_0.gguf"
+    sha="2188ac1deca4b77dffefd603c2776a9d76d9d74ec01841392982ebb840b09135"
     ;;
   *)
     echo "Unknown model: $name" >&2
