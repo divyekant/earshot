@@ -183,6 +183,10 @@ extension Engine {
     func keep(id: String, text raw: String, context: [String: String]) -> Outgoing {
         guard let store else { return .note(id, "The PA store does not open. Nothing saved.") }
         let text = Engine.clean(raw)
+        // Phase 2, Q6: "keep this folder [for <project>]".
+        if text.lowercased() == "folder" || text.lowercased().hasPrefix("folder ") {
+            return keepFolder(id: id, text: String(text.dropFirst(6)), context: context)
+        }
         let (project, _) = readProject("x " + text)
         // Phase 2: a file in front (context key "document"). The PA reads its text in the background.
         if let file = fileDoc(context, projectID: project?.id), textReader != nil {

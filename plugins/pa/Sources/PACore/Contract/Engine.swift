@@ -14,6 +14,8 @@ public final class Engine {
     /// index.sqlite: passages and numbers (phase 2).
     public internal(set) var index: IndexStore?
     var lastFileCheck: Date?
+    /// The watch on kept folders (phase 2, Q6). Nil: no watch; the hourly file check still reads changed files.
+    public var folderWatcher: FolderWatcher?
     /// The embedding model (phase 2, Q3). Nil: the search uses keywords only.
     public var models: ModelHost?
     /// A job of the index runs in the background.
@@ -73,6 +75,7 @@ public final class Engine {
             openIndex()
             checkFilesIfDue(force: true)
             startModelIndex()
+            watchFolders()
         } catch {
             log.write(now, "store-failed")
         }
@@ -200,7 +203,7 @@ public final class Engine {
         case .quiet: return quiet(id: id, text: text)
         case .whatProjects: return whatProjects(id: id)
         case .finishProject: return finishProject(id: id, text: text)
-        case .mainPoints: return .note(id, "Main points are not ready yet.")
+        case .mainPoints: return mainPoints(id: id, text: text, context: context)
         }
     }
 

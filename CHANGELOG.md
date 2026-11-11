@@ -8,6 +8,8 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Added
 
+- PA: "keep this folder" keeps a folder and reads its files. The PA watches the folder, reads new files and shows them as new arrivals (R-PA-3, R-PA-4).
+- PA: "main points of this" shows 5 sentences of a kept document that give its main points. The PA selects the sentences. It writes no new words (R-PA-4).
 - PA: after "new project kitchen", the next captures go to Kitchen for 5 minutes. A capture like an open item gets a second note: "To-do · like one that you have: order the paint". Project proposals with a "?" are available with the setting `proposeProject`, off by default (R-PA-4).
 - PA: "where is" finds the text of kept files, also in other words. The install script downloads a search model (EmbeddingGemma-300M, about 334 MB) with a SHA-256 check. The model loads at the first search and unloads after 5 minutes with no use. "open search" shows the full results (R-PA-4, R-PA-8).
 - Two plugin context keys: `document` (the file path of the front document) and `selection` (the selected text, up to 2,000 characters). A plugin gets them only if its manifest names them, never on a sign-in, code or payment page. The Plugins tab says that `selection` gives the plugin your selected text (R-PL-2).
