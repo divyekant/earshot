@@ -256,7 +256,7 @@ def report(records: list[dict], start: datetime, end: datetime) -> str:
             hours[h]["rejected"] += 1
         elif k == "near miss":
             n = re.search(r"near misses: (\d+)", r.get("note", ""))
-            hours[h]["near misses"] += int(n.group(1)) if n else 1
+            hours[h]["near-miss phrases"] += int(n.group(1)) if n else 1
         elif m == "wake":
             hours[h]["wakes"] += 1
             if k == "dropped wake turn":
@@ -265,10 +265,12 @@ def report(records: list[dict], start: datetime, end: datetime) -> str:
             hours[h]["follow-ups"] += 1
             if k == "dropped follow-up":
                 hours[h]["follow-up dropped"] += 1
-    cols = ["wakes", "wake dropped", "rejected", "near misses", "follow-ups", "follow-up dropped"]
+    cols = ["wakes", "wake dropped", "rejected", "near-miss phrases", "follow-ups", "follow-up dropped"]
     rows = [[f"{h:02d}"] + [str(hours[h][c]) for c in cols] for h in sorted(hours)]
     rows.append(["all"] + [str(sum(hours[h][c] for h in hours)) for c in cols])
     say(table(["Hour"] + cols, rows))
+    say("")
+    say("One near-miss record can count several phrases, so this column can be larger than the near-miss record count.")
     say("")
     scores = [float(m.group(1)) for r in rs if kind(r) == "rejected wake"
               for m in [re.search(r"score (-?\d+\.\d+)", r.get("note", ""))] if m]
