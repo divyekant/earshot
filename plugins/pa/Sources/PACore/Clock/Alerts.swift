@@ -96,7 +96,13 @@ extension Engine {
     }
 
     /// Other packages act at each tick (the copy in Reminders, the pages).
-    func clockTicked() {}
+    func clockTicked() {
+        // A safety net for the copy in Reminders: read the list each 5 minutes, also if EventKit reported nothing.
+        if mirrorOn, (lastPull.map { clock.now.timeIntervalSince($0) >= 300 } ?? true) {
+            lastPull = clock.now
+            pull()
+        }
+    }
 
     /// One time each day: the daily copy, and the delete of records that were dropped 30 days ago.
     func care() {

@@ -34,7 +34,7 @@ extension Engine {
         var lines: [String] = []
         if records.count > max {
             shown = Array(records.prefix(max - 1))
-            lines = shown.map(\.2) + ["and \(records.count - shown.count) more on the \(page) page"]
+            lines = shown.map(\.2) + ["and \(records.count - shown.count) more"]
         } else {
             lines = shown.map(\.2)
         }
@@ -101,7 +101,7 @@ extension Engine {
             if records.count > max {
                 let shown = Array(records.prefix(max - 1))
                 try? store.setLastList(shown.map { ($0.0, $0.1) })
-                let lines = shown.map(\.2) + ["and \(records.count - shown.count) more on the \(p.name) page",
+                let lines = shown.map(\.2) + ["and \(records.count - shown.count) more",
                                               "\(docs.count) document\(docs.count == 1 ? "" : "s")"]
                 return .list(id, p.name, lines)
             }

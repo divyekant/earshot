@@ -18,6 +18,10 @@ public final class Engine {
     var helloDone = false
     var pagesDirty = true
     var pagesWrittenAt: Date?
+    var lastPull: Date?
+    /// Runs a block on the queue of the engine after some seconds. The program sets it to the engine queue.
+    /// Tests run the block at once.
+    public var runLater: (TimeInterval, @escaping () -> Void) -> Void = { _, block in block() }
     var startedAt: Date?
 
     public var storeURL: URL { folder.appendingPathComponent("pa.sqlite") }
@@ -77,7 +81,17 @@ public final class Engine {
     }
 
     /// The PA got a new settings file. Later packages act on it (the clock, the copy in Reminders).
-    func settingsChanged(from old: PASettings) {}
+    func settingsChanged(from old: PASettings) {
+        if old.reminders.copy && !settings.reminders.copy { stopMirror() }
+        if !old.reminders.copy && settings.reminders.copy { startMirror() }
+        if old.reminders.list != settings.reminders.list || old.reminders.alertBy != settings.reminders.alertBy {
+            // A new list name or alert owner: copy all again into the list of the new name.
+            try? store?.setMeta(listIDKey, nil)
+            try? store?.db.run("DELETE FROM mirror")
+            syncAll()
+        }
+        markPagesDirty()
+    }
 
     /// The end: stdin closed.
     public func stop() {
@@ -128,26 +142,7 @@ public final class Engine {
         sendTargets()
         flushPages(force: true)
         tick()
-        probeReminders()
-    }
-
-    /// Probe 1 of the build: does macOS ask for access to Reminders for the PA? The PA asks one time, if the copy
-    /// is on, and answers with a note.
-    func probeReminders() {
-        guard settings.reminders.copy, let reminders else { return }
-        guard reminders.access == .notAsked else { return }
-        reminders.requestAccess { [weak self] result in
-            guard let self else { return }
-            let text: String
-            switch result {
-            case .allowed: text = "Reminders: allowed"
-            case .denied: text = "Reminders: denied"
-            case .notAsked: text = "Reminders: no question (error: no answer)"
-            case .failed(let e): text = "Reminders: no question (error: \(e))"
-            }
-            self.output.send(.note(nil, text))
-            self.log.write(self.clock.now, "reminders-access", ["result": text.replacingOccurrences(of: " ", with: "_")])
-        }
+        startMirror()
     }
 
     /// One command. Gives exactly one answer with `re`.
@@ -192,6 +187,7 @@ public final class Engine {
     func itemChanged(_ it: Item, old: Item?) {
         planAlerts(it, old: old)
         markPagesDirty()
+        push(it)
     }
 
     /// A document is new or changed.

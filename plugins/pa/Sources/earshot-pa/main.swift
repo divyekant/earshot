@@ -56,7 +56,10 @@ let queue = DispatchQueue(label: "earshot.pa.engine")
 let output = StdoutOutput()
 let engine = Engine(folder: folder, clock: SystemClock(), output: output, reminders: reminderStore(),
                     detector: SystemDateDetector())
-queue.sync { engine.start() }
+queue.sync {
+    engine.runLater = { delay, block in queue.asyncAfter(deadline: .now() + delay, execute: block) }
+    engine.start()
+}
 
 // The clock: one timer for the next check, and a check at least each 60 s (build spec 10.1). The timer uses the
 // wall clock, so it fires at the right time after a sleep of the Mac.
