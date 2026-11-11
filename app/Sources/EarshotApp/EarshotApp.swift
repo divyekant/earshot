@@ -292,7 +292,8 @@ final class AppController: ObservableObject {
             Task { @MainActor in
                 let record = await pipeline.finish(mode: mode)
                 // After an always-on command, the owner's voice can give the next one with no wake phrase.
-                if mode == .alwaysOn, !record.heard.isEmpty {
+                // A follow-up turn that was not a command does not open the window again: it was talk, not a command.
+                if mode == .alwaysOn, !record.heard.isEmpty, !pipeline.followUpMissed {
                     input?.commandFinished(expectsText: pipeline.expectsText, soundSeconds: Self.seconds(of: pipeline.lastSound))
                 }
                 // A command can change which items are enabled ("Copy" after "select all"). Read again for the next one.

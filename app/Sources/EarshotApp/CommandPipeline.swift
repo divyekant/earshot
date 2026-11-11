@@ -74,6 +74,9 @@ final class CommandPipeline {
     /// typing), it plays no result sound and mutes nothing: the note on screen is the cue, and the owner may go on
     /// talking at once (go-on typing, the text after "type", or "send").
     private var typedThisTurn = false
+    /// True if the last turn was a follow-up turn that was not a command (`isFollowUpMiss`). It showed no note and
+    /// played no sound, and the follow-up window does not open again after it.
+    private(set) var followUpMissed = false
     /// True if a send worked in this turn, for the "sent" sound.
     private var sentThisTurn = false
     /// The start of the open turn (begin()). The armed window and the send window test the start of the next turn,
@@ -153,6 +156,7 @@ final class CommandPipeline {
         let started = turnStartedAt ?? now()
         turnStartedAt = nil
         expectsText = false
+        followUpMissed = false
         sentThisTurn = false
         typedThisTurn = false
         speechSummary = ""  // a speech error must not show the line of the last command
@@ -345,7 +349,9 @@ final class CommandPipeline {
             ownerSend = true
         }
         if intent == .none {
-            return done(heard: text, intent: "none", tier: result.tier, ok: false, note: "not a command", stages: stages, clock, why: why)
+            followUpMissed = Self.isFollowUpMiss(mode: mode, wake: wake, commandWord: CommandRouter.hasCommandWord(text, context: context))
+            return done(heard: text, intent: "none", tier: result.tier, ok: false, note: "not a command", stages: stages, clock,
+                        quiet: followUpMissed, why: why)
         }
 
         let types = Self.types(intent)
