@@ -95,13 +95,15 @@ public struct CommandRouter: Router {
     /// "send", "show numbers", a web address, or a later sentence that starts with a command word.
     /// The app uses it for dictation: plain words with no command word in a focused text field (hold key only).
     public static func hasCommandWord(_ text: String, context: RouteContext) -> Bool {
-        sentences(text).contains { isCommandSentence($0, apps: context.apps) }
+        if PluginRouter.match(text, plugins: context.plugins, apps: context.apps) != nil { return true }
+        return sentences(text).contains { isCommandSentence($0, apps: context.apps) }
     }
 
     /// True if the FIRST sentence is a command. Dictation after "type" uses it: a command word later in the text,
     /// for example an app name, is text (live test: a dictated sentence that named "earshot" opened a Slack channel).
     public static func startsWithCommand(_ text: String, context: RouteContext) -> Bool {
-        sentences(text).first.map { isCommandSentence($0, apps: context.apps) } ?? false
+        if PluginRouter.match(text, plugins: context.plugins, apps: context.apps) != nil { return true }
+        return sentences(text).first.map { isCommandSentence($0, apps: context.apps) } ?? false
     }
 
     /// The sentences of the words, split after ".", "!", "?" or "…" and a space.
@@ -225,6 +227,9 @@ public struct CommandRouter: Router {
     }
 
     static func rulesBody(_ spoken: String, context: RouteContext) -> RulesDecision {
+        // A plugin lead (tier 0), on all the words: the words after it are text for the plugin, also a later
+        // sentence (R-PL-2). A lead never starts with a core command word or an app name, so a core command still wins (R-PL-4).
+        if let d = PluginRouter.decide(spoken, context: context) { return d }
         let text = dropLeadFillers(fromCommandSentence(spoken, apps: context.apps))
         var words = TextKit.words(text)
         while let f = words.first, fillers.contains(f), words.count > 1 { words.removeFirst() }

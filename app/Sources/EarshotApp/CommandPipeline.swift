@@ -127,6 +127,8 @@ final class CommandPipeline {
     var picker: ScreenPicker?
     /// The longest wait for the screenshot fallback (settings.jevScreenBudgetMs).
     var jevScreenBudgetMs = 1500
+    /// The approved plugins (R-PL-1, docs/PLUGINS.md). Nil means no plugins. CommandPipeline+Plugins.swift uses it.
+    var plugins: PluginHandOff?
     /// The speech engine's line for the log of the current command (engine, why, audio length).
     private var speechSummary = ""
     /// The turn model checks of the open always-on turn, for its log note (R-ON-1, I-2).
@@ -232,7 +234,8 @@ final class CommandPipeline {
         stages["screen"] = screenMs
         stages["context"] = contextClock.ms
         let front = frontBundleID().flatMap { $0 == ownBundleID ? nil : $0 }
-        var context = RouteContext(apps: rows, names: known, frontBundleID: front, screen: withMenus(screen, front: front))
+        var context = RouteContext(apps: rows, names: known, frontBundleID: front, screen: withMenus(screen, front: front),
+                                   plugins: plugins?.leads ?? [])
 
         // The answer to a chain that stopped at a step (I-28). In always-on mode, only in the owner's checked voice.
         if let chain = pendingChain {
@@ -284,6 +287,13 @@ final class CommandPipeline {
         let routeClock = Stopwatch()
         var result = await router.route(text, context: context)
         stages["route"] = routeClock.ms
+
+        // A plugin lead: hand the words off and return at once (R-PL-2, R-PL-5). See CommandPipeline+Plugins.swift.
+        if case let .handOff(pluginID, lead, words) = result.intent {
+            let h = handOffToPlugin(pluginID: pluginID, lead: lead, text: words, context: context)
+            stages["plugin.handoff"] = h.ms
+            return done(heard: h.heard, intent: h.intent, tier: result.tier, ok: h.ok, note: h.note, stages: stages, clock, why: result.why)
+        }
 
         // A name that no known chat explains: ask the app's own search once, then route again (E1).
         // Only when the route is not sure or is not a chat, and never for the owner's own chat: the search types
@@ -769,9 +779,13 @@ final class CommandPipeline {
     func test(_ text: String, runActions: Bool) async -> TestReport {
         speechSummary = ""  // a typed command has no speech
         let rows = apps().filter { $0.approved && $0.enabled }
-        var context = RouteContext(apps: rows, names: await allNames(), frontBundleID: frontBundleID())
+        var context = RouteContext(apps: rows, names: await allNames(), frontBundleID: frontBundleID(), plugins: plugins?.leads ?? [])
         context.screen = withMenus(await actions.screen(), front: context.frontBundleID)
         let result = await router.route(text, context: context)
+        if runActions, case let .handOff(pluginID, lead, words) = result.intent {
+            let h = handOffToPlugin(pluginID: pluginID, lead: lead, text: words, context: context)
+            return TestReport(heard: text, route: result, outcome: ActionOutcome(ok: h.ok, note: h.note, stages: ["plugin.handoff": h.ms]))
+        }
         guard runActions, result.confidence >= SafetyPolicy.minimumConfidence, result.intent != .none else {
             return TestReport(heard: text, route: result)
         }

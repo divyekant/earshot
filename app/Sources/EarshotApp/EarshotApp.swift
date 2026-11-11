@@ -79,6 +79,8 @@ final class AppController: ObservableObject {
     let pipeline: CommandPipeline
     /// The turn recorder of always-on mode (E7): numbers only, 7 days.
     let turns: TurnRecorder
+    /// The approved plugins, each a separate program (R-PL-1, docs/PLUGINS.md).
+    let plugins: PluginHost
     var input: InputSwitch?
     private var engineWhy = ""
     /// The wake phrase models (D-11). They load when always-on mode is on, and stay loaded.
@@ -137,6 +139,7 @@ final class AppController: ObservableObject {
         names = NameIndex(apps: { store.apps }, store: store)
         runner = EarshotActionRunner(options: ActionOptions(settings: settings), store: store)
         turns = TurnRecorder(store: store, settings: settings)
+        plugins = PluginHost(store: store)
         let (engine, why) = SpeechEngines.make(settings)
         engineWhy = why
         let names = self.names
@@ -178,6 +181,7 @@ final class AppController: ObservableObject {
         pipeline.playSounds = settings.playSounds
         pipeline.playSound = { kind in DispatchQueue.main.async { NSSound(named: kind.systemName).map { $0.volume = kind.volume; $0.play() } } }
         pipeline.wakePhrase = settings.wakePhrase
+        startPlugins()
         prepareEngine()
         startInput()
         let appsFile = store.folder.appendingPathComponent("apps.json")
@@ -214,6 +218,8 @@ final class AppController: ObservableObject {
             refreshNames: { appID in await names.refresh(appIDs: [appID]) },
             feedback: feedback,
             settingsChanged: { [weak self] new in self?.apply(new) },
+            pluginsChanged: { [plugins] in plugins.reload() },
+            leadRefusal: { lead in PluginRouter.refusal(lead, apps: store.apps) },
             voice: VoiceHooks(
                 status: { [weak self] in self?.voiceStatus() ?? "" },
                 record: { [weak self] in try await self?.recordPhrase() ?? [] },

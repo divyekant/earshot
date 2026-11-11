@@ -124,6 +124,9 @@ public enum Intent: Codable, Hashable, Sendable {
     /// Remove the last text that earshot typed ("undo that"). The router gives empty text. The app fills in the text
     /// that it typed last, in the same app only. It is never written to disk.
     case undoTyping(String)
+    /// Give the words after a plugin lead to that plugin (R-PL-2, docs/PLUGINS.md). One intent for all plugins.
+    /// The app hands the text off and shows a note. It never clicks, types or sends for it (R-PL-3).
+    case handOff(pluginID: String, lead: String, text: String)
 }
 
 /// Which router tier made the decision.
@@ -160,9 +163,13 @@ public struct RouteContext: Sendable {
     public var frontBundleID: String?
     /// The front window, for voice clicks. Nil when not needed.
     public var screen: ScreenSnapshot?
+    /// The leads of the approved plugins that run (R-PL-4). Empty if no plugin runs.
+    public var plugins: [PluginLead]
 
-    public init(apps: [AppEntry], names: [NameEntry], frontBundleID: String? = nil, screen: ScreenSnapshot? = nil) {
+    public init(apps: [AppEntry], names: [NameEntry], frontBundleID: String? = nil, screen: ScreenSnapshot? = nil,
+                plugins: [PluginLead] = []) {
         self.apps = apps; self.names = names; self.frontBundleID = frontBundleID; self.screen = screen
+        self.plugins = plugins
     }
 }
 
