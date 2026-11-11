@@ -140,12 +140,16 @@ final class TurnReplayTests: XCTestCase {
         settle(box, records: 1)
         t.stop()
         guard let record = box.records.first else { return XCTFail("no record") }
+        let live = TurnReplay.end(of: record)
+        var shorter = WakeConfig()
+        shorter.detector.endSilenceMs = 300
+        let early = TurnReplay.end(of: record, config: shorter)
+        XCTAssertEqual(early.end?.endSilenceMs, 300)
+        XCTAssertLessThan(early.endFrame ?? .max, live.endFrame ?? 0, "a shorter end silence ends the turn earlier")
+        // The record ends with the live turn. A longer end silence runs out of kept levels: the end is not known.
         var longer = WakeConfig()
         longer.detector.endSilenceMs = 1000
-        let live = TurnReplay.end(of: record)
-        let replay = TurnReplay.end(of: record, config: longer)
-        XCTAssertEqual(replay.end?.endSilenceMs, 1000)
-        XCTAssertGreaterThan(replay.endFrame ?? 0, live.endFrame ?? 0)
+        XCTAssertNil(TurnReplay.end(of: record, config: longer).event)
     }
 
     func testTheRecordGoesThroughTheFile() throws {
