@@ -15,7 +15,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Added
 
-- A "Listening" note stays on screen for the whole turn, from the start (or the wake) to the end. In always-on mode, it has a level bar (R-FB-1).
+- A "Listening" note stays on screen for the whole turn, from the start (or the wake) to the end. It shows for a wake, a hold-key turn and the text after "type", not for other follow-up turns (other sounds open many of them). In always-on mode, it has a level bar (R-FB-1).
 - A "not sure" note now shows up to two choices and stays on screen for 10 s. Say "yes" or "the first one", "the second one", or "no". In always-on mode, only your checked voice can answer. An answer never sends, unless you used the hold key for the command and for the answer (R-FB-1, R-NV-5, D-12).
 - In always-on mode, earshot keeps the numbers of each turn and each rejected wake for 7 days: sound levels, scores, the turn checks, the wake frames of the spotter, and the words as the activity log has them. No audio, and earshot cannot play the wake frames back. Tests can run the wake and end-of-turn rules again on them. A switch in Manage > General turns it off and deletes them (R-ON-1, R-ON-3, R-MD-1, D-11).
 - The menu bar icon shows what earshot does: it waits (ear), it listens to a command (filled ear), the follow-up window is open (ear with sound waves), it waits for text to type (text cursor), or it is paused (pause sign). The first menu line says the same in words (R-ON-2, R-FB-1).
