@@ -82,7 +82,7 @@ From 04:29 to 04:32 UTC: 2 wake turns, 2 follow-up turns, 0 rejected wakes, 0 dr
 
 A Python copy of the detector, fed with the kept levels and the kept model answers, gives the same live result (27 checks, no end before 60 s). It shows two causes:
 
-1. In 9 of 18 pauses of 600 ms or more, the model was unsure (P below 0.5). In a dictation turn, an unsure answer made the pause wait 3 s. The real end pauses had P 0.03 and 0.15.
+1. In 7 of 18 pauses of 600 ms or more, the model was unsure (P below 0.5). In a dictation turn, an unsure answer made the pause wait 3 s. The real end pauses had P 0.03 and 0.15.
 2. In each pause, single frames between the quiet level and the speech level (4 to 12 dB above the floor) set the quiet time back to zero. The longest quiet run in a 3.04 s pause was 1.46 s.
 
 | Rule on the kept dictation | The turn ends at | Before "send" (18.4 s)? |
