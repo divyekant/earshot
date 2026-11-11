@@ -13,11 +13,14 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Added
 
+- A "not sure" note now shows up to two choices and stays on screen for 10 s. Say "yes" or "the first one", "the second one", or "no". In always-on mode, only your checked voice can answer. An answer never sends, unless you used the hold key for the command and for the answer (R-FB-1, R-NV-5, D-12).
 - In always-on mode, earshot keeps the numbers of each turn and each rejected wake for 7 days: sound levels, scores, the turn checks, the wake frames of the spotter, and the words as the activity log has them. No audio, and earshot cannot play the wake frames back. Tests can run the wake and end-of-turn rules again on them. A switch in Manage > General turns it off and deletes them (R-ON-1, R-ON-3, R-MD-1, D-11).
 - The menu bar icon shows what earshot does: it waits (ear), it listens to a command (filled ear), the follow-up window is open (ear with sound waves), it waits for text to type (text cursor), or it is paused (pause sign). The first menu line says the same in words (R-ON-2, R-FB-1).
 - In always-on mode, a wake turn that got the start sound and then failed the voice check of the turn now gets a soft "Pop" and a short note. Its words stay in memory for 20 s, never on disk. One hold-key press with no words types them into the focused field. It never sends (R-ON-3, R-FB-1, R-NV-5).
 - The menu has "Pause for 1 hour" and a mode switch (hold key or always on). While paused, no input runs and the microphone closes. The pause ends after 1 hour, with "Resume listening", or when earshot starts again (R-ON-4, R-MD-1).
 - A weekly report script, `app/scripts/weekly-report.py`. It reads the activity log and prints the success rate for each command type, wakes and rejects for each hour, dropped turns, turns with no words for each mode, and the time with the end wait. It prints no message text (R-MD-1, gap item 1).
+- Spoken keys: "backspace three times", "new line", "press tab", "escape", "left arrow twice". earshot never presses Return in a message box: say "send" to send (I-34, D-13, R-NV-5).
+- "undo that" removes the last text that earshot typed, in the same app only (I-34, D-13).
 
 ### Changed
 
