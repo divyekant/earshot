@@ -118,6 +118,17 @@ Experimental, phase 1. The PA (personal assistant) is the first plugin of earsho
 | R-PA-7 | The PA interrupts the owner only by a rule that is set to "alert". By default, only time interrupts. | Must |
 | R-PA-8 | The PA answers a command in 100 ms or less. A PA command does not slow earshot (R-PL-5). | Must |
 
+### 3.10 Command line
+
+`docs/CONTROL.md` gives the commands. D-15 gives the decision.
+
+| ID | Requirement | Priority |
+|---|---|---|
+| R-CT-1 | The owner, or an agent of the owner, can read and change each setting with a command, without the window. A value that the settings cannot take gives an error. The cloud settings turn on only with an explicit owner flag. | Must |
+| R-CT-2 | The command line talks to the running app only through a socket file in the store folder. It opens no network port. Only the same user can use it. | Must |
+| R-CT-3 | The command line never approves a plugin (R-PL-4). It never gives the Accessibility permission of earshot to a program that does not have that permission. | Must |
+| R-CT-4 | The command line can run one typed command as the Test tab does, and shows the route, the result and the plugin answers. Without an explicit flag, it is a dry run. | Must |
+
 ## 4. Out of scope
 
 - Multi-step tasks that need reasoning, for example "reply to the person who asked about the invoice". These tasks need a large model and are slow. They are not part of earshot.
