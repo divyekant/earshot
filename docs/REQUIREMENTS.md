@@ -103,6 +103,21 @@ Experimental until a second plugin exists. `docs/PLUGINS.md` gives the contract.
 | R-PL-4 | The owner approves each plugin. A changed manifest needs a new approval. A core command wins over a plugin lead. | Must |
 | R-PL-5 | A plugin cannot slow a command. earshot shows its note at once and does not wait for the plugin. | Must |
 
+### 3.9 PA plugin
+
+Experimental, phase 1. The PA (personal assistant) is the first plugin of earshot. It is a separate program in `plugins/pa/`. The design document and `/mnt/project-files/earshot-pa/phase1-build-spec.md` give the reasons.
+
+| ID | Requirement | Priority |
+|---|---|---|
+| R-PA-1 | The PA is one local program with one store file. It needs no server software and no account. | Must |
+| R-PA-2 | No PA data leaves the Mac. Exception, chosen by the owner: the titles, times and project names of open to-dos and reminders go to Apple Reminders, which syncs through iCloud. A later exception for research is not in phase 1. | Must |
+| R-PA-3 | The PA changes only its own store, its own pages and its own list in Apple Reminders. It never sends, books, pays, or changes a file of the owner. | Must |
+| R-PA-4 | Rules decide what to do and when. Search finds. No model writes text. The PA shows the owner's words, fixed labels, times and counts. | Must |
+| R-PA-5 | A to-do that the PA found in a source is a proposal until the owner confirms it. (Not used in phase 1.) | Must |
+| R-PA-6 | If the PA is not sure of a time, it saves the item with no time and says so. The PA never loses a capture. | Must |
+| R-PA-7 | The PA interrupts the owner only by a rule that is set to "alert". By default, only time interrupts. | Must |
+| R-PA-8 | The PA answers a command in 100 ms or less. A PA command does not slow earshot (R-PL-5). | Must |
+
 ## 4. Out of scope
 
 - Multi-step tasks that need reasoning, for example "reply to the person who asked about the invoice". These tasks need a large model and are slow. They are not part of earshot.

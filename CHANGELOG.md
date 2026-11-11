@@ -6,6 +6,10 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+### Added
+
+- The PA plugin, phase 1 start: a separate program in `plugins/pa/` with its plugin file, its store and the script `install-pa.sh`. Each command answers "Not built yet" for now. At its first start, the PA asks macOS for access to Reminders and shows the result (R-PA-1, R-PA-2, R-PL-1).
+
 ## [0.4.0] - 2026-11-11
 
 This release adds answers to a "not sure" note, with memory of your choices and of misheard names, spoken keys and "undo that", a menu bar state icon with pause, a turn recorder with no audio, a weekly report script, and experimental plugins. The microphone is open only while you hold the key in hold mode. "Slack <name>" works again, WhatsApp chats open, and room sound no longer matches the wake phrase.
