@@ -182,7 +182,7 @@ final class PluginProcess: @unchecked Sendable {
     }
 
     /// The private call that makes the new process responsible for itself (libquarantine, macOS 10.14 and later).
-    typealias Disclaim = @convention(c) (UnsafeMutablePointer<posix_spawnattr_t>, Int32) -> Int32
+    typealias Disclaim = @convention(c) (UnsafeMutablePointer<posix_spawnattr_t?>, Int32) -> Int32
     static let disclaim: Disclaim? = {
         guard let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "responsibility_spawnattrs_setdisclaim") else { return nil }
         return unsafeBitCast(symbol, to: Disclaim.self)
@@ -214,7 +214,7 @@ final class PluginProcess: @unchecked Sendable {
         }
         for fd in toChild + fromChild { _ = fcntl(fd, F_SETFD, FD_CLOEXEC) }
 
-        var actions: posix_spawn_file_actions_t = nil
+        var actions: posix_spawn_file_actions_t?
         posix_spawn_file_actions_init(&actions)
         defer { posix_spawn_file_actions_destroy(&actions) }
         posix_spawn_file_actions_adddup2(&actions, toChild[0], 0)
@@ -222,7 +222,7 @@ final class PluginProcess: @unchecked Sendable {
         posix_spawn_file_actions_addopen(&actions, 2, "/dev/null", O_WRONLY, 0)
         posix_spawn_file_actions_addchdir_np(&actions, entry.folder.path)
 
-        var attr: posix_spawnattr_t = nil
+        var attr: posix_spawnattr_t?
         posix_spawnattr_init(&attr)
         defer { posix_spawnattr_destroy(&attr) }
         // Close every other file of earshot in the child, and give the child the default signal actions
