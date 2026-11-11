@@ -313,13 +313,16 @@ final class AppController: ObservableObject {
         }
         input.onCancel = { [weak self] why in
             self?.updateListen { $0.turnDropped() }
+            // A wake turn played the start sound: if the voice check drops it, it gets a cue (gap item 7).
+            let wake = pipeline.pendingWake
+            let cue = CommandPipeline.cuesDrop(why, wake: wake)
             // Log the voice score of a turn that the voice check dropped, for the limits (no text).
             if why.hasPrefix(WakeTrigger.otherVoice) || why.hasPrefix(WakeTrigger.tooShort) {
                 pipeline.droppedTurn(why)
             }
             pipeline.pendingWake = nil
             pipeline.turnVoice = nil
-            Task { await pipeline.cancel() }
+            Task { if cue { await pipeline.dropWakeTurn(wake) } else { await pipeline.cancel() } }
         }
         input.onStop = { [weak self, weak input] in
             let mode = input?.current ?? .hold
