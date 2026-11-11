@@ -1,6 +1,6 @@
 # E10: an embedding model for the PA plugin
 
-Status: measured. Only candidate 4 (EmbeddingGemma-300M) passes Search. No candidate passes Project. The owner selects the model, because candidate 4 has a license that is not open source (D-16).
+Status: closed. Only candidate 4 (EmbeddingGemma-300M) passes Search. No candidate passes Project. The owner selected candidate 4 with 768 numbers on 2026-11-11 (D-16).
 
 Source: the PA phase 2 build spec, section 6 (`/mnt/project-files/earshot-pa/phase2-build-spec.md` in the project folder). Requirements: R-PA-4, R-PA-8, R-MD-4.
 
@@ -94,5 +94,5 @@ The 4B model of dk's research put 90% of dk's items in the correct project. With
 
 ## Next
 
-1. The owner selects the model (D-16).
+1. Done: the owner selected EmbeddingGemma-300M (D-16).
 2. Q3: load the model when it is needed, unload it after a quiet time, and free it before exit.

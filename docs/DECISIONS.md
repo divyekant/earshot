@@ -328,3 +328,26 @@ Limits:
 
 - `run --actions` asks two things: the program that starts the command line has the Accessibility permission, and the socket peer has the code signature of earshot. A program of the same user that can change the earshot files can still do much. The command line does not protect against such a program.
 
+
+## D-16. EmbeddingGemma-300M for the search by sense of the PA
+
+Date: 2026-11-11. Status: accepted by the owner. Requirements: R-PA-4, R-PA-8, R-MD-4. Numbers: `docs/experiments/E10-pa-embedding.md`.
+
+The PA selects the embedding model by numbers on a made-up holdout set (PA phase 2 build spec, section 6). Only EmbeddingGemma-300M passes the Search mark: 92 of 100 in the first 3, with 768 numbers. Keywords alone get 78. No candidate passes the Project mark.
+
+Decision:
+
+- The PA uses EmbeddingGemma-300M (Q8_0 GGUF) in llama.cpp on the Apple GPU, with 768 numbers. The setting `searchModel` is `"gemma"`.
+- The model has the Gemma terms, not an open-source license. R-MD-4 prefers an open-source license, so the owner made this choice on 2026-11-11.
+- The install script downloads the model at a fixed revision with a SHA-256 check. The PA program has no network code.
+- Project proposals stay off by default (`"proposeProject": false`), because no candidate passes the Project mark.
+
+Rejected:
+
+| Option | Why it was rejected |
+|---|---|
+| `NLEmbedding.sentenceEmbedding` (macOS) | Search 61 to 63 of 100. Worse than keywords alone. |
+| `NLContextualEmbedding` (macOS) | Search 65 of 100. Worse than keywords alone. |
+| Qwen3-Embedding-0.6B (Apache 2.0) | Search 86 of 100, below the mark of 90. Twice the download and about 500 MB while loaded. |
+| Keywords only | Search 78 of 100. Questions in other words find less. |
+| EmbeddingGemma with 256 numbers | Search 90 of 100, at the mark with no margin. The full 768 numbers cost about 107 MB more while the model is loaded. |
