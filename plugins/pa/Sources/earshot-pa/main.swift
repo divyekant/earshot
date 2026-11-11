@@ -43,7 +43,7 @@ if args.contains("--probe-reminders") {
 }
 
 // The bench of phase 2 (build spec 6.5): earshot-pa --embed-bench <fixtures folder> --embedder <name> [--dims N]
-// [--get-assets]. It reads only the made-up fixtures and prints one table.
+// [--get-assets] [--model <file.gguf>] [--gpu]. It reads only the made-up fixtures and prints one table.
 if let i = args.firstIndex(of: "--embed-bench"), i + 1 < args.count {
     func value(_ flag: String) -> String? {
         args.firstIndex(of: flag).flatMap { $0 + 1 < args.count ? args[$0 + 1] : nil }
@@ -53,10 +53,12 @@ if let i = args.firstIndex(of: "--embed-bench"), i + 1 < args.count {
         let fx = try BenchFixtures.load(URL(fileURLWithPath: args[i + 1], isDirectory: true))
         let before = memoryFootprint()
         let t0 = Date()
-        let embedder = try makeEmbedder(name, allowAssetRequest: args.contains("--get-assets"))
+        let embedder = try makeEmbedder(name, allowAssetRequest: args.contains("--get-assets"), modelFile: value("--model"),
+                                        gpu: args.contains("--gpu"))
         _ = try embedder.embed(["A first text to load the model."], kind: .passage)
         let load = Date().timeIntervalSince(t0)
         let bench = EmbedBench(fixtures: fx, embedder: embedder, dims: value("--dims").flatMap(Int.init))
+        bench.bakeoff = value("--bakeoff").map { URL(fileURLWithPath: $0, isDirectory: true) }
         bench.progress = { FileHandle.standardError.write(Data(("BENCH " + $0 + "\n").utf8)) }
         var result = try bench.run()
         result.rows.insert(("First load and first text", String(format: "%.0f ms", load * 1000)), at: 1)

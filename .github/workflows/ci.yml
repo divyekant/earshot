@@ -106,6 +106,18 @@ jobs:
         if: always()
         run: grep -E "PROBE|MARK|CONTRACT" "$RUNNER_TEMP/pa-test.log" || true
 
+      # Phase 2, Q1: the GGUF files of candidates 3 and 4, at a fixed revision with a SHA-256 check.
+      - name: Cache the embedding models
+        uses: actions/cache@v4
+        with:
+          path: ~/pa-models
+          key: pa-models-qwen3-370f27d-gemma-0f741b5
+
+      - name: Get the embedding models
+        run: |
+          scripts/get-model.sh qwen3 ~/pa-models
+          scripts/get-model.sh gemma ~/pa-models
+
       # Phase 2, Q1: the embedding bench on the made-up fixtures (docs/experiments/E10-pa-embedding.md).
       # The models of macOS only. The contextual model may need a one-time download of macOS data.
       - name: Embedding bench
@@ -114,11 +126,14 @@ jobs:
           set -uo pipefail
           swift build -c release --product earshot-pa
           fx=Tests/PACoreTests/Fixtures/phase2
-          for e in hash nl-sentence nl-contextual; do
+          for e in hash nl-sentence nl-contextual qwen3 gemma; do
+            model=""
+            if [ "$e" = qwen3 ]; then model="--model $HOME/pa-models/Qwen3-Embedding-0.6B-Q8_0.gguf"; fi
+            if [ "$e" = gemma ]; then model="--model $HOME/pa-models/embeddinggemma-300M-Q8_0.gguf"; fi
             for d in full 256; do
               echo "=== bench $e, numbers: $d"
               if [ "$d" = full ]; then extra=""; else extra="--dims 256"; fi
-              .build/release/earshot-pa --embed-bench "$fx" --embedder "$e" --get-assets $extra 2>/dev/null || echo "bench $e failed"
+              .build/release/earshot-pa --embed-bench "$fx" --embedder "$e" --get-assets $model $extra 2>/dev/null || echo "bench $e failed"
             done
           done
 

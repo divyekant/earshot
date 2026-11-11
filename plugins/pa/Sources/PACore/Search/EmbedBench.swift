@@ -141,6 +141,9 @@ public final class EmbedBench {
     let embedder: Embedder
     let dims: Int?
     public var progress: (String) -> Void = { _ in }
+    /// dk's research items (build spec 6.4): a folder with projects.txt ("Name: description"), items.tsv
+    /// (id, text) and labels.tsv (id, project or "none"). They stay out of the repository.
+    public var bakeoff: URL?
 
     public init(fixtures: BenchFixtures, embedder: Embedder, dims: Int? = nil) {
         self.fx = fixtures
@@ -238,6 +241,7 @@ public final class EmbedBench {
                                          rule.a, rule.b, c.proposals, c.correct, share, c.wrong, c.covered, c.withProject))
             if set == "holdout" { res.projectPass = c.proposals > 0 && share >= 90 && c.wrong <= 5 }
         }
+        if let bakeoff { try runBakeoff(bakeoff, rule: rule, row: row) }
 
         // The duplicate notice (8.2): threshold C on the made-up pairs.
         if !fx.pairs.isEmpty {
@@ -306,6 +310,31 @@ public final class EmbedBench {
         // The sum is printed, so that the optimizer keeps the loop.
         row("Compare 50,000 passages", "median \(Self.ms(Self.median(times))) (numbers in memory; best \(String(format: "%.3f", checksum / 5)))")
         return res
+    }
+
+    /// The project test of 6.5 on dk's research items: the profile of a project is its name and description.
+    func runBakeoff(_ folder: URL, rule: ProjectRule, row: (String, String) -> Void) throws {
+        let projects = try String(contentsOf: folder.appendingPathComponent("projects.txt"), encoding: .utf8)
+            .split(separator: "\n").map(String.init).filter { $0.contains(":") }
+        let names = projects.map { String($0.prefix { $0 != ":" }) }
+        var labels: [String: String] = [:]
+        for r in try BenchFixtures.rows(folder.appendingPathComponent("labels.tsv")) where r.count >= 2 { labels[r[0]] = r[1] }
+        let items = try BenchFixtures.rows(folder.appendingPathComponent("items.tsv")).filter { $0.count >= 2 && labels[$0[0]] != nil }
+        let pv = try embed(projects, .passage)
+        let iv = try embed(items.map { $0[1] }, .passage)
+        let cases = items.indices.map { i in
+            (scores: names.indices.map { (names[$0], Vectors.dot(iv[i], pv[$0])) }, truth: labels[items[i][0]]!)
+        }
+        let c = rule.count(cases)
+        let share = c.proposals == 0 ? 0 : Double(c.correct) / Double(c.proposals) * 100
+        row("Project, dk's items (rule of the development set)", String(format: "%d proposals, %d correct (%.0f%%), %d wrong; %d of %d with a project got a correct proposal",
+                                                                     c.proposals, c.correct, share, c.wrong, c.covered, c.withProject))
+        let refit = ProjectRule.fit(cases)
+        let r = refit.count(cases)
+        row("Project, dk's items (rule fit on these items, for reference only)", String(format: "A %.3f, B %.4f: %d proposals, %d wrong", refit.a, refit.b, r.proposals, r.wrong))
+        let withProject = cases.filter { $0.truth != "none" }
+        let top1 = withProject.filter { $0.scores.max { $0.1 < $1.1 }?.0 == $0.truth }.count
+        row("Project, dk's items, best project with no threshold", "\(top1) of \(withProject.count) items with a project")
     }
 
     static func median(_ v: [TimeInterval]) -> TimeInterval {
