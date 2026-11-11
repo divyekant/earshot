@@ -18,7 +18,7 @@ final class TemplateMatcher {
         /// The score: the mean of the 2 best templates. 0 is the same sound, 1 is an unrelated sound.
         var score: Double
         /// The worst part: the highest mean cost of 5 frames (200 ms) in a row along the path, for the same
-        /// 2 templates. A sound-alike that differs in one syllable has a high worst part. For the log only.
+        /// 2 templates. A sound-alike that differs in one syllable has a high worst part. It is below `worstLimit`.
         var worst: Double
         /// The first stream frame of the match of the best template, counted from the last reset.
         var startFrame: Int
@@ -29,6 +29,10 @@ final class TemplateMatcher {
     /// The wake limit for the score. E5: 0.30 gave 90 % hits, 0.33 gave 93 %, 0.36 gave 96 %. The lowest score in
     /// 8.9 h of own talk was 0.38, so 0.33 keeps a margin of 0.05.
     static let defaultLimit = 0.33
+    /// The wake limit for the worst part (E7). In the night log of 2026-11-03, 4,718 room matches with no phrase
+    /// said had a worst part of 0.82 to 1.04. The owner's live wakes had 0.28 to 0.55. A match at or above this limit
+    /// does not wake earshot. It counts as blocked, for the log.
+    static let defaultWorstLimit = 0.7
     /// A local low of the score up to this much above the limit counts as a near miss, for the log.
     static let nearMissMargin = 0.08
     /// The extra cost of a stay or a skip step.
@@ -45,6 +49,7 @@ final class TemplateMatcher {
     static let minTemplates = 3
 
     let limit: Double
+    let worstLimit: Double
     /// The templates, each frame with length 1.
     let templates: [[[Float]]]
 
@@ -56,13 +61,18 @@ final class TemplateMatcher {
     private var lastWake = Int.min / 2
     private var nearMissCount = 0
     private var nearMissBest = Double.infinity
+    /// The matches below `limit` that the worst part stopped, and the frame of the last one.
+    private var blockedCount = 0
+    private var lastBlocked = Int.min / 2
     /// The lowest score of the current run of frames near the limit, and if that run woke earshot.
     private var runLow: Double?
     private var runWoke = false
 
     /// - Parameter templates: the encoder frames of each take. Templates with fewer than 2 frames are left out.
-    init(templates: [[[Float]]], limit: Double = TemplateMatcher.defaultLimit) {
+    init(templates: [[[Float]]], limit: Double = TemplateMatcher.defaultLimit,
+         worstLimit: Double = TemplateMatcher.defaultWorstLimit) {
         self.limit = limit
+        self.worstLimit = worstLimit
         self.templates = templates.filter { $0.count >= 2 }.map { $0.map(Self.unit) }
         columns = self.templates.map { Column(length: $0.count) }
     }
@@ -85,9 +95,16 @@ final class TemplateMatcher {
         if recent.count == Self.waitFrames + 1, let candidate = recent.first, candidate.score < limit,
            recent.dropFirst().allSatisfy({ candidate.score <= $0.score }),
            candidate.frame - lastWake >= Self.refractoryFrames {
-            lastWake = candidate.frame
-            runWoke = true
-            match = Match(score: candidate.score, worst: candidate.worst, startFrame: candidate.start, endFrame: candidate.frame)
+            if candidate.worst < worstLimit {
+                lastWake = candidate.frame
+                runWoke = true
+                match = Match(score: candidate.score, worst: candidate.worst, startFrame: candidate.start,
+                              endFrame: candidate.frame)
+            } else if candidate.frame - lastBlocked >= Self.refractoryFrames {
+                // A blocked match does not wake earshot, so the listener does not reset (E7, candidate A).
+                lastBlocked = candidate.frame
+                blockedCount += 1
+            }
         }
         countNearMiss(result.score)
         return match
@@ -104,15 +121,18 @@ final class TemplateMatcher {
         frameIndex = -1
         recent.removeAll()
         lastWake = Int.min / 2
+        lastBlocked = Int.min / 2
         runLow = nil
         runWoke = false
     }
 
-    /// The near misses since the last call: the count and the lowest score. Then it starts to count again.
-    func takeNearMisses() -> (count: Int, best: Double) {
-        let out = (nearMissCount, nearMissBest)
+    /// The near misses since the last call: the count, the lowest score and the matches that the worst part
+    /// stopped. Then it starts to count again.
+    func takeNearMisses() -> (count: Int, best: Double, blocked: Int) {
+        let out = (nearMissCount, nearMissBest, blockedCount)
         nearMissCount = 0
         nearMissBest = .infinity
+        blockedCount = 0
         return out
     }
 

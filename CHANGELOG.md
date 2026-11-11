@@ -8,6 +8,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Fixed
 
+- In always-on mode, room sound no longer matches the wake phrase every 4 to 6 s. A match now needs each 200 ms part of the phrase to fit, not only the mean. The log counts the stopped matches (R-ON-1, D-11, E7).
 - "Slack <name>" opens the chat again. Slack now lists "Search for: <name>" rows in Command-K, and earshot pressed Return on a search. earshot now skips search rows, and stops if a search row is above the chat. WhatsApp chats open too: earshot clicks the new-chat field and presses the result row when Return does not open it. Measured: Slack 437 ms, Messages 682 ms, WhatsApp 1,475 ms to the focused box (R-NV-2, R-NV-6, R-SP-1, E7).
 
 ### Added
@@ -20,6 +21,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - A weekly report script, `app/scripts/weekly-report.py`. It reads the activity log and prints the success rate for each command type, wakes and rejects for each hour, dropped turns, turns with no words for each mode, and the time with the end wait. It prints no message text (R-MD-1, gap item 1).
 - Spoken keys: "backspace three times", "new line", "press tab", "escape", "left arrow twice". earshot never presses Return in a message box: say "send" to send (I-34, D-13, R-NV-5).
 - "undo that" removes the last text that earshot typed, in the same app only (I-34, D-13).
+- Plugins, experimental. A plugin is a separate program on the Mac. A command that starts with its lead words, for example "remind me to …", goes to the plugin as text. The plugin answers with a note on screen. You approve each plugin in the new Plugins tab. A plugin never gets audio, never acts in an app, and never gets the permissions of earshot. `docs/PLUGINS.md` gives the contract (R-PL-1 to R-PL-5, D-14).
 - earshot remembers your answer to a "not sure" note. The next time the same targets tie, for example the same name in two chat apps, it opens your last choice and does not ask again. The answers are in `habits.json` in the earshot folder, with no message text (R-FB-1, R-NV-5).
 - earshot learns misheard names from your answer to a "not sure" note. If speech wrote "chart" and you chose the button "Chat", the next "click chart" in the same app clicks "Chat" with no note. It uses the pair only if the label is on the screen, in the names or in the app table at that time. The pairs are in `heard.json` in the earshot folder, with no message text. A correction never sends and never presses a risky button (R-FB-1, R-NV-5, I-15).
 

@@ -19,15 +19,22 @@ public struct ManageHooks {
     public var settingsChanged: ((EarshotSettings) -> Void)?
     /// The wake phrase models and the owner's voice (R-ON-3, D-11).
     public var voice: VoiceHooks?
+    /// Tells EarshotApp that the plugins or their approvals changed (R-PL-4). The Plugins tab calls it.
+    public var pluginsChanged: (() -> Void)?
+    /// Why the router does not use a plugin lead, or nil if it uses it (PluginRouter.refusal).
+    public var leadRefusal: ((String) -> String?)?
 
     public init(test: ((String, Bool) async -> TestReport)? = nil,
                 discoverApps: (() async -> [AppEntry])? = nil,
                 refreshNames: ((String) async -> [NameEntry])? = nil,
                 feedback: FeedbackSink? = nil,
                 settingsChanged: ((EarshotSettings) -> Void)? = nil,
+                pluginsChanged: (() -> Void)? = nil,
+                leadRefusal: ((String) -> String?)? = nil,
                 voice: VoiceHooks? = nil) {
         self.test = test; self.discoverApps = discoverApps; self.refreshNames = refreshNames
         self.feedback = feedback; self.settingsChanged = settingsChanged; self.voice = voice
+        self.pluginsChanged = pluginsChanged; self.leadRefusal = leadRefusal
     }
 }
 
@@ -93,6 +100,7 @@ public struct ManageView: View {
             AppsTab(store: store, hooks: hooks).tabItem { Text("Apps") }
             NamesTab(store: store, hooks: hooks).tabItem { Text("Names") }
             ActivityTab(store: store).tabItem { Text("Activity") }
+            PluginsTab(store: store, hooks: hooks).tabItem { Text("Plugins") }
             PermissionsTab().tabItem { Text("Permissions") }
             TestTab(store: store, hooks: hooks).tabItem { Text("Test") }
         }

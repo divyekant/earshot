@@ -1,6 +1,6 @@
 # E7. Turn recorder, and why room sounds match the wake templates
 
-Status: recorder built. The live session and the cause are open.
+Status: recorder built. Worst-part limit 0.7 added. The live session is open.
 
 Requirements: R-ON-1, R-ON-2, R-ON-3, R-MD-1. Decisions: D-11, D-12.
 
@@ -54,13 +54,28 @@ From 00:00 to 07:00 PST, with no owner in the room, the log has 4,731 rejected w
 - One match about every 5 s, for 7 hours, fits candidate A: each rejected wake resets the encoder (`PhraseListener.reset`), and the frames after a reset can start the next match. So the matches can feed each other.
 - A gate of 0.10 would open a turn, with the start sound, for most of these matches. The gate stays at 0.35.
 
+### 5.2 The match numbers of the same night (read by thread A on 2026-11-11)
+
+| Group | Match score | Worst part | Phrase voice |
+|---|---|---|---|
+| 4,718 rejected wakes, no phrase said | 0.22 to 0.32, median 0.25 | 0.82 to 1.04, median 0.97 | 0.01 to 0.34, median 0.21 |
+| The owner's live wakes (2026-11-03, desk) | 0.20 to 0.31 | 0.28 to 0.55 | 0.48 to 0.67 |
+
+Time between two rejected wakes: min 3.69 s, p10 4.91 s, median 5.29 s, p90 5.90 s. 99.7 % fall between 4 and 7 s.
+
+- The match score cannot separate the groups: they overlap from 0.22 to 0.31.
+- The worst part separates them with no overlap. A room match fits the mean of the phrase, but one part of 200 ms does not fit at all (cost near 1, an unrelated sound).
+- This fits candidate B or D more than C: the matches are not speech.
+- The fixed time between matches fits candidate A (the reset chain). A periodic room sound is also possible. These numbers do not rule it out.
+
 The live session is not done yet. It needs dk's "go" and a build on the Mac.
 
-### 5.2 Limits of the replay
+### 5.3 Limits of the replay
 
 The record ends with the live turn. So a replay with a shorter end silence shows where the turn would end, but a replay with a longer end silence runs out of kept levels: the end is not known.
 
 ## 6. Decisions
 
 - 2026-11-11, dk: the recorder keeps the wake frames and the scores for 7 days, on by default. No audio on disk.
-- The gate decision: not yet.
+- 2026-11-11: a template match wakes earshot only if its worst part is below 0.7 (`TemplateMatcher.defaultWorstLimit`). A stopped match does not reset the listener, which also breaks the chain of candidate A. See D-11 in `docs/DECISIONS.md`.
+- The gate on the phrase voice stays at 0.35. Lower it toward 0.10 only after a live run with the worst-part limit shows no rejected wakes for 15 min of room sound and talk.

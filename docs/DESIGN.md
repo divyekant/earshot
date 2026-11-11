@@ -87,7 +87,7 @@ How a command flows (`EarshotInput/WakeTrigger.swift`):
 2. The listener fires about 0.3 to 0.5 s after the phrase. If a voice is enrolled, the voice model scores the audio of the phrase. A score below the gate (`voiceGate`, 0.35) stops here, and the log gets one line with no text, with the voice score and the match score.
    - With templates, each new encoder frame (40 ms) updates the DTW match of each template. The score of a template is the mean cosine distance along its path: 0 is the same sound, 1 is an unrelated sound. The wake score is the mean of the 2 best template scores. earshot wakes when the score is below 0.33 and the next 2 frames give no lower score. The path can stay on a template frame up to 3 times (slower speech) or skip one frame (faster speech). After a wake, no second wake comes for 1.5 s.
    - The match gives the first and the last frame of the phrase. These take the place of the time stamps of the word pieces, for the voice clip and for the time cut in step 4.
-   - The log line of a wake adds the match score and the worst part (the highest mean cost of 200 ms along the path). The worst part is not a wake limit. If sound-alike wakes occur, a limit of 0.5 on it is the first step (E5).
+   - The log line of a wake adds the match score and the worst part (the highest mean cost of 200 ms along the path). A match with a worst part of 0.7 or more does not wake earshot (E7). Room sound matched the templates every 4 to 6 s with a worst part of 0.82 to 1.04. The owner's wakes had 0.28 to 0.55. A stopped match does not reset the listener. The near-miss line of the log counts the stopped matches. If sound-alike wakes occur, a limit of 0.5 is the next step (E5).
 3. The speech engine starts at the start of the phrase. `MicrophoneFeed` keeps 3 s of audio, and `PrerollControl.setNextPreroll` gives the engine the phrase and every word after it.
 4. The turn ends after the command. If a voice is enrolled, the voice model then scores the whole turn, from the start of the phrase to the end (E6, `VoiceRule`):
    - The trigger keeps the first 8 s of the turn for this check. `SpeechTrim.condensed` cuts the quiet ends, and cuts each quiet part inside to 300 ms, so the model scores speech, not the pause after the phrase.
@@ -238,6 +238,18 @@ Show a small overlay near the menu bar, for example "→ Slack · Ravi" or "✗ 
 The oMLX server can clean up dictated text: punctuation and filler words. Make it optional, because it adds latency.
 
 Measured on 2026-11-11 ([experiments/text-cleanup-omlx.md](experiments/text-cleanup-omlx.md)): `qwen3.5-0.8b-mlx-4bit` takes 285 ms (median, warm), but it cleaned only 3 of 10 sentences and changed words in 2. earshot has no cleanup setting until a larger general model passes with 0 changed words.
+
+### 3.8 Plugins (R-PL-1 to R-PL-5, D-14)
+
+A plugin is a separate program with a manifest (`docs/PLUGINS.md`). The parts in earshot:
+
+- `EarshotCore/Plugin.swift`: the manifest, the approvals (a SHA-256 of each approved `plugin.json`) and the JSON line messages.
+- `EarshotRouter/PluginRouter.swift`: a tier-0 rule. A command that starts with an approved lead becomes the one intent `handOff(pluginID, lead, text)`. The rule refuses a lead that starts with a core command word or an app name, so a core command wins. The words after the lead are text, as after "type".
+- `EarshotApp/PluginHost.swift`: starts each approved plugin with posix_spawn, with the responsibility disclaimed, so that the plugin does not get the permissions of earshot. Writes go on a separate queue, so a plugin cannot slow a command.
+- `EarshotApp/CommandPipeline+Plugins.swift`: the hand-off after the route. The log keeps the lead and a word count.
+- `EarshotUI/PluginsTab.swift`: the list of plugins and the approvals.
+
+The answers show as a note. An alert also goes to the Notification Center. A plugin also gives targets (names with ids). earshot keeps them for a later target source: "open <target>" with the core verb.
 
 ## 4. Permissions
 

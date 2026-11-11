@@ -91,6 +91,18 @@ The owner sees the screen and tells earshot what to do. earshot does not need to
 | R-FB-1 | earshot shows visual feedback, for example a small note "→ Slack · Ravi". The owner reads faster than they listen. | Must |
 | R-FB-2 | Spoken replies (talkback) are optional and off by default. | Could |
 
+### 3.8 Plugins
+
+Experimental until a second plugin exists. `docs/PLUGINS.md` gives the contract. D-14 gives the decision.
+
+| ID | Requirement | Priority |
+|---|---|---|
+| R-PL-1 | A plugin is a separate local program. No plugin code runs inside earshot. A plugin does not get the Microphone or the Accessibility permission of earshot. | Must |
+| R-PL-2 | A plugin gets only the text of commands that start with its lead words, and the context that its manifest names. It never gets audio. The words after a lead never go to a cloud model. | Must |
+| R-PL-3 | A plugin answer is never a command. A plugin cannot make earshot click, type or send. | Must |
+| R-PL-4 | The owner approves each plugin. A changed manifest needs a new approval. A core command wins over a plugin lead. | Must |
+| R-PL-5 | A plugin cannot slow a command. earshot shows its note at once and does not wait for the plugin. | Must |
+
 ## 4. Out of scope
 
 - Multi-step tasks that need reasoning, for example "reply to the person who asked about the invoice". These tasks need a large model and are slow. They are not part of earshot.
