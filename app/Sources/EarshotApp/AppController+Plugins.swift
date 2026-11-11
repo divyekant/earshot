@@ -23,6 +23,7 @@ extension AppController {
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
                     guard let self else { return }
+                    self.control?.collect("\(manifest.name): \(text)")
                     if self.settings.showFeedback || alert {
                         feedback.show("\(manifest.name): \(text)", ok: true, seconds: Self.pluginAnswerSeconds)
                     }

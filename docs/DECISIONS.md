@@ -306,3 +306,25 @@ Rules for dictation:
 
 - With the hold key and no "type", a sentence that starts with a lead goes to the plugin, not into the focused text box.
 - After a bare "type", the next turn is dictation (R-NV-4). A lead in it is text. The owner gave an explicit command to type.
+
+## D-15. A command line in the app program, with a socket file
+
+Date: 2026-11-11. Status: accepted. Requirements: R-CT-1 to R-CT-4. Commands: `docs/CONTROL.md`.
+
+The owner asked for a way to change settings without the window, so that agents can test and change earshot with no clicks.
+
+Decision: the app program is also the command line. When the first word is a control word, it runs one command and stops. The command line edits `settings.json` itself, then tells the running app through a Unix socket file in the store folder. The app reads the file again.
+
+Rejected:
+
+| Option | Why it was rejected |
+|---|---|
+| A local HTTP server | It opens a network port. Any local program, and a web page through the browser, can call a port. |
+| A separate command-line program | A second build product. The command line must be the same signed program for the peer check. |
+| Distributed notifications only | The app cannot know the sender, and the command line gets no answer. |
+| Plugin approval from the command line | The owner approves each plugin (R-PL-4). An agent must not approve its own plugin. |
+
+Limits:
+
+- `run --actions` asks two things: the program that starts the command line has the Accessibility permission, and the socket peer has the code signature of earshot. A program of the same user that can change the earshot files can still do much. The command line does not protect against such a program.
+

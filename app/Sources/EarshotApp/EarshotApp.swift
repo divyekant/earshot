@@ -11,8 +11,8 @@ import ServiceManagement
 import SwiftUI
 
 // T7: the menu-bar helper. It connects the modules. The management window is in EarshotUI (T6).
+// The program starts in Entry.swift: a control word runs the command line (docs/CONTROL.md), else this app.
 
-@main
 struct EarshotApp: App {
     @StateObject private var app = AppController()
 
@@ -85,6 +85,8 @@ final class AppController: ObservableObject {
     let turns: TurnRecorder
     /// The approved plugins, each a separate program (R-PL-1, docs/PLUGINS.md).
     let plugins: PluginHost
+    /// The control socket of the command line (R-CT-2, docs/CONTROL.md).
+    var control: ControlServer?
     var input: InputSwitch?
     private var engineWhy = ""
     /// The wake phrase models (D-11). They load when always-on mode is on, and stay loaded.
@@ -190,6 +192,7 @@ final class AppController: ObservableObject {
         pipeline.playSound = { kind in DispatchQueue.main.async { NSSound(named: kind.systemName).map { $0.volume = kind.volume; $0.play() } } }
         pipeline.wakePhrase = settings.wakePhrase
         startPlugins()
+        startControl()
         prepareEngine()
         startInput()
         let appsFile = store.folder.appendingPathComponent("apps.json")

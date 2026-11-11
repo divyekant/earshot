@@ -94,6 +94,32 @@ final class PluginHost: PluginHandOff, @unchecked Sendable {
         return nil
     }
 
+    /// Stops one plugin and starts it again, with a new start count (R-CT-2). It reads the plugins folder and the
+    /// approvals first, so a plugin that is not approved now does not start. Nil if it runs again, else a reason.
+    func restart(_ pluginID: String) -> String? {
+        reload()
+        guard let entry = all.first(where: { $0.id == pluginID }) else { return "there is no plugin \(pluginID)" }
+        guard entry.approved else { return "the plugin \(pluginID) is not approved" }
+        guard entry.problems.isEmpty else { return "the plugin \(pluginID) has problems: " + entry.problems.joined(separator: "; ") }
+        lock.lock()
+        let old = processes[pluginID]
+        processes[pluginID] = nil
+        targetCache[pluginID] = nil
+        starts[pluginID] = nil
+        lock.unlock()
+        old?.stop()
+        switch running(entry) {
+        case .success: return nil
+        case .failure(let why): return why.text
+        }
+    }
+
+    /// The ids of the plugins that run now.
+    var runningIDs: [String] {
+        lock.lock(); defer { lock.unlock() }
+        return processes.filter { $0.value.isRunning }.keys.sorted()
+    }
+
     func stopAll() {
         lock.lock()
         let all = processes.values

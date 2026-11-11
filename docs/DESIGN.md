@@ -281,6 +281,10 @@ A send and "undo that" clear the last typing. A wait does not change it.
 
 The menu bar icon (`ListenState`) shows "waits for text" as the text cursor. The other waits show as a note on screen. The wake rules and the end-of-turn rules (3.1) are in `WakeTrigger`, not in the talk state.
 
+### 3.10 Command line (R-CT-1 to R-CT-4, D-15)
+
+The app program is also the command line: `Earshot.app/Contents/MacOS/earshot settings set mode alwaysOn`. `EarshotCore/Control.swift` reads the words and edits `settings.json`. `EarshotApp/ControlSocket.swift` has the socket `<store>/control.sock` (mode 0600, same user id, one JSON line each way). The running app then reads the settings and the plugins again, as after a change in the window. `docs/CONTROL.md` gives each command.
+
 ## 4. Permissions
 
 - Microphone
