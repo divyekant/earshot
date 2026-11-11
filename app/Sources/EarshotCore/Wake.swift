@@ -98,9 +98,9 @@ public struct VoiceRule: Sendable, Equatable {
 }
 
 /// The voice check at the end of an always-on turn (R-ON-3, D-11, D-12). It holds no audio and no text.
-public struct TurnVoice: Sendable, Equatable {
+public struct TurnVoice: Codable, Sendable, Equatable {
     /// The turn that the check is for.
-    public enum Kind: String, Sendable { case wake, followUp }
+    public enum Kind: String, Codable, Sendable { case wake, followUp }
     public var kind: Kind
     /// The score that decided: the score of the turn, or of the phrase if the check of the turn did not run.
     public var score: Double
@@ -234,12 +234,16 @@ public protocol WakeListener: AnyObject {
     /// The probability (0 to 1) that the speaker finished the turn, from the sound of the last 8 s of the turn
     /// (Smart Turn v3.2). Nil if the turn model is not loaded or failed: then the end silence alone ends the turn.
     func turnScore(_ samples: [Float]) -> Double?
+    /// The encoder frames and the match scores around the match of the last hit, for the turn recorder (E7). Nil if
+    /// the listener has no templates, or if the last hit has no trace. A second call gives nil.
+    func takeTrace() -> WakeTrace?
 }
 
 public extension WakeListener {
     func takeNearMisses() -> NearMisses? { nil }
     func learn(_ turn: [Float]) -> VoiceProfile? { nil }
     func turnScore(_ samples: [Float]) -> Double? { nil }
+    func takeTrace() -> WakeTrace? { nil }
     /// The score of `voiceScore`, with the length of all the samples and no embedding.
     func voiceCheck(_ samples: [Float]) -> VoiceCheck? {
         voiceScore(samples).map { VoiceCheck(score: $0, seconds: Double(samples.count) / 16000) }
@@ -247,8 +251,8 @@ public extension WakeListener {
 }
 
 /// How an always-on turn ended (R-ON-1, I-2). For the log: numbers only, no audio and no text.
-public struct TurnEnd: Sendable, Equatable {
-    public enum Rule: String, Sendable {
+public struct TurnEnd: Codable, Sendable, Equatable {
+    public enum Rule: String, Codable, Sendable {
         /// Quiet frames at the room level for the end silence.
         case quiet
         /// No speech frame for the end silence plus `softEndExtraMs` (noise that changes, or a soft voice).
@@ -274,8 +278,8 @@ public struct TurnEnd: Sendable, Equatable {
 }
 
 /// One check of the turn model at a pause (R-ON-1, I-2). For the log: numbers only, no audio and no text.
-public struct TurnCheck: Sendable, Equatable {
-    public enum Decision: String, Sendable {
+public struct TurnCheck: Codable, Sendable, Equatable {
+    public enum Decision: String, Codable, Sendable {
         /// The model heard the end of the turn. The turn ends now.
         case end
         /// The model heard a pause inside the turn. The turn waits up to the fallback silence.

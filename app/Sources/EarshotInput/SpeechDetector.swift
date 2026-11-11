@@ -254,6 +254,9 @@ public struct SpeechDetector: Sendable {
         return loud
     }
 
+    /// Sets the noise floor, for a replay of a kept turn (E7). The live detector never calls it.
+    public mutating func setFloor(_ db: Double) { floorDb = db }
+
     /// Opens a turn from the outside, after the wake phrase (D-11). The phrase counts as speech, so a short
     /// command after it is not dropped.
     /// - Parameters:

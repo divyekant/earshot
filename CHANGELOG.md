@@ -6,6 +6,10 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+### Added
+
+- In always-on mode, earshot keeps the numbers of each turn and each rejected wake for 7 days: sound levels, scores, the turn checks, the wake frames of the spotter, and the words as the activity log has them. No audio, and earshot cannot play the wake frames back. Tests can run the wake and end-of-turn rules again on them. A switch in Manage > General turns it off and deletes them (R-ON-1, R-ON-3, R-MD-1, D-11).
+
 ### Changed
 
 - In hold mode, earshot closes the microphone after 2 minutes with no command, so the macOS microphone indicator goes off. The next hold-key press opens it again. That one command has no 450 ms preroll, so speak after the start sound. Always-on mode keeps the microphone open (R-ON-4, R-MD-1).
