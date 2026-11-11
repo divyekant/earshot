@@ -14,6 +14,9 @@ public final class Engine {
     /// A note for the next answer, for example after a new store started.
     var pendingNotice: String?
     var settingsStamp: Date?
+    var lastCapture: LastCapture?
+    var helloDone = false
+    var startedAt: Date?
 
     public var storeURL: URL { folder.appendingPathComponent("pa.sqlite") }
     public var settingsURL: URL { folder.appendingPathComponent("settings.json") }
@@ -33,6 +36,7 @@ public final class Engine {
     /// Opens the store and reads the settings. Call it one time, before the first message.
     public func start() {
         let now = clock.now
+        startedAt = now
         log.write(now, "start")
         loadSettings(announce: true)
         do {
@@ -44,6 +48,7 @@ public final class Engine {
                 s.log("store-recovered", .store, nil, at: now)
             }
             log.write(now, "store-open", ["search": s.searchKind.rawValue])
+            saveSpares()
         } catch {
             log.write(now, "store-failed")
         }
@@ -113,6 +118,11 @@ public final class Engine {
 
     /// Later packages add the targets, the missed list and the morning list here.
     func afterHello() {
+        if !helloDone {
+            helloDone = true
+            missedList(at: startedAt ?? clock.now)
+        }
+        tick()
         probeReminders()
     }
 
@@ -155,6 +165,32 @@ public final class Engine {
     }
 
     func run(_ cmd: PACommand, id: String, text: String, context: [String: String]) -> Outgoing {
-        .note(id, "Not built yet")
+        switch cmd {
+        case .remindMe, .todo, .note: return capture(cmd, id: id, text: text, context: context)
+        case .keepThis: return keep(id: id, text: text, context: context)
+        case .newProject: return newProject(id: id, text: text)
+        case .whatIsDue: return whatIsDue(id: id)
+        case .whatAbout: return whatAbout(id: id, text: text)
+        case .whereIs: return whereIs(id: id, text: text)
+        case .done: return done(id: id, text: text)
+        case .snooze: return snooze(id: id, text: text)
+        case .drop: return drop(id: id, text: text)
+        case .move: return move(id: id, text: text)
+        case .quiet: return quiet(id: id, text: text)
+        default: return .note(id, "Not built yet")
+        }
     }
+
+    // MARK: - Changes
+
+    /// An item is new or changed. The clock, the pages and the copy in Reminders act on it.
+    func itemChanged(_ it: Item, old: Item?) {
+        planAlerts(it, old: old)
+    }
+
+    /// A document is new or changed.
+    func docsChanged() {}
+
+    /// A project is new or changed.
+    func projectsChanged() {}
 }

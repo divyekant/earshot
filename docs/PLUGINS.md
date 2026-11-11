@@ -91,7 +91,8 @@ earshot starts the program with posix_spawn. The program reads JSON lines from s
 
 - earshot makes macOS treat the program as a separate process for the privacy permissions. The program does not get the Microphone or the Accessibility permission of earshot.
   - Test on the Mac, 2026-11-11, builds 2e53860 and abc46df: a test plugin ran `AXIsProcessTrusted` through osascript. The result was `false` in the plugin, and `true` in a shell with the Accessibility permission. The plugin was a child process of earshot.
-  - A plugin that needs a permission, for example Reminders, must get its own permission from macOS. This is not tested yet. A command-line program can need an embedded Info.plist or a helper app before macOS shows the permission question.
+  - A plugin that needs a permission, for example Reminders, must get its own permission from macOS.
+  - Test on the Mac, 2026-11-11, PA plugin at commit e8e87cf: earshot started the PA (`EarshotPA.app/Contents/MacOS/earshot-pa`) as a plugin. The PA asked for full access to Reminders. macOS gave the access to the PA 3 s after its start. The program has an `Info.plist` in its app bundle and in the linker section `__TEXT,__info_plist`, and a stable code signature. Use the same layout for a plugin that needs a permission.
 - The program gets only these environment variables: `EARSHOT_PLUGIN_DATA` (a data folder for the plugin), `EARSHOT_CONTRACT` (`1`), `PATH`, `HOME`, `LANG` and `TMPDIR`.
 - The data folder is `~/Library/Application Support/earshot/plugin-data/<id>/`. An update of the plugin does not change this folder.
 - stderr goes to `/dev/null`.

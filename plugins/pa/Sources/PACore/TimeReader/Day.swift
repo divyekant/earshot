@@ -82,12 +82,16 @@ public enum TimeText {
         return d.year == today.year ? base : base + " \(d.year)"
     }
 
-    public static func clock(_ date: Date, _ cal: Calendar) -> String {
-        let c = cal.dateComponents([.hour, .minute], from: date)
-        return String(format: "%02d:%02d", c.hour!, c.minute!)
+    /// The clock time in the 12 or 24 hour style of the locale: "17:00" or "5:00 PM".
+    public static func clock(_ date: Date, _ cal: Calendar, locale: Locale = Locale(identifier: "en_GB")) -> String {
+        let f = DateFormatter()
+        f.locale = locale
+        f.timeZone = cal.timeZone
+        f.dateFormat = DateFormatter.dateFormat(fromTemplate: "jmm", options: 0, locale: locale) ?? "HH:mm"
+        return f.string(from: date)
     }
 
-    public static func moment(_ date: Date, now: Date, _ cal: Calendar) -> String {
-        day(Day(date, cal), now: now, cal) + " " + clock(date, cal)
+    public static func moment(_ date: Date, now: Date, _ cal: Calendar, locale: Locale = Locale(identifier: "en_GB")) -> String {
+        day(Day(date, cal), now: now, cal) + " " + clock(date, cal, locale: locale)
     }
 }
