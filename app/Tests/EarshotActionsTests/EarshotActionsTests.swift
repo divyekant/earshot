@@ -322,7 +322,7 @@ final class ActionRunnerTests: XCTestCase {
         XCTAssertEqual(ActionRules.switcherResult(searchOnly, name: name, baseline: []), .none)
         XCTAssertFalse(ActionRules.resultShows(searchOnly, name: name, baseline: []))
         // The chat row first: Return opens the chat.
-        let chatFirst = [t("Sam Rivera, Direct Message", 131, 40), t("Sam Rivera", 141), t("(you)", 141)]
+        let chatFirst = [t("Suggestions", 131, 132), t("Sam Rivera, Direct Message", 131, 40), t("Sam Rivera", 141), t("(you)", 141)]
             + searchOnly.map { ($0.0, Frame(x: 400, y: $0.1.y + 40, w: 500, h: $0.1.h)) }
         XCTAssertEqual(ActionRules.switcherResult(chatFirst, name: name, baseline: []), .chat)
         // The chat row below a search row: Return would run the search.
@@ -334,6 +334,11 @@ final class ActionRunnerTests: XCTestCase {
         let rows = ActionRules.rows([("b", Frame(x: 0, y: 141, w: 10, h: 20)), ("a", Frame(x: 0, y: 131, w: 10, h: 40)),
                                      ("c", Frame(x: 0, y: 171, w: 10, h: 40))])
         XCTAssertEqual(rows.map { $0.map(\.0) }, [["a", "b"], ["c"]])
+        // A section label that covers the rows does not join them (Slack "Suggestions").
+        let withSection = ActionRules.rows([("Suggestions", Frame(x: 0, y: 131, w: 10, h: 132)), ("a", Frame(x: 0, y: 131, w: 10, h: 40)),
+                                            ("b", Frame(x: 0, y: 141, w: 10, h: 20)), ("c", Frame(x: 0, y: 171, w: 10, h: 40)),
+                                            ("d", Frame(x: 0, y: 211, w: 10, h: 40))])
+        XCTAssertEqual(withSection.map { $0.map(\.0) }, [["a", "b"], ["c"], ["d"]])
     }
 
     func testSwitcherFieldShowsLate() async {

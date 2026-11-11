@@ -267,11 +267,16 @@ enum ActionRules {
     }
 
     /// Groups the texts of a result list into rows, from top to bottom. A text joins the row above it
-    /// if it starts before that row ends.
+    /// if it starts before that row ends. A section label whose frame covers two or more rows
+    /// (Slack "Suggestions") is left out, so that it does not join the rows into one.
     static func rows(_ texts: [(String, Frame)]) -> [[(String, Frame)]] {
+        let starts = Set(texts.map { Int($0.1.y.rounded()) })
+        func isSection(_ f: Frame) -> Bool {
+            starts.filter { Double($0) > f.y + 2 && Double($0) < f.maxY - 2 }.count >= 2
+        }
         var out: [[(String, Frame)]] = []
         var rowEnd = -Double.infinity
-        for t in texts.sorted(by: { $0.1.y < $1.1.y }) {
+        for t in texts.filter({ !isSection($0.1) }).sorted(by: { $0.1.y < $1.1.y }) {
             if !out.isEmpty, t.1.y < rowEnd - 2 {
                 out[out.count - 1].append(t)
                 rowEnd = max(rowEnd, t.1.maxY)
