@@ -13,7 +13,12 @@ public final class FeedbackNote: FeedbackSink {
     public init(seconds: Double = 2.0) { self.seconds = seconds }
 
     public func show(_ text: String, ok: Bool) {
-        DispatchQueue.main.async { [weak self] in self?.present(text, ok: ok) }
+        show(text, ok: ok, seconds: seconds)
+    }
+
+    /// Shows the note for `seconds`, for example 10 s for a question that the owner can answer.
+    public func show(_ text: String, ok: Bool, seconds: Double) {
+        DispatchQueue.main.async { [weak self] in self?.present(text, ok: ok, seconds: seconds) }
     }
 
     public func hide() {
@@ -23,7 +28,7 @@ public final class FeedbackNote: FeedbackSink {
         }
     }
 
-    private func present(_ text: String, ok: Bool) {
+    private func present(_ text: String, ok: Bool, seconds: Double) {
         let panel = self.panel ?? makePanel()
         self.panel = panel
         let host = NSHostingView(rootView: NoteView(text: text, ok: ok))

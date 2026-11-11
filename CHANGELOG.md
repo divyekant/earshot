@@ -6,6 +6,10 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+### Added
+
+- A "not sure" note now shows up to two choices and stays on screen for 10 s. Say "yes" or "the first one", "the second one", or "no". In always-on mode, only your checked voice can answer. An answer never sends, unless you used the hold key for the command and for the answer (R-FB-1, R-NV-5, D-12).
+
 ### Changed
 
 - In hold mode, earshot closes the microphone after 2 minutes with no command, so the macOS microphone indicator goes off. The next hold-key press opens it again. That one command has no 450 ms preroll, so speak after the start sound. Always-on mode keeps the microphone open (R-ON-4, R-MD-1).

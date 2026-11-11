@@ -214,6 +214,8 @@ Libraries: AXorcist (MIT) for accessibility. Peekaboo (MIT) is a reference for t
 
 Show a small overlay near the menu bar, for example "→ Slack · Ravi" or "✗ not for me". Spoken replies are off by default.
 
+**The answer to a "not sure" note (gap item 5, 2026-11-11).** If one command is not sure, the note shows at most two choices: the best guess first, then the next one. Example: "not sure: two chats match · 1: → Slack · Ravi · 2: → Messages · Ravi". The note stays on screen for 10 s. In that time, the next turn can answer: "yes" or "the first one" runs choice 1, "the second one" runs choice 2, and "no" does nothing. Other words are a new command, and the note goes away. The answer adds no verb and no intent (section 3.0): the words act only on a note that waits, the same as the answer to a chain. In always-on mode, only the owner's checked voice can answer. A choice is never a send and never a press on a risky element, and it runs at the tier `fuzzy`, so the press rules block a risky label (R-NV-5). A click choice finds the same element (role and label) on a new screen read, in the same front app, or it fails with "the screen changed". After "… and send", the answer sends only if the command and the answer both used the hold key. In always-on mode, the owner says "send" on its own (D-12). The choices stay in memory only.
+
 ### 3.7 Optional text cleanup
 
 The oMLX server can clean up dictated text: punctuation and filler words. Make it optional, because it adds latency.
