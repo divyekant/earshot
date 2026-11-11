@@ -1,5 +1,6 @@
 import Carbon.HIToolbox
 import CoreGraphics
+import EarshotCore
 
 // Keyboard and mouse events. Ported from probe/Sources/EarshotProbe/Keys.swift.
 // The front app receives the events. The process needs the Accessibility permission.
@@ -33,6 +34,7 @@ enum Keys {
     static let home = Combo(key: CGKeyCode(kVK_Home), flags: [])
     static let end = Combo(key: CGKeyCode(kVK_End), flags: [])
     /// Only two callers use Return: the chat switcher (after the safety check) and the "send" intent.
+    /// A spoken "new line" uses `spoken(.newLine)`, after `KeyRules.block`.
     static let returnKey = Combo(key: CGKeyCode(kVK_Return), flags: [])
 
     /// Parses "cmd+k", "ctrl+opt+e" and similar text from the catalogue. Nil for a key that is not in `codes`.
@@ -69,6 +71,24 @@ enum Keys {
             release.flags = []
             release.post(tap: .cghidEventTap)
         }
+    }
+
+    /// The key of a spoken key command (I-34, D-13), with no modifier. Return is here only for "new line": the caller
+    /// must check `KeyRules.block` first, so that Return is never pressed in a message box (R-NV-5).
+    static func spoken(_ key: SpokenKey) -> Combo {
+        let code: Int
+        switch key {
+        case .backspace: code = kVK_Delete
+        case .forwardDelete: code = kVK_ForwardDelete
+        case .newLine: code = kVK_Return
+        case .tab: code = kVK_Tab
+        case .escape: code = kVK_Escape
+        case .left: code = kVK_LeftArrow
+        case .right: code = kVK_RightArrow
+        case .up: code = kVK_UpArrow
+        case .down: code = kVK_DownArrow
+        }
+        return Combo(key: CGKeyCode(code), flags: [])
     }
 
     /// Types text as Unicode key events. Control characters are removed first,

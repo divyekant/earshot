@@ -135,6 +135,7 @@ public struct CommandRouter: Router {
         guard !words.isEmpty else { return false }
         let phrase = words.joined(separator: " ")
         if sendPhrases.contains(phrase) || showNumbers.contains(phrase) || hideNumbers.contains(phrase) { return true }
+        if keyDecision(words) != nil { return true }
         if words.prefix(3).contains(where: { commandStarts.contains($0) && $0 != "in" && $0 != "into" }) { return true }
         if ["in", "into"].contains(words[0]), words.contains("type") || words.contains("enter") { return true }
         if WebAddress.parse(text) != nil { return true }
@@ -171,8 +172,8 @@ public struct CommandRouter: Router {
             if leadFillers.contains(w) { return true }
             // "Here" at the very start is most often the end of a wake phrase ("hey atlas" heard as "Here").
             if i == 0, w == "here" { return true }
-            // "right" is a filler, but not in "right click".
-            if w == "right", tokens.words[i + 1] != "click" { return true }
+            // "right" is a filler, but not in "right click" or "right arrow" (a spoken key, I-34).
+            if w == "right", !["click", "arrow"].contains(tokens.words[i + 1]) { return true }
             // "here at least" at the start is most often the wake phrase "hey atlas" (activity records, 2026-11-03).
             if i <= 1, w == "at", tokens.words[i + 1] == "least" { return true }
             if (1...2).contains(i), w == "least", tokens.words[i - 1] == "at" { return true }
@@ -243,6 +244,8 @@ public struct CommandRouter: Router {
         if hideNumbers.contains(phrase) {
             return RulesDecision(intent: .hideNumbers, sure: true, exact: true, why: "hide numbers", options: [])
         }
+        // Spoken keys and "undo that" (I-34, D-13).
+        if let d = keyDecision(words) { return d }
 
         // A bare command word never matches a target by sound or a fuzzy match: "type." once pressed the menu item "Top".
         // A bare "type" tells the app that the next turn is the text (awaitsText).
