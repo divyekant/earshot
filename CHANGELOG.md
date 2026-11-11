@@ -6,6 +6,11 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+### Added
+
+- The menu bar icon shows what earshot does: it waits (ear), it listens to a command (filled ear), the follow-up window is open (ear with sound waves), it waits for text to type (text cursor), or it is paused (pause sign). The first menu line says the same in words (R-ON-2, R-FB-1).
+- The menu has "Pause for 1 hour" and a mode switch (hold key or always on). While paused, no input runs and the microphone closes. The pause ends after 1 hour, with "Resume listening", or when earshot starts again (R-ON-4, R-MD-1).
+
 ### Changed
 
 - The activity log keeps no typed text. For a "type …" command, the message of a chat command and hold-key dictation, it keeps the command words and a word count. The note on screen still shows the text. The log keeps 30 days, and the Activity tab reads only the end of the file (R-MD-1, gap item 11).
