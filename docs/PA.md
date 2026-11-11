@@ -6,6 +6,8 @@ The PA works only on your Mac. It has no network code. It does not send your wor
 
 The PA has one small search model (EmbeddingGemma-300M, about 334 MB, D-16). The model turns a text into a list of numbers, so that the search can find a document by its meaning. The model does not write text. The PA shows only your words, the words of your kept documents, fixed labels, times and counts (R-PA-4).
 
+The model runs in a separate worker process (`earshot-pa --embed-worker`). The worker reads no file and has no access to the store: the PA sends it the texts. The worker starts at the first use of the model and stops after 5 minutes with no use, so that its memory goes back to the Mac. If the worker stops or gives no answer in 10 seconds, the PA answers the command with the keyword search, and the next use starts a new worker (R-PA-8).
+
 ## Install
 
 1. Build and install the plugin. In a terminal, go to the earshot folder. Then run this command:

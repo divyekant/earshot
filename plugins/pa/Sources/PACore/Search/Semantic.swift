@@ -39,11 +39,13 @@ extension Engine {
         guard !indexing, let models, !models.isFailed, let index, let store else { return }
         let model = models.modelID
         var kind = IndexStore.VectorKind.passage
-        var work: [(Int64, String)] = index.passagesWithoutVectors(model: model, limit: Engine.indexBatch).map { ($0.id, $0.text) }
+        let skip = indexSkip
+        var work: [(Int64, String)] = index.passagesWithoutVectors(model: model, limit: Engine.indexBatch + skip.count)
+            .filter { !skip.contains("passage:\($0.id)") }.prefix(Engine.indexBatch).map { ($0.id, $0.text) }
         if work.isEmpty {
             kind = .item
             let have = index.vectorOwners(.item, model: model)
-            work = store.items(where: "state != 'dropped'").filter { !have.contains($0.id) }
+            work = store.items(where: "state != 'dropped'").filter { !have.contains($0.id) && !skip.contains("item:\($0.id)") }
                 .prefix(Engine.indexBatch).map { ($0.id, $0.title.isEmpty ? $0.said : $0.title) }
         }
         guard !work.isEmpty else {
@@ -65,6 +67,14 @@ extension Engine {
                 self.indexing = false
                 guard let vectors, vectors.count == work.count else {
                     self.log.write(self.clock.now, "index-failed", ["kind": kind.rawValue])
+                    // The next check tries again. After 3 failures, the batch waits until the next start of the PA.
+                    let key = "\(kind.rawValue):\(work[0].0)"
+                    self.indexTries[key, default: 0] += 1
+                    if self.indexTries[key]! >= 3 {
+                        for (id, _) in work { self.indexSkip.insert("\(kind.rawValue):\(id)") }
+                        self.indexTries[key] = nil
+                        self.log.write(self.clock.now, "index-batch-failed", ["kind": kind.rawValue, "texts": String(work.count)])
+                    }
                     return
                 }
                 let rows = zip(work.map(\.0), vectors).map { ($0, $1) }

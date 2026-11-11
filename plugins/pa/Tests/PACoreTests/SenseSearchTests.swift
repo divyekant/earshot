@@ -130,6 +130,8 @@ final class SenseSearchTests: XCTestCase {
         let a = say(e, out, "where is", "paint")
         guard case .answer(_, .list, _, let lines) = a else { return XCTFail("\(a)") }
         XCTAssertEqual(lines.first, "order the green paint · to-do")
+        // A load can fail one time (a worker that stops at its start). After 3 failed loads, the PA stops trying.
+        for _ in 0..<ModelHost.maxLoadFailures { e.models!.preload() }
         XCTAssertTrue(e.models!.isFailed)
     }
 

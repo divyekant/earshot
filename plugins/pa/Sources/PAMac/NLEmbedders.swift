@@ -128,30 +128,64 @@ public func makeEmbedder(_ name: String, allowAssetRequest: Bool = false, modelF
 }
 
 /// The model of the search by sense for the PA (phase 2, Q3), or nil for keywords only. The model file is in
-/// `<data folder>/models/`, where the install script puts it. The model loads at the first use, on the GPU.
+/// `<data folder>/models/`, where the install script puts it. The model runs in a worker process (follow-up R3):
+/// the same program file with `--embed-worker <name>`. It loads at the first use, on the GPU.
+/// "hash-worker" is a worker with the hash model, for tests only.
 public func makeSearchModel(_ name: String, folder: URL) -> ModelHost? {
+    let exe = Bundle.main.executableURL ?? URL(fileURLWithPath: CommandLine.arguments[0])
+    func worker(_ id: String, dimension: Int) -> ModelHost {
+        ModelHost(modelID: id) {
+            try WorkerEmbedder(executable: exe, arguments: ["--embed-worker", name, "--data", folder.path], id: id, dimension: dimension)
+        }
+    }
+    if name == "hash-worker" { return worker("hash-256-v1", dimension: 256) }
     #if canImport(llama)
-    let spec: LlamaEmbedder.Spec
-    let file: String
     // The rule values come from the development files of the bench, with all numbers of the model (E10).
-    let rules: ModelRules
+    let host: ModelHost
     switch name {
     case "gemma":
-        spec = LlamaEmbedder.gemma; file = "embeddinggemma-300M-Q8_0.gguf"
-        rules = ModelRules(projectA: 0.542, projectB: 0.025, duplicateC: 0.806, searchFloor: 0.411)
+        host = worker(LlamaEmbedder.gemma.id, dimension: 768)
+        host.rules = ModelRules(projectA: 0.542, projectB: 0.025, duplicateC: 0.806, searchFloor: 0.411)
     case "qwen3":
-        spec = LlamaEmbedder.qwen3; file = "Qwen3-Embedding-0.6B-Q8_0.gguf"
-        rules = ModelRules(projectA: 0.632, projectB: 0.035, duplicateC: 0.800)
+        host = worker(LlamaEmbedder.qwen3.id, dimension: 1024)
+        host.rules = ModelRules(projectA: 0.632, projectB: 0.035, duplicateC: 0.800)
     case "gemma2":
-        spec = LlamaEmbedder.gemma2; file = "embeddinggemma-2-Q8_0.gguf"
-        rules = ModelRules(projectA: 0.791, projectB: 0.0175, duplicateC: 0.842)
+        host = worker(LlamaEmbedder.gemma2.id, dimension: 768)
+        host.rules = ModelRules(projectA: 0.791, projectB: 0.0175, duplicateC: 0.842)
     default: return nil
     }
-    let path = folder.appendingPathComponent("models").appendingPathComponent(file).path
-    guard FileManager.default.fileExists(atPath: path) else { return nil }
-    let host = ModelHost(modelID: spec.id) { try LlamaEmbedder(path: path, spec: spec, gpu: true) }
-    host.rules = rules
+    guard let file = modelFile(name), FileManager.default.fileExists(atPath: folder.appendingPathComponent("models").appendingPathComponent(file).path) else {
+        return nil
+    }
     return host
+    #else
+    return nil
+    #endif
+}
+
+func modelFile(_ name: String) -> String? {
+    switch name {
+    case "gemma": return "embeddinggemma-300M-Q8_0.gguf"
+    case "qwen3": return "Qwen3-Embedding-0.6B-Q8_0.gguf"
+    case "gemma2": return "embeddinggemma-2-Q8_0.gguf"
+    default: return nil
+    }
+}
+
+/// The embedder inside the worker process: the model file of `name` in `<data folder>/models/`.
+public func makeWorkerEmbedder(_ name: String, folder: URL) -> Embedder? {
+    if name == "hash-worker" { return HashEmbedder() }
+    #if canImport(llama)
+    let spec: LlamaEmbedder.Spec
+    switch name {
+    case "gemma": spec = LlamaEmbedder.gemma
+    case "qwen3": spec = LlamaEmbedder.qwen3
+    case "gemma2": spec = LlamaEmbedder.gemma2
+    default: return nil
+    }
+    guard let file = modelFile(name) else { return nil }
+    let path = folder.appendingPathComponent("models").appendingPathComponent(file).path
+    return try? LlamaEmbedder(path: path, spec: spec, gpu: true)
     #else
     return nil
     #endif

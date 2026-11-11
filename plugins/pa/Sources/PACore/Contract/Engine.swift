@@ -17,7 +17,29 @@ public final class Engine {
     /// The watch on kept folders (phase 2, Q6). Nil: no watch; the hourly file check still reads changed files.
     public var folderWatcher: FolderWatcher?
     /// The embedding model (phase 2, Q3). Nil: the search uses keywords only.
-    public var models: ModelHost?
+    public var models: ModelHost? {
+        didSet {
+            // The log gets the process id of each new worker, and each fault of the model (follow-up R3).
+            models?.onLoad = { [weak self] m in
+                let pid = (m as? WorkerEmbedder).map { String($0.pid) } ?? "none"
+                self?.runLater(0) { [weak self] in
+                    guard let self else { return }
+                    self.log.write(self.clock.now, "model-loaded", ["worker": pid])
+                }
+            }
+            models?.onFault = { [weak self] in
+                self?.runLater(0) { [weak self] in
+                    guard let self else { return }
+                    self.log.write(self.clock.now, "model-fault")
+                }
+            }
+        }
+    }
+    /// The batches of the index that failed 3 times in this run of the PA: "passage:<id>" or "item:<id>". The PA
+    /// skips them until the next start (follow-up R3).
+    var indexSkip = Set<String>()
+    /// The count of failures of each batch, by the key of its first text.
+    var indexTries: [String: Int] = [:]
     /// A job of the index runs in the background.
     var indexing = false
     /// The start and the count of texts of the current run of index jobs, for the line "index-done" in the log.
