@@ -6,12 +6,9 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
-### Fixed
+## [0.4.0] - 2026-11-11
 
-- In always-on mode, a dictation now ends at a pause of 1.2 s. Before, a click or a breath in the pause, or an unsure turn model, kept it open up to the 60 s limit, so the text came late (R-ON-1, E7).
-- After the wake phrase, the echo of the start sound no longer ends the turn before the command (R-ON-1, E7).
-- In always-on mode, room sound no longer matches the wake phrase every 4 to 6 s. A match now needs each 200 ms part of the phrase to fit, not only the mean. The log counts the stopped matches (R-ON-1, D-11, E7).
-- "Slack <name>" opens the chat again. Slack now lists "Search for: <name>" rows in Command-K, and earshot pressed Return on a search. earshot now skips search rows, and stops if a search row is above the chat. WhatsApp chats open too: earshot clicks the new-chat field and presses the result row when Return does not open it. Measured: Slack 437 ms, Messages 682 ms, WhatsApp 1,475 ms to the focused box (R-NV-2, R-NV-6, R-SP-1, E7).
+This release adds answers to a "not sure" note, with memory of your choices and of misheard names, spoken keys and "undo that", a menu bar state icon with pause, a turn recorder with no audio, a weekly report script, and experimental plugins. The microphone is open only while you hold the key in hold mode. "Slack <name>" works again, WhatsApp chats open, and room sound no longer matches the wake phrase.
 
 ### Added
 
@@ -28,6 +25,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - earshot remembers your answer to a "not sure" note. The next time the same targets tie, for example the same name in two chat apps, it opens your last choice and does not ask again. The answers are in `habits.json` in the earshot folder, with no message text (R-FB-1, R-NV-5).
 - earshot learns misheard names from your answer to a "not sure" note. If speech wrote "chart" and you chose the button "Chat", the next "click chart" in the same app clicks "Chat" with no note. It uses the pair only if the label is on the screen, in the names or in the app table at that time. The pairs are in `heard.json` in the earshot folder, with no message text. A correction never sends and never presses a risky button (R-FB-1, R-NV-5, I-15).
 
+
 ### Changed
 
 - Only the newest question waits for an answer. A new question (a bare "type", a stopped chain, a "not sure" note, or the words of a dropped wake turn) replaces the older one, the same as the note on screen. Before, an older wait could take the next turn (R-FB-1, gap item 13).
@@ -37,6 +35,14 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - In hold mode, the microphone is open only while you hold the key. The macOS microphone indicator is off between commands. The start sound now plays when the microphone is live: speak after it. There is no 450 ms preroll in hold mode. Always-on mode keeps the microphone open (R-ON-4, R-MD-1).
 - In always-on mode, a follow-up turn with no command word shows no note and plays no sound, and the follow-up window does not open again after it. The log keeps the record (R-ON-2, R-FB-1).
 - In hold mode, earshot closes the microphone after 2 minutes with no command, so the macOS microphone indicator goes off. The next hold-key press opens it again. That one command has no 450 ms preroll, so speak after the start sound. Always-on mode keeps the microphone open (R-ON-4, R-MD-1).
+
+### Fixed
+
+- In always-on mode, a dictation now ends at a pause of 1.2 s. Before, a click or a breath in the pause, or an unsure turn model, kept it open up to the 60 s limit, so the text came late (R-ON-1, E7).
+- After the wake phrase, the echo of the start sound no longer ends the turn before the command (R-ON-1, E7).
+- In always-on mode, room sound no longer matches the wake phrase every 4 to 6 s. A match now needs each 200 ms part of the phrase to fit, not only the mean. The log counts the stopped matches (R-ON-1, D-11, E7).
+- "Slack <name>" opens the chat again. Slack now lists "Search for: <name>" rows in Command-K, and earshot pressed Return on a search. earshot now skips search rows, and stops if a search row is above the chat. WhatsApp chats open too: earshot clicks the new-chat field and presses the result row when Return does not open it. Measured: Slack 437 ms, Messages 682 ms, WhatsApp 1,475 ms to the focused box (R-NV-2, R-NV-6, R-SP-1, E9).
+
 
 ## [0.3.0] - 2026-11-03
 
@@ -130,7 +136,8 @@ The first public release. earshot is early software. Expect bugs and changes to 
 
 - earshot never presses Send, or does another action that cannot be undone, without an explicit command (R-NV-5, R-ON-5).
 
-[Unreleased]: https://github.com/divyekant/earshot/compare/v0.3.0...develop
+[Unreleased]: https://github.com/divyekant/earshot/compare/v0.4.0...develop
+[0.4.0]: https://github.com/divyekant/earshot/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/divyekant/earshot/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/divyekant/earshot/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/divyekant/earshot/releases/tag/v0.1.0

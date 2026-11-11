@@ -1,4 +1,4 @@
-# E7. Chat flow stages in Slack, Messages, WhatsApp and Mail
+# E9. Chat flow stages in Slack, Messages, WhatsApp and Mail
 
 Date: 2026-11-11. Requirements: R-SP-1, R-NV-2, R-NV-3, R-NV-6, R-MT-1, R-NV-5.
 
