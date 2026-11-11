@@ -115,6 +115,8 @@ final class CommandPipeline {
     static let chainAnswerSeconds: TimeInterval = 10
     /// The choices of a "not sure" note for one command (CommandPipeline+Answer.swift). Nil if no note waits.
     var pendingChoice: PendingChoice?
+    /// The owner's last answers to ties (gap item 6). The answer to a note keeps one. Nil: no habit.
+    var habits: TieHabits?
     /// The wait after a step, before earshot reads the screen again. After "open <app>", earshot first waits until
     /// the app is in front, for at most `chainFrontWaitMs`.
     static let chainSettleMs = 400
