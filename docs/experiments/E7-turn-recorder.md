@@ -1,6 +1,6 @@
 # E7. Turn recorder, and why room sounds match the wake templates
 
-Status: recorder built. Worst-part limit 0.7 added. Live session part 1 done; end-of-turn fixes added. Part 2 is open.
+Status: recorder built. Worst-part limit 0.7 added. Live sessions part 1 and part 2 done. The gate change is open.
 
 Requirements: R-ON-1, R-ON-2, R-ON-3, R-MD-1. Decisions: D-11, D-12.
 
@@ -100,7 +100,24 @@ Changes (PR after #122):
 - The detector ignores 0.3 s more after each sound of earshot (`soundTailSeconds`). In the kept wake 1, this leaves 140 ms of echo, less than the 200 ms that starts a command. So the turn keeps the 2 s grace time for the command.
 - A "Listening" note stays on screen for the whole turn, with a level bar (dk, 2026-11-11).
 
-### 5.4 Limits of the replay
+### 5.4 Live session, part 2 (2026-11-11, build 2e53860)
+
+From 05:03 to 05:09 UTC, numbers from the activity log and the turns file:
+
+| Case | Result |
+|---|---|
+| Room sound, 5 min | 0 rejected wakes, 0 false wakes. The worst-part limit stopped 19 to 38 matches each minute. |
+| Wake + "type" (2 times) | Both woke (voice 0.67 and 0.63, worst part 0.28 and 0.16) and armed the text. |
+| "send" alone after the text | Sent (follow-up turn, voice 0.63). |
+| Dictation, 28 words | Ended at a pause (rule soft, 2.2 s with no speech frame), turn 21.3 s. Not the 60 s limit. |
+| Follow-up turns opened by other sounds | 2, both dropped by the voice check (0.23, 0.21). The "Listening" note showed for them, and dk saw it as random. PR #127 shows the note only for a wake, a hold-key turn and the text after "type". |
+
+Open:
+
+- A wake turn with "type" said after a pause lasted 9.4 s: the model was unsure 3 times (P 0.01 to 0.07), and each pause waited 2 s. It did not lose the command.
+- The rejected-wake gate: the worst-part limit stopped all room matches in both parts (about 11 minutes). A gate change needs a longer run with talk in the room.
+
+### 5.5 Limits of the replay
 
 The record ends with the live turn. So a replay with a shorter end silence shows where the turn would end, but a replay with a longer end silence runs out of kept levels: the end is not known.
 
