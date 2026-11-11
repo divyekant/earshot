@@ -14,7 +14,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - The PA plugin shows an alert at the time of a reminder, one more time after 10 minutes, and a morning list at 09:00. It shows 3 alerts or fewer in one hour, and none in quiet hours (22:00 to 08:00). "quiet for 2 hours" stops the alerts. Each rule has a setting in `settings.json` in the PA data folder: alert, list or off (R-PA-7).
 - The PA plugin writes local pages: today, all open items, and one page for each project. It sends these pages to earshot as targets (R-PA-3).
 - The PA plugin copies each open to-do and reminder to the Reminders list "earshot", so that you see them on your iPhone. A tick, a change, a delete or a new reminder in that list goes back to the PA (R-PA-2, R-PA-3).
-- `docs/PA.md` tells how to install and use the PA plugin.
+- `docs/PA.md` tells how to install and use the PA plugin. Say "open today" or "open <project>" to open a PA page (R-PA-3).
 
 ### Fixed
 

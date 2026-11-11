@@ -84,7 +84,9 @@ The PA writes HTML pages in this folder:
 - `all-open.html`: all open items, by project.
 - `project-<name>.html`: one page for each open project.
 
-Open a page in your browser. The pages have no script and load nothing from the network. The PA writes the pages again after each change.
+To open a page, say "open today", "open all open" or "open <project>". You can also open a page in your browser. If an app has the same name as a project, "open <name>" opens the app.
+
+The pages have no script and load nothing from the network. The PA writes the pages again after each change.
 
 ## Settings
 
