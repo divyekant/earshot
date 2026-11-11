@@ -191,17 +191,26 @@ public final class EmbedBench {
 
         // Search (6.5): the first 3 of the merged list.
         var queryTimes: [TimeInterval] = []
+        // The floor of the list by numbers: a result with a lower score does not count. Without it, each question
+        // gets results, also a question that matches nothing. The floor is the score of the correct result that
+        // 95 of 100 development questions reach or pass. It is found on the development set only.
+        var floor: Float = -1
         for set in ["dev", "holdout"] {
             let qs = fx.questions[set] ?? []
-            var hitKw = 0, hitVec = 0, hitFused = 0, other = 0, hitOther = 0, hitOtherKw = 0
+            var hitKw = 0, hitVec = 0, hitFused = 0, other = 0, hitOther = 0, hitOtherKw = 0, hitFloor = 0
+            var targetScores: [Float] = []
             for q in qs {
                 let kwList = Fusion.unique(kw.search(q.words, limit: 50).map { entryKey[Int($0) - 1] })
                 let tq = Date()
                 let qv = try embed([q.words], .query)[0]
                 queryTimes.append(Date().timeIntervalSince(tq))
-                let order = entryVec.indices.sorted { Vectors.dot(entryVec[$0], qv) > Vectors.dot(entryVec[$1], qv) }
+                let scores = entryVec.map { Vectors.dot($0, qv) }
+                let order = entryVec.indices.sorted { scores[$0] > scores[$1] }
                 let vecList = Fusion.unique(order.prefix(80).map { entryKey[$0] })
                 let fused = Fusion.merge([kwList, vecList])
+                if let best = entryKey.indices.filter({ entryKey[$0] == q.target }).map({ scores[$0] }).max() { targetScores.append(best) }
+                let floorList = Fusion.unique(order.prefix(80).filter { scores[$0] >= floor }.map { entryKey[$0] })
+                if Fusion.merge([kwList, floorList]).prefix(3).contains(q.target) { hitFloor += 1 }
                 let k = kwList.prefix(3).contains(q.target)
                 let v = vecList.prefix(3).contains(q.target)
                 let f = fused.prefix(3).contains(q.target)
@@ -215,6 +224,12 @@ public final class EmbedBench {
                 }
             }
             row("Search \(set), first 3", "merged \(hitFused) of \(qs.count); keywords only \(hitKw); numbers only \(hitVec); other words: merged \(hitOther) of \(other), keywords \(hitOtherKw)")
+            if set == "dev" {
+                let s = targetScores.sorted()
+                if !s.isEmpty { floor = s[Int(Double(s.count) * 0.05)] }
+            } else {
+                row("Search holdout with the floor", String(format: "floor %.3f (from the development set): merged %d of %d", floor, hitFloor, qs.count))
+            }
             if set == "holdout" { res.searchHoldout = hitFused; res.searchHoldoutKeyword = hitKw }
         }
 

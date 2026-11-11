@@ -8,11 +8,15 @@ public struct ModelRules: Equatable, Sendable {
     public var projectB: Float
     /// The duplicate notice: an open item of the same kind with a score above `duplicateC`.
     public var duplicateC: Float
+    /// The search: a result of the list by numbers with a lower score does not count, so that a question that
+    /// matches nothing gets no result (E10, "Search holdout with the floor").
+    public var searchFloor: Float
 
-    public init(projectA: Float, projectB: Float, duplicateC: Float) {
+    public init(projectA: Float, projectB: Float, duplicateC: Float, searchFloor: Float = -1) {
         self.projectA = projectA
         self.projectB = projectB
         self.duplicateC = duplicateC
+        self.searchFloor = searchFloor
     }
 }
 

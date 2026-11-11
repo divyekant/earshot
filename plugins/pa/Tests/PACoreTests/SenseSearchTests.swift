@@ -138,3 +138,19 @@ final class SenseSearchTests: XCTestCase {
         XCTAssertLessThanOrEqual(c.count, 81)
     }
 }
+
+extension SenseSearchTests {
+    func testTheFloorDropsWeakResultsByNumbers() throws {
+        let out = MemoryOutput()
+        let e = Engine(folder: tempFolder(), clock: FixedClock(wed(10)), output: out, textReader: FileTextReader())
+        let host = ModelHost(modelID: "hash-256-v1") { HashEmbedder() }
+        host.rules = ModelRules(projectA: 1, projectB: 1, duplicateC: 1, searchFloor: 0.99)
+        e.models = host
+        e.start()
+        say(e, out, "todo", "order the green paint")
+        say(e, out, "where is", "passport")
+        // A word with no keyword match and no strong number match: nothing found.
+        let a = say(e, out, "where is", "passport")
+        XCTAssertEqual(a.text, "Nothing found for passport.")
+    }
+}

@@ -122,6 +122,9 @@ extension Engine {
             scored.append((.doc(0), pid, Vectors.dot(q, v)))
         }
         for (iid, v) in cache.items { scored.append((.item(iid), nil, Vectors.dot(q, v))) }
+        // The floor of the model (E10): a question that matches nothing gets no result by numbers.
+        let floor = models.rules?.searchFloor ?? -1
+        scored.removeAll { $0.2 < floor }
         scored.sort { $0.2 > $1.2 }
         var out: [(SearchHit, Int64?)] = []
         for (hit, pid, _) in scored {
