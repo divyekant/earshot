@@ -31,6 +31,10 @@ public struct Item: Equatable, Sendable {
     public var updatedAt: Date
     public var doneAt: Date?
     public var droppedAt: Date?
+    /// Who set the project: "owner" (the words or a move) or "search" (a proposal, phase 2 build spec 8.1).
+    public var projectBy: String?
+    /// The score of a proposal of the search.
+    public var projectScore: Double?
 
     public init(kind: ItemKind, said: String, title: String, createdAt: Date) {
         self.kind = kind; self.said = said; self.title = title
@@ -45,13 +49,34 @@ public struct Project: Equatable, Sendable {
     public var state: String = "open"
     public var createdAt: Date
     public var aliases: [String] = []
+    /// The time of "finish project". A closed project is not a target and gets no proposals.
+    public var closedAt: Date?
 
     public init(name: String, slug: String, createdAt: Date) {
         self.name = name; self.slug = slug; self.createdAt = createdAt
     }
 }
 
-/// A reference to a document or a web page. The PA keeps the address and the title, not the document.
+/// The kind of a kept reference.
+public enum DocKind: String, Sendable {
+    case file, page, folder
+}
+
+/// The state of the text of a kept file (phase 2 build spec, 7.3).
+public enum TextState: String, Sendable {
+    /// No text to read: a web page, a reference, or a file type that the PA does not read.
+    case none
+    case queued
+    case read
+    /// A PDF with no text, for example a scan.
+    case noText = "no_text"
+    case tooLarge = "too_large"
+    case noAccess = "no_access"
+    case gone
+}
+
+/// A reference to a document or a web page. For a page, the PA keeps the address and the title. For a kept file,
+/// the PA also reads the text into index.sqlite. It never changes, moves or deletes the file (R-PA-3).
 public struct Doc: Equatable, Sendable {
     public var id: Int64 = 0
     public var address: String?
@@ -60,6 +85,16 @@ public struct Doc: Equatable, Sendable {
     public var projectID: Int64?
     public var createdAt: Date
     public var droppedAt: Date?
+    /// The file path of a kept file or folder.
+    public var path: String?
+    public var kind: DocKind = .page
+    public var size: Int64?
+    public var modifiedAt: Date?
+    public var textState: TextState = .none
+    /// The count of passages in index.sqlite.
+    public var passages = 0
+    /// The kept folder of a file (phase 2, Q6).
+    public var parentDocID: Int64?
 
     public init(address: String?, title: String, app: String?, projectID: Int64?, createdAt: Date) {
         self.address = address; self.title = title; self.app = app; self.projectID = projectID; self.createdAt = createdAt

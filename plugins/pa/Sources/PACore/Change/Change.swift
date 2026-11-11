@@ -93,6 +93,7 @@ extension Engine {
         case .doc(var d):
             d.droppedAt = clock.now
             do { try store?.updateDoc(d, event: "drop", at: clock.now) } catch { return .note(id, "The store had an error. Nothing changed.") }
+            forgetText(d.id)
             docsChanged()
             return .note(id, "Dropped · \(d.title)")
         case .item(var it):
@@ -181,6 +182,8 @@ extension Engine {
         case .item(var it):
             let old = it
             it.projectID = project?.id
+            it.projectBy = project == nil ? nil : "owner"
+            it.projectScore = nil
             it.updatedAt = clock.now
             guard save(it, old: old, event: "move") else { return .note(id, "The store had an error. Nothing changed.") }
             return .note(id, "Moved · \(project?.name ?? "no project") · \(it.title)")

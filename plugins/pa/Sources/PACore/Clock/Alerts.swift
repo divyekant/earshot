@@ -87,6 +87,7 @@ extension Engine {
         repeatAlerts(now)
         morningList(now)
         clockTicked()
+        checkFilesIfDue()
         // The pages show "today" and "late": write them again when the day changes.
         if store?.meta("pages_day") != Day(now, clock.calendar).description {
             try? store?.setMeta("pages_day", Day(now, clock.calendar).description)

@@ -7,6 +7,7 @@ public enum SQLValue: Equatable, Sendable {
     case int(Int64)
     case real(Double)
     case text(String)
+    case blob(Data)
 
     public var int: Int64? {
         switch self {
@@ -23,6 +24,7 @@ public enum SQLValue: Equatable, Sendable {
         }
     }
     public var text: String? { if case .text(let v) = self { return v } else { return nil } }
+    public var blob: Data? { if case .blob(let v) = self { return v } else { return nil } }
 }
 
 public struct SQLError: Error, CustomStringConvertible {
@@ -85,6 +87,8 @@ public final class SQLite {
             case .int(let v): sqlite3_bind_int64(stmt, idx, v)
             case .real(let v): sqlite3_bind_double(stmt, idx, v)
             case .text(let v): sqlite3_bind_text(stmt, idx, v, -1, SQLite.transient)
+            case .blob(let v):
+                _ = v.withUnsafeBytes { sqlite3_bind_blob(stmt, idx, $0.baseAddress, Int32(v.count), SQLite.transient) }
             }
         }
         return stmt
@@ -118,6 +122,9 @@ public final class SQLite {
                 case SQLITE_INTEGER: row.append(.int(sqlite3_column_int64(stmt, c)))
                 case SQLITE_FLOAT: row.append(.real(sqlite3_column_double(stmt, c)))
                 case SQLITE_NULL: row.append(.null)
+                case SQLITE_BLOB:
+                    let n = Int(sqlite3_column_bytes(stmt, c))
+                    if let p = sqlite3_column_blob(stmt, c), n > 0 { row.append(.blob(Data(bytes: p, count: n))) } else { row.append(.blob(Data())) }
                 default:
                     if let p = sqlite3_column_text(stmt, c) { row.append(.text(String(cString: p))) } else { row.append(.null) }
                 }
