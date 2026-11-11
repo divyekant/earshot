@@ -21,6 +21,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - Spoken keys: "backspace three times", "new line", "press tab", "escape", "left arrow twice". earshot never presses Return in a message box: say "send" to send (I-34, D-13, R-NV-5).
 - "undo that" removes the last text that earshot typed, in the same app only (I-34, D-13).
 - earshot remembers your answer to a "not sure" note. The next time the same targets tie, for example the same name in two chat apps, it opens your last choice and does not ask again. The answers are in `habits.json` in the earshot folder, with no message text (R-FB-1, R-NV-5).
+- earshot learns misheard names from your answer to a "not sure" note. If speech wrote "chart" and you chose the button "Chat", the next "click chart" in the same app clicks "Chat" with no note. It uses the pair only if the label is on the screen, in the names or in the app table at that time. The pairs are in `heard.json` in the earshot folder, with no message text. A correction never sends and never presses a risky button (R-FB-1, R-NV-5, I-15).
 
 ### Changed
 

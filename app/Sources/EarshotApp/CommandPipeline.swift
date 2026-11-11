@@ -117,6 +117,8 @@ final class CommandPipeline {
     var pendingChoice: PendingChoice?
     /// The owner's last answers to ties (gap item 6). The answer to a note keeps one. Nil: no habit.
     var habits: TieHabits?
+    /// Words that speech wrote for a label (gap item 12). The answer to a note keeps a pair. Nil: no correction.
+    var heardFixes: HeardFixes?
     /// The wait after a step, before earshot reads the screen again. After "open <app>", earshot first waits until
     /// the app is in front, for at most `chainFrontWaitMs`.
     static let chainSettleMs = 400

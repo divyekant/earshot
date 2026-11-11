@@ -26,6 +26,9 @@ extension CommandPipeline {
         var element: ScreenElement?
         /// The target key for the habit memory (TieHabits.key). Nil if the target cannot have a habit.
         var habitKey: String? = nil
+        /// The heard words of the command and the label of this target, if they differ (gap item 12). If the owner
+        /// picks this choice, earshot keeps the pair (HeardFixes). Nil if the target has no habit key.
+        var fix: HeardFixes.Entry? = nil
     }
 
     /// The choices of a "not sure" note, and what the answer needs. Memory only. It holds the message text of a chat
@@ -58,7 +61,8 @@ extension CommandPipeline {
 
     /// The choices to offer: the router's intent first, then its alternatives. Never a send, never nothing, and never a
     /// press on a risky element (R-NV-5). None on a sign-in, code or payment page.
-    static func choices(_ result: RouteResult, rows: [AppEntry], screen: ScreenSnapshot?, sensitive: Bool) -> [Choice] {
+    static func choices(_ result: RouteResult, rows: [AppEntry], screen: ScreenSnapshot?, sensitive: Bool,
+                        text: String = "", at: Date = Date()) -> [Choice] {
         guard !sensitive else { return [] }
         var out: [Choice] = []
         for intent in [result.intent] + result.alternatives where out.count < choiceCount && !out.contains(where: { $0.intent == intent }) {
@@ -74,10 +78,29 @@ extension CommandPipeline {
                 }
             default: break
             }
+            let key = TieHabits.key(intent, screen: screen)
+            var fix: HeardFixes.Entry?
+            if let key, let label = targetLabel(intent, rows: rows, screen: screen),
+               let pair = CommandRouter.heardWords(text, label: label) {
+                fix = HeardFixes.Entry(heard: pair.heard, label: pair.label, key: key, at: at)
+            }
             out.append(Choice(intent: intent, describe: IntentText.describe(intent, apps: rows, screen: screen), element: element,
-                              habitKey: TieHabits.key(intent, screen: screen)))
+                              habitKey: key, fix: fix))
         }
         return out
+    }
+
+    /// The name or label of a target, for the heard-word pairs: a chat name, an app name, the label of a screen
+    /// element, or the last item of a menu path. Nil for other intents.
+    static func targetLabel(_ intent: Intent, rows: [AppEntry], screen: ScreenSnapshot?) -> String? {
+        switch intent {
+        case .openChat(_, let target, _): return target
+        case .openApp(let app): return rows.first { $0.id == app }?.name
+        case .click(let id), .typeInto(let id, _):
+            if let path = MenuElements.path(id) { return path.last }
+            return screen?.elements.first { $0.id == id }?.label
+        default: return nil
+        }
     }
 
     /// The note of a "not sure" command, with its choices, and what the owner can say.
@@ -121,7 +144,7 @@ extension CommandPipeline {
     /// `choiceAnswerSeconds`. The note stays on screen for the same time.
     func notSure(_ text: String, _ result: RouteResult, mode: InputMode, sensitive: Bool, context: RouteContext,
                  rows: [AppEntry], stages: [String: Double], _ clock: Stopwatch, why: String) -> ActivityRecord {
-        let choices = Self.choices(result, rows: rows, screen: context.screen, sensitive: sensitive)
+        let choices = Self.choices(result, rows: rows, screen: context.screen, sensitive: sensitive, text: text, at: now())
         let describe = IntentText.describe(result.intent, apps: rows, screen: context.screen)
         guard !choices.isEmpty else {
             pendingChoice = nil
@@ -163,6 +186,11 @@ extension CommandPipeline {
         if pending.choices.count >= 2, let chosen = choice.habitKey {
             let others = pending.choices.indices.filter { $0 != i }.compactMap { pending.choices[$0].habitKey }
             if others.count == pending.choices.count - 1 { habits?.record(chosen: chosen, over: others, at: now()) }
+        }
+        // Misheard names (gap item 12): the heard words and the chosen label correct the same words the next time.
+        if var fix = choice.fix {
+            fix.at = now()
+            heardFixes?.record(fix)
         }
         var stages = stages
         // The tier is never .rules: a choice never presses a risky element (SafetyPolicy.mayPress) and never sends.

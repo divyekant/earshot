@@ -248,6 +248,44 @@ final class ChoiceTests: XCTestCase {
         XCTAssertEqual(text, "see you soon")
     }
 
+    // Gap item 12: the answer to a misheard name corrects the same words the next time, with no note.
+    func testTheAnswerCorrectsAMisheardName() async {
+        let engine = TextEngine()
+        let runner = DryRunner()
+        let fixes = HeardFixes()
+        var router = CommandRouter()
+        router.heardFixes = fixes
+        let names = Fixture.names + [NameEntry(appID: "slack", name: "Siobhan Kelly", source: .sidebar)]
+        let p = CommandPipeline(engine: engine, router: router, actions: runner, names: FakeNames(),
+                                apps: { Fixture.apps }, allNames: { names }, frontBundleID: { "com.apple.Notes" })
+        p.heardFixes = fixes
+        p.now = { [unowned self] in self.clock }
+        p.playSounds = false
+        let r1 = await say(p, engine, "ping Shivan Kelly, running late")
+        XCTAssertFalse(r1.ok, r1.note)
+        XCTAssertNotNil(p.pendingChoice, r1.note)
+        await say(p, engine, "yes")
+        XCTAssertEqual(fixes.all.map(\.heard), ["shivan kelly"])
+        XCTAssertEqual(fixes.all.map(\.label), ["siobhan kelly"])
+        XCTAssertEqual(fixes.all.map(\.key), ["chat:slack:siobhan kelly"])
+
+        let r = await say(p, engine, "ping Shivan Kelly, see you soon")
+        XCTAssertTrue(r.ok, r.note)
+        XCTAssertNil(p.pendingChoice)
+        guard case .openChat(let app, let target, let text) = runner.runs.last?.0 else { return XCTFail("\(runner.runs)") }
+        XCTAssertEqual([app, target, text], ["slack", "Siobhan Kelly", "see you soon"])
+    }
+
+    // "no" keeps no correction.
+    func testNoKeepsNoCorrection() async {
+        let (p, e, _, _) = make()
+        let fixes = HeardFixes()
+        p.heardFixes = fixes
+        await say(p, e, "ping Nadia Brok, running late")
+        await say(p, e, "no")
+        XCTAssertTrue(fixes.all.isEmpty)
+    }
+
     // "no" keeps no habit.
     func testNoKeepsNoHabit() async {
         let (p, e, _, _) = make()

@@ -12,6 +12,8 @@ public struct CommandRouter: Router {
     public var tier2BudgetMs: Int
     /// The owner's last answers to ties (gap item 6). Nil: no habit. The app sets it from the store folder.
     public var habits: TieHabits?
+    /// Words that speech wrote for a label, from the owner's answers (gap item 12). Nil: no correction.
+    public var heardFixes: HeardFixes?
 
     /// Confidence of a sure rules answer.
     public static let sureConfidence = 0.9
@@ -37,6 +39,7 @@ public struct CommandRouter: Router {
         func ms() -> Double { Double(DispatchTime.now().uptimeNanoseconds &- t0) / 1_000_000 }
         var d = Self.rules(text, context: context)
         if let habits, let broken = Self.breakTie(d, habits: habits, screen: context.screen) { d = broken }
+        if let heardFixes, let fixed = Self.fixHeard(text, d, fixes: heardFixes, context: context) { d = fixed }
         let alternatives = { (chosen: Intent) in Array(d.options.map(\.intent).filter { $0 != chosen }.prefix(3)) }
 
         if !d.sure, let tier2, !d.options.isEmpty {
