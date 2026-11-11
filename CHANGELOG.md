@@ -10,7 +10,9 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 - A "not sure" note now shows up to two choices and stays on screen for 10 s. Say "yes" or "the first one", "the second one", or "no". In always-on mode, only your checked voice can answer. An answer never sends, unless you used the hold key for the command and for the answer (R-FB-1, R-NV-5, D-12).
 - The menu bar icon shows what earshot does: it waits (ear), it listens to a command (filled ear), the follow-up window is open (ear with sound waves), it waits for text to type (text cursor), or it is paused (pause sign). The first menu line says the same in words (R-ON-2, R-FB-1).
+- In always-on mode, a wake turn that got the start sound and then failed the voice check of the turn now gets a soft "Pop" and a short note. Its words stay in memory for 20 s, never on disk. One hold-key press with no words types them into the focused field. It never sends (R-ON-3, R-FB-1, R-NV-5).
 - The menu has "Pause for 1 hour" and a mode switch (hold key or always on). While paused, no input runs and the microphone closes. The pause ends after 1 hour, with "Resume listening", or when earshot starts again (R-ON-4, R-MD-1).
+- A weekly report script, `app/scripts/weekly-report.py`. It reads the activity log and prints the success rate for each command type, wakes and rejects for each hour, dropped turns, turns with no words for each mode, and the time with the end wait. It prints no message text (R-MD-1, gap item 1).
 
 ### Changed
 

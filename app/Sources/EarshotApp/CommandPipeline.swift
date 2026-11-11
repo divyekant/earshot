@@ -77,6 +77,9 @@ final class CommandPipeline {
     /// True if the last turn was a follow-up turn that was not a command (`isFollowUpMiss`). It showed no note and
     /// played no sound, and the follow-up window does not open again after it.
     private(set) var followUpMissed = false
+    /// The words of the last wake turn that the voice check dropped after the start sound, in memory only, never on
+    /// disk (gap item 7, `CommandPipeline+Dropped.swift`).
+    var keptText: KeptText?
     /// True if a send worked in this turn, for the "sent" sound.
     private var sentThisTurn = false
     /// The start of the open turn (begin()). The armed window and the send window test the start of the next turn,
@@ -145,11 +148,12 @@ final class CommandPipeline {
         do { try engine.begin(); return nil } catch { return "speech did not start: \(error)" }
     }
 
-    /// The input dropped the turn. The text is not used.
-    func cancel() async {
+    /// The input dropped the turn. The caller decides about the text: the normal drop does not use it.
+    @discardableResult
+    func cancel() async -> Utterance? {
         turnStartedAt = nil
         turnChecks = []
-        _ = try? await engine.end()
+        return try? await engine.end()
     }
 
     /// The input closed the turn (key up, or end of speech). Runs the whole command, and returns the log record.
@@ -206,6 +210,8 @@ final class CommandPipeline {
             if !checks.isEmpty { parts.append("turn: " + checks.joined(separator: "; ")) }
             speechSummary = parts.joined(separator: " · ")
         }
+        // The words of a dropped wake turn (gap item 7): one hold-key press with no words types them.
+        if let kept = takeKeptText(), mode == .hold, text.isEmpty { return await typeKept(kept, stages: stages, clock) }
         guard !text.isEmpty else { return done(heard: "", intent: "none", tier: .none, ok: false, note: "no words", stages: stages, clock, quiet: true) }
 
         let rows = apps().filter { $0.approved && $0.enabled }
@@ -854,6 +860,8 @@ final class CommandPipeline {
 enum FeedbackSound: String, CaseIterable {
     /// `start`: earshot starts to listen (hold key down, or the wake phrase), as Hex does (dk).
     case start, done, sent, failed
+    /// `notMatched`: a wake turn got the start sound, and then the voice check of the turn dropped it (gap item 7).
+    case notMatched
 
     /// A macOS system sound name (/System/Library/Sounds). No sound files ship with earshot.
     /// The start sound is the shortest one (Tink, 0.56 s), so it is over before most words.
@@ -863,9 +871,17 @@ enum FeedbackSound: String, CaseIterable {
         case .done: return "Morse"
         case .sent: return "Glass"
         case .failed: return "Basso"
+        case .notMatched: return "Pop"
         }
     }
 
     /// The start sound is quiet: the microphone hears it at the start of a hold-key turn.
-    var volume: Float { self == .start ? 0.3 : 1 }
+    /// The "not matched" cue is soft: it is a question, not an error.
+    var volume: Float {
+        switch self {
+        case .start: return 0.3
+        case .notMatched: return 0.6
+        default: return 1
+        }
+    }
 }
