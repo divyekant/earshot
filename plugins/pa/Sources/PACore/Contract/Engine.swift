@@ -14,6 +14,12 @@ public final class Engine {
     /// index.sqlite: passages and numbers (phase 2).
     public internal(set) var index: IndexStore?
     var lastFileCheck: Date?
+    /// The embedding model (phase 2, Q3). Nil: the search uses keywords only.
+    public var models: ModelHost?
+    /// A job of the index runs in the background.
+    var indexing = false
+    /// The numbers of the index in memory, while the model is loaded (build spec 7.6).
+    var vectorCache: VectorCache?
     /// Runs a block at background priority, off the engine queue (phase 2 build rule 6). Tests run it at once.
     public var background: (@escaping () -> Void) -> Void = { block in block() }
     public internal(set) var settings = PASettings()
@@ -66,6 +72,7 @@ public final class Engine {
             saveSpares()
             openIndex()
             checkFilesIfDue(force: true)
+            startModelIndex()
         } catch {
             log.write(now, "store-failed")
         }
@@ -107,6 +114,8 @@ public final class Engine {
     /// The end: stdin closed.
     public func stop() {
         log.write(clock.now, "stop")
+        // Free the model before exit (llama.cpp with Metal stops the program if a model is still loaded).
+        models?.unload()
         store?.db.close()
         index?.db.close()
     }
@@ -200,6 +209,7 @@ public final class Engine {
     /// An item is new or changed. The clock, the pages and the copy in Reminders act on it.
     func itemChanged(_ it: Item, old: Item?) {
         planAlerts(it, old: old)
+        itemIndexChanged(it, old: old)
         markPagesDirty()
         push(it)
     }

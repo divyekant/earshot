@@ -34,7 +34,7 @@ Hold the earshot key and say one of these commands.
 | "new project kitchen" | Makes the project "Kitchen". |
 | "what is due" | Shows late items, the reminders of today, and the to-dos of today and tomorrow. "what's due" is the same. |
 | "what about kitchen" | Shows the open items of the project. |
-| "where is passport" | Shows the items, documents and projects with these words. |
+| "where is passport" | Shows the items, documents, projects and passages of kept files that match. With the search model, it also finds results in other words ("the offer for the tiles" finds a quote). "open search" shows 10 results with more text. |
 | "done 2" | Marks item 2 of the last list as done. "done that" uses the last alert. |
 | "snooze 2 to tomorrow" | Moves the time of item 2. With no time, the PA uses 10 minutes. |
 | "drop 2" | Removes item 2 from the open lists. |
@@ -106,6 +106,7 @@ The settings file is `~/Library/Application Support/earshot/plugin-data/pa/setti
 | `rules` | time alert, due list, silence list, nearEvent alert, newArrival list | Each rule is `"alert"`, `"list"` or `"off"`. |
 | `projects` | `{}` | Rules for one project. Example: `{"kitchen": {"due": "alert"}}`. |
 | `reminders` | `{"copy": true, "list": "earshot", "alertBy": "reminders"}` | The copy in Apple Reminders. If `alertBy` is `"pa"`, the PA gives the alerts. |
+| `searchModel` | `"gemma"` | The search model: `"gemma"`, `"qwen3"` or `"none"` (keywords only). The PA reads it at its start. Run `PA_MODEL=<name> scripts/install-pa.sh` to download another model. |
 
 If the file has an error, the PA uses the default values and shows one note.
 
@@ -114,6 +115,8 @@ If the file has an error, the PA uses the default values and shows one note.
 All data stays in `~/Library/Application Support/earshot/plugin-data/pa/`:
 
 - `pa.sqlite`: the store.
+- `index.sqlite`: the text of kept files and the numbers of the search model. The PA can make it again from the kept files. It has no daily copy.
+- `models/`: the search model file.
 - `backups/`: one copy of the store each day. The PA keeps 7 copies.
 - `pa.log`: times, event types and record numbers. The log has no words of yours.
 

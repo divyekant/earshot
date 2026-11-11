@@ -126,6 +126,25 @@ public func makeEmbedder(_ name: String, allowAssetRequest: Bool = false, modelF
     }
 }
 
+/// The model of the search by sense for the PA (phase 2, Q3), or nil for keywords only. The model file is in
+/// `<data folder>/models/`, where the install script puts it. The model loads at the first use, on the GPU.
+public func makeSearchModel(_ name: String, folder: URL) -> ModelHost? {
+    #if canImport(llama)
+    let spec: LlamaEmbedder.Spec
+    let file: String
+    switch name {
+    case "gemma": spec = LlamaEmbedder.gemma; file = "embeddinggemma-300M-Q8_0.gguf"
+    case "qwen3": spec = LlamaEmbedder.qwen3; file = "Qwen3-Embedding-0.6B-Q8_0.gguf"
+    default: return nil
+    }
+    let path = folder.appendingPathComponent("models").appendingPathComponent(file).path
+    guard FileManager.default.fileExists(atPath: path) else { return nil }
+    return ModelHost(modelID: spec.id) { try LlamaEmbedder(path: path, spec: spec, gpu: true) }
+    #else
+    return nil
+    #endif
+}
+
 public struct BenchNameError: Error, CustomStringConvertible {
     public var name: String
     public var description: String { "unknown embedder \(name)" }

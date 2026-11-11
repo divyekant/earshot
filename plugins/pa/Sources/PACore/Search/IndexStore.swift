@@ -107,4 +107,65 @@ public final class IndexStore {
     public func passageCount() -> Int {
         Int((try? db.query("SELECT COUNT(*) FROM passage"))?.first?.first?.int ?? 0)
     }
+
+    // MARK: - Numbers (Q3, build spec 7.6)
+
+    /// The kinds of owner of a list of numbers.
+    public enum VectorKind: String, Sendable {
+        case passage, item, project
+    }
+
+    static func blob(_ v: [Float]) -> Data { v.withUnsafeBufferPointer { Data(buffer: $0) } }
+
+    static func floats(_ d: Data) -> [Float] {
+        var out = [Float](repeating: 0, count: d.count / MemoryLayout<Float>.size)
+        _ = out.withUnsafeMutableBytes { d.copyBytes(to: $0) }
+        return out
+    }
+
+    /// Saves lists of numbers, in one transaction. A list for the same owner replaces the old one.
+    public func putVectors(_ kind: VectorKind, _ rows: [(Int64, [Float])], model: String) throws {
+        try db.transaction {
+            for (id, v) in rows {
+                try db.run("INSERT OR REPLACE INTO vector(owner_kind, owner_id, model_id, dimension, data) VALUES (?, ?, ?, ?, ?)",
+                           [.text(kind.rawValue), .int(id), .text(model), .int(Int64(v.count)), .blob(IndexStore.blob(v))])
+            }
+        }
+    }
+
+    /// All lists of one kind for one model.
+    public func vectors(_ kind: VectorKind, model: String) -> [(Int64, [Float])] {
+        ((try? db.query("SELECT owner_id, data FROM vector WHERE owner_kind = ? AND model_id = ?",
+                        [.text(kind.rawValue), .text(model)])) ?? [])
+            .compactMap { r in r[1].blob.map { (r[0].int ?? 0, IndexStore.floats($0)) } }
+    }
+
+    /// The owners of one kind that have numbers of the model.
+    public func vectorOwners(_ kind: VectorKind, model: String) -> Set<Int64> {
+        Set(((try? db.query("SELECT owner_id FROM vector WHERE owner_kind = ? AND model_id = ?",
+                            [.text(kind.rawValue), .text(model)])) ?? []).compactMap { $0.first?.int })
+    }
+
+    public func deleteVector(_ kind: VectorKind, _ id: Int64) throws {
+        try db.run("DELETE FROM vector WHERE owner_kind = ? AND owner_id = ?", [.text(kind.rawValue), .int(id)])
+    }
+
+    /// A change of the model: the numbers of other models go, and the index builds them again (7.6).
+    @discardableResult
+    public func deleteVectors(notOf model: String) throws -> Int {
+        try db.run("DELETE FROM vector WHERE model_id != ?", [.text(model)])
+    }
+
+    /// Passages with no numbers of the model, in the order of their id.
+    public func passagesWithoutVectors(model: String, limit: Int) -> [Row] {
+        ((try? db.query("""
+            SELECT p.id, p.doc_id, p.position, p.page, p.text FROM passage p
+            WHERE NOT EXISTS (SELECT 1 FROM vector v WHERE v.owner_kind = 'passage' AND v.owner_id = p.id AND v.model_id = ?)
+            ORDER BY p.id LIMIT ?
+            """, [.text(model), .int(Int64(limit))])) ?? []).map(IndexStore.row)
+    }
+
+    public func vectorCount(model: String) -> Int {
+        Int((try? db.query("SELECT COUNT(*) FROM vector WHERE model_id = ?", [.text(model)]))?.first?.first?.int ?? 0)
+    }
 }

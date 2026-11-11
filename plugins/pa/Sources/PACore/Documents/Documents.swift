@@ -116,6 +116,9 @@ extension Engine {
         try? store.updateDoc(d, event: "doc-read", at: now)
         log.write(now, "doc-read", ["doc": String(id), "state": state.rawValue, "passages": String(d.passages)])
         docsChanged()
+        // The passages of the old text left the numbers in memory: read them again at the next search.
+        vectorCache = nil
+        if state == .read { indexIfNeeded() }
     }
 
     /// One note for each folder that macOS does not let the PA read. The PA does not ask again.
@@ -163,5 +166,6 @@ extension Engine {
     /// Deletes the text and the numbers of a dropped document at once (R-PA-9).
     func forgetText(_ docID: Int64) {
         try? index?.deleteDoc(docID)
+        vectorCache = nil
     }
 }

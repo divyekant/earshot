@@ -145,3 +145,6 @@ jobs:
           scripts/install-pa.sh
           otool -s __TEXT __info_plist .build/EarshotPA.app/Contents/MacOS/earshot-pa | head -n 3
           codesign -dv .build/EarshotPA.app 2>&1 | grep -E "Identifier|Signature"
+          # The model runtime is in the bundle, and the program finds it (rpath @executable_path/../Frameworks).
+          test -d .build/EarshotPA.app/Contents/Frameworks/llama.framework
+          .build/EarshotPA.app/Contents/MacOS/earshot-pa --embed-bench Tests/PACoreTests/Fixtures/phase2 --embedder hash | head -n 4

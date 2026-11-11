@@ -129,6 +129,9 @@ public struct PASettings: Codable, Equatable, Sendable {
     /// The value of one project for some rules. The key is the project name in lower case.
     public var projects: [String: ProjectRules] = [:]
     public var reminders = ReminderSettings()
+    /// The embedding model of the search by sense (phase 2, D-16): "gemma", "qwen3" or "none" (keywords only).
+    /// The install script downloads the model file. A change takes effect at the next start of the PA.
+    public var searchModel = "gemma"
 
     public init() {}
 
@@ -147,6 +150,7 @@ public struct PASettings: Codable, Equatable, Sendable {
         waitingDays = try c.decodeIfPresent(Int.self, forKey: .waitingDays) ?? d.waitingDays
         projects = try c.decodeIfPresent([String: ProjectRules].self, forKey: .projects) ?? d.projects
         reminders = try c.decodeIfPresent(ReminderSettings.self, forKey: .reminders) ?? d.reminders
+        searchModel = try c.decodeIfPresent(String.self, forKey: .searchModel) ?? d.searchModel
     }
 
     /// The rules for an item in a project: the value of the project if it has one, or the general value.

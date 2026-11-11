@@ -173,6 +173,10 @@ extension Engine {
             Target(id: "page-today", name: "today", kind: "page", open: pagesFolder.appendingPathComponent("today.html").path),
             Target(id: "page-all-open", name: "all open", kind: "page", open: pagesFolder.appendingPathComponent("all-open.html").path),
         ]
+        // "open search" shows the full results of the last search (phase 2 build spec, 7.7).
+        if FileManager.default.fileExists(atPath: searchPageURL.path) {
+            out.append(Target(id: "page-search", name: "search", kind: "page", open: searchPageURL.path))
+        }
         for p in store?.projects() ?? [] {
             out.append(Target(id: "project-\(p.id)", name: p.name, kind: "project",
                               open: pagesFolder.appendingPathComponent("project-\(p.slug).html").path))

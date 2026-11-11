@@ -41,6 +41,8 @@ let package = Package(
             linkerSettings: [
                 .unsafeFlags(["-Xlinker", "-sectcreate", "-Xlinker", "__TEXT", "-Xlinker", "__info_plist",
                               "-Xlinker", infoPlist], .when(platforms: [.macOS])),
+                // In EarshotPA.app, llama.framework is in Contents/Frameworks (install-pa.sh).
+                .unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks"], .when(platforms: [.macOS])),
             ]
         ),
         .testTarget(name: "PACoreTests", dependencies: ["PACore", "PAMac"], path: "Tests/PACoreTests",
