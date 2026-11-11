@@ -90,6 +90,8 @@ The activity log keeps the lead and the number of words. It does not keep the wo
 earshot starts the program with posix_spawn. The program reads JSON lines from stdin and writes JSON lines to stdout. Each message is one JSON object on one line. No network port is open.
 
 - earshot makes macOS treat the program as a separate process for the privacy permissions. The program does not get the Microphone or the Accessibility permission of earshot.
+  - Test on the Mac, 2026-11-11, builds 2e53860 and abc46df: a test plugin ran `AXIsProcessTrusted` through osascript. The result was `false` in the plugin, and `true` in a shell with the Accessibility permission. The plugin was a child process of earshot.
+  - A plugin that needs a permission, for example Reminders, must get its own permission from macOS. This is not tested yet. A command-line program can need an embedded Info.plist or a helper app before macOS shows the permission question.
 - The program gets only these environment variables: `EARSHOT_PLUGIN_DATA` (a data folder for the plugin), `EARSHOT_CONTRACT` (`1`), `PATH`, `HOME`, `LANG` and `TMPDIR`.
 - The data folder is `~/Library/Application Support/earshot/plugin-data/<id>/`. An update of the plugin does not change this folder.
 - stderr goes to `/dev/null`.
