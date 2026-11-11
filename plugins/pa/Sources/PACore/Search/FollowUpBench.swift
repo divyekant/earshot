@@ -29,10 +29,6 @@ public final class FollowUpBench {
         return all
     }
 
-    static let timeWords: Set<String> = ["today", "tomorrow", "tonight", "morning", "afternoon", "evening", "week",
-                                         "weekend", "month", "monday", "tuesday", "wednesday", "thursday", "friday",
-                                         "saturday", "sunday", "next", "before", "after", "by", "until", "noon"]
-
     /// The words of a capture with the time phrase cut, as the PA keeps the title.
     static func captureTitle(_ words: String) -> String {
         let reader = TimeReader(calendar: Calendar(identifier: .gregorian))
@@ -40,9 +36,7 @@ public final class FollowUpBench {
         return r.rest.isEmpty ? words : r.rest
     }
 
-    static func keywordText(_ title: String) -> String {
-        Words.terms(title).filter { !timeWords.contains($0) && !$0.allSatisfy(\.isNumber) }.joined(separator: " ")
-    }
+    static func keywordText(_ title: String) -> String { ProjectRuleV2.keywordText(title) }
 
     // MARK: - The records of the owner
 

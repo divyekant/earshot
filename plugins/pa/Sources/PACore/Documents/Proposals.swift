@@ -68,43 +68,52 @@ extension Engine {
         let duplicates = it.kind != .note
         guard propose || duplicates else { return }
         let title = it.title.isEmpty ? it.said : it.title
-        // The names of projects with no numbers yet are embedded in the same job.
-        let have = index?.vectorOwners(.project, model: models.modelID) ?? []
-        let names = propose ? (store?.projects() ?? []).filter { !have.contains($0.id) } : []
-        let texts = [title] + names.map(\.name)
         let model = models.modelID
         background { [weak self] in
-            let vectors = models.embed(texts, kind: .passage)
+            let vectors = models.embed([title], kind: .passage)
             self?.runLater(0) { [weak self] in
-                guard let self, let vectors, vectors.count == texts.count else { return }
+                guard let self, let vectors, vectors.count == 1 else { return }
                 try? self.index?.putVectors(.item, [(it.id, vectors[0])], model: model)
                 self.vectorCache?.items[it.id] = vectors[0]
-                if !names.isEmpty {
-                    try? self.index?.putVectors(.project, zip(names.map(\.id), vectors.dropFirst()).map { ($0, $1) }, model: model)
-                }
                 self.secondNote(it.id, vectors[0], propose: propose, duplicates: duplicates, rules: rules, model: model)
             }
         }
     }
 
-    /// Runs on the engine queue. Sends at most one note with the proposal and the duplicate.
+    /// Runs on the engine queue. Reads the records of the owner, then finds the proposal in the background
+    /// (project rule version 2, follow-up R1), then sends at most one note with the proposal and the duplicate.
     func secondNote(_ itemID: Int64, _ v: [Float], propose: Bool, duplicates: Bool, rules: ModelRules, model: String) {
+        guard let store, let it = store.item(itemID), it.state == .open else { return }
+        guard propose, it.projectID == nil else {
+            finishNote(itemID, v, proposal: nil, duplicates: duplicates, rules: rules, model: model)
+            return
+        }
+        let records = ownerRecords(model: model)
+        let projects = store.projects().map { (id: String($0.id), name: $0.name) }
+        let title = it.title.isEmpty ? it.said : it.title
+        background { [weak self] in
+            let found = ProjectRuleV2().propose(title: title, vector: v, records: records, projects: projects,
+                                                floor: rules.searchFloor)
+            self?.runLater(0) { [weak self] in
+                self?.finishNote(itemID, v, proposal: found, duplicates: duplicates, rules: rules, model: model)
+            }
+        }
+    }
+
+    /// Runs on the engine queue. Sets the proposed project, looks for a duplicate, and sends the note.
+    func finishNote(_ itemID: Int64, _ v: [Float], proposal: (project: String, score: Float)?, duplicates: Bool,
+                    rules: ModelRules, model: String) {
         guard let store, let index, var it = store.item(itemID), it.state == .open else { return }
         var proposed: Project?
-        if propose, it.projectID == nil {
-            let profiles = projectProfiles(model: model)
-            let scores = profiles.map { ($0.0, Vectors.dot(v, $0.1)) }
-            let rule = ProjectRule(a: rules.projectA, b: rules.projectB)
-            if let name = rule.propose(scores.map { (String($0.0.id), $0.1) }), let p = profiles.first(where: { String($0.0.id) == name })?.0 {
-                let old = it
-                it.projectID = p.id
-                it.projectBy = "search"
-                it.projectScore = Double(scores.first { $0.0.id == p.id }?.1 ?? 0)
-                it.updatedAt = clock.now
-                if (try? store.update(it, event: "proposal", at: clock.now)) != nil {
-                    itemChanged(it, old: old)
-                    proposed = p
-                }
+        if let proposal, it.projectID == nil, let id = Int64(proposal.project), let p = store.project(id), p.state == "open" {
+            let old = it
+            it.projectID = p.id
+            it.projectBy = "search"
+            it.projectScore = Double(proposal.score)
+            it.updatedAt = clock.now
+            if (try? store.update(it, event: "proposal", at: clock.now)) != nil {
+                itemChanged(it, old: old)
+                proposed = p
             }
         }
         var like: Item?
@@ -141,27 +150,23 @@ extension Engine {
         }
     }
 
-    /// The profile of each open project with 3 or more items or passages: the mean of the numbers of its name,
-    /// its item titles and its passages (7.6). Projects with no numbers for the name are left out.
-    func projectProfiles(model: String) -> [(Project, [Float])] {
+    /// The records of the owner for the project rule: the items that the owner put in a project, and the passages
+    /// of the documents with a project. A proposal does not feed the next proposal.
+    func ownerRecords(model: String) -> [ProjectRuleV2.Record] {
         guard let store, let index else { return [] }
-        let names = Dictionary(uniqueKeysWithValues: index.vectors(.project, model: model).map { ($0.0, $0.1) })
         let items = Dictionary(uniqueKeysWithValues: index.vectors(.item, model: model).map { ($0.0, $0.1) })
         let passages = Dictionary(uniqueKeysWithValues: index.vectors(.passage, model: model).map { ($0.0, $0.1) })
-        var out: [(Project, [Float])] = []
+        var out: [ProjectRuleV2.Record] = []
         for p in store.projects() {
-            guard let nv = names[p.id] else { continue }
-            var parts: [[Float]] = [nv]
-            // Only the items that the owner set: a proposal does not feed the next proposal.
+            let key = String(p.id)
             for it in store.items(where: "project_id = ? AND state != 'dropped' AND (project_by IS NULL OR project_by = 'owner')", [.int(p.id)]) {
-                if let v = items[it.id] { parts.append(v) }
+                if let v = items[it.id] { out.append(.init(project: key, vector: v, text: it.title.isEmpty ? it.said : it.title)) }
             }
             for d in store.docs(project: p.id) {
-                for row in index.passages(doc: d.id) { if let v = passages[row.id] { parts.append(v) } }
+                for row in index.passages(doc: d.id) {
+                    if let v = passages[row.id] { out.append(.init(project: key, vector: v, text: row.text)) }
+                }
             }
-            guard parts.count - 1 >= 3 else { continue }
-            // Not normalized: the bench found A and B with the plain mean (E10).
-            out.append((p, Vectors.mean(parts)))
         }
         return out
     }

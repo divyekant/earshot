@@ -41,7 +41,7 @@ final class MainPointsTests: XCTestCase {
         for l in lines { XCTAssertLessThanOrEqual(l.count, Engine.pointLine + 1) }
         // The page has the full sentences: each one is in the document, character for character.
         let page = try String(contentsOf: e.mainPointsPageURL, encoding: .utf8)
-        let sentences = MainPoints.candidates(text).filter { page.contains(Engine.escape($0)) }
+        let sentences = MainPointsV2.sentences(text).map(\.text).filter { page.contains(Engine.escape($0)) }
         XCTAssertEqual(sentences.count, 5)
         for s in sentences { XCTAssertTrue(text.contains(s)) }
         // The document in front was not kept: the command kept it.

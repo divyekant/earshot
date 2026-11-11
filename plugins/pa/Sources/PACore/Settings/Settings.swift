@@ -132,9 +132,9 @@ public struct PASettings: Codable, Equatable, Sendable {
     /// The embedding model of the search by sense (phase 2, D-16): "gemma", "qwen3" or "none" (keywords only).
     /// The install script downloads the model file. A change takes effect at the next start of the PA.
     public var searchModel = "gemma"
-    /// Project proposals for a capture with no project (8.1). Off by default: no model passed the Project mark
-    /// of E10 (D-16).
-    public var proposeProject = false
+    /// Project proposals for a capture with no project (8.1). On by default since project rule version 2 passed
+    /// its holdout (follow-up R1: 20 proposals, 19 correct, 1 wrong).
+    public var proposeProject = true
     /// After "new project", the next captures go to it for this count of minutes (8.3). 0 switches it off.
     public var projectFocusMinutes = 5
 

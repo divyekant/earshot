@@ -72,7 +72,9 @@ extension Engine {
             finishRead(doc.id, outcome: outcome, passages: passages, size: nil, modified: nil)
         }
         let full = pages.map(\.text).joined(separator: "\n\n")
-        guard let points = try? MainPoints.select(full, embedder: HostEmbedder(models)), !points.isEmpty else {
+        // Main points version 2 (follow-up R2): each sentence gets points for its features.
+        let name = (doc.title as NSString).deletingPathExtension
+        guard let points = try? MainPointsV2.select(full, title: name, embedder: HostEmbedder(models)), !points.isEmpty else {
             return .note(id, "No text for \(doc.title). Nothing to show.")
         }
         let withPages: [(String, Int?)] = points.map { s in (s, pages.first { $0.text.contains(s) }?.page) }

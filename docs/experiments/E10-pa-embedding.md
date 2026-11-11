@@ -129,3 +129,64 @@ The 4B model of dk's research put 90% of dk's items in the correct project. With
 
 1. Done: the owner selected EmbeddingGemma-300M (D-16).
 2. Q3: load the model when it is needed, unload it after a quiet time, and free it before exit.
+
+## Follow-up: project rule version 2 and main points version 2
+
+Spec: `phase2-followup-spec.md`, packages R1 and R2. Model: EmbeddingGemma-300M, 768 numbers, Metal, on the Mac.
+New holdout data: `capture-holdout-2.tsv` (100 captures, 30 with no project) and `points-holdout/` (10 documents, 3 marks each).
+The holdout data was committed before the rule code. Each holdout ran one time (2026-11-11, 23:34 UTC, commit 5ea27bb).
+
+### R1: project rule version 2
+
+The rule uses only the owner records: items that the owner put in a project, and the passages of documents with a project.
+A project needs 3 or more records. The rule proposes a project if:
+
+1. the capture has the name of exactly one project, or
+2. 4 or more of the 5 nearest records (above the search floor) are in the project, and 3 of the first 3 keyword results are in the same project.
+
+Line 3 of the spec (5 of 5 neighbors above a score H) adds nothing: no 5-of-5 case was wrong on the development data.
+
+Development data (old dev and old holdout, 200 captures, 140 with a project):
+
+| Rule | Proposals | Correct | Wrong |
+|---|---|---|---|
+| Version 1 | 97 | 87 | 10 |
+| Neighbors only (4 of 5) | 45 | 43 | 2 |
+| Full rule, keywords 2 of 3 | 41 | 39 | 2 |
+| Full rule, neighbors 5 of 5, keywords 2 of 3 | 20 | 20 | 0 |
+| **Full rule, neighbors 4 of 5, keywords 3 of 3 (selected)** | **26** | **26** | **0** |
+| Full rule, neighbors 5 of 5, keywords 3 of 3 | 13 | 13 | 0 |
+
+Holdout (`capture-holdout-2.tsv`, one run): **20 proposals, 19 correct (95%), 1 wrong. Pass** (mark: 90% or more, 5 or fewer wrong).
+19 of 70 captures with a project got a correct proposal.
+
+The owner's 100 labeled research items (75 with a project): version 1 gave 16 proposals, 15 correct, 1 wrong. Version 2 gave 18 proposals, 15 correct, 3 wrong.
+The 4B model of the research session scored 0.90 on these items.
+
+Causes:
+
+- Version 1 compared a capture with the mean of each project. Large projects with many topics (wedding, move) have a wide mean. 6 of the 7 wrong proposals on the old holdout were household captures with no project.
+- Version 2 needs two signals that agree. The nearest records see local likeness. The keyword results see rare words. A household capture seldom passes both.
+- The cost is coverage: 19 of 70 captures with a project got a proposal, against 41 of 70 for version 1 on the old holdout.
+- No fixture capture has the name of a project, so the name signal gave 0 proposals in these tests.
+- On the owner's research items, version 2 made 2 more wrong proposals than version 1. The cause is not known yet.
+
+### R2: main points version 2
+
+Each candidate sentence gets points for its features. The weights were set by hand on the old 10 documents only:
+amount 3, date or time limit 3, request 3, result 2, opening 0, title words 0.5 each (at most 1), central by words 1, central by numbers 1, boilerplate -5.
+A sentence that is too similar to a selected one (dot product above 0.9) is skipped.
+
+| Data | Documents with 2 or more marks in the 5 | Marks in the 5 | Sentences not in the text |
+|---|---|---|---|
+| Old documents (development), version 1 | 1 of 10 | — | 0 |
+| Old documents (development), version 2 | 9 of 10 | 21 of 30 | 0 |
+| **`points-holdout/`, version 2, one run** | **10 of 10** | **24 of 30** | **0** |
+
+**Pass** (mark: 8 or more of 10).
+
+Causes:
+
+- Version 1 selected the sentences nearest to the center of the document. The marked sentences (a price, a date, a request) are often not central, so most of them ranked below 5.
+- 22 of the 30 development marks have an amount, a date or a request. Version 2 gives points for these features.
+- The 6 missed holdout marks have a request or a result, but rank 6 to 10 behind other sentences with an amount or a date.
