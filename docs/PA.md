@@ -19,7 +19,7 @@ The PA works only on your Mac. It has no network code and no language model. It 
 
 The script does not approve the plugin. The script does not restart earshot. If you install a new version and `plugin.json` changes, approve the plugin again.
 
-If you install a new version and `plugin.json` does not change, earshot keeps the old program until its next start. To start the new program now, turn **Approved** off and on for **PA** in **Manage > Plugins**.
+After you install a new version, click **Read again** in **Manage > Plugins** to start the new program. An earshot build from before 2026-11-11 keeps the old program. In that case, turn **Approved** off and on for **PA**.
 
 ## Commands
 
