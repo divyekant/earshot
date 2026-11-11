@@ -8,6 +8,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Added
 
+- PA: `pa.log` has the line `index-done texts=N ms=M` at the end of each run of index jobs, so that a speed test can see when the background index ends (R-PA-8).
 - PA: "keep this folder" keeps a folder and reads its files. The PA watches the folder, reads new files and shows them as new arrivals (R-PA-3, R-PA-4).
 - PA: "main points of this" shows 5 sentences of a kept document that give its main points. The PA selects the sentences. It writes no new words (R-PA-4).
 - PA: after "new project kitchen", the next captures go to Kitchen for 5 minutes. A capture like an open item gets a second note: "To-do · like one that you have: order the paint". Project proposals with a "?" are available with the setting `proposeProject`, off by default (R-PA-4).

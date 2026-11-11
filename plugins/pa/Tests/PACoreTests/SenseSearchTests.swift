@@ -36,6 +36,9 @@ final class SenseSearchTests: XCTestCase {
         XCTAssertEqual(e.index!.vectorOwners(.passage, model: model).count, 1)
         XCTAssertEqual(e.index!.vectorOwners(.item, model: model).count, 1)
         XCTAssertEqual(e.index!.vectors(.item, model: model).first?.1.count, 256)
+        // The end of each run of index jobs is in the log, with the count of texts and the time.
+        let log = try String(contentsOf: e.log.url!, encoding: .utf8)
+        XCTAssertTrue(log.contains("index-done ms="), log)
     }
 
     func testWhereIsFindsAPassageAndWritesTheSearchPage() throws {
