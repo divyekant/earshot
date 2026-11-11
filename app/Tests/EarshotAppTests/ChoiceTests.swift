@@ -219,6 +219,45 @@ final class ChoiceTests: XCTestCase {
         XCTAssertTrue(runner.runs.isEmpty)
     }
 
+    // Gap item 6: the answer breaks the same tie the next time, with no note.
+    func testTheAnswerBreaksTheSameTieNextTime() async {
+        let engine = TextEngine()
+        let runner = DryRunner()
+        let habits = TieHabits()
+        var router = CommandRouter()
+        router.habits = habits
+        let p = CommandPipeline(engine: engine, router: router, actions: runner, names: FakeNames(),
+                                apps: { Fixture.apps }, allNames: { Self.names }, frontBundleID: { "com.apple.Notes" })
+        p.habits = habits
+        p.now = { [unowned self] in self.clock }
+        p.playSounds = false
+        await say(p, engine, "ping Nadia Brook, running late")
+        let second = p.pendingChoice?.choices[1].intent
+        await say(p, engine, "the second one")
+        XCTAssertEqual(habits.all.count, 1)
+        // No message text in the habit.
+        XCTAssertFalse(habits.all.contains { ($0.over + [$0.chosen]).contains { $0.contains("late") } })
+
+        let r = await say(p, engine, "ping Nadia Brook, see you soon")
+        XCTAssertTrue(r.ok, r.note)
+        XCTAssertNil(p.pendingChoice)
+        guard case .openChat(let app, _, let text) = runner.runs.last?.0, case .openChat(let want, _, _)? = second else {
+            return XCTFail("\(runner.runs)")
+        }
+        XCTAssertEqual(app, want)
+        XCTAssertEqual(text, "see you soon")
+    }
+
+    // "no" keeps no habit.
+    func testNoKeepsNoHabit() async {
+        let (p, e, _, _) = make()
+        let habits = TieHabits()
+        p.habits = habits
+        await say(p, e, "ping Nadia Brook, running late")
+        await say(p, e, "no")
+        XCTAssertTrue(habits.all.isEmpty)
+    }
+
     func testAnswerWords() {
         let cases: [(String, CommandPipeline.ChoiceAnswer?)] = [
             ("yes", .pick(0)), ("Yeah.", .pick(0)), ("the first one", .pick(0)), ("number one", .pick(0)), ("1", .pick(0)),
