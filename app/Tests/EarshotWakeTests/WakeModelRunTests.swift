@@ -38,7 +38,13 @@ final class WakeModelRunTests: XCTestCase {
         guard process.terminationStatus == 0, FileManager.default.fileExists(atPath: url.path) else {
             throw XCTSkip("the say command did not make audio")
         }
-        return try Self.read16k(url)
+        let clip = try Self.read16k(url)
+        // Some CI runners (macos-26, 2026-11-11) have no usable voice: `say` writes a file of digital quiet. Then
+        // the clips cannot test the models.
+        guard SpeechTrim.span(clip) != nil else {
+            throw XCTSkip("the say command made no speech on this machine (\(clip.count) quiet samples)")
+        }
+        return clip
     }
 
     static func read16k(_ url: URL) throws -> [Float] {
