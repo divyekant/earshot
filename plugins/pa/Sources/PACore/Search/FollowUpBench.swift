@@ -12,7 +12,7 @@ public final class FollowUpBench {
     /// Prints the 8 best sentences of each document, with their features and points.
     public var verbose = false
     /// The needs of the project rule for the final run: neighbors of 5, keywords of 3.
-    public var needs = (neighbors: 4, keywords: 2)
+    public var needs = (neighbors: 4, keywords: 3)
     public var out: (String) -> Void = { print($0) }
 
     public init(folder: URL, embedder: Embedder) throws {
@@ -188,7 +188,7 @@ public final class FollowUpBench {
             out(Self.line(v.rawValue, Self.count(sig.map(\.truth), sig.map { rule.propose($0.signals, variant: v) })))
         }
         // Stricter needs, on the same data (tuning on the development data only).
-        for (n, k) in [(5, 2), (4, 3), (5, 3)] {
+        for (n, k) in [(4, 2), (5, 2), (4, 3), (5, 3)] {
             var r2 = rule
             r2.neighborsNeed = n; r2.keywordsNeed = k
             out(Self.line("Full rule without line 3, neighbors \(n) of 5, keywords \(k) of 3",

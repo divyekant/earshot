@@ -16,8 +16,9 @@ public struct ProjectRuleV2: Equatable, Sendable {
 
     /// Of the 5 nearest records, this many must be in one project.
     public var neighborsNeed = 4
-    /// Of the first 3 keyword results, this many must be in one project.
-    public var keywordsNeed = 2
+    /// Of the first 3 keyword results, this many must be in one project. The development data chose 3:
+    /// 26 proposals, 26 correct, 0 wrong (with 2: 41 proposals, 2 wrong).
+    public var keywordsNeed = 3
     /// Line 3: 5 of 5 neighbors, and the nearest record above this score. Nil: line 3 is off.
     public var high: Float?
     /// A project needs this many owner records before the rule can propose it.
