@@ -18,7 +18,7 @@ This log records the options that the owner and Claude examined on 2026-11-01, a
 - "undo that": earshot removes the last text that it typed (D-13);
 - optional text cleanup on the local oMLX server, off by default (DESIGN 3.7, D-5).
 
-Dictation with no "type" in always-on mode (I-26) is not part of this change. It needs the owner's choice first, because earshot could then type speech that was not for earshot.
+Dictation with no "type" in always-on mode (I-26): the owner chose "no" on 2026-11-11. Always-on types only after a bare "type", or as go-on text within 3 s after a typing. Reason: a false wake could type speech that was not for earshot.
 
 ## D-2. Do not use large-model agents for each step
 
