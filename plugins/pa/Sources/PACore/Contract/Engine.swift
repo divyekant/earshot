@@ -87,7 +87,7 @@ public final class Engine {
         if old.reminders.list != settings.reminders.list || old.reminders.alertBy != settings.reminders.alertBy {
             // A new list name or alert owner: copy all again into the list of the new name.
             try? store?.setMeta(listIDKey, nil)
-            try? store?.db.run("DELETE FROM mirror")
+            _ = try? store?.db.run("DELETE FROM mirror")
             syncAll()
         }
         markPagesDirty()
@@ -177,7 +177,6 @@ public final class Engine {
         case .drop: return drop(id: id, text: text)
         case .move: return move(id: id, text: text)
         case .quiet: return quiet(id: id, text: text)
-        default: return .note(id, "Not built yet")
         }
     }
 
