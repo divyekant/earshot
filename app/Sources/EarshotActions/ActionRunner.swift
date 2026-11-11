@@ -308,22 +308,20 @@ public final class EarshotActionRunner: ActionRunner {
             return "the safety check stopped the Return key (\(focus))"
         }
         Keys.press(Keys.returnKey)
-        // Some apps (WhatsApp) do not open the first result on Return: the field keeps the focus and the name.
+        // Some apps (WhatsApp) do not open the first result on Return: the field stays on screen with the name.
+        // WhatsApp does not report its focus well, so the check reads the field, not the focus.
         // Then press the result row that matches the name. A chat row opens a chat; it is not a send.
-        func stillInField() -> Bool {
-            AX.same(AX.focused(app), target)
-                && AX.value(target)?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == wanted
+        func fieldOpen() -> Bool {
+            AX.frame(target) != nil && AX.value(target)?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == wanted
         }
-        let closed = await waitUntil(timeoutMs: SwitcherTiming.returnMs, intervalMs: SwitcherTiming.pollMs) { !stillInField() }
-        if !closed {
-            guard let f = AX.frame(target) ?? fieldFrame else { return "Return did not open the chat" }
+        let closed = await waitUntil(timeoutMs: SwitcherTiming.returnMs, intervalMs: SwitcherTiming.pollMs) { !fieldOpen() }
+        if !closed, let f = AX.frame(target) {
             let rows = AX.resultRows(below: f, app: app, skip: target)
-            guard let i = ActionRules.pickResultRow(rows.map { ($0.1, $0.2) }, name: name, baseline: baseline),
-                  AX.perform(rows[i].0, "AXPress") else {
-                Keys.press(Keys.escape)
-                return "Return did not open the chat, and no result row matches \"\(name)\""
+            // No row: the message box check that follows decides.
+            if let i = ActionRules.pickResultRow(rows.map { ($0.1, $0.2) }, name: name, baseline: baseline),
+               AX.perform(rows[i].0, "AXPress") {
+                watch.mark("row_press")
             }
-            watch.mark("row_press")
         }
         return nil
     }
