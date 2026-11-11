@@ -313,6 +313,18 @@ final class ActionRunnerTests: XCTestCase {
         XCTAssertLessThan(Clock.ms(since: fake.t0), Double(3 * SwitcherTiming.scanMs) + 200)
     }
 
+    /// An app learned as "click" gets the click at the first find, with no AXFocused try before it.
+    func testLearnedClickClicksAtFirstFind() async {
+        let runner = EarshotActionRunner(store: nil)
+        let fake = FakeSwitcher(showsAt: 0, ownFocus: false, acceptsAX: false)
+        let (field, _, stats) = await runner.waitForSwitcherField(scanDelayMs: 0, clickFirst: true, focused: fake.focused,
+                                                                 newField: fake.newField, setFocus: fake.setFocus, click: fake.click)
+        XCTAssertEqual(field, "to-field")
+        XCTAssertEqual(fake.focusSets, 0)
+        XCTAssertEqual(fake.clicks, 1)
+        XCTAssertTrue(stats.clicked)
+    }
+
     /// Slack (2026) Cmd-K: query rows hold the typed name. They are not results, and Return on them runs a search.
     func testQueryRowsAreNotChatResults() {
         let name = "Sam Rivera"

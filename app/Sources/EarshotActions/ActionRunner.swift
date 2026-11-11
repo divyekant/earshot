@@ -237,7 +237,8 @@ public final class EarshotActionRunner: ActionRunner {
         // Wait until the switcher field has focus. Check the focused element first (cheap). Scan for a new field
         // without focus (Messages "To:") only when the app needed it last time, or after scanDelayMs.
         let (found, failure, stats) = await waitForSwitcherField(
-            scanDelayMs: learnedSwitcher == "set" ? 0 : SwitcherTiming.scanDelayMs,
+            scanDelayMs: learnedSwitcher == "set" || learnedSwitcher == "click" ? 0 : SwitcherTiming.scanDelayMs,
+            clickFirst: learnedSwitcher == "click",
             focused: { () -> (AXUIElement?, Bool, Bool) in
                 guard let el = AX.focused(app), let win = AX.window(app) else { return (nil, false, false) }
                 let isNew = keys.isEmpty || !AX.same(el, before)
@@ -258,7 +259,7 @@ public final class EarshotActionRunner: ActionRunner {
         watch.note("field_scan_ms", stats.scanMs)
         if stats.clicked { watch.note("field_clicked", 1) }
         if found == nil, learnedSwitcher == "own" { forget(Self.switcherKey(appID)) }
-        if found != nil { learn(Self.switcherKey(appID), stats.setFocus ? "set" : "own") }
+        if found != nil { learn(Self.switcherKey(appID), stats.clicked ? "click" : stats.setFocus ? "set" : "own") }
         guard let field = found else { return "\(failure ?? "no search field") (\(AX.describeFocus(app)))" }
         // Never type the name while the focus is in a message box.
         guard let now = AX.focused(app), AX.same(now, field), let win = AX.window(app),
@@ -307,6 +308,16 @@ public final class EarshotActionRunner: ActionRunner {
             Keys.press(Keys.escape)
             return "the safety check stopped the Return key (\(focus))"
         }
+        // An app where Return did not open the chat last time (learned "row"): press the result row at once.
+        let resultKey = Self.resultKey(appID)
+        if learnedFocus[resultKey] == "row", let f = AX.frame(target) {
+            let rows = AX.resultRows(below: f, app: app, skip: target)
+            if let i = ActionRules.pickResultRow(rows.map { ($0.1, $0.2) }, name: name, baseline: baseline),
+               AX.perform(rows[i].0, "AXPress") {
+                watch.mark("row_press")
+                return nil
+            }
+        }
         Keys.press(Keys.returnKey)
         // Some apps (WhatsApp) do not open the first result on Return: the field stays on screen with the name.
         // WhatsApp does not report its focus well, so the check reads the field, not the focus.
@@ -321,7 +332,10 @@ public final class EarshotActionRunner: ActionRunner {
             if let i = ActionRules.pickResultRow(rows.map { ($0.1, $0.2) }, name: name, baseline: baseline),
                AX.perform(rows[i].0, "AXPress") {
                 watch.mark("row_press")
+                learn(resultKey, "row")
             }
+        } else if closed {
+            forget(resultKey)
         }
         return nil
     }
@@ -342,7 +356,7 @@ public final class EarshotActionRunner: ActionRunner {
     /// switcher field; if one shows without focus, `setFocus` focuses it.
     /// It returns the field, or the reason for the time-out. The caller types nothing on a time-out.
     func waitForSwitcherField<T>(timeoutMs: Int = SwitcherTiming.fieldMs, scanDelayMs: Int = SwitcherTiming.scanDelayMs,
-                                 focused: () -> (T?, Bool, Bool), newField: () -> T?,
+                                 clickFirst: Bool = false, focused: () -> (T?, Bool, Bool), newField: () -> T?,
                                  setFocus: (T) -> Void, click: (T) -> Void = { _ in }) async -> (T?, String?, FieldWaitStats) {
         let t0 = Clock.nowNs()
         var stats = FieldWaitStats()
@@ -365,7 +379,7 @@ public final class EarshotActionRunner: ActionRunner {
                 if let f {
                     // The first find sets the focus through accessibility. If the field is still without focus
                     // at the next scan, the app ignores AXFocused: click the field one time.
-                    if sawField && !stats.clicked {
+                    if (sawField || clickFirst) && !stats.clicked {
                         stats.clicked = true
                         click(f)
                     } else {
@@ -440,8 +454,13 @@ public final class EarshotActionRunner: ActionRunner {
         // Find the box and set the focus at once. Repeat until the box takes it: the new chat can take a moment (E0).
         let t0 = Clock.nowNs()
         var found: AXUIElement?
+        var scans = 0.0, nodes = 0.0
+        defer { watch.note("box_scans", scans); watch.note("box_nodes", nodes) }
         while Clock.ms(since: t0) < Double(SwitcherTiming.boxMs) {
-            if let win = AX.window(app), let box = AX.findComposer(in: win, budgetMs: 100).0 {
+            scans += 1
+            let (hit, read) = AX.window(app).map { AX.findComposer(in: $0, budgetMs: 100) } ?? (nil, 0)
+            nodes = Double(read)
+            if let box = hit {
                 if found == nil { watch.mark("box_found") }
                 found = box
                 if learned == "click" { break }
@@ -465,6 +484,8 @@ public final class EarshotActionRunner: ActionRunner {
     }
 
     static func switcherKey(_ appID: String) -> String { "switcher:\(appID)" }
+    /// The learned way to open the result: "row" if Return did not open the chat last time.
+    static func resultKey(_ appID: String) -> String { "result:\(appID)" }
 
     private func forget(_ key: String) {
         guard learnedFocus.removeValue(forKey: key) != nil else { return }
