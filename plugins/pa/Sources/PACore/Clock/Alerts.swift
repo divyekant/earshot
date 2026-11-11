@@ -57,6 +57,7 @@ extension Engine {
            let s = a.shownAt { times.append(s.addingTimeInterval(repeatAfter)) }
         if let q = quietUntil, q > now { times.append(q) }
         times.append(nextMorning(now))
+        if pagesDirty, let w = pagesWrittenAt { times.append(w.addingTimeInterval(1)) }
         return times.min()
     }
 
@@ -86,10 +87,22 @@ extension Engine {
         repeatAlerts(now)
         morningList(now)
         clockTicked()
+        // The pages show "today" and "late": write them again when the day changes.
+        if store?.meta("pages_day") != Day(now, clock.calendar).description {
+            try? store?.setMeta("pages_day", Day(now, clock.calendar).description)
+            markPagesDirty()
+        }
+        flushPages()
     }
 
     /// Other packages act at each tick (the copy in Reminders, the pages).
-    func clockTicked() {}
+    func clockTicked() {
+        // A safety net for the copy in Reminders: read the list each 5 minutes, also if EventKit reported nothing.
+        if mirrorOn, (lastPull.map { clock.now.timeIntervalSince($0) >= 300 } ?? true) {
+            lastPull = clock.now
+            pull()
+        }
+    }
 
     /// One time each day: the daily copy, and the delete of records that were dropped 30 days ago.
     func care() {

@@ -35,7 +35,7 @@ final class QueryChangeTests: XCTestCase {
         for n in 1...12 { say(e, out, "todo", "made-up task \(n) by tomorrow") }
         let list = say(e, out, "what is due")
         XCTAssertEqual(list.items.count, 10)
-        XCTAssertEqual(list.items.last, "and 3 more on the Today page")
+        XCTAssertEqual(list.items.last, "and 3 more")
     }
 
     func testWhatAboutAndWhereIs() {

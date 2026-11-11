@@ -74,6 +74,11 @@ public enum TimeText {
     static let weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
     static let months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
+    /// "Wed 11 Nov 2026".
+    public static func fullDay(_ d: Day, _ cal: Calendar) -> String {
+        "\(weekdays[d.weekday(cal) - 1]) \(d.day) \(months[d.month - 1]) \(d.year)"
+    }
+
     public static func day(_ d: Day, now: Date, _ cal: Calendar) -> String {
         let today = Day(now, cal)
         if d == today { return "today" }

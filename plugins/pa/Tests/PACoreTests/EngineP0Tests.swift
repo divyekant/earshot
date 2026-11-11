@@ -38,7 +38,7 @@ final class EngineP0Tests: XCTestCase {
         for (n, lead) in PACommand.leads.keys.sorted().enumerated() {
             e.handle(.command(id: "c\(n)", lead: lead, text: "x", context: [:]))
         }
-        let answers = out.take()
+        let answers = out.take().filter { $0.re != nil }
         XCTAssertEqual(answers.count, PACommand.leads.count)
         XCTAssertEqual(Set(answers.compactMap(\.re)).count, PACommand.leads.count)
     }

@@ -18,6 +18,7 @@ final class ClockTests: XCTestCase {
         let (e, out, clock) = makeEngine()
         e.handle(.hello(contract: 1)); _ = out.take()
         say(e, out, "remind me", "to call the plumber at 11")
+        at(e, clock, wed(10, 1))  // the pages write; then the next check is the alert
         XCTAssertEqual(e.nextCheck(), wed(11))
         at(e, clock, wed(10, 59)); XCTAssertEqual(alerts(out), [])
         at(e, clock, wed(11).addingTimeInterval(1)); XCTAssertEqual(alerts(out), ["Reminder · call the plumber"])
