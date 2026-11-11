@@ -150,6 +150,8 @@ extension CommandPipeline {
                         note: "there is only one choice: say the command again", stages: stages, clock, why: why)
         }
         let choice = pending.choices[i]
+        // The log keeps a word count in place of the text of the choice (gap item 11).
+        turnTyped += Self.typedTexts(choice.intent)
         guard let intent = Self.refresh(choice, pending: pending, screen: context.screen) else {
             return done(heard: text, intent: choice.describe, tier: .fuzzy, ok: false,
                         note: "the screen changed: say the command again", stages: stages, clock, why: why)

@@ -96,6 +96,8 @@ final class ChoiceTests: XCTestCase {
         XCTAssertEqual(runner.runs[0].1.tier, .fuzzy)
         XCTAssertNil(p.pendingChoice)
         XCTAssertTrue(r.note.contains("your answer to: not sure (two chats match)"), r.note)
+        // The log keeps no typed text (gap item 11).
+        XCTAssertFalse(r.intent.contains("running late"), r.intent)
     }
 
     func testYesOpensTheFirstChoice() async {
