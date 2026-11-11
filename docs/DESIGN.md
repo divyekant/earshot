@@ -190,6 +190,8 @@ E1 built the app rows from each app's menu bar, with no row written by hand: the
 
 E0 used each app's own search in place of links, so the owner gives names only. Slack: Command-K. Messages: File > New Message (Command-N) and the "To:" field. WhatsApp (left out of E0): Command-F; the search also lists message hits, so a later design must check the type of the top result before Return.
 
+E7 (2026-11-11, [E7-chat-stages.md](experiments/E7-chat-stages.md)) measured the chat flow in each app and changed the switcher. A switcher list can hold query rows that repeat the typed name, for example Slack "Search for: <name>". earshot groups the list texts into rows, skips query rows, and stops if a query row is above the chat row. If a new field does not take the focus from accessibility (WhatsApp), earshot clicks it. If Return leaves the field open with the name, earshot presses the result row that matches the name. earshot learns the click and the row press for each app.
+
 **Generic focus.** Run a depth-limited accessibility search of the focused window. Find the lowest and widest editable element (`AXTextArea`, `AXTextField`, or an editable web area), then focus it. For Electron apps, first set `AXManualAccessibility`, then poll `AXChildren` for up to 200 ms. Never walk the full tree of an Electron app.
 
 **Type text.** Set the accessibility value, or paste through the clipboard and restore the clipboard afterwards.
