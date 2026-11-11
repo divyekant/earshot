@@ -6,8 +6,8 @@ import Foundation
 /// It gives the last 450 ms before `begin`, so that the first word is not lost (E0). Hex measured 450 ms: a key press
 /// often comes after the first sound of the word.
 /// It keeps the last 3 s in memory, for a turn that the wake phrase opens: that turn starts at the phrase (D-11).
-/// In hold mode, it closes the microphone after `MicIdle.holdSeconds` with no turn, so that the macOS microphone
-/// indicator goes off. The next `begin` opens it again, with no preroll for that turn.
+/// In hold mode, it closes the microphone `MicIdle.holdSeconds` after each turn (0: at once), so that the macOS
+/// microphone indicator is on only while the key is down. The next `begin` opens it again, with no preroll.
 final class MicrophoneFeed: @unchecked Sendable {
     let format: AVAudioFormat
     /// The usual audio before `begin`.
@@ -113,7 +113,7 @@ final class MicrophoneFeed: @unchecked Sendable {
             guard self.running, self.deliver == nil else { return }
             self.close()
             self.closedForIdle = true
-            NSLog("earshot mic: closed after %.0f s with no command (hold mode)", self.idle.seconds ?? 0)
+            NSLog("earshot mic: closed (hold mode)")
         }
     }
 

@@ -9,7 +9,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 ### Changed
 
 - The Activity tab shows the time from the end of speech to the end of the command. Before, it showed the audio length for most turns. The summary line counts only turns with words. It gives the other records (rejected wakes, near misses, turns with no words) as one count (R-SP-1, R-FB-1).
-- In hold mode, earshot closes the microphone after 2 minutes with no command, so the macOS microphone indicator goes off. The next hold-key press opens it again. That one command has no 450 ms preroll, so speak after the start sound. Always-on mode keeps the microphone open (R-ON-4, R-MD-1).
+- In hold mode, the microphone is open only while you hold the key. The macOS microphone indicator is off between commands. The start sound now plays when the microphone is live: speak after it. There is no 450 ms preroll in hold mode. Always-on mode keeps the microphone open (R-ON-4, R-MD-1).
 
 ## [0.3.0] - 2026-11-03
 
