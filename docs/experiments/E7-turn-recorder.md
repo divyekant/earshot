@@ -46,7 +46,19 @@ dk chose on a card on 2026-11-11: keep the wake frames and the scores for 7 days
 
 ## 5. Results
 
-Not yet. The live session needs dk's "go" and a build on the Mac.
+### 5.1 The activity log of 2026-11-03 (read on the Mac on 2026-11-11)
+
+From 00:00 to 07:00 PST, with no owner in the room, the log has 4,731 rejected wakes: about 680 each hour, 11 each minute. Their phrase voice scores: min 0.01, median 0.21, p90 0.24, max 0.34. The gate is 0.35. In the same hours: 7 near misses, 4 wake turns.
+
+- The matches do not need speech: the room was quiet, with no video. This makes candidate C unlikely as the main cause.
+- One match about every 5 s, for 7 hours, fits candidate A: each rejected wake resets the encoder (`PhraseListener.reset`), and the frames after a reset can start the next match. So the matches can feed each other.
+- A gate of 0.10 would open a turn, with the start sound, for most of these matches. The gate stays at 0.35.
+
+The live session is not done yet. It needs dk's "go" and a build on the Mac.
+
+### 5.2 Limits of the replay
+
+The record ends with the live turn. So a replay with a shorter end silence shows where the turn would end, but a replay with a longer end silence runs out of kept levels: the end is not known.
 
 ## 6. Decisions
 
