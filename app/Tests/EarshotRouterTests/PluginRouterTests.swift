@@ -105,11 +105,21 @@ final class PluginRouterTests: XCTestCase {
         XCTAssertEqual(PluginRouter.match("note milk", plugins: two, apps: [])?.lead.pluginID, "alpha")
     }
 
-    /// The lead counts as a command, so an armed "type" does not type the words of a plugin command.
-    func testLeadIsACommandForDictation() {
-        XCTAssertTrue(CommandRouter.startsWithCommand("remind me to call", context: context()))
+    /// With the hold key, a lead is a command, so plain dictation does not type it. After a bare "type", the next
+    /// turn is dictation (R-NV-4): there a lead is text.
+    func testLeadAndDictation() {
+        XCTAssertFalse(CommandRouter.startsWithCommand("note buy stamps", context: context()))
         XCTAssertTrue(CommandRouter.hasCommandWord("note buy stamps", context: context()))
         XCTAssertFalse(CommandRouter.hasCommandWord("note buy stamps", context: context([])))
+    }
+
+    /// The speech engine can write one word in more than one way. "todo" matches "to do" and "to-do".
+    func testLeadIgnoresSpacesAndHyphens() {
+        let todo = [PluginLead(pluginID: "pa", lead: "todo")]
+        for spoken in ["todo buy stamps", "To do buy stamps", "to-do, buy stamps", "Hey, to-do buy stamps"] {
+            XCTAssertEqual(PluginRouter.match(spoken, plugins: todo, apps: [])?.rest, "buy stamps", spoken)
+        }
+        XCTAssertNil(PluginRouter.match("today buy stamps", plugins: todo, apps: []))
     }
 
     /// A lead must match whole words: "noted" is not "note".

@@ -289,3 +289,8 @@ Rejected:
 | The personal assistant as fixed code in earshot | Each user gets it. No structure for other additions. |
 | A plugin that sends commands back to earshot | A plugin could then click, type or send. An answer is text only (R-PL-3). |
 | A child process with the default spawn | macOS gives a child the privacy permissions of the app that started it. earshot disclaims the responsibility of each plugin. |
+
+Rules for dictation:
+
+- With the hold key and no "type", a sentence that starts with a lead goes to the plugin, not into the focused text box.
+- After a bare "type", the next turn is dictation (R-NV-4). A lead in it is text. The owner gave an explicit command to type.

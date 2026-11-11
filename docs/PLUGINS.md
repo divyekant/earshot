@@ -68,7 +68,7 @@ If two plugins have the same lead, the plugin with the first id (in alphabetical
 ## 4. How earshot routes a plugin command
 
 1. The router reads the start of the command. It removes filler words such as "hey" and "can you".
-2. If the command starts with a lead, the router makes the intent `handOff`. The longest lead wins.
+2. If the command starts with a lead, the router makes the intent `handOff`. The longest lead wins. The match ignores spaces and hyphens between words, so the lead "todo" also matches "to do" and "to-do".
 3. The words after the lead are text. earshot does not read commands in them. "remind me to open Slack" sends "open Slack" to the plugin. Slack does not open.
 4. earshot sends the text to the plugin and shows a note at once, for example "→ Echo · say back".
 5. The plugin answers later. earshot shows the answer as a note.
@@ -78,7 +78,7 @@ Some more rules:
 - The rule is in tier 0 of the router. The router is sure, so tier 2 (Jev) never runs for a plugin command. The words after a lead never go to Jev (R-MD-1, D-9).
 - A plugin command is never a chain of commands. A trailing "and send" is text for the plugin. earshot does not send.
 - With the hold key, a sentence that starts with a lead goes to the plugin. It does not go into the focused text box.
-- After a bare "type", a sentence that starts with a lead goes to the plugin. It is not typed.
+- After a bare "type", the next sentence is dictation (R-NV-4). A lead in it is text, and earshot types it.
 - In always-on mode, the wake phrase and the voice check apply as for each other command.
 - The Test tab routes typed commands to plugins.
 - On a sign-in, code or payment page, earshot sends no context. The plugin gets the text only.

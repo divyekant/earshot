@@ -50,22 +50,30 @@ public enum PluginRouter {
     }
 
     /// The plugin, the lead and the raw words after it, if the command starts with a usable lead. The longest lead
-    /// wins. Lead fillers ("hey", "please", "can you") before the lead do not count. Nil if no lead matches.
+    /// wins. The match ignores the spaces and hyphens between the words, because the speech engine can write one
+    /// spoken word in more than one way ("todo", "to do", "to-do"). Lead fillers ("hey", "can you") before the lead
+    /// do not count. Nil if no lead matches.
     public static func match(_ text: String, plugins: [PluginLead], apps: [AppEntry]) -> (lead: PluginLead, rest: String)? {
         guard !plugins.isEmpty else { return nil }
-        var tokens = Tokens(text)
-        var lead = 0
-        while lead < tokens.count - 1, CommandRouter.leadFillers.contains(tokens.words[lead]) { lead += 1 }
-        tokens.dropFirst(lead)
+        let tokens = Tokens(text)
         let words = tokens.words
-        var best: (PluginLead, Int)?
-        for p in usable(plugins, apps: apps) {
-            let lw = TextKit.words(p.lead)
-            guard words.count >= lw.count, Array(words.prefix(lw.count)) == lw else { continue }
-            if best == nil || lw.count > best!.1 { best = (p, lw.count) }
+        // Each lead as one key with no spaces: "todo" matches the spoken "to do" and "to-do" too.
+        let keys = usable(plugins, apps: apps).map { ($0, TextKit.words($0.lead).joined()) }
+        var start = 0
+        while start < words.count {
+            var best: (lead: PluginLead, length: Int, end: Int)?
+            for (p, key) in keys {
+                var joined = ""
+                var end = start
+                while end < words.count, joined.count < key.count { joined += words[end]; end += 1 }
+                if joined == key, best == nil || key.count > best!.length { best = (p, key.count, end) }
+            }
+            if let best { return (best.lead, tokens.raw(best.end..<words.count)) }
+            // A lead filler ("hey", "can you") before the lead does not count. Try the lead after it.
+            guard start < words.count - 1, CommandRouter.leadFillers.contains(words[start]) else { return nil }
+            start += 1
         }
-        guard let found = best else { return nil }
-        return (found.0, tokens.raw(found.1..<tokens.count))
+        return nil
     }
 
     /// The rules decision for a plugin lead, or nil.

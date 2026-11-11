@@ -102,8 +102,8 @@ public struct CommandRouter: Router {
     /// True if the FIRST sentence is a command. Dictation after "type" uses it: a command word later in the text,
     /// for example an app name, is text (live test: a dictated sentence that named "earshot" opened a Slack channel).
     public static func startsWithCommand(_ text: String, context: RouteContext) -> Bool {
-        if PluginRouter.match(text, plugins: context.plugins, apps: context.apps) != nil { return true }
-        return sentences(text).first.map { isCommandSentence($0, apps: context.apps) } ?? false
+        // A plugin lead does not count here: after a bare "type", the next turn is dictation (R-NV-4, D-14).
+        sentences(text).first.map { isCommandSentence($0, apps: context.apps) } ?? false
     }
 
     /// The sentences of the words, split after ".", "!", "?" or "…" and a space.
