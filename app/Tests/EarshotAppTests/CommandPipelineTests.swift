@@ -221,6 +221,8 @@ final class CommandPipelineTests: XCTestCase {
         let t = p.nearMisses(NearMisses(count: 2, best: 0, bestScore: 0.362))
         XCTAssertEqual(t.note, "wake phrase near misses: 2, best template score 0.36", "E5: the audio templates")
         XCTAssertEqual(t.heard, "")
+        let b = p.nearMisses(NearMisses(count: 0, best: 0, blocked: 12))
+        XCTAssertEqual(b.note, "wake phrase near misses: 0, 12 template matches stopped by the worst part", "E7")
     }
 
     func testWakeSummaryHasTheTemplateScores() {

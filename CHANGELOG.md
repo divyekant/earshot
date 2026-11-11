@@ -8,6 +8,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Fixed
 
+- In always-on mode, room sound no longer matches the wake phrase every 4 to 6 s. A match now needs each 200 ms part of the phrase to fit, not only the mean. The log counts the stopped matches (R-ON-1, D-11, E7).
 - "Slack <name>" opens the chat again. Slack now lists "Search for: <name>" rows in Command-K, and earshot pressed Return on a search. earshot now skips search rows, and stops if a search row is above the chat. WhatsApp chats open too: earshot clicks the new-chat field and presses the result row when Return does not open it. Measured: Slack 437 ms, Messages 682 ms, WhatsApp 1,475 ms to the focused box (R-NV-2, R-NV-6, R-SP-1, E7).
 
 ### Added
