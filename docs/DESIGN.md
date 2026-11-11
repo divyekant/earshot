@@ -237,6 +237,18 @@ The oMLX server can clean up dictated text: punctuation and filler words. Make i
 
 Measured on 2026-11-11 ([experiments/text-cleanup-omlx.md](experiments/text-cleanup-omlx.md)): `qwen3.5-0.8b-mlx-4bit` takes 285 ms (median, warm), but it cleaned only 3 of 10 sentences and changed words in 2. earshot has no cleanup setting until a larger general model passes with 0 changed words.
 
+### 3.8 Plugins (R-PL-1 to R-PL-5, D-14)
+
+A plugin is a separate program with a manifest (`docs/PLUGINS.md`). The parts in earshot:
+
+- `EarshotCore/Plugin.swift`: the manifest, the approvals (a SHA-256 of each approved `plugin.json`) and the JSON line messages.
+- `EarshotRouter/PluginRouter.swift`: a tier-0 rule. A command that starts with an approved lead becomes the one intent `handOff(pluginID, lead, text)`. The rule refuses a lead that starts with a core command word or an app name, so a core command wins. The words after the lead are text, as after "type".
+- `EarshotApp/PluginHost.swift`: starts each approved plugin with posix_spawn, with the responsibility disclaimed, so that the plugin does not get the permissions of earshot. Writes go on a separate queue, so a plugin cannot slow a command.
+- `EarshotApp/CommandPipeline+Plugins.swift`: the hand-off after the route. The log keeps the lead and a word count.
+- `EarshotUI/PluginsTab.swift`: the list of plugins and the approvals.
+
+The answers show as a note. An alert also goes to the Notification Center. A plugin also gives targets (names with ids). earshot keeps them for a later target source: "open <target>" with the core verb.
+
 ## 4. Permissions
 
 - Microphone

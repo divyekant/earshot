@@ -62,6 +62,8 @@ public final class EarshotActionRunner: ActionRunner {
         case .send: out = await send(command: command, watch: watch)
         case let .pressKey(key, times): out = await pressKey(key, times: times, command: command, watch: watch)
         case .undoTyping(let text): out = await undoTyping(text, watch: watch)
+        // The app hands this off to the plugin. The actions never act for a plugin (R-PL-3).
+        case .handOff: out = fail("a plugin hand-off is not an action")
         }
         watch.mark("total")
         out.stages = watch.stages.merging(out.stages) { a, _ in a }

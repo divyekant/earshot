@@ -29,6 +29,7 @@ public enum IntentText {
         case let .pressKey(key, times): return "Press \(KeyText.name(key))" + (times > 1 ? " \(times) times" : "")
         // The typed text stays out of the note and the log: only its length.
         case .undoTyping(let text): return text.isEmpty ? "Undo the last typing" : "Undo the last typing (\(text.count) characters)"
+        case .handOff(let id, let lead, _): return "→ plugin \(id) · \"\(lead)\""
         }
     }
 

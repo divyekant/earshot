@@ -1,0 +1,10 @@
+{
+  "contract": 1,
+  "id": "echo",
+  "name": "Echo",
+  "version": "0.1.0",
+  "leads": ["say back"],
+  "context": [],
+  "run": ["./plugin.sh"],
+  "network": []
+}

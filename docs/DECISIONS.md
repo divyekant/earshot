@@ -285,3 +285,24 @@ The owner chose earshot as the dictation tool (change to D-1). Dictation needs k
 - No key on a sign-in, code or payment page.
 - One intent `undoTyping`. "undo that", "scratch that" or "delete that" removes the last text that earshot typed, with one Backspace for each character. It runs only if all are true: the same app is in front, the typing was within 2 minutes, the focused field still ends with that text, and the cursor is at its end with no selection. Else it does nothing and says why. One undo for each typing. After an undo, "send" alone has no typing to follow.
 - earshot keeps the text of the last typing in memory only, for "undo that". The log and the note show only its length.
+## D-14. Plugins are separate programs
+
+Date: 2026-11-11. Status: accepted, experimental until a second plugin exists. Requirements: R-PL-1 to R-PL-5. Contract: `docs/PLUGINS.md`.
+
+The owner asked for a structure so that other people can add to earshot, and for the personal assistant as the first addition (idea I-35).
+
+Decision: a plugin is a separate local program with a manifest. earshot gives it the text after its lead words, and gets back answers and targets. One intent, `handOff`, serves all plugins.
+
+Rejected:
+
+| Option | Why it was rejected |
+|---|---|
+| Plugin code inside the earshot app | The code gets the Accessibility and Microphone permissions of earshot. A fault stops earshot. |
+| The personal assistant as fixed code in earshot | Each user gets it. No structure for other additions. |
+| A plugin that sends commands back to earshot | A plugin could then click, type or send. An answer is text only (R-PL-3). |
+| A child process with the default spawn | macOS gives a child the privacy permissions of the app that started it. earshot disclaims the responsibility of each plugin. |
+
+Rules for dictation:
+
+- With the hold key and no "type", a sentence that starts with a lead goes to the plugin, not into the focused text box.
+- After a bare "type", the next turn is dictation (R-NV-4). A lead in it is text. The owner gave an explicit command to type.
