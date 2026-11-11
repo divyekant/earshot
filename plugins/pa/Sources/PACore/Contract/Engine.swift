@@ -1,0 +1,160 @@
+import Foundation
+
+/// The PA. One object owns the store, the settings and the answers. The program calls it from one serial queue
+/// only, so the store has one writer.
+public final class Engine {
+    public let folder: URL
+    public let clock: Clock
+    public let output: Output
+    public let reminders: ReminderStore?
+    public let detector: TimeDetector?
+    public internal(set) var store: Store?
+    public internal(set) var settings = PASettings()
+    let log: PALog
+    /// A note for the next answer, for example after a new store started.
+    var pendingNotice: String?
+    var settingsStamp: Date?
+
+    public var storeURL: URL { folder.appendingPathComponent("pa.sqlite") }
+    public var settingsURL: URL { folder.appendingPathComponent("settings.json") }
+    public var pagesFolder: URL { folder.appendingPathComponent("pages", isDirectory: true) }
+    public var backupsFolder: URL { folder.appendingPathComponent("backups", isDirectory: true) }
+
+    public init(folder: URL, clock: Clock, output: Output, reminders: ReminderStore? = nil, detector: TimeDetector? = nil) {
+        self.folder = folder
+        self.clock = clock
+        self.output = output
+        self.reminders = reminders
+        self.detector = detector
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        log = PALog(url: folder.appendingPathComponent("pa.log"))
+    }
+
+    /// Opens the store and reads the settings. Call it one time, before the first message.
+    public func start() {
+        let now = clock.now
+        log.write(now, "start")
+        loadSettings(announce: true)
+        do {
+            let s = try Store(url: storeURL, now: now)
+            store = s
+            if s.recoveredFrom != nil {
+                pendingNotice = "The PA store had an error. A new store started. The old file is kept."
+                log.write(now, "store-recovered")
+                s.log("store-recovered", .store, nil, at: now)
+            }
+            log.write(now, "store-open", ["search": s.searchKind.rawValue])
+        } catch {
+            log.write(now, "store-failed")
+        }
+    }
+
+    /// Reads settings.json. Sends the error note one time if the file has an error.
+    func loadSettings(announce: Bool) {
+        let (s, problem) = PASettings.load(settingsURL)
+        settings = s
+        settingsStamp = (try? FileManager.default.attributesOfItem(atPath: settingsURL.path))?[.modificationDate] as? Date
+        if let problem, announce { output.send(.note(nil, problem)) }
+    }
+
+    /// Reads settings.json again if the file changed. Gives true if it changed.
+    @discardableResult
+    public func reloadSettingsIfChanged() -> Bool {
+        let stamp = (try? FileManager.default.attributesOfItem(atPath: settingsURL.path))?[.modificationDate] as? Date
+        guard stamp != settingsStamp else { return false }
+        let old = settings
+        loadSettings(announce: true)
+        log.write(clock.now, "settings-read")
+        settingsChanged(from: old)
+        return true
+    }
+
+    /// The PA got a new settings file. Later packages act on it (the clock, the copy in Reminders).
+    func settingsChanged(from old: PASettings) {}
+
+    /// The end: stdin closed.
+    public func stop() {
+        log.write(clock.now, "stop")
+        store?.db.close()
+    }
+
+    // MARK: - Messages
+
+    /// Reads one line from earshot. A line that is not a message is dropped. The PA never stops for bad input.
+    public func receive(_ line: Data) {
+        guard let msg = Incoming.parse(line) else {
+            log.write(clock.now, "bad-line", ["bytes": String(line.count)])
+            return
+        }
+        handle(msg)
+    }
+
+    public func handle(_ msg: Incoming) {
+        switch msg {
+        case .hello(let contract):
+            log.write(clock.now, "hello", ["contract": String(contract)])
+            hello()
+        case .command(let id, let lead, let text, let context):
+            let start = Date()
+            let answer = command(id: id, lead: lead, text: text, context: context)
+            output.send(answer)
+            let ms = Int(Date().timeIntervalSince(start) * 1000)
+            log.write(clock.now, "command", ["lead": PACommand.from(lead: lead)?.rawValue ?? "unknown",
+                                             "words": String(text.split(separator: " ").count), "ms": String(ms)])
+        case .unknown(let type):
+            log.write(clock.now, "unknown-type", ["chars": String(type.count)])
+        }
+    }
+
+    /// After hello: the targets, and the question for Reminders.
+    func hello() {
+        afterHello()
+    }
+
+    /// Later packages add the targets, the missed list and the morning list here.
+    func afterHello() {
+        probeReminders()
+    }
+
+    /// Probe 1 of the build: does macOS ask for access to Reminders for the PA? The PA asks one time, if the copy
+    /// is on, and answers with a note.
+    func probeReminders() {
+        guard settings.reminders.copy, let reminders else { return }
+        guard reminders.access == .notAsked else { return }
+        reminders.requestAccess { [weak self] result in
+            guard let self else { return }
+            let text: String
+            switch result {
+            case .allowed: text = "Reminders: allowed"
+            case .denied: text = "Reminders: denied"
+            case .notAsked: text = "Reminders: no question (error: no answer)"
+            case .failed(let e): text = "Reminders: no question (error: \(e))"
+            }
+            self.output.send(.note(nil, text))
+            self.log.write(self.clock.now, "reminders-access", ["result": text.replacingOccurrences(of: " ", with: "_")])
+        }
+    }
+
+    /// One command. Gives exactly one answer with `re`.
+    public func command(id: String, lead: String, text: String, context: [String: String]) -> Outgoing {
+        let answer: Outgoing
+        if store == nil {
+            answer = .note(id, "The PA store does not open. Nothing saved.")
+        } else if let cmd = PACommand.from(lead: lead) {
+            answer = run(cmd, id: id, text: text, context: context)
+        } else {
+            answer = .note(id, "The PA does not know this command.")
+        }
+        guard let notice = pendingNotice else { return answer }
+        pendingNotice = nil
+        store?.clearRecovered()
+        if case .answer(let re, let kind, let t, let items) = answer {
+            return .answer(re: re, kind: kind, text: notice + " " + t, items: items)
+        }
+        return answer
+    }
+
+    func run(_ cmd: PACommand, id: String, text: String, context: [String: String]) -> Outgoing {
+        .note(id, "Not built yet")
+    }
+}

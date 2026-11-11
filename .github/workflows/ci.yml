@@ -75,3 +75,42 @@ jobs:
           echo "Swift libraries:"; otool -L "$exe" | grep -i swift || true
           ls -la "$EARSHOT_APP_OUT/Contents/Frameworks"
           codesign --verify --deep --strict "$EARSHOT_APP_OUT"
+
+  # The PA plugin (plugins/pa) is a separate Swift package. It is not a part of the app (R-PL-1).
+  pa:
+    name: PA plugin build and test
+    runs-on: macos-26
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: plugins/pa
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select the newest Xcode 26
+        run: |
+          set -euo pipefail
+          xcode="$(ls -d /Applications/Xcode_26*.app | sort -V | tail -n 1)"
+          echo "Using $xcode"
+          sudo xcode-select -s "$xcode/Contents/Developer"
+          swift --version
+
+      - name: Build
+        run: swift build
+
+      # The probes and the go marks print lines that start with PROBE or MARK. The pull request records them.
+      - name: Test
+        run: swift test 2>&1 | tee "$RUNNER_TEMP/pa-test.log"
+
+      - name: Probe and mark lines
+        if: always()
+        run: grep -E "PROBE|MARK|CONTRACT" "$RUNNER_TEMP/pa-test.log" || true
+
+      - name: Build the app bundle (no install)
+        env:
+          PA_NO_INSTALL: "1"
+        run: |
+          set -euo pipefail
+          scripts/install-pa.sh
+          otool -s __TEXT __info_plist .build/EarshotPA.app/Contents/MacOS/earshot-pa | head -n 3
+          codesign -dv .build/EarshotPA.app 2>&1 | grep -E "Identifier|Signature"
