@@ -20,6 +20,8 @@ public final class Engine {
     public var models: ModelHost?
     /// A job of the index runs in the background.
     var indexing = false
+    /// The start and the count of texts of the current run of index jobs, for the line "index-done" in the log.
+    var indexRun: (start: Date, texts: Int)?
     /// The numbers of the index in memory, while the model is loaded (build spec 7.6).
     var vectorCache: VectorCache?
     /// Runs a block at background priority, off the engine queue (phase 2 build rule 6). Tests run it at once.

@@ -46,7 +46,16 @@ extension Engine {
             work = store.items(where: "state != 'dropped'").filter { !have.contains($0.id) }
                 .prefix(Engine.indexBatch).map { ($0.id, $0.title.isEmpty ? $0.said : $0.title) }
         }
-        guard !work.isEmpty else { return }
+        guard !work.isEmpty else {
+            if let run = indexRun {
+                indexRun = nil
+                log.write(clock.now, "index-done", ["texts": String(run.texts),
+                                                     "ms": String(Int(Date().timeIntervalSince(run.start) * 1000))])
+            }
+            return
+        }
+        if indexRun == nil { indexRun = (Date(), 0) }
+        indexRun?.texts += work.count
         indexing = true
         let texts = work.map(\.1)
         background { [weak self] in
