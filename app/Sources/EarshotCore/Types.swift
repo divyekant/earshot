@@ -95,6 +95,12 @@ public struct ScreenSnapshot: Codable, Hashable, Sendable {
 
 public enum ScrollDirection: String, Codable, Sendable { case up, down, top, bottom }
 
+/// The keys that the owner can say (I-34, D-13). The list is fixed. Return ("new line") keeps the send rule:
+/// earshot never presses it in a message box (R-NV-5).
+public enum SpokenKey: String, Codable, Sendable, CaseIterable {
+    case backspace, forwardDelete, newLine, tab, escape, left, right, up, down
+}
+
 /// What the owner asked for. The router makes one intent. The action module runs it.
 public enum Intent: Codable, Hashable, Sendable {
     case none
@@ -113,6 +119,14 @@ public enum Intent: Codable, Hashable, Sendable {
     case hideNumbers
     /// Only an explicit spoken "send" makes this intent (R-NV-5).
     case send
+    /// Press one key of the fixed list, 1 to `SpokenKey` limit times: "backspace three times", "new line" (I-34, D-13).
+    case pressKey(SpokenKey, times: Int)
+    /// Remove the last text that earshot typed ("undo that"). The router gives empty text. The app fills in the text
+    /// that it typed last, in the same app only. It is never written to disk.
+    case undoTyping(String)
+    /// Give the words after a plugin lead to that plugin (R-PL-2, docs/PLUGINS.md). One intent for all plugins.
+    /// The app hands the text off and shows a note. It never clicks, types or sends for it (R-PL-3).
+    case handOff(pluginID: String, lead: String, text: String)
 }
 
 /// Which router tier made the decision.
@@ -149,9 +163,13 @@ public struct RouteContext: Sendable {
     public var frontBundleID: String?
     /// The front window, for voice clicks. Nil when not needed.
     public var screen: ScreenSnapshot?
+    /// The leads of the approved plugins that run (R-PL-4). Empty if no plugin runs.
+    public var plugins: [PluginLead]
 
-    public init(apps: [AppEntry], names: [NameEntry], frontBundleID: String? = nil, screen: ScreenSnapshot? = nil) {
+    public init(apps: [AppEntry], names: [NameEntry], frontBundleID: String? = nil, screen: ScreenSnapshot? = nil,
+                plugins: [PluginLead] = []) {
         self.apps = apps; self.names = names; self.frontBundleID = frontBundleID; self.screen = screen
+        self.plugins = plugins
     }
 }
 

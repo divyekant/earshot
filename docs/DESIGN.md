@@ -46,6 +46,7 @@ earshot uses one model for all apps. A command is one verb and one target.
 | scroll | `scroll` | "scroll down", "go to the top" |
 | back | `back` | "go back" |
 | send | `send` | "send" (hold key; in always-on, only "send" alone after typing, D-12, R-NV-5) |
+| key | `pressKey`, `undoTyping` | "backspace three times", "new line", "press tab", "undo that" (D-13) |
 
 "Show numbers" and "hide numbers" are display helpers for press.
 
@@ -64,7 +65,9 @@ earshot uses one model for all apps. A command is one verb and one target.
 3. Every target goes through the same matcher and the same safety rules (`SafetyPolicy`), from any source.
 4. Facts about one app are data (`apps.json`, `names.json`, `focus-methods.json`). They are never code.
 
-Plain words with no command word are dictation: with the hold key, the pipeline types them into the focused text field (`typeText`), if `ScreenSnapshot.focusedID` names an editable field that is not a password field and the page is not a sign-in, code or payment page. Dictation never presses Return. Always-on mode dictates only after a bare "type": the router sets `RouteResult.awaitsText`, and the next turn that starts within 5 s (in the owner's voice, so it passed the voice check) types its words into the focused field with the same field check. A command word in that turn runs as a command. It is one turn only. The log keeps the word count, not the words. Only a turn whose FIRST sentence is a command runs as a command; a command word later in the text is typed. After earshot typed in always-on mode, a turn that starts within 3 s in the same app, with no command in its first sentence, goes on with the text (one space before it, never Return). Each result plays a short system sound if "Play sounds" is on: one for done, one for sent, one for failed, blocked or not sure. When earshot waits for the owner's words (after "type", or after a typing), it plays no result sound: the note on screen is the cue, and the owner can go on talking at once. A quiet start sound (Tink, volume 0.3) plays the moment earshot starts to listen: on hold-key down, and on the wake phrase (also inside a follow-up turn). It is loaded and warmed up at start, so it plays 20-31 ms after the event. The voice check never hears it: a wake uses the audio of the phrase, before the sound. If earshot's own window is in front, the pipeline first brings back the app that was in front before it; earshot's own window is never a target.
+Plain words with no command word are dictation: with the hold key, the pipeline types them into the focused text field (`typeText`), if `ScreenSnapshot.focusedID` names an editable field that is not a password field and the page is not a sign-in, code or payment page. Dictation never presses Return. Always-on mode dictates only after a bare "type": the router sets `RouteResult.awaitsText`, and the next turn that starts within 5 s (in the owner's voice, so it passed the voice check) types its words into the focused field with the same field check. A command word in that turn runs as a command. It is one turn only. The log keeps the word count, not the words. Only a turn whose FIRST sentence is a command runs as a command; a command word later in the text is typed. After earshot typed in always-on mode, a turn that starts within 3 s in the same app, with no command in its first sentence, goes on with the text (one space before it, never Return). Each result plays a short system sound if "Play sounds" is on: one for done, one for sent, one for failed, blocked or not sure. When earshot waits for the owner's words (after "type", or after a typing), it plays no result sound: the note on screen is the cue, and the owner can go on talking at once. A quiet start sound (Tink, volume 0.3) plays the moment earshot starts to listen: on hold-key down, and on the wake phrase (also inside a follow-up turn). It is loaded and warmed up at start, so it plays 20-31 ms after the event. The voice check never hears it: a wake uses the audio of the phrase, before the sound. The detector ignores the sound and 0.3 s more (`soundTailSeconds`), because the speaker plays it late and the room echoes it (E7). A "Listening" note stays on screen from the start of the turn to its end: for a wake, a hold-key turn and the text after "type". A follow-up turn with no phrase shows no note, because other sounds open many of them and the voice check drops them (E7). In always-on mode, the note has a level bar. If earshot's own window is in front, the pipeline first brings back the app that was in front before it; earshot's own window is never a target.
+
+**Spoken keys and "undo that" (I-34, D-13).** The router reads a fixed key list from the words, with a count ("backspace three times", "left arrow twice"). It is text only (under 1 ms) and runs before the screen rules. A key phrase is a command, so dictation never types it. The action module checks the focused element first (`KeyRules`): Backspace and Forward Delete only in a text field, Return only in a text area that is not a message box, and no key on a sign-in, code or payment page. "undo that" removes the last text that earshot typed with Backspace presses, only in the same app and only if the field still ends with that text. A chain can hold a key step after "press" ("type hello, then press tab"). The text of the last typing stays in memory only.
 
 **A chain of commands (I-28).** One sentence can hold up to 10 steps: "click on this, click on that, type this and press send". `CommandRouter.steps` cuts the words at a comma, a sentence end, "and", "then", "and then" or "after that", but only where the next part starts with a step verb and the part before it is a command. After a text verb ("type", "message"), only "then", "and then", "after that" or a sentence end can end the text. A send phrase at the end stays on the text step as "and send", so the send rules of one command hold. The cut is text only (under 1 ms). It adds no verb and no intent. The pipeline routes each step on a new screen read, after the step before it ran and the screen settled (after "open <app>": until the app is in front, at most 2 s). Each step has its own confidence check and action safety check. If a step is not a command, is not sure, is blocked or fails, the chain stops and asks (dk, 2026-11-03): for 10 s, "go on" skips the step and runs the rest, "stop" ends the chain, "yes" runs the best guess of an unsure step, and other words replace the step. In always-on mode, only the owner's voice can answer, and a chain never sends: the owner says "send" on its own (D-12). One sound plays at the end of the chain.
 
@@ -74,7 +77,7 @@ Plain words with no command word are dictation: with the hold key, the pipeline 
 |---|---|---|
 | Wake phrase | icefall KWS Zipformer (gigaspeech, 3.49M parameters, Apache-2.0), Core ML INT8 (`aufklarer/KWS-Zipformer-3M-CoreML-INT8`), and audio templates (`TemplateMatcher`) | The encoder runs on 320 ms chunks. Vendor time: 5.4 ms for each chunk on Apple silicon. After the owner teaches the phrase, a streaming DTW (dynamic time warping) matches the encoder frames against the owner's takes, and the keyword decoder does not run (E5). It uses no spelling, so any phrase, name or language works. Before the teach step, the spelled spotter listens: the phrase is text, no training. |
 | Owner voice check | WeSpeaker ResNet34-LM (VoxCeleb, CC BY 4.0), Core ML (`aufklarer/WeSpeaker-ResNet34-LM-CoreML`) | 256-value embedding. Cosine similarity against the mean of 5 enrolment phrases, from the profile of the microphone in use. The phrase must score 0.35 or more to start a turn (the gate). At the end of the turn, the voice of the whole turn decides: 0.35 up to 1 s of speech, then a line up to 0.42 at 2 s or more (E6). Live trial: owner 0.50 to 0.73, another voice 0.06. |
-| End of turn | `SpeechDetector` (energy with a noise floor that adapts) | 550 ms of quiet after the command. After the phrase alone, it waits 2 s for the command. A turn that is expected to hold dictated text (after a bare "type", or after earshot typed in always-on mode) ends after 1200 ms of quiet, so a natural pause does not cut the sentence in two. Two levels, as in Hex: speech starts at 12 dB above the floor (and -50 dBFS); in a turn, only a frame within 4 dB of the floor (or under -70 dBFS) is quiet. A frame between the levels does not count toward the end; after the end silence plus 1 s with no speech frame, the turn ends anyway (noise that changes). The level removes the DC offset of each frame. A command turn is dropped at 15 s (a TV); a dictation turn ends with its text at 60 s. With the optional turn model (Smart Turn v3.2, Core ML, about 17 MB, 3.5 ms for each check), the first pause of 300 ms after 200 ms of speech gets one check on the last 8 s of the turn audio: a probability of 0.5 or more ends the turn at once; a lower one waits up to 2 s of quiet (3 s for dictation). Live test 2026-11-03 gave two limits. After the wake phrase, only speech after the phrase counts (200 ms in total starts the command, and the check needs 200 ms of it), because the model hears "hey atlas" alone as a finished turn. In a dictation turn, the model never ends the turn early: a sentence end is not the end of the text, so only the 1.2 s dictation silence ends it. A new speech frame starts a new pause and a new check. Hex tried the same rule (300 ms, 2 s fallback) and removed it for the size of its ONNX runtime, not for its quality. The turn log note shows each check and how the turn ended (`end quiet`, `end soft`, `end model`, `end grace` or `end limit`, with the quiet time, the end silence and the turn length), so the threshold can be set from the owner's own turns. |
+| End of turn | `SpeechDetector` (energy with a noise floor that adapts) | 550 ms of quiet after the command. After the phrase alone, it waits 2 s for the command. A turn that is expected to hold dictated text (after a bare "type", or after earshot typed in always-on mode) ends after 1200 ms of quiet, so a natural pause does not cut the sentence in two. Two levels, as in Hex: speech starts at 12 dB above the floor (and -50 dBFS); in a turn, only a frame within 4 dB of the floor (or under -70 dBFS) is quiet. A frame between the levels does not count toward the end. A run of 3 or more such frames (60 ms) starts the quiet time again; 1 or 2 (a click, a breath) do not (E7). After the end silence plus 1 s with no speech frame, the turn ends anyway (noise that changes). The level removes the DC offset of each frame. A command turn is dropped at 15 s (a TV); a dictation turn ends with its text at 60 s. With the optional turn model (Smart Turn v3.2, Core ML, about 17 MB, 3.5 ms for each check), the first pause of 300 ms after 200 ms of speech gets one check on the last 8 s of the turn audio: a probability of 0.5 or more ends the turn at once; a lower one waits up to 2 s of quiet. In a dictation turn, the model does not change the pause: live test 2026-11-11 (E7), it gave P 0.01 to 0.15 in the owner's real end pauses, and a 3 s wait kept a dictation open for 60 s. Live test 2026-11-03 gave two limits. After the wake phrase, only speech after the phrase counts (200 ms in total starts the command, and the check needs 200 ms of it), because the model hears "hey atlas" alone as a finished turn. In a dictation turn, the model never ends the turn early: a sentence end is not the end of the text, so only the 1.2 s dictation silence ends it. A new speech frame starts a new pause and a new check. Hex tried the same rule (300 ms, 2 s fallback) and removed it for the size of its ONNX runtime, not for its quality. The turn log note shows each check and how the turn ended (`end quiet`, `end soft`, `end model`, `end grace` or `end limit`, with the quiet time, the end silence and the turn length), so the threshold can be set from the owner's own turns. |
 
 The code is in `app/Sources/EarshotWake`. The spotter and voice code are copied from soniqo/speech-swift at `a57702e` (Apache-2.0, see THIRD_PARTY_NOTICES.md). The models download one time (about 18 MB) at pinned revisions, with a SHA-256 check, into `~/Library/Application Support/earshot/models/`.
 
@@ -84,7 +87,7 @@ How a command flows (`EarshotInput/WakeTrigger.swift`):
 2. The listener fires about 0.3 to 0.5 s after the phrase. If a voice is enrolled, the voice model scores the audio of the phrase. A score below the gate (`voiceGate`, 0.35) stops here, and the log gets one line with no text, with the voice score and the match score.
    - With templates, each new encoder frame (40 ms) updates the DTW match of each template. The score of a template is the mean cosine distance along its path: 0 is the same sound, 1 is an unrelated sound. The wake score is the mean of the 2 best template scores. earshot wakes when the score is below 0.33 and the next 2 frames give no lower score. The path can stay on a template frame up to 3 times (slower speech) or skip one frame (faster speech). After a wake, no second wake comes for 1.5 s.
    - The match gives the first and the last frame of the phrase. These take the place of the time stamps of the word pieces, for the voice clip and for the time cut in step 4.
-   - The log line of a wake adds the match score and the worst part (the highest mean cost of 200 ms along the path). The worst part is not a wake limit. If sound-alike wakes occur, a limit of 0.5 on it is the first step (E5).
+   - The log line of a wake adds the match score and the worst part (the highest mean cost of 200 ms along the path). A match with a worst part of 0.7 or more does not wake earshot (E7). Room sound matched the templates every 4 to 6 s with a worst part of 0.82 to 1.04. The owner's wakes had 0.28 to 0.55. A stopped match does not reset the listener. The near-miss line of the log counts the stopped matches. If sound-alike wakes occur, a limit of 0.5 is the next step (E5).
 3. The speech engine starts at the start of the phrase. `MicrophoneFeed` keeps 3 s of audio, and `PrerollControl.setNextPreroll` gives the engine the phrase and every word after it.
 4. The turn ends after the command. If a voice is enrolled, the voice model then scores the whole turn, from the start of the phrase to the end (E6, `VoiceRule`):
    - The trigger keeps the first 8 s of the turn for this check. `SpeechTrim.condensed` cuts the quiet ends, and cuts each quiet part inside to 300 ms, so the model scores speech, not the pause after the phrase.
@@ -106,6 +109,14 @@ How a command flows (`EarshotInput/WakeTrigger.swift`):
 The enrolment (Manage > General > Teach earshot your voice) records 5 phrases. For each take, earshot finds the loud part and runs the encoder on it, with 0.3 s of digital quiet before it and 0.5 s after it. The template is the encoder frames of the loud part, with one more frame at each end. Then earshot scores each take against the templates of the other 4. A take with a lowest score above 0.33 gives no template: it does not sound like the others. At least 3 templates must stay, else the owner must teach earshot again. E5 proposed to ask again for such a take. The build leaves it out instead, so the teach step stays one pass.
 
 earshot keeps the mean voice embedding and the templates (16-bit floats, about 100 KB for 5 takes) in `voice.json`. The profile also learns the owner's free speech: a wake turn that passed the check by 0.05 or more over its limit, with 1.5 s of speech or more, adds its voice embedding (`learnedTurns`, at most 10, the oldest goes first). The check of a whole turn compares with the mean of the 5 phrases and the learned turns. The gate on the phrase alone uses the 5 phrases. Only a wake turn teaches, and only the profile of the microphone in use (or an older profile with no microphone). A new teach step starts with no learned turns (E6, section 8.2: a profile of one phrase passes free speech 73 % to 75 % of the time; with 3 learned turns, 91 % to 94 %). It keeps one profile for each microphone (`VoiceBook`, at most 4), keyed by the Core Audio UID of the default input device at the teach step. Always-on uses the profile of the microphone in use, else the newest profile, and the status line in Manage > General then asks the owner to teach earshot again with that microphone. A new teach step replaces only the profile of its microphone. When the default input device changes, always-on starts again with the right profile. A `voice.json` from before the book holds one profile, and earshot reads it as a book of one. Each teach step adds a line to the activity log: the phrase, the microphone, the take scores and the voice self score. It keeps no audio, and earshot cannot play a template back. The templates count only for the phrase of the enrolment. After a change of the phrase, the spelled spotter listens until the owner teaches earshot the new phrase. The voice embedding counts for any phrase. A profile from before the templates has none: the spelled spotter listens, and the status line in Manage > General asks the owner to teach earshot again. The enrolment no longer learns word pieces for a made-up name.
+
+The turn recorder (E7, [experiments/E7-turn-recorder.md](experiments/E7-turn-recorder.md)) keeps the numbers of each always-on turn and each rejected wake for 7 days, so that a wake or voice problem can run again in a test with no audio. It is on by default, with a switch in Manage > General. Turning it off deletes the kept numbers. Each record is one JSON line in `turns/YYYY-MM-DD.jsonl` (UTC day) in the store folder:
+- the sound level of each 20 ms frame, from up to 3 s before the turn to its end, and the noise floor of the detector;
+- the wake: the phrase voice score, the gate, the match score, the worst part, and a trace of the match: the match score of each 40 ms encoder frame, from 480 ms before the match to the wake, at most 5 s;
+- the wake frames of that trace, as 16-bit floats, the same kind of data as the templates in `voice.json`. earshot cannot play them back. At most 60 records with frames in one hour, and none after 40 MB in one day;
+- each answer of the turn model, how the turn ended, the voice check of the turn, and the words and the result as the activity log has them.
+
+The `EarshotReplayTests` target runs the rules again on kept records: `TurnReplay` feeds the kept levels and the kept answers of the turn model to `SpeechDetector`, and gives the same end as the live turn; `TemplateMatcher` runs on the kept frames with the templates of `voice.json`; the gate runs on the kept voice scores. `EARSHOT_TURNS=<turns folder> EARSHOT_VOICE=<voice.json> swift test --filter KeptTurnsReport` prints a summary with numbers only.
 
 Limits:
 - The spelled spotter is English only. A made-up name ("hey earshot") also wakes it on sound-alikes ("hey, your shot").
@@ -142,7 +153,8 @@ E2 (section 6.2) chose Parakeet by a small margin: 1 command in 126, on `say` vo
 - macOS moved the 890 MB of Parakeet weights out of memory between commands (the app's resident memory fell from 746 MB to about 100 MB). Each decode then read them back from swap.
 - So "auto" uses Apple and does not load Parakeet. The setting "Parakeet" uses Parakeet for a command only when a warm-up run at the key press shows that the weights are in memory and the memory pressure is normal. Else Apple makes the text, so Parakeet never makes the owner wait.
 - Each command logs the engine and the reason (`SpeechTiming.why`) and the stages `speech.tail`, `speech.wait` and `speech.decode`.
-- Edges of a hold-key turn (Hex study, I-1): the engine gets 450 ms of audio from before the key press, and records 200 ms more real audio after the release, then adds 300 ms of silence. Hex measured 10 of 10 last words kept with 0 to 200 ms after the release, and 7 of 10 with 100 ms less. The 200 ms wait is in `speech.tail`. An always-on turn ends on a pause that the detector heard, so it waits 0 ms (`CaptureControl`).
+- Edges of a hold-key turn (Hex study, I-1): the engine got 450 ms of audio from before the key press (until 2026-11-11, see the next item), and records 200 ms more real audio after the release, then adds 300 ms of silence. Hex measured 10 of 10 last words kept with 0 to 200 ms after the release, and 7 of 10 with 100 ms less. The 200 ms wait is in `speech.tail`. An always-on turn ends on a pause that the detector heard, so it waits 0 ms (`CaptureControl`).
+- Microphone in hold mode (2026-11-11, dk): the microphone is open only while the key is down, like the "Turn off the mic when not dictating" setting of Hex. The feed closes it at the end of each turn (`MicIdle.holdSeconds` = 0), and the key press opens it again. So there is no 450 ms preroll in hold mode. The app opens the microphone before the start sound, so the sound says that the microphone is live. First live reopen: the input was live about 80 ms after the start call. Always-on mode keeps the microphone open, because a wake turn starts up to 3 s before the hit.
 
 Both engines miss the same names, so the router must also match names by sound.
 
@@ -154,17 +166,22 @@ The safety rule stays: actions that cannot be undone, such as Send, need the hol
 
 ### 3.4 Router: "System 1" (R-SP-2, R-MD-2)
 
-| Tier | Method | Speed |
-|---|---|---|
-| 0 | Rule match on app names, verbs and grammar | under 1 ms |
-| 1 | Sentence embedding + nearest intent; fuzzy match of names against Contacts and per-app caches | a few ms |
-| 2 | FunctionGemma 270M, fine-tuned on a few hundred of the owner's commands, through MLX | measure in Phase 0 |
+The router (`app/Sources/EarshotRouter`) turns the words of one turn into one intent, for example `openChat(slack, "Ravi", "running late")` or `click(e12)`. It makes no agent loop: it calls a model one time for each command at most. All steps except tier 2 run on the Mac.
 
-Output: one action with arguments, for example `{action: "message", app: "slack", target: "Ravi", text: "running late"}`.
+The steps, in order:
 
-free-mac-voice (MIT) already uses the same tiers. Read its code before you write the router.
+| Step | What it does | Tier in the log | Speed |
+|---|---|---|---|
+| 1. Rules | Plugin leads (3.8), "send", "show numbers", spoken keys and "undo that" (D-13), a bare "type", a screen command for one app, web addresses, scroll and back, then the chat rules and the screen rules. A chain of commands is cut into steps before the route (I-28). | `rules` if exact, `fuzzy` if by sound or fuzzy match | under 1 ms to a few ms |
+| 2. Habit memory | Only for a tie between targets of the same score. The owner's last answer picks the target (3.6). | `fuzzy` | under 1 ms |
+| 3. Misheard names | Only for a route that is not sure or found nothing. Heard words become label words, then the rules run again (3.6, E8). | `fuzzy` | a few ms |
+| 4. Tier 2: Jev | Only if the owner turned it on (D-9), and only if the rules are not sure. One text-only call picks from the short list of options. The rules answer stays after the 1 s budget. | `jev` | about 90 ms median in E1 |
 
-Measured in E1 (2026-11-02, [E1-generic-router.md](experiments/E1-generic-router.md)): rules with fuzzy match (tiers 0 and 1) were sure for 30 of 42 test commands and correct for all 30, in about 20 ms. For the other 12, one text-only call to Jev (a cloud model, test only, see R-MD-1) picked from a short list in about 90 ms median (568 ms at most). Together: 42 of 42, with no wrong chat. The tier-2 model is still open: the owner plans an own small model, trained on the logs.
+A sure route has a confidence of 0.9 (rules) or 0.8 (tier 2). Below `SafetyPolicy.minimumConfidence`, earshot does nothing and shows a "not sure" note with choices (3.6).
+
+The first design had a fine-tuned FunctionGemma 270M model as tier 2. It is not built. The owner allows only small local models (R-MD-2, D-5), and the Phase 4 plan keeps an own small model, trained on the logs, as an option.
+
+Measured in E1 (2026-11-02, [E1-generic-router.md](experiments/E1-generic-router.md)): rules with fuzzy match were sure for 30 of 42 test commands and correct for all 30, in about 20 ms. For the other 12, one text-only call to Jev picked from a short list in about 90 ms median (568 ms at most). Together: 42 of 42, with no wrong chat. With 200 misheard-name pairs, the route takes 2.33 ms median (E8).
 
 ### 3.5 Actions (R-NV-*, R-CL-*, R-MT-*)
 
@@ -188,6 +205,8 @@ Verify the deep-link formats for WhatsApp, Messages and Discord. The research di
 E1 built the app rows from each app's menu bar, with no row written by hand: the menu item whose title says "switch to", "jump to" or "new message" gives the search keys. For Slack and Messages, the generated rows were the same as the E0 rows. The names come from two sources: the chat list in each app's sidebar (fast, but Slack shows only a few chats to Accessibility), and the app's own search at command time (it knows every chat; 160 to 630 ms).
 
 E0 used each app's own search in place of links, so the owner gives names only. Slack: Command-K. Messages: File > New Message (Command-N) and the "To:" field. WhatsApp (left out of E0): Command-F; the search also lists message hits, so a later design must check the type of the top result before Return.
+
+E9 (2026-11-11, [E9-chat-stages.md](experiments/E9-chat-stages.md)) measured the chat flow in each app and changed the switcher. A switcher list can hold query rows that repeat the typed name, for example Slack "Search for: <name>". earshot groups the list texts into rows, skips query rows, and stops if a query row is above the chat row. If a new field does not take the focus from accessibility (WhatsApp), earshot clicks it. If Return leaves the field open with the name, earshot presses the result row that matches the name. earshot learns the click and the row press for each app.
 
 **Generic focus.** Run a depth-limited accessibility search of the focused window. Find the lowest and widest editable element (`AXTextArea`, `AXTextField`, or an editable web area), then focus it. For Electron apps, first set `AXManualAccessibility`, then poll `AXChildren` for up to 200 ms. Never walk the full tree of an Electron app.
 
@@ -213,9 +232,54 @@ Libraries: AXorcist (MIT) for accessibility. Peekaboo (MIT) is a reference for t
 
 Show a small overlay near the menu bar, for example "→ Slack · Ravi" or "✗ not for me". Spoken replies are off by default.
 
+**The answer to a "not sure" note (gap item 5, 2026-11-11).** If one command is not sure, the note shows at most two choices: the best guess first, then the next one. Example: "not sure: two chats match · 1: → Slack · Ravi · 2: → Messages · Ravi". The note stays on screen for 10 s. In that time, the next turn can answer: "yes" or "the first one" runs choice 1, "the second one" runs choice 2, and "no" does nothing. Other words are a new command, and the note goes away. The answer adds no verb and no intent (section 3.0): the words act only on a note that waits, the same as the answer to a chain. In always-on mode, only the owner's checked voice can answer. A choice is never a send and never a press on a risky element, and it runs at the tier `fuzzy`, so the press rules block a risky label (R-NV-5). A click choice finds the same element (role and label) on a new screen read, in the same front app, or it fails with "the screen changed". After "… and send", the answer sends only if the command and the answer both used the hold key. In always-on mode, the owner says "send" on its own (D-12). The choices stay in memory only.
+
+**Habit memory (gap item 6, 2026-11-11).** When the owner picks a choice of a note, earshot keeps the answer in `habits.json` in the store folder, next to `names.json`. An entry holds target keys only: the chosen target and the other targets of the note (an app id and a chat name, or the front app, role and label of an element). It holds no message text. The next time the rules score the same targets the same (within 0.05 of the best score), the router takes the owner's last choice, and the route is sure at the tier `fuzzy`. It changes the order only between those targets. A tie with a target that the note did not show has no habit. A newer answer for the same targets replaces the older one, and the file keeps at most 200 entries. A risky element, a send and plain typing have no key, so a habit never makes a risky press sure (R-NV-5). "No" keeps nothing. The check is a list scan inside the route, well under 1 ms.
+
+**Misheard names (gap item 12, 2026-11-11, [E8](experiments/E8-misheard-names.md)).** Speech can write a label as other words: "cloud" for Claude, "chart" for Chat. When the owner picks a choice of a note, earshot compares the command words with the label of the chosen target and keeps the best pair of 1 to 3 words, by text and by sound, in `heard.json` (heard words, label words, target key; at most 200 entries; no message text). If a later route is not sure or found nothing, the router replaces the heard words with the label words and routes again with the same rules. It keeps the result only if it is sure and goes to the same target key, so the label must be on the screen of the same app, in the names or in the app table at that time (I-15). The route is then sure at the tier `fuzzy`. A send, a risky element and plain typing have no key, and a pair with a risky label is never kept (R-NV-5).
+
 ### 3.7 Optional text cleanup
 
 The oMLX server can clean up dictated text: punctuation and filler words. Make it optional, because it adds latency.
+
+Measured on 2026-11-11 ([experiments/text-cleanup-omlx.md](experiments/text-cleanup-omlx.md)): `qwen3.5-0.8b-mlx-4bit` takes 285 ms (median, warm), but it cleaned only 3 of 10 sentences and changed words in 2. earshot has no cleanup setting until a larger general model passes with 0 changed words.
+
+### 3.8 Plugins (R-PL-1 to R-PL-5, D-14)
+
+A plugin is a separate program with a manifest (`docs/PLUGINS.md`). The parts in earshot:
+
+- `EarshotCore/Plugin.swift`: the manifest, the approvals (a SHA-256 of each approved `plugin.json`) and the JSON line messages.
+- `EarshotRouter/PluginRouter.swift`: a tier-0 rule. A command that starts with an approved lead becomes the one intent `handOff(pluginID, lead, text)`. The rule refuses a lead that starts with a core command word or an app name, so a core command wins. The words after the lead are text, as after "type".
+- `EarshotApp/PluginHost.swift`: starts each approved plugin with posix_spawn, with the responsibility disclaimed, so that the plugin does not get the permissions of earshot. Writes go on a separate queue, so a plugin cannot slow a command.
+- `EarshotApp/CommandPipeline+Plugins.swift`: the hand-off after the route. The log keeps the lead and a word count.
+- `EarshotUI/PluginsTab.swift`: the list of plugins and the approvals.
+
+The answers show as a note. An alert also goes to the Notification Center. A plugin also gives targets (names with ids). earshot keeps them for a later target source: "open <target>" with the core verb.
+
+### 3.9 Talk state (gap item 13, 2026-11-11)
+
+The talk state is what the next turn can mean. One value holds it: `TalkState` in `app/Sources/EarshotApp/TalkState.swift`. It is in memory only, never in the log and never on disk.
+
+It has one wait at a time. A new wait replaces the old wait, because the note on screen shows only the newest question.
+
+| State | Starts when | The next turn | Ends |
+|---|---|---|---|
+| idle | earshot starts, or a wait ends | is a new command | — |
+| waits for text | a bare "type" (R-NV-4) | is text for the focused field, unless its first sentence is a command | after 5 s, or after one turn |
+| waits for a chain answer | a chain stops at a step (I-28) | can say "go on", "stop", "yes" or the step again | after 10 s, or after one turn |
+| waits for a choice answer | a "not sure" note shows its choices (3.6) | can say "yes", "the first one", "the second one" or "no" | after 10 s, or after one turn |
+| keeps dropped words | the voice check drops a wake turn that played the start sound (gap item 7) | with the hold key and no words, types the kept words | after 20 s, or after one turn |
+
+In always-on mode, only the owner's checked voice can answer a chain or a choice.
+
+The talk state also keeps the last typing that worked: the time, the front app, the text and the mode. These rules use it:
+- In always-on mode, "send" alone sends within 5 s in the same app (D-12).
+- In always-on mode, a turn within 3 s in the same app goes on with the text, unless its first sentence is a command.
+- "undo that" removes the text within 120 s, in the same app only (D-13).
+
+A send and "undo that" clear the last typing. A wait does not change it.
+
+The menu bar icon (`ListenState`) shows "waits for text" as the text cursor. The other waits show as a note on screen. The wake rules and the end-of-turn rules (3.1) are in `WakeTrigger`, not in the talk state.
 
 ## 4. Permissions
 
@@ -224,6 +288,20 @@ The oMLX server can clean up dictated text: punctuation and filler words. Make i
 - Screen Recording (only for the OCR fallback)
 
 ## 5. Phase plan
+
+Status on 2026-11-11 (v0.3.0 is the last release; `develop` holds the gap work for the next release):
+
+| Phase | Status | Evidence |
+|---|---|---|
+| 0. Measure | Done | E0 to E9 in [experiments/](experiments/) |
+| 1. Push-to-talk MVP | Done. Slack, Messages and WhatsApp open a chat and focus the message box: 437 ms, 682 ms and 1,475 ms (E9). WhatsApp is above the 1 s goal (R-SP-1). "Mail <name>" opens Mail only. A new mail from a name waits for the owner's choice (E7, section 6). | E0, E7 |
+| 2. Voice clicks | Done: label match, ordinal match, "show numbers", OCR fallback, and the opt-in screenshot fallback (D-10) | E2, E3 |
+| 3. Always on | In progress. The wake phrase, the owner voice check and the follow-up window are built (D-11). The end-of-turn rules still change after live tests. The turn recorder keeps numbers, not audio, so tests can run the rules again (E7 turn recorder). | E5, E6, E7 turn recorder |
+| 4. Learn | Started. earshot learns from the owner's answers to "not sure" notes: habit memory and misheard names (3.6). The own small router model is not started. | E8 |
+
+Gap work of 2026-11-11 (after the evaluation of v0.3.0): the activity numbers and a weekly report, the chat flow (E9), the answer to a "not sure" note, habit memory, the menu bar state and pause, a cue for a dropped wake turn, the dictation set (D-13), the turn recorder, misheard names (E8), plugins (D-14) and the talk state (3.9). Install for other people waits for an Apple Developer ID.
+
+The plans below are the original plans. They stay for reference.
 
 ### Phase 0: Measure (do this first)
 

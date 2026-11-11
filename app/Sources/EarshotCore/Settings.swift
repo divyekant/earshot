@@ -54,6 +54,12 @@ public struct EarshotSettings: Codable, Equatable, Sendable {
     /// so this limit is higher than `voiceThreshold`, which is the limit for 1 s of speech or less. Between 1 s and
     /// 2 s, the limit goes up in a line. An always-on "send" needs a turn that passed (D-12).
     public var turnVoiceThreshold: Double = 0.42
+    /// The turn recorder (E7): for each always-on turn and each rejected wake, earshot keeps the numbers of the turn
+    /// for 7 days in the `turns` folder of the store folder. No audio. Turning it off deletes the kept numbers.
+    public var recordTurns: Bool = true
+    /// The turn recorder also keeps the wake frames: the encoder frames of the spotter around each match, as the
+    /// templates in `voice.json`. earshot cannot play them back.
+    public var recordWakeFrames: Bool = true
 
     public init() {}
 
@@ -84,6 +90,8 @@ public struct EarshotSettings: Codable, Equatable, Sendable {
         read(.voiceThreshold, &voiceThreshold)
         read(.voiceGate, &voiceGate)
         read(.turnVoiceThreshold, &turnVoiceThreshold)
+        read(.recordTurns, &recordTurns)
+        read(.recordWakeFrames, &recordWakeFrames)
     }
 }
 

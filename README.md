@@ -15,7 +15,19 @@ You look at the screen and say what you want. earshot finds the correct app, foc
 
 ## Status
 
-earshot is early software. The first full build of the app is in progress. Expect bugs and changes to the settings format.
+earshot is early software. Expect bugs and changes to the settings format.
+
+What works now:
+- Hold key: chat commands in Slack, Messages and WhatsApp, voice clicks, "show numbers", web addresses, chains of up to 10 commands, dictation into the focused field, spoken keys and "undo that".
+- Always-on mode, off by default: a wake phrase and a check of your voice. The end-of-turn rules still change after live tests.
+- A "not sure" note with two choices. earshot learns from your answer.
+- Plugins, experimental (`docs/PLUGINS.md`).
+
+What does not work yet:
+- "Mail <name>" opens Mail only. It does not start a new mail.
+- There is no signed download. You must build the app from source (see [Build](#build)).
+
+[docs/DESIGN.md](docs/DESIGN.md), section 5, gives the status of each phase.
 
 Each release has a tag `vX.Y.Z` and notes on the [Releases](https://github.com/divyekant/earshot/releases) page. [CHANGELOG.md](CHANGELOG.md) lists the changes. The `main` branch holds the latest release. The `develop` branch holds the work for the next release.
 
@@ -37,7 +49,9 @@ App support is data, not code. earshot reads the menus, sidebars and search resu
 
 - All audio stays on your Mac. earshot saves no audio.
 - All decisions stay on your Mac by default.
-- One optional cloud model, Jev, can help when the rules are unsure. Jev is off by default. If you turn it on, earshot sends only text to Jev: the command words and the short list of labels on screen. It never sends audio, screenshots or message text. See [docs/DECISIONS.md](docs/DECISIONS.md), D-9.
+- One optional cloud model, Jev, can help when the rules are unsure. Jev is off by default. If you turn it on, earshot sends only text to Jev: the command words and the short list of labels on screen. It never sends audio or message text. See [docs/DECISIONS.md](docs/DECISIONS.md), D-9.
+- A separate setting, "Jev sees the screen", is also off by default. If you turn it on, a hold-key click with no sure target can send one picture of the front window to Jev. It never does this on a sign-in, code or payment page. See D-10.
+- The activity log (`activity.jsonl`) keeps the command words, the result and the stage times for 30 days. For the text that earshot types (a "type …" command, a chat message, dictation), it keeps only a word count.
 - earshot keeps the Jev key in the macOS Keychain, not in a settings file.
 - Settings, the app list and the name list are JSON files in `~/Library/Application Support/earshot`.
 
@@ -81,6 +95,13 @@ To update the installed app to the latest `develop` with no clicks, run `scripts
 4. It keeps the old app in `app/build/old-<time>.zip`, copies the new build over `app/build/Earshot.app` and opens it again.
 
 If the new build does not start, the script puts back the old app. If the installed app is already on the `develop` commit, the script does nothing. `--dry-run` shows the steps and changes nothing. `--skip-tests`, `--now` (no idle wait) and `--force` (install again) change the steps. `EARSHOT_APP` sets another installed app. The log goes to `~/Library/Logs/earshot-mem/`.
+
+To see how earshot works for you, run the weekly report. It reads the activity log and prints, for the last 7 days: the success rate for each command type, the wakes and rejects for each hour, the dropped turns, the turns with no words for each mode, and the time with the end wait. It prints no message text, labels or names.
+
+```sh
+uv run app/scripts/weekly-report.py
+uv run app/scripts/weekly-report.py --since 2026-11-03 --until 2026-11-10
+```
 
 ## Set up
 

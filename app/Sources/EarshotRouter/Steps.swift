@@ -37,6 +37,8 @@ extension CommandRouter {
     ///   `sendAfter`, and the send rules of one command hold (D-12).
     /// - "open Notes and Calendar": two app names after one "open" give two steps.
     public static func steps(_ spoken: String, context: RouteContext) -> [String] {
+        // The words after a plugin lead are text for the plugin, never a chain (R-PL-2).
+        if PluginRouter.match(spoken, plugins: context.plugins, apps: context.apps) != nil { return [spoken] }
         let text = fromCommandSentence(spoken, apps: context.apps)
         let tokens = Tokens(text)
         let w = tokens.words

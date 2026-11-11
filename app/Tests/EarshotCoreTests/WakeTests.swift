@@ -308,6 +308,13 @@ final class WakeTests: XCTestCase {
         XCTAssertEqual(spotter.bestScore, 0.4)
     }
 
+    // E7: the template matches that the worst part stopped add up.
+    func testNearMissesAddTheBlockedMatches() {
+        var m = NearMisses(count: 0, best: 0, blocked: 3)
+        m.add(NearMisses(count: 1, best: 0, bestScore: 0.37, blocked: 2))
+        XCTAssertEqual(m, NearMisses(count: 1, best: 0, bestScore: 0.37, blocked: 5))
+    }
+
     func testOldProfileHasNoTemplates() throws {
         // A voice.json from before the templates: the spelled spotter listens until the owner teaches earshot again.
         let old = #"{"phrase":"hey atlas","embedding":[0.6,0.8],"keywordTokens":[["▁HE","Y"]],"samples":5,"selfScore":0.7,"createdAt":0}"#

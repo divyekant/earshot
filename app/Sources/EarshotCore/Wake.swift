@@ -98,9 +98,9 @@ public struct VoiceRule: Sendable, Equatable {
 }
 
 /// The voice check at the end of an always-on turn (R-ON-3, D-11, D-12). It holds no audio and no text.
-public struct TurnVoice: Sendable, Equatable {
+public struct TurnVoice: Codable, Sendable, Equatable {
     /// The turn that the check is for.
-    public enum Kind: String, Sendable { case wake, followUp }
+    public enum Kind: String, Codable, Sendable { case wake, followUp }
     public var kind: Kind
     /// The score that decided: the score of the turn, or of the phrase if the check of the turn did not run.
     public var score: Double
@@ -193,9 +193,12 @@ public struct NearMisses: Sendable, Equatable {
     public var best: Double
     /// The audio templates: the lowest score of the near misses (the wake limit is lower). Nil for the spotter.
     public var bestScore: Double?
+    /// The audio templates: the matches below the score limit that the worst-part limit stopped (E7). 0 for the
+    /// spotter.
+    public var blocked: Int
 
-    public init(count: Int, best: Double, bestScore: Double? = nil) {
-        self.count = count; self.best = best; self.bestScore = bestScore
+    public init(count: Int, best: Double, bestScore: Double? = nil, blocked: Int = 0) {
+        self.count = count; self.best = best; self.bestScore = bestScore; self.blocked = blocked
     }
 
     /// Adds other near misses to these.
@@ -203,6 +206,7 @@ public struct NearMisses: Sendable, Equatable {
         count += other.count
         best = max(best, other.best)
         if let score = other.bestScore { bestScore = min(bestScore ?? score, score) }
+        blocked += other.blocked
     }
 }
 
@@ -234,12 +238,16 @@ public protocol WakeListener: AnyObject {
     /// The probability (0 to 1) that the speaker finished the turn, from the sound of the last 8 s of the turn
     /// (Smart Turn v3.2). Nil if the turn model is not loaded or failed: then the end silence alone ends the turn.
     func turnScore(_ samples: [Float]) -> Double?
+    /// The encoder frames and the match scores around the match of the last hit, for the turn recorder (E7). Nil if
+    /// the listener has no templates, or if the last hit has no trace. A second call gives nil.
+    func takeTrace() -> WakeTrace?
 }
 
 public extension WakeListener {
     func takeNearMisses() -> NearMisses? { nil }
     func learn(_ turn: [Float]) -> VoiceProfile? { nil }
     func turnScore(_ samples: [Float]) -> Double? { nil }
+    func takeTrace() -> WakeTrace? { nil }
     /// The score of `voiceScore`, with the length of all the samples and no embedding.
     func voiceCheck(_ samples: [Float]) -> VoiceCheck? {
         voiceScore(samples).map { VoiceCheck(score: $0, seconds: Double(samples.count) / 16000) }
@@ -247,8 +255,8 @@ public extension WakeListener {
 }
 
 /// How an always-on turn ended (R-ON-1, I-2). For the log: numbers only, no audio and no text.
-public struct TurnEnd: Sendable, Equatable {
-    public enum Rule: String, Sendable {
+public struct TurnEnd: Codable, Sendable, Equatable {
+    public enum Rule: String, Codable, Sendable {
         /// Quiet frames at the room level for the end silence.
         case quiet
         /// No speech frame for the end silence plus `softEndExtraMs` (noise that changes, or a soft voice).
@@ -274,8 +282,8 @@ public struct TurnEnd: Sendable, Equatable {
 }
 
 /// One check of the turn model at a pause (R-ON-1, I-2). For the log: numbers only, no audio and no text.
-public struct TurnCheck: Sendable, Equatable {
-    public enum Decision: String, Sendable {
+public struct TurnCheck: Codable, Sendable, Equatable {
+    public enum Decision: String, Codable, Sendable {
         /// The model heard the end of the turn. The turn ends now.
         case end
         /// The model heard a pause inside the turn. The turn waits up to the fallback silence.
@@ -314,6 +322,23 @@ public protocol PrerollControl: AnyObject {
 public protocol CaptureControl: AnyObject {
     /// The next `end` waits this long for audio, then adds the tail silence. Later turns use the usual value again.
     func setNextCapture(seconds: Double)
+}
+
+/// A speech engine that can close its microphone after a time with no command, so that the macOS microphone
+/// indicator goes off. The next command opens it again, with no preroll for that command.
+public protocol MicIdleControl: AnyObject {
+    /// Nil keeps the microphone open. Always-on needs that: the turn starts up to 3 s before the wake hit (D-11).
+    func setMicIdleClose(seconds: Double?)
+}
+
+/// When the speech engine closes its microphone.
+public enum MicIdle {
+    /// Hold mode: the microphone is open only while the hold key is down (dk, 2026-11-11). It closes at once after
+    /// the end of each turn. This is the "Turn off the mic when not dictating" setting of Hex. The cost: no preroll.
+    public static let holdSeconds = 0.0
+
+    /// The idle time for an input mode. Always-on keeps the microphone open.
+    public static func seconds(for mode: InputMode) -> Double? { mode == .hold ? holdSeconds : nil }
 }
 
 /// The sound pattern of one teach take: the encoder frames of the spotter model for the spoken part of the phrase

@@ -17,13 +17,25 @@ struct EarshotApp: App {
     @StateObject private var app = AppController()
 
     var body: some Scene {
-        MenuBarExtra("earshot", systemImage: "ear") {
+        MenuBarExtra {
+            Text(app.listenLabel)
             Text(app.status)
+            Divider()
+            Button(app.isPaused ? "Resume listening" : "Pause for 1 hour") {
+                if app.isPaused { app.resume() } else { app.pause(seconds: AppController.pauseSeconds) }
+            }
+            Picker("Mode", selection: Binding(get: { app.settings.mode }, set: { app.setMode($0) })) {
+                Text("Hold key").tag(InputMode.hold)
+                Text("Always on").tag(InputMode.alwaysOn)
+            }
             Divider()
             OpenManageButton()
             Toggle("Start at login", isOn: Binding(get: { app.startsAtLogin }, set: { app.setStartsAtLogin($0) }))
             Divider()
             Button("Quit earshot") { NSApplication.shared.terminate(nil) }
+        } label: {
+            Image(systemName: ListenIcon.symbol(app.listen))
+                .accessibilityLabel("earshot: " + app.listenLabel)
         }
         Window("earshot", id: "manage") {
             ManageView(settings: $app.settings, store: app.store, hooks: app.hooks)
@@ -52,14 +64,28 @@ final class AppController: ObservableObject {
     private var applied: EarshotSettings
     @Published var status = "Starting…"
     @Published var startsAtLogin = SMAppService.mainApp.status == .enabled
+    /// What earshot does with the microphone now, for the menu bar icon (gap list item 10).
+    @Published var listen = ListenState.idle
+    /// The facts that give `listen`. Change it only with `updateListen`.
+    var listenClock = ListenClock()
+    /// Reads `listen` again when a window or the pause ends.
+    var listenTimer: DispatchWorkItem?
 
     let store = Store()
+    /// The owner's last answers to ties (gap item 6), in the store folder.
+    let habits = TieHabits(store: Store())
+    /// Words that speech wrote for a label, from the owner's answers (gap item 12), in the store folder.
+    let heardFixes = HeardFixes(store: Store())
     let feedback = FeedbackNote()
     let catalogue = MenuCatalogue()
     let names: NameIndex
     let runner: EarshotActionRunner
     let pipeline: CommandPipeline
-    private var input: InputSwitch?
+    /// The turn recorder of always-on mode (E7): numbers only, 7 days.
+    let turns: TurnRecorder
+    /// The approved plugins, each a separate program (R-PL-1, docs/PLUGINS.md).
+    let plugins: PluginHost
+    var input: InputSwitch?
     private var engineWhy = ""
     /// The wake phrase models (D-11). They load when always-on mode is on, and stay loaded.
     private var wake: WakeModels?
@@ -111,19 +137,25 @@ final class AppController: ObservableObject {
 
     init() {
         let store = self.store
+        let habits = self.habits
+        let heardFixes = self.heardFixes
         let settings = store.settings
         self.settings = settings
         applied = settings
         names = NameIndex(apps: { store.apps }, store: store)
         runner = EarshotActionRunner(options: ActionOptions(settings: settings), store: store)
+        turns = TurnRecorder(store: store, settings: settings)
+        plugins = PluginHost(store: store)
         let (engine, why) = SpeechEngines.make(settings)
         engineWhy = why
         let names = self.names
         let lastNotReady = Counter()
-        pipeline = CommandPipeline(engine: engine, router: Self.router(settings), actions: runner, names: names,
+        pipeline = CommandPipeline(engine: engine, router: Self.router(settings, habits: habits, heardFixes: heardFixes), actions: runner, names: names,
                                    apps: { store.apps }, allNames: { await Self.chatNames(names, apps: store.apps, notReady: { lastNotReady.value = $0 }) },
                                    frontBundleID: { NSWorkspace.shared.frontmostApplication?.bundleIdentifier })
         pipeline.namesNotReady = { lastNotReady.value }
+        pipeline.habits = habits
+        pipeline.heardFixes = heardFixes
         let frontTracker = FrontTracker(own: Bundle.main.bundleIdentifier)
         pipeline.ownBundleID = Bundle.main.bundleIdentifier
         pipeline.restoreFront = { await frontTracker.restore() }
@@ -144,11 +176,20 @@ final class AppController: ObservableObject {
             MainActor.assumeIsolated { self?.applyJev() }
         }
         pipeline.feedback = feedback
-        pipeline.log = ActivityLog(store: store)
+        let activityLog = ActivityLog(store: store)
+        pipeline.log = activityLog
+        // The log keeps 30 days (gap item 11): remove older records at start, then every 6 hours, off the main thread.
+        Task.detached(priority: .utility) {
+            while !Task.isCancelled {
+                try? activityLog.prune()
+                try? await Task.sleep(nanoseconds: 6 * 3_600 * 1_000_000_000)
+            }
+        }
         pipeline.showFeedback = settings.showFeedback
         pipeline.playSounds = settings.playSounds
         pipeline.playSound = { kind in DispatchQueue.main.async { NSSound(named: kind.systemName).map { $0.volume = kind.volume; $0.play() } } }
         pipeline.wakePhrase = settings.wakePhrase
+        startPlugins()
         prepareEngine()
         startInput()
         let appsFile = store.folder.appendingPathComponent("apps.json")
@@ -185,6 +226,8 @@ final class AppController: ObservableObject {
             refreshNames: { appID in await names.refresh(appIDs: [appID]) },
             feedback: feedback,
             settingsChanged: { [weak self] new in self?.apply(new) },
+            pluginsChanged: { [plugins] in plugins.reload() },
+            leadRefusal: { lead in PluginRouter.refusal(lead, apps: store.apps) },
             voice: VoiceHooks(
                 status: { [weak self] in self?.voiceStatus() ?? "" },
                 record: { [weak self] in try await self?.recordPhrase() ?? [] },
@@ -230,13 +273,16 @@ final class AppController: ObservableObject {
 
     /// Makes the Jev router and the screenshot picker again: at start, after a settings change, and after a new key.
     private func applyJev() {
-        pipeline.router = Self.router(settings)
+        pipeline.router = Self.router(settings, habits: habits, heardFixes: heardFixes)
         pipeline.picker = ScreenPickerFactory.make(settings, jevKey: settings.jevSeesScreen ? KeychainSecret.jev.read() : nil)
         pipeline.jevScreenBudgetMs = settings.jevScreenBudgetMs
     }
 
-    static func router(_ settings: EarshotSettings) -> CommandRouter {
-        CommandRouter(settings: settings, jevKey: settings.tier2 == .jev ? KeychainSecret.jev.read() : nil)
+    static func router(_ settings: EarshotSettings, habits: TieHabits, heardFixes: HeardFixes) -> CommandRouter {
+        var router = CommandRouter(settings: settings, jevKey: settings.tier2 == .jev ? KeychainSecret.jev.read() : nil)
+        router.habits = habits
+        router.heardFixes = heardFixes
+        return router
     }
 
     /// Loads the speech model in the background. Parakeet takes about 15 s; commands before that get an error note.
@@ -256,39 +302,73 @@ final class AppController: ObservableObject {
 
     /// In always-on mode, the speech engine gets the wake phrase as context, so that Apple speech spells it right more
     /// often (D-11). In hold mode, no hints.
+    /// In hold mode, the microphone is open only while the key is down (`MicIdle`).
     private func applyPhraseHints() {
         let hints = settings.mode == .alwaysOn ? [settings.wakePhrase] : []
         (pipeline.engine as? PhraseHintControl)?.setPhraseHints(hints)
+        (pipeline.engine as? MicIdleControl)?.setMicIdleClose(seconds: MicIdle.seconds(for: settings.mode))
     }
 
-    private func startInput() {
+    func startInput() {
         input?.stop()
         applyPhraseHints()
+        // Paused: no input runs, and the microphone of the speech engine closes (gap list item 10).
+        if isPaused {
+            input = nil
+            (pipeline.engine as? MicIdleControl)?.setMicIdleClose(seconds: MicIdle.holdSeconds)
+            return
+        }
         let listener = makeWakeListener()
         let input = InputTriggers.make(settings, wake: listener)
-        let pipeline = self.pipeline, menus = self.menus, feedback = self.feedback
+        let pipeline = self.pipeline, menus = self.menus, feedback = self.feedback, turns = self.turns
         let gate = settings.voiceGate
         input.onStart = { [weak self, weak input] in
-            // The start sound first, before any other work (hold key; a wake plays it in onWake).
+            // Hold key: open the microphone first, then the start sound. The microphone is closed between commands
+            // (`MicIdle`), and the sound set-up takes about 150 ms. So the sound now says: the microphone is live.
+            // A wake plays the sound in onWake.
+            let problem = pipeline.begin()
             if input?.current == .hold { self?.playStartSound() }
-            if let problem = pipeline.begin() { self?.feedback.show(problem, ok: false) }
-        }
-        input.onCancel = { why in
-            // Log the voice score of a turn that the voice check dropped, for the limits (no text).
-            if why.hasPrefix(WakeTrigger.otherVoice) || why.hasPrefix(WakeTrigger.tooShort) {
-                pipeline.droppedTurn(why)
+            if let self, Self.showsListening(mode: input?.current ?? .hold, before: listenClock.state(at: Date())),
+               settings.showFeedback {
+                feedback.showListening()
             }
+            self?.updateListen { $0.turnStarted() }
+            if let problem { self?.feedback.show(problem, ok: false) }
+        }
+        input.onCancel = { [weak self] why in
+            self?.updateListen { $0.turnDropped() }
+            // A wake turn played the start sound: if the voice check drops it, it gets a cue (gap item 7).
+            let wake = pipeline.pendingWake
+            let cue = CommandPipeline.cuesDrop(why, wake: wake)
+            // Log the voice score of a turn that the voice check dropped, for the limits (no text).
+            let turn = turns.take()
+            var activity: ActivityRecord?
+            if why.hasPrefix(WakeTrigger.otherVoice) || why.hasPrefix(WakeTrigger.tooShort) {
+                activity = pipeline.droppedTurn(why)
+            }
+            turns.write(turn, activity: activity)
             pipeline.pendingWake = nil
             pipeline.turnVoice = nil
-            Task { await pipeline.cancel() }
+            Task { if cue { await pipeline.dropWakeTurn(wake) } else { await pipeline.cancel() } }
         }
-        input.onStop = { [weak input] in
+        input.onStop = { [weak self, weak input] in
+            feedback.endListening()
             let mode = input?.current ?? .hold
+            let turn = mode == .alwaysOn ? turns.take() : nil
             Task { @MainActor in
                 let record = await pipeline.finish(mode: mode)
+                turns.write(turn, activity: record)
                 // After an always-on command, the owner's voice can give the next one with no wake phrase.
-                if mode == .alwaysOn, !record.heard.isEmpty {
-                    input?.commandFinished(expectsText: pipeline.expectsText, soundSeconds: Self.seconds(of: pipeline.lastSound))
+                // A follow-up turn that was not a command does not open the window again: it was talk, not a command.
+                let window = mode == .alwaysOn && !record.heard.isEmpty && !pipeline.followUpMissed
+                let sound = Self.seconds(of: pipeline.lastSound)
+                if window {
+                    input?.commandFinished(expectsText: pipeline.expectsText, soundSeconds: sound)
+                }
+                self?.updateListen {
+                    $0.turnFinished(at: Date(), followUpSeconds: window ? (input?.alwaysOn as? WakeTrigger)?.config.followUpSeconds : nil,
+                                    soundSeconds: sound, armedUntil: pipeline.armedUntil,
+                                    expectsText: window && pipeline.expectsText)
                 }
                 // A command can change which items are enabled ("Copy" after "select all"). Read again for the next one.
                 if let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier { menus.refresh(front) }
@@ -305,9 +385,11 @@ final class AppController: ObservableObject {
                     (pipeline.engine as? PrerollControl)?.setNextPreroll(seconds: hit.prerollSeconds)
                 }
                 pipeline.pendingWake = hit
-                if self?.settings.showFeedback == true { feedback.show("Listening…", ok: true) }
+                if self?.settings.showFeedback == true { feedback.showListening() }
             }
-            trigger.onRejected = { hit in pipeline.rejectedWake(hit, threshold: gate) }
+            trigger.onTurnLevel = { feedback.listeningLevel($0) }
+            trigger.onRejected = { hit in turns.write(turns.take(), activity: pipeline.rejectedWake(hit, threshold: gate)) }
+            trigger.onRecord = { record in turns.hold(record) }
             trigger.onTurnVoice = { voice in pipeline.turnVoice = voice }
             trigger.onVoiceLearned = { [weak self] profile in self?.saveLearnedVoice(profile) }
             trigger.onNearMisses = { misses in pipeline.nearMisses(misses) }
@@ -472,7 +554,7 @@ final class AppController: ObservableObject {
     }
 
     /// The management window changed the settings (it saved them already).
-    private func apply(_ new: EarshotSettings) {
+    func apply(_ new: EarshotSettings) {
         // Compare with the settings that the running parts use, not with `settings`: the window changed `settings`
         // already, so a comparison with it found no change, and a new wake phrase did not reach the listener.
         let restart = SettingsRestart.needed(from: applied, to: new)
@@ -481,6 +563,7 @@ final class AppController: ObservableObject {
         pipeline.showFeedback = new.showFeedback
         pipeline.playSounds = new.playSounds
         pipeline.wakePhrase = new.wakePhrase
+        turns.apply(new)
         runner.options = ActionOptions(settings: new)
         if restart.contains(.jev) { applyJev() }
         if restart.contains(.engine) {

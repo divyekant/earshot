@@ -29,8 +29,11 @@ public struct WakeConfig: Sendable, Equatable {
     /// If the model hears a pause inside the turn, the turn ends only after this much quiet (a command turn).
     /// Smart Turn's own pipeline and Hex used 2 s.
     public var turnWaitMs: Double = 2000
-    /// The same for a dictation turn. Hex's "patient" preset used 3 s.
-    public var dictationTurnWaitMs: Double = 3000
+    /// The detector ignores this much more time after each sound that earshot plays: the sound comes out of the
+    /// speaker later than the call to play it, and the room keeps it for a moment. Live test 2026-11-11 (E7): the
+    /// echo of the start sound after a mute of the sound length started a command with no words, and the turn
+    /// model ended the turn 680 ms after the wake.
+    public var soundTailSeconds: Double = 0.3
     /// The limits of the owner voice check (E6). The phrase alone must pass `voice.gate` to start a turn. At the end
     /// of the turn, the voice of the whole turn decides.
     public var voice = VoiceRule()
@@ -87,6 +90,17 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
     /// How each turn that goes to the pipeline ended: the rule and the end silence. It comes before `onStop`.
     /// For the log: numbers only (R-ON-1, I-2).
     public var onTurnEnd: ((TurnEnd) -> Void)?
+    /// The numbers of each turn and each rejected wake, for the turn recorder (E7): the sound levels, the wake
+    /// frames and scores, the turn checks, the end and the voice check. No audio. It comes on the main thread right
+    /// before `onTurnVoice`, and before `onStop`, `onCancel` or `onRejected` of the same turn. Set it before `start()`.
+    /// If it is nil, the trigger keeps no numbers.
+    public var onRecord: ((TurnRecord) -> Void)?
+    /// The sound level of an open turn, about 10 times each second, on the main thread: the loudest frame of the last
+    /// 100 ms in dB above the noise floor. For the "Listening" note. Set it before `start()`.
+    public var onTurnLevel: ((Double) -> Void)?
+    // Used only on `queue`.
+    private var levelPeak = -Double.infinity
+    private var levelFrames = 0
 
     public let config: WakeConfig
     private let listener: WakeListener
@@ -135,6 +149,22 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
     /// the embedding: no audio. It is dropped when the follow-up window closes, at stop, and after
     /// `lastTurnKeepSeconds`.
     private var lastPassed: (embedding: [Float], clock: Int)?
+
+    // The numbers of the open turn, for `onRecord` (E7). Used only on `queue`.
+    /// The level of each frame (nil if muted) and the noise floor before it: up to 3 s before the turn, then the turn.
+    private var traceLevels: [(db: Double?, floor: Double)] = []
+    /// The index in `traceLevels` of the first frame of the open turn.
+    private var traceTurnStart: Int?
+    /// The index in `traceLevels` of the frame that started a follow-up turn, in the last block of frames.
+    private var traceSpeechStart: Int?
+    private var traceKind = TurnRecord.Kind.wake
+    private var traceChecks: [TurnCheck] = []
+    private var traceWake: (hit: WakeHit, trace: WakeTrace?)?
+    private var traceOpen: (heard: Bool, quietMs: Double)?
+    private static let tracePreFrames = 150
+    /// 60 s of dictation and the frames before the turn.
+    private static let traceMaxFrames = 3200
+    private var records: Bool { onRecord != nil }
 
     static let rate = 16000
     private var frameSamples: Int { Int(Double(Self.rate) * config.detector.frameMs / 1000) }
@@ -207,9 +237,22 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
         queue.async { [self] in muteLocked(seconds) }
     }
 
+    /// Sends the loudest level of each 5 frames (100 ms) of a turn to `onTurnLevel`.
+    private func reportLevel(_ db: Double) {
+        guard onTurnLevel != nil else { return }
+        levelPeak = max(levelPeak, db - detector.floorDb)
+        levelFrames += 1
+        guard levelFrames >= 5 else { return }
+        let peak = levelPeak
+        levelPeak = -.infinity
+        levelFrames = 0
+        DispatchQueue.main.async { [weak self] in self?.onTurnLevel?(peak) }
+    }
+
     private func muteLocked(_ seconds: Double) {
         guard seconds > 0 else { return }
-        muteUntilClock = max(muteUntilClock, clock + Int(seconds * Double(Self.rate)))
+        let total = seconds + max(0, config.soundTailSeconds)
+        muteUntilClock = max(muteUntilClock, clock + Int(total * Double(Self.rate)))
     }
 
     /// The sample clock until which the detector ignores the audio (`mute`).
@@ -255,7 +298,12 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
             let db = SpeechDetector.db(pending[offset..<(offset + frame)])
             offset += frame
             recentLevels.append(db)
-            if let event = level(db) { events.append(event) }
+            traceLevel(db)
+            if inTurn { reportLevel(db) }
+            if let event = level(db) {
+                events.append(event)
+                if event == .start, records { traceSpeechStart = traceLevels.count - 1 }
+            }
             if let event = pauseCheck() { events.append(event) }
         }
         pending.removeFirst(offset)
@@ -292,28 +340,33 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
             setTurnEndSilence()
             state = .followTurn
             turnStartClock = clock
+            startTrace(.followUp, at: traceSpeechStart)
             // The turn starts a little before the detector saw it, as the speech engine's preroll does.
             startTurnSamples(Array(recentSamples.suffix(Self.rate / 4)), wake: nil)
             turnAudio = turnSamples
             deliver(.start)
         case (.wakeTurn, .end):
             let (samples, count, wake) = (turnSamples, turnSampleCount, turnWake)
+            let draft = traceDraft()
             finishTurn()
             let result = verdict(.wake, samples, audioSamples: count, phrase: wake)
             if result == .end { reportEnd() }
-            deliver(result, voice: lastTurnVoice)
+            deliver(result, voice: lastTurnVoice, record: finished(draft, result, voice: lastTurnVoice))
         case (.wakeTurn, .drop):
+            let draft = traceDraft()
             finishTurn()
-            deliver(event)
+            deliver(event, record: finished(draft, event, voice: nil))
         case (.followTurn, .end):
             let (samples, count) = (turnSamples, turnSampleCount)
+            let draft = traceDraft()
             finishTurn()
             let result = followUpVerdict(samples, audioSamples: count)
             if result == .end { reportEnd() }
-            deliver(result, voice: lastTurnVoice)
+            deliver(result, voice: lastTurnVoice, record: finished(draft, result, voice: lastTurnVoice))
         case (.followTurn, .drop):
+            let draft = traceDraft()
             finishTurn()
-            deliver(event)
+            deliver(event, record: finished(draft, event, voice: nil))
         default:
             break
         }
@@ -391,15 +444,22 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
 
     private func wake(_ hit: WakeHit) {
         reportNearMisses()
-        if state == .followTurn { return wakeInFollowTurn(hit) }
+        let trace = listener.takeTrace()
+        if state == .followTurn { return wakeInFollowTurn(hit, trace: trace) }
         guard !inTurn else { return }
         guard hit.isOwner else {
             listener.reset()
-            DispatchQueue.main.async { [weak self] in self?.onRejected?(hit) }
+            let record = rejectedRecord(hit, trace: trace)
+            DispatchQueue.main.async { [weak self] in
+                if let record { self?.onRecord?(record) }
+                self?.onRejected?(hit)
+            }
             return
         }
         setTurnEndSilence()
         openAfterPhrase(hit)
+        startTrace(.wake, at: traceLevels.count)
+        traceWake = (hit, trace)
         state = .wakeTurn
         // The voice check and the turn model hear the turn from the start of the phrase. The spotter fires after
         // the phrase ended. The audio before the phrase is not part of the turn.
@@ -416,10 +476,14 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
     /// The owner said the phrase again at the start of a follow-up turn (D-11). The turn becomes a wake turn, so the
     /// pipeline removes the phrase by its time. The voice of the whole turn is checked at the end, as for a wake turn.
     /// If the voice of the phrase does not reach the gate, the turn stays a follow-up turn.
-    private func wakeInFollowTurn(_ hit: WakeHit) {
+    private func wakeInFollowTurn(_ hit: WakeHit, trace: WakeTrace?) {
         guard hit.isOwner else {
             // Only a line in the log, as for a rejected wake between turns: no note and no sound.
-            DispatchQueue.main.async { [weak self] in self?.onRejected?(hit) }
+            let record = rejectedRecord(hit, trace: trace)
+            DispatchQueue.main.async { [weak self] in
+                if let record { self?.onRecord?(record) }
+                self?.onRejected?(hit)
+            }
             return
         }
         var hit = hit
@@ -435,6 +499,7 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
         }
         if back < turnAudio.count { turnAudio = Array(turnAudio.suffix(back)) }
         turnWake = hit
+        if records { traceWake = (hit, trace) }
         // The speech engine runs already: no new preroll and no second start.
         DispatchQueue.main.async { [weak self] in self?.onWake?(hit) }
     }
@@ -452,7 +517,9 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
         let heard = Double(loud) * frameMs >= config.detector.commandStartMs
         // Only quiet frames count toward the end silence, as in the turn (SpeechDetector.quietDb).
         let quietFrames = tail.reversed().prefix(while: { $0 <= quiet }).count
-        detector.open(heardSpeech: heard, quietMs: heard ? Double(quietFrames) * frameMs : 0, graceMs: config.graceMs)
+        let quietMs = heard ? Double(quietFrames) * frameMs : 0
+        detector.open(heardSpeech: heard, quietMs: quietMs, graceMs: config.graceMs)
+        if records { traceOpen = (heard, quietMs) }
     }
 
     /// Sends the near misses of the spotter since the last report, if there are some.
@@ -493,6 +560,7 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
     /// Ends an open turn from the outside. Returns `.drop` if a turn was open.
     private func endTurn() -> SpeechEvent? {
         let open = inTurn
+        let draft = open ? traceDraft() : nil
         _ = detector.reset()
         detector.endSilenceOverrideMs = nil
         detector.dictationTurn = false
@@ -502,7 +570,13 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
         turnAudio.removeAll()
         pending.removeAll()
         listener.reset()
-        return open ? .drop("input stopped") : nil
+        clearTrace()
+        guard open else { return nil }
+        let event = SpeechEvent.drop("input stopped")
+        if let record = finished(draft, event, voice: nil) {
+            DispatchQueue.main.async { [weak self] in self?.onRecord?(record) }
+        }
+        return event
     }
 
     /// Asks the turn model at the first pause of the turn (R-ON-1, I-2). A high probability ends the turn now. A low
@@ -516,29 +590,29 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
         let runMs = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
         guard let probability else { return nil }
         let silenceMs = detector.pauseMs
-        let done = probability >= config.turnThreshold
-        var event: SpeechEvent?
-        let decision: TurnCheck.Decision
-        if dictation {
-            // A sentence end in dictated text is not the end of the turn (live test 2026-11-03: P 0.88 to 0.93 cut
-            // the text). The model only makes the turn wait longer; it never ends a dictation turn early.
-            if done {
-                decision = .none
-            } else {
-                detector.answerPauseCheck(waitMs: config.dictationTurnWaitMs)
-                decision = .wait
-            }
-        } else if done {
-            event = detector.endTurnNow()
-            decision = .end
-        } else {
-            detector.answerPauseCheck(waitMs: config.turnWaitMs)
-            decision = .wait
-        }
+        let (event, decision) = Self.answer(probability, config: config, detector: &detector)
         let check = TurnCheck(probability: probability, silenceMs: silenceMs, decision: decision,
                               runMs: runMs, dictation: dictation)
+        if records { traceChecks.append(check) }
         DispatchQueue.main.async { [weak self] in self?.onTurnCheck?(check) }
         return event
+    }
+
+    /// Applies one answer of the turn model at a pause to the detector. `TurnReplay` uses the same rule.
+    static func answer(_ probability: Double, config: WakeConfig,
+                       detector: inout SpeechDetector) -> (SpeechEvent?, TurnCheck.Decision) {
+        let done = probability >= config.turnThreshold
+        if detector.dictationTurn {
+            // A sentence end in dictated text is not the end of the turn (live test 2026-11-03: P 0.88 to 0.93 cut
+            // the text). An unsure answer does not make the pause longer either: live test 2026-11-11 (E7), the
+            // model gave P 0.01 to 0.15 in the owner's real end pauses, and a 3 s wait kept the dictation open for
+            // 60 s. Only the dictation silence ends a dictation turn. The check stays for the log.
+            _ = done
+            return (nil, .none)
+        }
+        if done { return (detector.endTurnNow(), .end) }
+        detector.answerPauseCheck(waitMs: config.turnWaitMs)
+        return (nil, .wait)
     }
 
     /// Posts how the turn ended. It goes to the main queue before the `onStop` of the same turn.
@@ -559,11 +633,12 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
         if recentSamples.count > Self.keepSamples * 2 { recentSamples.removeFirst(recentSamples.count - Self.keepSamples) }
     }
 
-    /// Calls the callback of the event on the main thread. `voice` comes first, in the same block, so that the app
-    /// has the voice check of the turn when the turn ends.
-    private func deliver(_ event: SpeechEvent, voice: TurnVoice? = nil) {
+    /// Calls the callback of the event on the main thread. `record` and `voice` come first, in the same block, so that
+    /// the app has the numbers and the voice check of the turn when the turn ends.
+    private func deliver(_ event: SpeechEvent, voice: TurnVoice? = nil, record: TurnRecord? = nil) {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
+            if let record { self.onRecord?(record) }
             if let voice { self.onTurnVoice?(voice) }
             switch event {
             case .start: self.onStart?()
@@ -571,5 +646,82 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
             case .drop(let why): if let c = self.onCancel { c(why) } else { self.onStop?() }
             }
         }
+    }
+
+    // MARK: - The turn recorder (E7)
+
+    /// Keeps the level of one frame for the record: nil if the detector ignores it (earshot plays a sound).
+    private func traceLevel(_ db: Double) {
+        guard records else { return }
+        traceLevels.append((clock < muteUntilClock ? nil : db, detector.floorDb))
+        if traceTurnStart == nil, traceLevels.count > Self.tracePreFrames * 2 {
+            traceLevels.removeFirst(traceLevels.count - Self.tracePreFrames)
+        } else if traceLevels.count > Self.traceMaxFrames {
+            // A very long turn: drop its oldest frames. The replay of such a turn is not exact.
+            let drop = traceLevels.count - Self.traceMaxFrames
+            traceLevels.removeFirst(drop)
+            traceTurnStart = traceTurnStart.map { max(0, $0 - drop) }
+        }
+    }
+
+    /// The turn starts at this frame. For a wake turn, the next frame; for a follow-up turn, the frame of the start.
+    private func startTrace(_ kind: TurnRecord.Kind, at index: Int?) {
+        guard records else { return }
+        traceKind = kind
+        traceTurnStart = index ?? traceLevels.count
+        traceSpeechStart = nil
+        traceChecks = []
+        traceWake = nil
+        if kind == .followUp { traceOpen = nil }
+    }
+
+    /// The record of the open turn, with no outcome yet. It must come before `finishTurn`.
+    private func traceDraft() -> TurnRecord? {
+        guard records, let start = traceTurnStart else { return nil }
+        var record = TurnRecord(kind: traceKind, outcome: "", levelFrameMs: config.detector.frameMs,
+                                levels: traceLevels.map { TurnRecord.rounded($0.db, places: 10) },
+                                floorDb: TurnRecord.rounded(traceLevels.first?.floor, places: 100) ?? detector.floorDb,
+                                turnStart: start, dictation: detector.dictationTurn, checks: traceChecks)
+        if let wake = traceWake { record.add(wake: wake.hit, gate: config.voice.gate, trace: wake.trace) }
+        if traceKind == .wake {
+            record.openHeardSpeech = traceOpen?.heard
+            record.openQuietMs = traceOpen?.quietMs
+        }
+        return record
+    }
+
+    /// The draft with the outcome, the end and the voice check. The levels of the turn are cleared.
+    private func finished(_ draft: TurnRecord?, _ event: SpeechEvent, voice: TurnVoice?) -> TurnRecord? {
+        clearTrace()
+        guard var record = draft else { return nil }
+        switch event {
+        case .end: record.outcome = "end"; record.end = detector.lastEnd
+        case .drop(let why): record.outcome = why
+        case .start: record.outcome = "start"
+        }
+        record.voice = voice
+        return record
+    }
+
+    /// The record of a rejected wake: the levels up to now, and the wake.
+    private func rejectedRecord(_ hit: WakeHit, trace: WakeTrace?) -> TurnRecord? {
+        guard records else { return nil }
+        var record = TurnRecord(kind: .rejectedWake, outcome: "rejected", levelFrameMs: config.detector.frameMs,
+                                levels: traceLevels.suffix(Self.tracePreFrames).map { TurnRecord.rounded($0.db, places: 10) },
+                                floorDb: TurnRecord.rounded(traceLevels.suffix(Self.tracePreFrames).first?.floor, places: 100)
+                                    ?? detector.floorDb,
+                                turnStart: min(traceLevels.count, Self.tracePreFrames))
+        record.add(wake: hit, gate: config.voice.gate, trace: trace)
+        return record
+    }
+
+    /// Ends the numbers of the turn. The last frames stay, as the frames before the next turn.
+    private func clearTrace() {
+        traceTurnStart = nil
+        traceSpeechStart = nil
+        traceChecks = []
+        traceWake = nil
+        traceOpen = nil
+        if traceLevels.count > Self.tracePreFrames { traceLevels.removeFirst(traceLevels.count - Self.tracePreFrames) }
     }
 }

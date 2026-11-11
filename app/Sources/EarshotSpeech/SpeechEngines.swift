@@ -53,12 +53,14 @@ public enum SpeechEngines {
 
 /// Uses `primary`. If `primary` fails in `prepare`, it uses the fallback engine.
 /// So a broken model file never stops voice commands.
-public final class FallbackSpeechEngine: TurnSpeechEngine, PrerollControl, CaptureControl, PhraseHintControl, @unchecked Sendable {
+public final class FallbackSpeechEngine: TurnSpeechEngine, PrerollControl, CaptureControl, PhraseHintControl, MicIdleControl,
+                                          @unchecked Sendable {
     private let lock = NSLock()
     private var current: SpeechEngine
     private var makeFallback: (() -> SpeechEngine)?
     private var partial: (@Sendable (String) -> Void)?
     private var hints: [String] = []
+    private var idleClose: Double?
     /// The error of the primary engine, if the fallback engine is in use.
     public private(set) var fallbackReason: String?
 
@@ -95,6 +97,7 @@ public final class FallbackSpeechEngine: TurnSpeechEngine, PrerollControl, Captu
                 let next = make()
                 next.onPartial = partial
                 (next as? PhraseHintControl)?.setPhraseHints(hints)
+                (next as? MicIdleControl)?.setMicIdleClose(seconds: idleClose)
                 (next as? SpeechTimingReporting)?.reason = "fallback: \(error)"
                 current = next
                 makeFallback = nil
@@ -113,6 +116,11 @@ public final class FallbackSpeechEngine: TurnSpeechEngine, PrerollControl, Captu
     public func setPhraseHints(_ phrases: [String]) {
         let engine = lock.withLock { () -> SpeechEngine in hints = phrases; return current }
         (engine as? PhraseHintControl)?.setPhraseHints(phrases)
+    }
+    /// The fallback engine gets the same idle time if it takes over.
+    public func setMicIdleClose(seconds: Double?) {
+        let engine = lock.withLock { () -> SpeechEngine in idleClose = seconds; return current }
+        (engine as? MicIdleControl)?.setMicIdleClose(seconds: seconds)
     }
     public func end() async throws -> Utterance { try await active.end() }
     public func cancelTurn() { (active as? TurnSpeechEngine)?.cancelTurn() }

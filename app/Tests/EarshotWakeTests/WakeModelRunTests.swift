@@ -27,7 +27,19 @@ final class WakeModelRunTests: XCTestCase {
     }
 
     /// Speech from `say`, as 16 kHz mono samples. Skips the test if `say` does not work here.
+    /// On the CI runner, `say` sometimes writes a file with only silence (seen on 2026-11-11 in PR #109 and #110:
+    /// "heard speech in 0 of 5 phrases", then green on a re-run of the same commit). Then it tries again, up to 3
+    /// times. Silence after 3 tries means that the runner cannot make speech: the test skips, it does not fail.
     private func say(_ text: String, rate: Int = 180, voice: String? = nil) throws -> [Float] {
+        for _ in 0..<3 {
+            let clip = try sayOnce(text, rate: rate, voice: voice)
+            if clip.contains(where: { abs($0) > 0.001 }) { return clip }
+            print("say: silent clip for \"\(text)\" at rate \(rate); trying again")
+        }
+        throw XCTSkip("the say command made only silence 3 times")
+    }
+
+    private func sayOnce(_ text: String, rate: Int, voice: String?) throws -> [Float] {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("earshot-wake-\(UUID().uuidString).aiff")
         defer { try? FileManager.default.removeItem(at: url) }
         let process = Process()

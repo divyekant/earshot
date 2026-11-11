@@ -10,6 +10,10 @@ public struct CommandRouter: Router {
     public var tier2: Tier2Chooser?
     /// The longest wait for tier 2. After it, the rules answer stays.
     public var tier2BudgetMs: Int
+    /// The owner's last answers to ties (gap item 6). Nil: no habit. The app sets it from the store folder.
+    public var habits: TieHabits?
+    /// Words that speech wrote for a label, from the owner's answers (gap item 12). Nil: no correction.
+    public var heardFixes: HeardFixes?
 
     /// Confidence of a sure rules answer.
     public static let sureConfidence = 0.9
@@ -33,7 +37,9 @@ public struct CommandRouter: Router {
     public func route(_ text: String, context: RouteContext) async -> RouteResult {
         let t0 = DispatchTime.now().uptimeNanoseconds
         func ms() -> Double { Double(DispatchTime.now().uptimeNanoseconds &- t0) / 1_000_000 }
-        let d = Self.rules(text, context: context)
+        var d = Self.rules(text, context: context)
+        if let habits, let broken = Self.breakTie(d, habits: habits, screen: context.screen) { d = broken }
+        if let heardFixes, let fixed = Self.fixHeard(text, d, fixes: heardFixes, context: context) { d = fixed }
         let alternatives = { (chosen: Intent) in Array(d.options.map(\.intent).filter { $0 != chosen }.prefix(3)) }
 
         if !d.sure, let tier2, !d.options.isEmpty {
@@ -95,12 +101,14 @@ public struct CommandRouter: Router {
     /// "send", "show numbers", a web address, or a later sentence that starts with a command word.
     /// The app uses it for dictation: plain words with no command word in a focused text field (hold key only).
     public static func hasCommandWord(_ text: String, context: RouteContext) -> Bool {
-        sentences(text).contains { isCommandSentence($0, apps: context.apps) }
+        if PluginRouter.match(text, plugins: context.plugins, apps: context.apps) != nil { return true }
+        return sentences(text).contains { isCommandSentence($0, apps: context.apps) }
     }
 
     /// True if the FIRST sentence is a command. Dictation after "type" uses it: a command word later in the text,
     /// for example an app name, is text (live test: a dictated sentence that named "earshot" opened a Slack channel).
     public static func startsWithCommand(_ text: String, context: RouteContext) -> Bool {
+        // A plugin lead does not count here: after a bare "type", the next turn is dictation (R-NV-4, D-14).
         sentences(text).first.map { isCommandSentence($0, apps: context.apps) } ?? false
     }
 
@@ -135,6 +143,7 @@ public struct CommandRouter: Router {
         guard !words.isEmpty else { return false }
         let phrase = words.joined(separator: " ")
         if sendPhrases.contains(phrase) || showNumbers.contains(phrase) || hideNumbers.contains(phrase) { return true }
+        if keyDecision(words) != nil { return true }
         if words.prefix(3).contains(where: { commandStarts.contains($0) && $0 != "in" && $0 != "into" }) { return true }
         if ["in", "into"].contains(words[0]), words.contains("type") || words.contains("enter") { return true }
         if WebAddress.parse(text) != nil { return true }
@@ -171,8 +180,8 @@ public struct CommandRouter: Router {
             if leadFillers.contains(w) { return true }
             // "Here" at the very start is most often the end of a wake phrase ("hey atlas" heard as "Here").
             if i == 0, w == "here" { return true }
-            // "right" is a filler, but not in "right click".
-            if w == "right", tokens.words[i + 1] != "click" { return true }
+            // "right" is a filler, but not in "right click" or "right arrow" (a spoken key, I-34).
+            if w == "right", !["click", "arrow"].contains(tokens.words[i + 1]) { return true }
             // "here at least" at the start is most often the wake phrase "hey atlas" (activity records, 2026-11-03).
             if i <= 1, w == "at", tokens.words[i + 1] == "least" { return true }
             if (1...2).contains(i), w == "least", tokens.words[i - 1] == "at" { return true }
@@ -224,6 +233,9 @@ public struct CommandRouter: Router {
     }
 
     static func rulesBody(_ spoken: String, context: RouteContext) -> RulesDecision {
+        // A plugin lead (tier 0), on all the words: the words after it are text for the plugin, also a later
+        // sentence (R-PL-2). A lead never starts with a core command word or an app name, so a core command still wins (R-PL-4).
+        if let d = PluginRouter.decide(spoken, context: context) { return d }
         let text = dropLeadFillers(fromCommandSentence(spoken, apps: context.apps))
         var words = TextKit.words(text)
         while let f = words.first, fillers.contains(f), words.count > 1 { words.removeFirst() }
@@ -243,6 +255,8 @@ public struct CommandRouter: Router {
         if hideNumbers.contains(phrase) {
             return RulesDecision(intent: .hideNumbers, sure: true, exact: true, why: "hide numbers", options: [])
         }
+        // Spoken keys and "undo that" (I-34, D-13).
+        if let d = keyDecision(words) { return d }
 
         // A bare command word never matches a target by sound or a fuzzy match: "type." once pressed the menu item "Top".
         // A bare "type" tells the app that the next turn is the text (awaitsText).

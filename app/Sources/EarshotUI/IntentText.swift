@@ -26,6 +26,27 @@ public enum IntentText {
         case .showNumbers: return "Show numbers"
         case .hideNumbers: return "Hide numbers"
         case .send: return "Send"
+        case let .pressKey(key, times): return "Press \(KeyText.name(key))" + (times > 1 ? " \(times) times" : "")
+        // The typed text stays out of the note and the log: only its length.
+        case .undoTyping(let text): return text.isEmpty ? "Undo the last typing" : "Undo the last typing (\(text.count) characters)"
+        case .handOff(let id, let lead, _): return "→ plugin \(id) · \"\(lead)\""
+        }
+    }
+
+    /// The spoken name of a key, for the note.
+    public enum KeyText {
+        public static func name(_ key: SpokenKey) -> String {
+            switch key {
+            case .backspace: return "Backspace"
+            case .forwardDelete: return "Forward Delete"
+            case .newLine: return "Return"
+            case .tab: return "Tab"
+            case .escape: return "Escape"
+            case .left: return "Left Arrow"
+            case .right: return "Right Arrow"
+            case .up: return "Up Arrow"
+            case .down: return "Down Arrow"
+            }
         }
     }
 

@@ -8,7 +8,8 @@ import Speech
 /// Apple silicon, so this engine is the Apple engine on other Macs.
 /// It always sets `requiresOnDeviceRecognition`. If this Mac cannot recognize the locale on the device,
 /// `prepare` throws. The engine never sends audio to a server.
-public final class DictationEngine: TurnSpeechEngine, PrerollControl, CaptureControl, PhraseHintControl, @unchecked Sendable {
+public final class DictationEngine: TurnSpeechEngine, PrerollControl, CaptureControl, PhraseHintControl, MicIdleControl,
+                                    @unchecked Sendable {
     public static let engineID = "apple-dictation"
     public let id = DictationEngine.engineID
     public let locale: Locale
@@ -27,6 +28,8 @@ public final class DictationEngine: TurnSpeechEngine, PrerollControl, CaptureCon
     private var timing: SpeechTiming?
     /// Words to expect, such as the wake phrase (D-11). They go to each request as contextual strings.
     private var hints: [String] = []
+    /// The idle time of the microphone (`MicIdleControl`). The feed gets it when `prepare` makes the feed.
+    private var idleClose: Double?
     private let format = AudioUtil.parakeetFormat
     let activity = TurnActivity()
 
@@ -38,6 +41,7 @@ public final class DictationEngine: TurnSpeechEngine, PrerollControl, CaptureCon
     public func prepare() async throws {
         try await prepareRecognizer()
         let feed = MicrophoneFeed(format: format)
+        feed.setIdleClose(seconds: lock.withLock { idleClose })
         try feed.start()
         lock.withLock { mic = feed }
     }
@@ -63,6 +67,9 @@ public final class DictationEngine: TurnSpeechEngine, PrerollControl, CaptureCon
 
     public func setNextPreroll(seconds: Double) { lock.withLock { mic }?.setNextPreroll(seconds: seconds) }
     public func setNextCapture(seconds: Double) { lock.withLock { mic }?.setNextCapture(seconds: seconds) }
+    public func setMicIdleClose(seconds: Double?) {
+        lock.withLock { () -> MicrophoneFeed? in idleClose = seconds; return mic }?.setIdleClose(seconds: seconds)
+    }
 
     public func setPhraseHints(_ phrases: [String]) { lock.withLock { hints = phrases.filter { !$0.isEmpty } } }
 
@@ -70,7 +77,7 @@ public final class DictationEngine: TurnSpeechEngine, PrerollControl, CaptureCon
         guard let mic = lock.withLock({ self.mic }) else {
             throw SpeechError("Apple dictation is not ready: call prepare() first")
         }
-        mic.begin(try startTurn())
+        try mic.begin(try startTurn())
     }
 
     /// Starts a turn with no microphone, for measurements. Give 16 kHz mono float audio to the returned function.

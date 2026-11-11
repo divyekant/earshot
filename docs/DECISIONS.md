@@ -13,6 +13,13 @@ This log records the options that the owner and Claude examined on 2026-11-01, a
 
 **Decision:** Keep Wispr Flow or VoiceInk for plain dictation. Build earshot for routing, focus and clicks.
 
+**Change on 2026-11-11 (the owner's choice, after the gap evaluation of v0.3.0):** earshot is the dictation tool. This replaces the decision above. earshot already types plain words with the hold key, and after "type" in always-on mode (DESIGN 3.0). To replace a dictation app, earshot adds:
+- spoken keys: "backspace three times", "new line", "tab" (D-13);
+- "undo that": earshot removes the last text that it typed (D-13);
+- optional text cleanup on the local oMLX server, off by default (DESIGN 3.7, D-5).
+
+Dictation with no "type" in always-on mode (I-26): the owner chose "no" on 2026-11-11. Always-on types only after a bare "type", or as go-on text within 3 s after a typing. Reason: a false wake could type speech that was not for earshot.
+
 ## D-2. Do not use large-model agents for each step
 
 | Option | Result | Reason |
@@ -222,6 +229,18 @@ The owner chose "Turn check and one print per mic" on a card.
 - The profile learns the owner's free speech from wake turns that passed well (E6, section 8.2). The 5 takes hold the wake phrase only, and follow-up turns in the owner's voice scored 0.16 to 0.28 in the live retest of 2026-11-03. Only a wake turn teaches, at 0.05 or more over its limit and with 1.5 s of speech or more. At most 10 turns. Embeddings only, no audio.
 - Rejected: max or top-2 over the 5 takes instead of the mean (no gain on the bench); repeat padding (no gain).
 
+**Change on 2026-11-11 (E7, [experiments/E7-turn-recorder.md](experiments/E7-turn-recorder.md)):** a worst-part limit stops the room matches.
+
+| Night log of 2026-11-03, 7 h, no owner in the room | Match score | Worst part | Phrase voice |
+|---|---|---|---|
+| 4,718 rejected wakes (no phrase said) | 0.22 to 0.32, median 0.25 | 0.82 to 1.04, median 0.97 | 0.01 to 0.34, median 0.21 |
+| The owner's live wakes (E5 first live run) | 0.20 to 0.31 | 0.28 to 0.55 | 0.48 to 0.67 |
+
+- A template match wakes earshot only if its worst part is below 0.7 (`TemplateMatcher.defaultWorstLimit`). The two groups do not overlap, and 0.7 is 0.15 above the owner's highest value.
+- A stopped match does not reset the listener. The near-miss line of the log counts the stopped matches.
+- The gate on the phrase voice stays at 0.35. The highest rejected voice score in the night log was 0.34, so a lower gate would open turns for room sound if the worst-part limit fails. Lower the gate toward 0.10 only after a live run on the new build shows no rejected wakes for 15 minutes of room sound and talk, and the owner's wakes still pass.
+- Not done: a worst-part limit of 0.5 (E5: it cut near hits from 93 % to 90 %). It stays the next step for sound-alike wakes.
+
 ## D-12. "send" alone after typing, in always-on mode
 
 Date: 2026-11-03.
@@ -244,3 +263,46 @@ The owner chose this on a card: in always-on mode, earshot never sent, so a dict
 - Anything else in always-on mode stays blocked: "send needs the hold key".
 - A trailing "and send" after text is never typed. With the hold key, earshot types and then sends. In always-on mode, it types only, and the note says to say "send" on its own.
 - If no voice is enrolled, no voice check runs, so always-on never sends.
+
+## D-13. A "key" verb for spoken keys
+
+Date: 2026-11-11. Idea I-34. Rule 2 of DESIGN 3.0: a new verb needs a reason here.
+
+The owner chose earshot as the dictation tool (change to D-1). Dictation needs keys that are not text: Backspace, Return, Tab, Escape and the arrows. No current verb can do this:
+
+| Option | Result | Reason |
+|---|---|---|
+| "type" with a key name | Rejected | "type" types its words as text. `Keys.type` removes control characters, so it can never press Return (R-NV-5). A key name in the text would type the name. |
+| "press" on a screen target | Rejected | A key is not a target on the screen or in the menus. The menus have no item for Backspace or Return. |
+| A menu item, for example Edit > Undo, for "undo that" | Rejected | The step of the menu Undo differs between apps. It can undo more than earshot typed, or undo the owner's own typing. |
+| One verb "key" with a fixed key list, and "undo that" as Backspace presses | Chosen | One generic verb. The list names no app and no feature. |
+
+**Decision:**
+- One intent `pressKey(key, times)`. The key list is fixed: Backspace ("delete"), Forward Delete, Return ("new line", "enter"), Tab, Escape and the four arrows. 1 to 20 presses.
+- A word that is also a command or a menu title ("delete", "enter", "return", "tab", "up") is a key only after "press", "hit" or "tap", or with a count. A bare "undo" stays the app's menu item Edit > Undo.
+- Return keeps the send rule. earshot never presses it in a message box: only "send" may press Return there (R-NV-5, `SafetyPolicy.mayPressReturn`). It presses Return only in a text area, not in a one-line field, because Return there can submit a form. A box that is short, wide and low in the window, or whose label says message, reply, compose, write or send, is a message box. In always-on mode, "new line" needs the owner's checked voice, and a chain never presses Return. The always-on send rule (D-12) does not change.
+- Backspace and Forward Delete only in a text field: outside a field, they can delete a selected item, for example a mail.
+- No key on a sign-in, code or payment page.
+- One intent `undoTyping`. "undo that", "scratch that" or "delete that" removes the last text that earshot typed, with one Backspace for each character. It runs only if all are true: the same app is in front, the typing was within 2 minutes, the focused field still ends with that text, and the cursor is at its end with no selection. Else it does nothing and says why. One undo for each typing. After an undo, "send" alone has no typing to follow.
+- earshot keeps the text of the last typing in memory only, for "undo that". The log and the note show only its length.
+## D-14. Plugins are separate programs
+
+Date: 2026-11-11. Status: accepted, experimental until a second plugin exists. Requirements: R-PL-1 to R-PL-5. Contract: `docs/PLUGINS.md`.
+
+The owner asked for a structure so that other people can add to earshot, and for the personal assistant as the first addition (idea I-35).
+
+Decision: a plugin is a separate local program with a manifest. earshot gives it the text after its lead words, and gets back answers and targets. One intent, `handOff`, serves all plugins.
+
+Rejected:
+
+| Option | Why it was rejected |
+|---|---|
+| Plugin code inside the earshot app | The code gets the Accessibility and Microphone permissions of earshot. A fault stops earshot. |
+| The personal assistant as fixed code in earshot | Each user gets it. No structure for other additions. |
+| A plugin that sends commands back to earshot | A plugin could then click, type or send. An answer is text only (R-PL-3). |
+| A child process with the default spawn | macOS gives a child the privacy permissions of the app that started it. earshot disclaims the responsibility of each plugin. |
+
+Rules for dictation:
+
+- With the hold key and no "type", a sentence that starts with a lead goes to the plugin, not into the focused text box.
+- After a bare "type", the next turn is dictation (R-NV-4). A lead in it is text. The owner gave an explicit command to type.

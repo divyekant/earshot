@@ -6,6 +6,44 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-11
+
+This release adds answers to a "not sure" note, with memory of your choices and of misheard names, spoken keys and "undo that", a menu bar state icon with pause, a turn recorder with no audio, a weekly report script, and experimental plugins. The microphone is open only while you hold the key in hold mode. "Slack <name>" works again, WhatsApp chats open, and room sound no longer matches the wake phrase.
+
+### Added
+
+- A "Listening" note stays on screen for the whole turn, from the start (or the wake) to the end. It shows for a wake, a hold-key turn and the text after "type", not for other follow-up turns (other sounds open many of them). In always-on mode, it has a level bar (R-FB-1).
+- A "not sure" note now shows up to two choices and stays on screen for 10 s. Say "yes" or "the first one", "the second one", or "no". In always-on mode, only your checked voice can answer. An answer never sends, unless you used the hold key for the command and for the answer (R-FB-1, R-NV-5, D-12).
+- In always-on mode, earshot keeps the numbers of each turn and each rejected wake for 7 days: sound levels, scores, the turn checks, the wake frames of the spotter, and the words as the activity log has them. No audio, and earshot cannot play the wake frames back. Tests can run the wake and end-of-turn rules again on them. A switch in Manage > General turns it off and deletes them (R-ON-1, R-ON-3, R-MD-1, D-11).
+- The menu bar icon shows what earshot does: it waits (ear), it listens to a command (filled ear), the follow-up window is open (ear with sound waves), it waits for text to type (text cursor), or it is paused (pause sign). The first menu line says the same in words (R-ON-2, R-FB-1).
+- In always-on mode, a wake turn that got the start sound and then failed the voice check of the turn now gets a soft "Pop" and a short note. Its words stay in memory for 20 s, never on disk. One hold-key press with no words types them into the focused field. It never sends (R-ON-3, R-FB-1, R-NV-5).
+- The menu has "Pause for 1 hour" and a mode switch (hold key or always on). While paused, no input runs and the microphone closes. The pause ends after 1 hour, with "Resume listening", or when earshot starts again (R-ON-4, R-MD-1).
+- A weekly report script, `app/scripts/weekly-report.py`. It reads the activity log and prints the success rate for each command type, wakes and rejects for each hour, dropped turns, turns with no words for each mode, and the time with the end wait. It prints no message text (R-MD-1, gap item 1).
+- Spoken keys: "backspace three times", "new line", "press tab", "escape", "left arrow twice". earshot never presses Return in a message box: say "send" to send (I-34, D-13, R-NV-5).
+- "undo that" removes the last text that earshot typed, in the same app only (I-34, D-13).
+- Plugins, experimental. A plugin is a separate program on the Mac. A command that starts with its lead words, for example "remind me to …", goes to the plugin as text. The plugin answers with a note on screen. You approve each plugin in the new Plugins tab. A plugin never gets audio, never acts in an app, and never gets the permissions of earshot. `docs/PLUGINS.md` gives the contract (R-PL-1 to R-PL-5, D-14).
+- earshot remembers your answer to a "not sure" note. The next time the same targets tie, for example the same name in two chat apps, it opens your last choice and does not ask again. The answers are in `habits.json` in the earshot folder, with no message text (R-FB-1, R-NV-5).
+- earshot learns misheard names from your answer to a "not sure" note. If speech wrote "chart" and you chose the button "Chat", the next "click chart" in the same app clicks "Chat" with no note. It uses the pair only if the label is on the screen, in the names or in the app table at that time. The pairs are in `heard.json` in the earshot folder, with no message text. A correction never sends and never presses a risky button (R-FB-1, R-NV-5, I-15).
+
+
+### Changed
+
+- Only the newest question waits for an answer. A new question (a bare "type", a stopped chain, a "not sure" note, or the words of a dropped wake turn) replaces the older one, the same as the note on screen. Before, an older wait could take the next turn (R-FB-1, gap item 13).
+- The README status and `docs/DESIGN.md` (the router in section 3.4, the new talk state in section 3.9, and the phase status in section 5) describe the app as it is now (gap item 13).
+- The activity log keeps no typed text. For a "type …" command, the message of a chat command and hold-key dictation, it keeps the command words and a word count. The note on screen still shows the text. The log keeps 30 days, and the Activity tab reads only the end of the file (R-MD-1, gap item 11).
+- The Activity tab shows the time from the end of speech to the end of the command. Before, it showed the audio length for most turns. The summary line counts only turns with words. It gives the other records (rejected wakes, near misses, turns with no words) as one count (R-SP-1, R-FB-1).
+- In hold mode, the microphone is open only while you hold the key. The macOS microphone indicator is off between commands. The start sound now plays when the microphone is live: speak after it. There is no 450 ms preroll in hold mode. Always-on mode keeps the microphone open (R-ON-4, R-MD-1).
+- In always-on mode, a follow-up turn with no command word shows no note and plays no sound, and the follow-up window does not open again after it. The log keeps the record (R-ON-2, R-FB-1).
+- In hold mode, earshot closes the microphone after 2 minutes with no command, so the macOS microphone indicator goes off. The next hold-key press opens it again. That one command has no 450 ms preroll, so speak after the start sound. Always-on mode keeps the microphone open (R-ON-4, R-MD-1).
+
+### Fixed
+
+- In always-on mode, a dictation now ends at a pause of 1.2 s. Before, a click or a breath in the pause, or an unsure turn model, kept it open up to the 60 s limit, so the text came late (R-ON-1, E7).
+- After the wake phrase, the echo of the start sound no longer ends the turn before the command (R-ON-1, E7).
+- In always-on mode, room sound no longer matches the wake phrase every 4 to 6 s. A match now needs each 200 ms part of the phrase to fit, not only the mean. The log counts the stopped matches (R-ON-1, D-11, E7).
+- "Slack <name>" opens the chat again. Slack now lists "Search for: <name>" rows in Command-K, and earshot pressed Return on a search. earshot now skips search rows, and stops if a search row is above the chat. WhatsApp chats open too: earshot clicks the new-chat field and presses the result row when Return does not open it. Measured: Slack 437 ms, Messages 682 ms, WhatsApp 1,475 ms to the focused box (R-NV-2, R-NV-6, R-SP-1, E9).
+
+
 ## [0.3.0] - 2026-11-03
 
 This release adds several commands in one sentence, a small on-Mac turn model for always-on mode, one voice profile for each microphone, a new ear icon, and a project web page. The voice check now uses the whole turn, and the voice print learns from good wake turns. Many always-on fixes stop the loss of long dictation and of follow-up turns.
@@ -98,7 +136,8 @@ The first public release. earshot is early software. Expect bugs and changes to 
 
 - earshot never presses Send, or does another action that cannot be undone, without an explicit command (R-NV-5, R-ON-5).
 
-[Unreleased]: https://github.com/divyekant/earshot/compare/v0.3.0...develop
+[Unreleased]: https://github.com/divyekant/earshot/compare/v0.4.0...develop
+[0.4.0]: https://github.com/divyekant/earshot/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/divyekant/earshot/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/divyekant/earshot/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/divyekant/earshot/releases/tag/v0.1.0
