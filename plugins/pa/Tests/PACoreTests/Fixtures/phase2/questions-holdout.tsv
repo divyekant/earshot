@@ -1,0 +1,101 @@
+# words	target	other
+the tile quote	kitchen/quote-tiles	0
+Tom's letter about the sink	kitchen/plumber-letter	0
+the electrics notes	kitchen/electrics-notes	0
+the Northwood order	kitchen/cabinet-order	0
+the offer for the splashback	kitchen/quote-tiles	1
+the cost of the pipework job	kitchen/plumber-letter	1
+how many plugs along the counter	kitchen/electrics-notes	1
+sage green cupboard doors	kitchen/cabinet-order	1
+clear out the old cupboards	kitchen#4	1
+book the plasterer	kitchen#6	0
+Helen's email	taxes/accountant-email	0
+the rental income sheet	taxes/rental-income	0
+the Brightwater letter	taxes/pension-letter	0
+the home office notes	taxes/home-office	0
+what the tax adviser asked for	taxes/accountant-email	1
+repairs on the let flat	taxes/rental-income	1
+how much did the government add to my retirement pot	taxes/pension-letter	1
+can I claim the office chair	taxes#7	1
+the boiler receipt	taxes#4	0
+my tax code	taxes#11	0
+the Riverside admissions letter	school/admissions-letter	0
+route 7 timetable	school/bus-timetable	0
+the Hillcrest report	school/old-school-report	0
+the uniform list	school/uniform-list	0
+what time does the breakfast club open	school/admissions-letter	1
+what happens to the coach when it snows	school/bus-timetable	1
+her teacher's comments on reading	school/old-school-report	1
+the jumper with the badge	school#4	1
+the bus pass	school#6	0
+morning club on Mondays	school#11	1
+the car valuation	car/valuation	0
+the Hillside Motors invoice	car/garage-invoice	0
+the buyer messages	car/buyer-messages	0
+the logbook steps	car/logbook-steps	0
+what would a dealer give in part exchange	car/valuation	1
+the advisory on the test	car/garage-invoice	1
+who wanted to pay cash	car/buyer-messages	1
+notify the licensing office	car#7	1
+pictures of the car	car#2	1
+the advert	car#5	0
+the Coastline booking	trip/flight-booking	0
+Casa Azulejo	trip/apartment	0
+the day plans	trip/day-plans	0
+the packing list for March	trip/packing-list	0
+how heavy can the hold luggage be	trip/flight-booking	1
+where do we leave our bags before check in	trip/apartment	1
+the day trip to the palace	trip/day-plans	1
+passport check	trip#1	0
+cash for the city tax	trip#5	1
+away message at work	trip#11	1
+the Greenleaf quote	shed/shed-quote	0
+the base instructions	shed/base-instructions	0
+the council rules	shed/council-rules	0
+Joan's note	shed/neighbour-note	0
+how long is the guarantee against rot	shed/shed-quote	1
+how much concrete under the hut	shed/base-instructions	1
+height limit next to the fence	shed/council-rules	1
+remove the grass for the base	shed#2	1
+the lock for the shed	shed#7	0
+clear the way to the bottom of the garden	shed#10	1
+the Old Mill agreement	wedding/venue-contract	0
+the guest notes	wedding/guest-list-notes	0
+Clara's email	wedding/photographer-email	0
+the budget sheet	wedding/budget-sheet	0
+what time must the music stop	wedding/venue-contract	1
+where do the far away families sleep	wedding/guest-list-notes	1
+photos at sunset by the pond	wedding/photographer-email	1
+pick the musicians	wedding#8	1
+discount for the inn	wedding#7	0
+tell the caterers about the nut allergy	wedding#3	1
+the Swift Removals quote	move/removal-quote	0
+the Brook Lettings letter	move/tenancy-end	0
+the utilities list	move/utilities-list	0
+the Orchard Close notes	move/new-house-notes	0
+who packs the fragile things	move/removal-quote	1
+which keys do I hand back	move/tenancy-end	1
+what council tax band is the new place	move/utilities-list	1
+smoke and gas detector	move#9	1
+meter photos	move#10	0
+fix the gate	move#12	1
+the Westside plan	knee/physio-plan	0
+the GP letter	knee/gp-letter	0
+the log of my exercises	knee/exercise-log	0
+the Riverside race entry	knee/race-entry	0
+how long must I stop jogging	knee/physio-plan	1
+did the doctor want an x-ray	knee/gp-letter	1
+where are the drink stations in the race	knee/race-entry	1
+ask about starting to run	knee#5	0
+pass on my place in the race	knee#8	1
+back to the GP if no better	knee#12	1
+the Valley Wheelers newsletter	bike/club-newsletter	0
+the Cog and Chain report	bike/bike-service	0
+the Three Valleys route	bike/sportive-route	0
+the minutes of the meeting	bike/committee-minutes	0
+what kit is needed on club rides	bike/club-newsletter	1
+how much was the chain	bike/bike-service	1
+the fall on the loose stones	bike/committee-minutes	1
+a spare inner tube	bike#8	1
+sign up for the sportive	bike#7	1
+mudguards	bike#12	0

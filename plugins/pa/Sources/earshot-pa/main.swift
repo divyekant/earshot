@@ -42,6 +42,35 @@ if args.contains("--probe-reminders") {
     exit(0)
 }
 
+// The bench of phase 2 (build spec 6.5): earshot-pa --embed-bench <fixtures folder> --embedder <name> [--dims N]
+// [--get-assets]. It reads only the made-up fixtures and prints one table.
+if let i = args.firstIndex(of: "--embed-bench"), i + 1 < args.count {
+    func value(_ flag: String) -> String? {
+        args.firstIndex(of: flag).flatMap { $0 + 1 < args.count ? args[$0 + 1] : nil }
+    }
+    let name = value("--embedder") ?? "hash"
+    do {
+        let fx = try BenchFixtures.load(URL(fileURLWithPath: args[i + 1], isDirectory: true))
+        let before = memoryFootprint()
+        let t0 = Date()
+        let embedder = try makeEmbedder(name, allowAssetRequest: args.contains("--get-assets"))
+        _ = try embedder.embed(["A first text to load the model."], kind: .passage)
+        let load = Date().timeIntervalSince(t0)
+        let bench = EmbedBench(fixtures: fx, embedder: embedder, dims: value("--dims").flatMap(Int.init))
+        bench.progress = { FileHandle.standardError.write(Data(("BENCH " + $0 + "\n").utf8)) }
+        var result = try bench.run()
+        result.rows.insert(("First load and first text", String(format: "%.0f ms", load * 1000)), at: 1)
+        if let b = before, let a = memoryFootprint() {
+            result.rows.append(("Memory footprint", String(format: "%.1f MB before the model, %.1f MB after the bench", Double(b) / 1e6, Double(a) / 1e6)))
+        }
+        print(EmbedBench.table(result))
+        exit(0)
+    } catch {
+        print("Bench error: \(error)")
+        exit(1)
+    }
+}
+
 let env = ProcessInfo.processInfo.environment
 let folder: URL
 if let path = env["EARSHOT_PLUGIN_DATA"], !path.isEmpty {

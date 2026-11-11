@@ -1,0 +1,121 @@
+# project	number	kind	title
+kitchen	1	todo	choose the colour of the grout
+kitchen	2	todo	pay the deposit for the floor tiles
+kitchen	3	reminder	call Tom the plumber about the start date
+kitchen	4	todo	empty the old kitchen units
+kitchen	5	note	the oven must fit a 600 housing
+kitchen	6	todo	book the plasterer for after the electrics
+kitchen	7	reminder	collect the tile samples from the showroom
+kitchen	8	todo	pay the balance for the cabinets
+kitchen	9	note	Ravi says the fuse board needs replacing within five years
+kitchen	10	todo	order the oak oil for the worktop
+kitchen	11	todo	buy the brass handles if the order misses them
+kitchen	12	reminder	turn off the water before the plumber starts
+taxes	1	todo	download the interest statements from the bank
+taxes	2	todo	send Helen the rental figures
+taxes	3	reminder	the self assessment deadline is the end of January
+taxes	4	todo	find the receipt for the boiler repair
+taxes	5	note	the pension total with relief is 3,000 pounds
+taxes	6	todo	count the weeks that I worked from home
+taxes	7	todo	ask Helen if the desk chair counts
+taxes	8	reminder	pay the accountant fee
+taxes	9	todo	get the mortgage interest statement
+taxes	10	note	receipts are in the blue folder in the study
+taxes	11	todo	check the tax code on the last payslip
+taxes	12	todo	put money aside for the tax bill
+school	1	todo	return the signed admission form
+school	2	todo	copy the birth certificate for the school
+school	3	reminder	book the visit day with the school office
+school	4	todo	buy the navy jumper with the logo
+school	5	todo	sew name labels into the uniform
+school	6	todo	apply for the bus pass
+school	7	note	Mia's new teacher is Mr Daniels
+school	8	todo	sign the travel form for the bus
+school	9	todo	buy wellington boots for forest school
+school	10	reminder	tell Hillcrest that Mia is leaving
+school	11	todo	book the breakfast club for Mondays
+school	12	note	Mia should practise the nine times table
+car	1	todo	replace the rear tyres before the sale
+car	2	todo	take photos of the car in daylight
+car	3	todo	find the second key
+car	4	reminder	show the car to Priya on Monday at six
+car	5	todo	write the advert for the hatchback
+car	6	note	the private sale value is up to 8,600 pounds
+car	7	todo	tell the agency that the car is sold
+car	8	todo	cancel the car insurance after the sale
+car	9	todo	write a sale receipt for both people
+car	10	reminder	check that the bank transfer has cleared
+car	11	todo	clean the inside of the car
+car	12	note	the MOT runs until next October
+trip	1	todo	check that both passports are valid
+trip	2	reminder	online check-in opens 24 hours before the flight
+trip	3	todo	book a table for the fado show
+trip	4	todo	buy the Pena palace tickets online
+trip	5	todo	get euros in cash for the tourist tax
+trip	6	todo	buy a travel adapter
+trip	7	note	the key box is to the right of the blue door
+trip	8	todo	ask the neighbour to water the plants
+trip	9	todo	renew the travel insurance
+trip	10	reminder	free cancellation ends 30 days before arrival
+trip	11	todo	set the out-of-office message
+trip	12	note	many museums close on Mondays
+shed	1	todo	order the shed from Greenleaf
+shed	2	todo	dig out the turf for the base
+shed	3	todo	buy paving slabs and sharp sand
+shed	4	note	keep the shed half a metre from the fence
+shed	5	todo	borrow a long spirit level
+shed	6	reminder	ask Mrs Avery about her side gate for the delivery
+shed	7	todo	add the security lock to the order
+shed	8	note	do not cut the roots of the apple tree
+shed	9	todo	treat the shed with preservative
+shed	10	todo	clear the path to the end of the garden
+shed	11	reminder	the shed delivery is in about four weeks
+shed	12	todo	check the height rule near the boundary
+wedding	1	todo	send the invitations
+wedding	2	reminder	second venue payment is due three months before
+wedding	3	todo	tell the venue about Mira's nut allergy
+wedding	4	todo	book the photographer with a deposit
+wedding	5	todo	make the list of group photos
+wedding	6	note	Grandpa Ivo needs a seat near the door
+wedding	7	todo	get the discount code for the village inn
+wedding	8	todo	choose the band
+wedding	9	reminder	final guest numbers four weeks before the date
+wedding	10	todo	order the rings
+wedding	11	note	the band must stop at 23.30
+wedding	12	todo	update the budget sheet with what we paid
+move	1	todo	pay the deposit for Swift Removals
+move	2	todo	get a parking suspension for Canal Street
+move	3	reminder	return all keys to Brook Lettings by noon
+move	4	todo	clean the oven before the check-out
+move	5	todo	fill the holes from the pictures
+move	6	todo	book the broadband move
+move	7	todo	set up the post redirection
+move	8	note	the stopcock is under the kitchen sink
+move	9	todo	buy a carbon monoxide alarm
+move	10	todo	take photos of the meters on moving day
+move	11	reminder	tell the council about the move
+move	12	todo	buy a new hinge for the garden gate
+knee	1	todo	do the wall sits every day
+knee	2	reminder	physio session on Thursday at 17.30
+knee	3	todo	buy ice packs
+knee	4	note	pain up to 3 out of 10 is acceptable when running
+knee	5	todo	ask the physio when I can run again
+knee	6	todo	book the remaining physio sessions
+knee	7	note	no pain on the stairs for the first time on Thursday
+knee	8	todo	decide if I transfer the race place
+knee	9	reminder	race place transfer closes on 31 March
+knee	10	todo	buy new running shoes
+knee	11	todo	write the exercise log every evening
+knee	12	todo	go back to the doctor if it is not better in eight weeks
+bike	1	todo	pay the club membership
+bike	2	todo	order the new club jersey
+bike	3	reminder	jersey orders close on 15 March
+bike	4	todo	replace the front tyre
+bike	5	todo	buy new bar tape
+bike	6	note	the next bike service is due in six months
+bike	7	todo	enter the Three Valleys sportive
+bike	8	todo	buy a spare tube and a pump
+bike	9	todo	volunteer as a marshal for the hill climb
+bike	10	reminder	club rides start on the first Sunday of April
+bike	11	note	warn the group about the gravel at Mill Hill
+bike	12	todo	fit mudguards for the winter rides
