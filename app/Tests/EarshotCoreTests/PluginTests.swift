@@ -96,4 +96,38 @@ final class PluginTests: XCTestCase {
         XCTAssertEqual(m?.isAlert, true)
         XCTAssertEqual(m?.re, "c1")
     }
+
+    /// "open <target>" opens a web address, a document or a folder. Never a program or a script (R-PL-3).
+    func testTargetOpensOnlyDocuments() throws {
+        let fm = FileManager.default
+        try fm.createDirectory(at: folder, withIntermediateDirectories: true)
+        func file(_ name: String) throws -> String {
+            let u = folder.appendingPathComponent(name)
+            try Data("x".utf8).write(to: u)
+            return u.path
+        }
+        let page = try file("today.html")
+        XCTAssertNotNil(PluginTargetOpen.url(page).url)
+        XCTAssertNotNil(PluginTargetOpen.url(try file("lease.PDF")).url)
+        XCTAssertNotNil(PluginTargetOpen.url("https://example.com/today").url)
+        XCTAssertNotNil(PluginTargetOpen.url(folder.path).url, "a plain folder opens in Finder")
+
+        for name in ["run.sh", "run.command", "tool", "setup.pkg", "x.scpt", "x.webloc", "x.terminal"] {
+            XCTAssertNil(PluginTargetOpen.url(try file(name)).url, name)
+        }
+        let app = folder.appendingPathComponent("Helper.app", isDirectory: true)
+        try fm.createDirectory(at: app, withIntermediateDirectories: true)
+        XCTAssertNil(PluginTargetOpen.url(app.path).url, "an app bundle is a program")
+
+        // A link with a document name to a script: earshot checks the file that the link points to.
+        let link = folder.appendingPathComponent("link.html")
+        try fm.createSymbolicLink(atPath: link.path, withDestinationPath: try file("evil.sh"))
+        XCTAssertNil(PluginTargetOpen.url(link.path).url)
+
+        for bad in ["", "today.html", "file:///etc/hosts", "ftp://example.com/x", "javascript:alert(1)",
+                    "x-apple.systempreferences:com.apple.preference.security", folder.appendingPathComponent("gone.html").path] {
+            XCTAssertNil(PluginTargetOpen.url(bad).url, bad)
+            XCTAssertNotNil(PluginTargetOpen.url(bad).why, bad)
+        }
+    }
 }

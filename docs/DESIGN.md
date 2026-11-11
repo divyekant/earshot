@@ -254,7 +254,7 @@ A plugin is a separate program with a manifest (`docs/PLUGINS.md`). The parts in
 - `EarshotApp/CommandPipeline+Plugins.swift`: the hand-off after the route. The log keeps the lead and a word count.
 - `EarshotUI/PluginsTab.swift`: the list of plugins and the approvals.
 
-The answers show as a note. An alert also goes to the Notification Center. A plugin also gives targets (names with ids). earshot keeps them for a later target source: "open <target>" with the core verb.
+The answers show as a note. An alert also goes to the Notification Center. A plugin also gives targets (names with ids). The targets are a target source for the core verb "open": "open today" opens the page that the plugin named. An app name wins. The action opens only a web address, a document or a folder (`PluginTargetOpen`).
 
 ### 3.9 Talk state (gap item 13, 2026-11-11)
 

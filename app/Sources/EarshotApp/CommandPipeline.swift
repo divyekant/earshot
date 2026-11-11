@@ -230,7 +230,7 @@ final class CommandPipeline {
         stages["context"] = contextClock.ms
         let front = frontBundleID().flatMap { $0 == ownBundleID ? nil : $0 }
         var context = RouteContext(apps: rows, names: known, frontBundleID: front, screen: withMenus(screen, front: front),
-                                   plugins: plugins?.leads ?? [])
+                                   plugins: plugins?.leads ?? [], targets: plugins?.targetNames ?? [])
 
         // The answer to a chain that stopped at a step (I-28). In always-on mode, only in the owner's checked voice.
         if let chain = pendingChain {
@@ -778,7 +778,8 @@ final class CommandPipeline {
     func test(_ text: String, runActions: Bool) async -> TestReport {
         speechSummary = ""  // a typed command has no speech
         let rows = apps().filter { $0.approved && $0.enabled }
-        var context = RouteContext(apps: rows, names: await allNames(), frontBundleID: frontBundleID(), plugins: plugins?.leads ?? [])
+        var context = RouteContext(apps: rows, names: await allNames(), frontBundleID: frontBundleID(), plugins: plugins?.leads ?? [],
+                                   targets: plugins?.targetNames ?? [])
         context.screen = withMenus(await actions.screen(), front: context.frontBundleID)
         let result = await router.route(text, context: context)
         if runActions, case let .handOff(pluginID, lead, words) = result.intent {
