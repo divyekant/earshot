@@ -33,13 +33,22 @@ extension AppController {
         }
         let state = listenClock.state(at: now)
         if state != listen { listen = state }
-        // The "Listening" note stays for the whole open turn (dk, 2026-11-11), not 2 s.
-        if state == .listening, settings.showFeedback { feedback.showListening() } else { feedback.endListening() }
+        // The "Listening" note stays for the whole open turn (dk, 2026-11-11). `showsListening` decides which turns
+        // show it. It goes when the turn ends.
+        if state != .listening { feedback.endListening() }
         listenTimer?.cancel()
         guard let next = listenClock.nextChange(after: now) else { return }
         let work = DispatchWorkItem { [weak self] in MainActor.assumeIsolated { self?.refreshListen() } }
         listenTimer = work
         DispatchQueue.main.asyncAfter(deadline: .now() + next.timeIntervalSince(now) + 0.05, execute: work)
+    }
+
+    /// True if a turn that starts now shows the "Listening" note. A wake shows it in `onWake`. In always-on mode, a
+    /// follow-up turn with no phrase shows it only when text is expected (after "type"): other sounds in the
+    /// follow-up window open turns that the voice check drops, and a note for each looked random (live test
+    /// 2026-11-11, E7).
+    static func showsListening(mode: InputMode, before: ListenState) -> Bool {
+        mode == .hold || before == .textExpected
     }
 
     /// Stops all input for `seconds`: no wake phrase and no hold key. An open turn is dropped, with no action.

@@ -328,6 +328,10 @@ final class AppController: ObservableObject {
             // A wake plays the sound in onWake.
             let problem = pipeline.begin()
             if input?.current == .hold { self?.playStartSound() }
+            if let self, Self.showsListening(mode: input?.current ?? .hold, before: listenClock.state(at: Date())),
+               settings.showFeedback {
+                feedback.showListening()
+            }
             self?.updateListen { $0.turnStarted() }
             if let problem { self?.feedback.show(problem, ok: false) }
         }
