@@ -200,7 +200,7 @@ public final class Engine {
         case .quiet: return quiet(id: id, text: text)
         case .whatProjects: return whatProjects(id: id)
         case .finishProject: return finishProject(id: id, text: text)
-        case .mainPoints: return .note(id, "Main points are not ready yet.")
+        case .mainPoints: return mainPoints(id: id, text: text, context: context)
         }
     }
 

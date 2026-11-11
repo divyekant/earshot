@@ -185,6 +185,9 @@ extension Engine {
         if FileManager.default.fileExists(atPath: searchPageURL.path) {
             out.append(Target(id: "page-search", name: "search", kind: "page", open: searchPageURL.path))
         }
+        if FileManager.default.fileExists(atPath: mainPointsPageURL.path) {
+            out.append(Target(id: "page-main-points", name: "main points", kind: "page", open: mainPointsPageURL.path))
+        }
         for p in store?.projects() ?? [] {
             out.append(Target(id: "project-\(p.id)", name: p.name, kind: "project",
                               open: pagesFolder.appendingPathComponent("project-\(p.slug).html").path))
