@@ -31,7 +31,7 @@ extension EarshotActionRunner {
 
 extension AX {
     /// Walks the elements of a window (breadth first) and reads their file addresses (AXURL with "file:"). Web
-    /// content is skipped. After each new address, `answer` gets all addresses so far, and the first non-nil answer
+    /// content and a sidebar are skipped. After each new address, `answer` gets all addresses so far, and the first non-nil answer
     /// ends the walk. The walk also stops after `budgetMs` or `maxNodes` elements.
     static func fileURLs(in window: AXUIElement, budgetMs: Int = 80, maxNodes: Int = 800,
                          answer: ([String]) -> String?) -> String? {
@@ -42,7 +42,10 @@ extension AX {
         while index < queue.count, index < maxNodes, Clock.ms(since: t0) < Double(budgetMs) {
             let element = queue[index]
             index += 1
-            if role(element) == "AXWebArea" { continue }
+            let r = role(element)
+            if r == "AXWebArea" { continue }
+            // A sidebar holds places, not the items of the window. In Finder it is about a third of the elements.
+            if r == "AXOutline" || r == "AXScrollArea", string(element, "AXDescription")?.lowercased() == "sidebar" { continue }
             if let u = copy(element, "AXURL") {
                 let s = (u as? URL)?.absoluteString ?? text(u)
                 if let s, s.hasPrefix("file:") {
