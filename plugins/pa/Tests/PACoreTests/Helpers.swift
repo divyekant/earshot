@@ -24,8 +24,8 @@ struct TimeCase {
     var expected: String
 }
 
-func timeCases() -> [TimeCase] {
-    let url = Bundle.module.url(forResource: "time-phrases", withExtension: "tsv", subdirectory: "Fixtures")!
+func timeCases(file: String = "time-phrases") -> [TimeCase] {
+    let url = Bundle.module.url(forResource: file, withExtension: "tsv", subdirectory: "Fixtures")!
     let text = try! String(contentsOf: url, encoding: .utf8)
     let f = DateFormatter()
     f.locale = Locale(identifier: "en_US_POSIX")
