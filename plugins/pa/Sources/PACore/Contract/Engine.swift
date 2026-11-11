@@ -16,6 +16,8 @@ public final class Engine {
     var settingsStamp: Date?
     var lastCapture: LastCapture?
     var helloDone = false
+    var pagesDirty = true
+    var pagesWrittenAt: Date?
     var startedAt: Date?
 
     public var storeURL: URL { folder.appendingPathComponent("pa.sqlite") }
@@ -103,6 +105,7 @@ public final class Engine {
             let start = Date()
             let answer = command(id: id, lead: lead, text: text, context: context)
             output.send(answer)
+            flushPages()
             let ms = Int(Date().timeIntervalSince(start) * 1000)
             log.write(clock.now, "command", ["lead": PACommand.from(lead: lead)?.rawValue ?? "unknown",
                                              "words": String(text.split(separator: " ").count), "ms": String(ms)])
@@ -122,6 +125,8 @@ public final class Engine {
             helloDone = true
             missedList(at: startedAt ?? clock.now)
         }
+        sendTargets()
+        flushPages(force: true)
         tick()
         probeReminders()
     }
@@ -186,11 +191,15 @@ public final class Engine {
     /// An item is new or changed. The clock, the pages and the copy in Reminders act on it.
     func itemChanged(_ it: Item, old: Item?) {
         planAlerts(it, old: old)
+        markPagesDirty()
     }
 
     /// A document is new or changed.
-    func docsChanged() {}
+    func docsChanged() { markPagesDirty() }
 
-    /// A project is new or changed.
-    func projectsChanged() {}
+    /// A project is new or changed. earshot gets the new targets.
+    func projectsChanged() {
+        markPagesDirty()
+        sendTargets()
+    }
 }

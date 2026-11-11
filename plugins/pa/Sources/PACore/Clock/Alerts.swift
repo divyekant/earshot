@@ -57,6 +57,7 @@ extension Engine {
            let s = a.shownAt { times.append(s.addingTimeInterval(repeatAfter)) }
         if let q = quietUntil, q > now { times.append(q) }
         times.append(nextMorning(now))
+        if pagesDirty, let w = pagesWrittenAt { times.append(w.addingTimeInterval(1)) }
         return times.min()
     }
 
@@ -86,6 +87,12 @@ extension Engine {
         repeatAlerts(now)
         morningList(now)
         clockTicked()
+        // The pages show "today" and "late": write them again when the day changes.
+        if store?.meta("pages_day") != Day(now, clock.calendar).description {
+            try? store?.setMeta("pages_day", Day(now, clock.calendar).description)
+            markPagesDirty()
+        }
+        flushPages()
     }
 
     /// Other packages act at each tick (the copy in Reminders, the pages).
