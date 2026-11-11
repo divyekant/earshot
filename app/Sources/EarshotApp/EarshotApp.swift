@@ -17,13 +17,25 @@ struct EarshotApp: App {
     @StateObject private var app = AppController()
 
     var body: some Scene {
-        MenuBarExtra("earshot", systemImage: "ear") {
+        MenuBarExtra {
+            Text(app.listenLabel)
             Text(app.status)
+            Divider()
+            Button(app.isPaused ? "Resume listening" : "Pause for 1 hour") {
+                if app.isPaused { app.resume() } else { app.pause(seconds: AppController.pauseSeconds) }
+            }
+            Picker("Mode", selection: Binding(get: { app.settings.mode }, set: { app.setMode($0) })) {
+                Text("Hold key").tag(InputMode.hold)
+                Text("Always on").tag(InputMode.alwaysOn)
+            }
             Divider()
             OpenManageButton()
             Toggle("Start at login", isOn: Binding(get: { app.startsAtLogin }, set: { app.setStartsAtLogin($0) }))
             Divider()
             Button("Quit earshot") { NSApplication.shared.terminate(nil) }
+        } label: {
+            Image(systemName: ListenIcon.symbol(app.listen))
+                .accessibilityLabel("earshot: " + app.listenLabel)
         }
         Window("earshot", id: "manage") {
             ManageView(settings: $app.settings, store: app.store, hooks: app.hooks)
@@ -52,6 +64,12 @@ final class AppController: ObservableObject {
     private var applied: EarshotSettings
     @Published var status = "Starting…"
     @Published var startsAtLogin = SMAppService.mainApp.status == .enabled
+    /// What earshot does with the microphone now, for the menu bar icon (gap list item 10).
+    @Published var listen = ListenState.idle
+    /// The facts that give `listen`. Change it only with `updateListen`.
+    var listenClock = ListenClock()
+    /// Reads `listen` again when a window or the pause ends.
+    var listenTimer: DispatchWorkItem?
 
     let store = Store()
     let feedback = FeedbackNote()
@@ -61,7 +79,7 @@ final class AppController: ObservableObject {
     let pipeline: CommandPipeline
     /// The turn recorder of always-on mode (E7): numbers only, 7 days.
     let turns: TurnRecorder
-    private var input: InputSwitch?
+    var input: InputSwitch?
     private var engineWhy = ""
     /// The wake phrase models (D-11). They load when always-on mode is on, and stay loaded.
     private var wake: WakeModels?
@@ -274,9 +292,15 @@ final class AppController: ObservableObject {
         (pipeline.engine as? MicIdleControl)?.setMicIdleClose(seconds: MicIdle.seconds(for: settings.mode))
     }
 
-    private func startInput() {
+    func startInput() {
         input?.stop()
         applyPhraseHints()
+        // Paused: no input runs, and the microphone of the speech engine closes (gap list item 10).
+        if isPaused {
+            input = nil
+            (pipeline.engine as? MicIdleControl)?.setMicIdleClose(seconds: MicIdle.holdSeconds)
+            return
+        }
         let listener = makeWakeListener()
         let input = InputTriggers.make(settings, wake: listener)
         let pipeline = self.pipeline, menus = self.menus, feedback = self.feedback, turns = self.turns
@@ -287,9 +311,11 @@ final class AppController: ObservableObject {
             // A wake plays the sound in onWake.
             let problem = pipeline.begin()
             if input?.current == .hold { self?.playStartSound() }
+            self?.updateListen { $0.turnStarted() }
             if let problem { self?.feedback.show(problem, ok: false) }
         }
-        input.onCancel = { why in
+        input.onCancel = { [weak self] why in
+            self?.updateListen { $0.turnDropped() }
             // Log the voice score of a turn that the voice check dropped, for the limits (no text).
             let turn = turns.take()
             var activity: ActivityRecord?
@@ -301,7 +327,7 @@ final class AppController: ObservableObject {
             pipeline.turnVoice = nil
             Task { await pipeline.cancel() }
         }
-        input.onStop = { [weak input] in
+        input.onStop = { [weak self, weak input] in
             let mode = input?.current ?? .hold
             let turn = mode == .alwaysOn ? turns.take() : nil
             Task { @MainActor in
@@ -309,8 +335,15 @@ final class AppController: ObservableObject {
                 turns.write(turn, activity: record)
                 // After an always-on command, the owner's voice can give the next one with no wake phrase.
                 // A follow-up turn that was not a command does not open the window again: it was talk, not a command.
-                if mode == .alwaysOn, !record.heard.isEmpty, !pipeline.followUpMissed {
-                    input?.commandFinished(expectsText: pipeline.expectsText, soundSeconds: Self.seconds(of: pipeline.lastSound))
+                let window = mode == .alwaysOn && !record.heard.isEmpty && !pipeline.followUpMissed
+                let sound = Self.seconds(of: pipeline.lastSound)
+                if window {
+                    input?.commandFinished(expectsText: pipeline.expectsText, soundSeconds: sound)
+                }
+                self?.updateListen {
+                    $0.turnFinished(at: Date(), followUpSeconds: window ? (input?.alwaysOn as? WakeTrigger)?.config.followUpSeconds : nil,
+                                    soundSeconds: sound, armedUntil: pipeline.armedUntil,
+                                    expectsText: window && pipeline.expectsText)
                 }
                 // A command can change which items are enabled ("Copy" after "select all"). Read again for the next one.
                 if let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier { menus.refresh(front) }
@@ -495,7 +528,7 @@ final class AppController: ObservableObject {
     }
 
     /// The management window changed the settings (it saved them already).
-    private func apply(_ new: EarshotSettings) {
+    func apply(_ new: EarshotSettings) {
         // Compare with the settings that the running parts use, not with `settings`: the window changed `settings`
         // already, so a comparison with it found no change, and a new wake phrase did not reach the listener.
         let restart = SettingsRestart.needed(from: applied, to: new)
