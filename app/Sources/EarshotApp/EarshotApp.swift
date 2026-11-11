@@ -77,6 +77,8 @@ final class AppController: ObservableObject {
     let names: NameIndex
     let runner: EarshotActionRunner
     let pipeline: CommandPipeline
+    /// The turn recorder of always-on mode (E7): numbers only, 7 days.
+    let turns: TurnRecorder
     var input: InputSwitch?
     private var engineWhy = ""
     /// The wake phrase models (D-11). They load when always-on mode is on, and stay loaded.
@@ -134,6 +136,7 @@ final class AppController: ObservableObject {
         applied = settings
         names = NameIndex(apps: { store.apps }, store: store)
         runner = EarshotActionRunner(options: ActionOptions(settings: settings), store: store)
+        turns = TurnRecorder(store: store, settings: settings)
         let (engine, why) = SpeechEngines.make(settings)
         engineWhy = why
         let names = self.names
@@ -300,7 +303,7 @@ final class AppController: ObservableObject {
         }
         let listener = makeWakeListener()
         let input = InputTriggers.make(settings, wake: listener)
-        let pipeline = self.pipeline, menus = self.menus, feedback = self.feedback
+        let pipeline = self.pipeline, menus = self.menus, feedback = self.feedback, turns = self.turns
         let gate = settings.voiceGate
         input.onStart = { [weak self, weak input] in
             // Hold key: open the microphone first, then the start sound. The microphone is closed between commands
@@ -317,17 +320,22 @@ final class AppController: ObservableObject {
             let wake = pipeline.pendingWake
             let cue = CommandPipeline.cuesDrop(why, wake: wake)
             // Log the voice score of a turn that the voice check dropped, for the limits (no text).
+            let turn = turns.take()
+            var activity: ActivityRecord?
             if why.hasPrefix(WakeTrigger.otherVoice) || why.hasPrefix(WakeTrigger.tooShort) {
-                pipeline.droppedTurn(why)
+                activity = pipeline.droppedTurn(why)
             }
+            turns.write(turn, activity: activity)
             pipeline.pendingWake = nil
             pipeline.turnVoice = nil
             Task { if cue { await pipeline.dropWakeTurn(wake) } else { await pipeline.cancel() } }
         }
         input.onStop = { [weak self, weak input] in
             let mode = input?.current ?? .hold
+            let turn = mode == .alwaysOn ? turns.take() : nil
             Task { @MainActor in
                 let record = await pipeline.finish(mode: mode)
+                turns.write(turn, activity: record)
                 // After an always-on command, the owner's voice can give the next one with no wake phrase.
                 // A follow-up turn that was not a command does not open the window again: it was talk, not a command.
                 let window = mode == .alwaysOn && !record.heard.isEmpty && !pipeline.followUpMissed
@@ -357,7 +365,8 @@ final class AppController: ObservableObject {
                 pipeline.pendingWake = hit
                 if self?.settings.showFeedback == true { feedback.show("Listening…", ok: true) }
             }
-            trigger.onRejected = { hit in pipeline.rejectedWake(hit, threshold: gate) }
+            trigger.onRejected = { hit in turns.write(turns.take(), activity: pipeline.rejectedWake(hit, threshold: gate)) }
+            trigger.onRecord = { record in turns.hold(record) }
             trigger.onTurnVoice = { voice in pipeline.turnVoice = voice }
             trigger.onVoiceLearned = { [weak self] profile in self?.saveLearnedVoice(profile) }
             trigger.onNearMisses = { misses in pipeline.nearMisses(misses) }
@@ -531,6 +540,7 @@ final class AppController: ObservableObject {
         pipeline.showFeedback = new.showFeedback
         pipeline.playSounds = new.playSounds
         pipeline.wakePhrase = new.wakePhrase
+        turns.apply(new)
         runner.options = ActionOptions(settings: new)
         if restart.contains(.jev) { applyJev() }
         if restart.contains(.engine) {

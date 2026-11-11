@@ -95,11 +95,20 @@ enum SwitcherTiming {
     static let typedMs = 1000
     /// From the name in the field to a result that shows the name. It replaces the fixed 250 ms sleep of E0.
     static let resultMs = 800
+    /// After Return in the switcher: the longest wait for the field to close before earshot presses the result row.
+    static let returnMs = 250
 }
 
 /// The time limit for "scroll into view" before a click (E2, section 7).
 enum ScrollTiming {
     static let limitMs = 300
+}
+
+/// What the switcher list shows after the name (see ActionRules.switcherResult).
+enum SwitcherResult: Equatable {
+    case none
+    case chat
+    case searchFirst
 }
 
 /// The result of the chat check.
@@ -241,9 +250,68 @@ enum ActionRules {
         Set(texts.filter { chatCheck(texts: [$0.0], names: [name]) != .none }.map { placeKey($0.0, $0.1) })
     }
 
-    /// True if a text that matches the name shows at a place where it was not before typing.
+    /// True if a chat row that matches the name shows at a place where it was not before typing.
     static func resultShows(_ texts: [(String, Frame)], name: String, baseline: Set<String>) -> Bool {
-        !matchKeys(texts, name: name).subtracting(baseline).isEmpty
+        switcherResult(texts, name: name, baseline: baseline) == .chat
+    }
+
+    /// The start words of a row that runs the typed text as a query, not a chat. Slack (2026) shows
+    /// "Search for: <name>", "Show results for: <name>" and "Ask Slackbot about <name>" in its Cmd-K list.
+    /// Such a row holds the typed name, so the name alone does not make it a result.
+    static let queryRowStarts = ["search for", "show results", "search in", "search all", "ask "]
+
+    /// True if one text of the row starts with a query word.
+    static func isQueryRow(_ texts: [String]) -> Bool {
+        texts.contains { t in
+            let s = t.lowercased().trimmingCharacters(in: .whitespaces)
+            return queryRowStarts.contains { s.hasPrefix($0) }
+        }
+    }
+
+    /// Groups the texts of a result list into rows, from top to bottom. A text joins the row above it
+    /// if it starts before that row ends. A section label whose frame covers two or more rows
+    /// (Slack "Suggestions") is left out, so that it does not join the rows into one.
+    static func rows(_ texts: [(String, Frame)]) -> [[(String, Frame)]] {
+        let starts = Set(texts.map { Int($0.1.y.rounded()) })
+        func isSection(_ f: Frame) -> Bool {
+            starts.filter { Double($0) > f.y + 2 && Double($0) < f.maxY - 2 }.count >= 2
+        }
+        var out: [[(String, Frame)]] = []
+        var rowEnd = -Double.infinity
+        for t in texts.filter({ !isSection($0.1) }).sorted(by: { $0.1.y < $1.1.y }) {
+            if !out.isEmpty, t.1.y < rowEnd - 2 {
+                out[out.count - 1].append(t)
+                rowEnd = max(rowEnd, t.1.maxY)
+            } else {
+                out.append([t])
+                rowEnd = t.1.maxY
+            }
+        }
+        return out
+    }
+
+    /// What Return in the switcher would open. `.chat`: the first result row is a new row that matches the name.
+    /// `.searchFirst`: a query row stays above that row, so Return would run a search. `.none`: no such row yet.
+    static func switcherResult(_ texts: [(String, Frame)], name: String, baseline: Set<String>) -> SwitcherResult {
+        var queryAbove = false
+        for row in rows(texts) {
+            if isQueryRow(row.map(\.0)) { queryAbove = true; continue }
+            if !matchKeys(row, name: name).subtracting(baseline).isEmpty { return queryAbove ? .searchFirst : .chat }
+        }
+        return .none
+    }
+
+    /// The result row to press when Return does not open the chat (WhatsApp): the top row that is new,
+    /// matches the name, is not a query row and has no risky word. Returns its index in `rows`, or nil.
+    static func pickResultRow(_ rows: [(label: String, frame: Frame)], name: String, baseline: Set<String>) -> Int? {
+        let order = rows.indices.sorted { rows[$0].frame.y < rows[$1].frame.y }
+        for i in order {
+            let (label, f) = rows[i]
+            if isQueryRow([label]) || SafetyPolicy.isRisky(label) { continue }
+            if baseline.contains(placeKey(label, f)) { continue }
+            if chatCheck(texts: [label], names: [name]) != .none { return i }
+        }
+        return nil
     }
 
     /// The reason not to type the dictated text into the chat, or nil (R-NV-4).

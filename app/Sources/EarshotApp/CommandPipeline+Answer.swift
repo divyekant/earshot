@@ -164,7 +164,7 @@ extension CommandPipeline {
         let outcome = await actions.run(intent, context: context, command: command)
         if types { pauseAlwaysOn(false) }
         for (k, ms) in outcome.stages { stages["action." + k] = ms }
-        if types, outcome.ok { noteTyped(mode: mode) }
+        if types, outcome.ok { noteTyped(mode: mode, text: Self.typedText(intent)) }
         var (ok, note) = (outcome.ok, outcome.note)
         // "… and send": a send needs the hold key in the command and in the answer (R-NV-5). In always-on mode the
         // owner says "send" on its own (D-12): sendAfterTyping only types and says so.

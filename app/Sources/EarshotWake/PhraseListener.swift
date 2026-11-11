@@ -21,6 +21,10 @@ final class PhraseListener: WakeListener {
     let matcher: TemplateMatcher?
     /// The match of the last push, if the templates found the phrase.
     private var pendingMatch: TemplateMatcher.Match?
+    /// The last encoder frames and their scores, for the turn recorder (E7). Memory only.
+    private var frameRing = FrameRing()
+    /// The trace of the last hit, until `takeTrace`.
+    private var pendingTrace: WakeTrace?
 
     static let rate = 16000
     /// One encoder frame of the spotter is 40 ms.
@@ -65,8 +69,10 @@ final class PhraseListener: WakeListener {
         session = try models.locked { try models.base.createSession() }
         // Each encoder frame goes to the matcher, and the keyword decoder does not run.
         session.frameSink = { [weak self] frame in
-            guard let self, let match = matcher.push(frame), self.pendingMatch == nil else { return }
-            self.pendingMatch = match
+            let match = matcher.push(frame)
+            guard let self else { return }
+            self.frameRing.add(frame, score: matcher.lastScore)
+            if let match, self.pendingMatch == nil { self.pendingMatch = match }
         }
     }
 
@@ -107,6 +113,7 @@ final class PhraseListener: WakeListener {
         if matcher != nil {
             guard let match = pendingMatch else { return nil }
             pendingMatch = nil
+            pendingTrace = frameRing.trace(matchStart: match.startFrame, matchEnd: match.endFrame, limit: matcher?.limit ?? 0)
             // The first and the last frame of the match take the place of the time stamps of the word pieces.
             return hit(stamps: [match.startFrame, match.endFrame], matchScore: match.score, matchWorst: match.worst)
         }
@@ -142,6 +149,11 @@ final class PhraseListener: WakeListener {
         return (min(start, total), end, clipEnd)
     }
 
+    func takeTrace() -> WakeTrace? {
+        defer { pendingTrace = nil }
+        return pendingTrace
+    }
+
     func voiceScore(_ samples: [Float]) -> Double? {
         guard let profile else { return nil }
         return try? models.voiceScore(samples, profile: profile)
@@ -168,6 +180,7 @@ final class PhraseListener: WakeListener {
         total = 0
         matcher?.reset()
         pendingMatch = nil
+        frameRing.reset()
         do { try models.locked { try session.reset() } } catch {
             NSLog("earshot wake: the spotter reset failed: %@", "\(error)")
         }
