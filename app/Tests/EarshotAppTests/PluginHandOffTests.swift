@@ -183,6 +183,29 @@ final class PluginHandOffTests: XCTestCase {
         XCTAssertTrue(last?.contains("it is off") == true, last ?? "nil")
     }
 
+    /// A new build of the program, with the same plugin.json: "Read again" (reload) starts the new program.
+    /// The approval stays.
+    func testNewProgramStartsOnReload() throws {
+        let host = try install("echo", run: ["./plugin.sh"], script: echo)
+        defer { host.stopAll() }
+        func answer() -> String? {
+            let answered = expectation(description: "answer")
+            var got: String?
+            host.onAnswer = { message, _ in got = message.shownText; answered.fulfill() }
+            XCTAssertNil(host.handOff(pluginID: "echo", lead: "note", text: "x", available: [:]))
+            wait(for: [answered], timeout: 5)
+            host.onAnswer = nil
+            return got
+        }
+        XCTAssertEqual(answer(), "kept")
+        let file = folder.appendingPathComponent("plugins/echo/plugin.sh")
+        try Data(echo.replacingOccurrences(of: "kept", with: "new build").utf8).write(to: file)
+        try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(10)], ofItemAtPath: file.path)
+        host.reload()
+        XCTAssertEqual(host.leads, [PluginLead(pluginID: "echo", lead: "note")], "the approval stays")
+        XCTAssertEqual(answer(), "new build")
+    }
+
     /// A changed manifest stops the plugin and needs a new approval.
     func testChangedManifestNeedsApproval() throws {
         let host = try install("echo", run: ["./plugin.sh"], script: echo)
