@@ -77,6 +77,17 @@ final class ChatStageBench: XCTestCase {
         if let combo = Keys.parse(keys) { Keys.press(combo) }
         try await Task.sleep(nanoseconds: 400_000_000)
         print("DUMP focus after keys: \(AX.describeFocus(app))")
+        // A field that shows without focus (a new-chat panel): look for it for up to 2 s, then focus it.
+        let tScan = Clock.nowNs()
+        while Clock.ms(since: tScan) < 2000, let w = AX.window(app), let f = AX.focused(app), !AX.isSwitcherField(f, in: w) {
+            if let field = AX.switcherFields(in: w, budgetMs: 60).first {
+                print("DUMP field found at +\(Int(Clock.ms(since: tScan)) + 400) ms: \(AX.role(field)) \(AX.label(field)); focus set: \(AX.set(field, "AXFocused", kCFBooleanTrue))")
+                try await Task.sleep(nanoseconds: 100_000_000)
+                break
+            }
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+        print("DUMP focus now: \(AX.describeFocus(app))")
         // Type only into a switcher field, never into a message box.
         guard let field0 = AX.focused(app), let win = AX.window(app), AX.isSwitcherField(field0, in: win),
               !AX.isComposer(field0, in: win), !AX.looksLikeComposer(field0) else {
