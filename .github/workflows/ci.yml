@@ -107,6 +107,8 @@ jobs:
         run: grep -E "PROBE|MARK|CONTRACT" "$RUNNER_TEMP/pa-test.log" || true
 
       # Phase 2, Q1: the GGUF files of candidates 3 and 4, at a fixed revision with a SHA-256 check.
+      # CI only checks the download. The bench of candidates 3 and 4 runs on the Mac (Apple GPU):
+      # on the CI machine one run used all of the 30 minutes.
       - name: Cache the embedding models
         uses: actions/cache@v4
         with:
@@ -122,18 +124,16 @@ jobs:
       # The models of macOS only. The contextual model may need a one-time download of macOS data.
       - name: Embedding bench
         if: always()
+        timeout-minutes: 12
         run: |
           set -uo pipefail
           swift build -c release --product earshot-pa
           fx=Tests/PACoreTests/Fixtures/phase2
-          for e in hash nl-sentence nl-contextual qwen3 gemma; do
-            model=""
-            if [ "$e" = qwen3 ]; then model="--model $HOME/pa-models/Qwen3-Embedding-0.6B-Q8_0.gguf"; fi
-            if [ "$e" = gemma ]; then model="--model $HOME/pa-models/embeddinggemma-300M-Q8_0.gguf"; fi
+          for e in hash nl-sentence nl-contextual; do
             for d in full 256; do
               echo "=== bench $e, numbers: $d"
               if [ "$d" = full ]; then extra=""; else extra="--dims 256"; fi
-              .build/release/earshot-pa --embed-bench "$fx" --embedder "$e" --get-assets $model $extra 2>/dev/null || echo "bench $e failed"
+              .build/release/earshot-pa --embed-bench "$fx" --embedder "$e" --get-assets $extra 2>/dev/null || echo "bench $e failed"
             done
           done
 
