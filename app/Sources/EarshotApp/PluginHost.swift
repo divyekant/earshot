@@ -51,7 +51,9 @@ final class PluginHost: PluginHandOff, @unchecked Sendable {
         lock.lock()
         let wanted = found.filter { $0.approved && $0.problems.isEmpty }
         let keep = Set(wanted.map(\.hash))
-        let stop = processes.filter { !keep.contains($0.value.hash) }
+        // A plugin also stops if its program files changed since it started, so that "Read again" starts a new build.
+        // The approval stays on the plugin.json hash.
+        let stop = processes.filter { !keep.contains($0.value.hash) || $0.value.stamp != PluginProcess.stamp(of: $0.value.entry) }
         for id in stop.keys { processes[id] = nil; targetCache[id] = nil }
         entries = found
         starts = [:]
@@ -167,6 +169,8 @@ final class PluginHost: PluginHandOff, @unchecked Sendable {
 final class PluginProcess: @unchecked Sendable {
     let entry: PluginEntry
     var hash: String { entry.hash }
+    /// The program files when the process started. See `stamp(of:)`.
+    let stamp: String
     private let dataFolder: URL
     private let onMessage: (PluginMessage) -> Void
     private let onExit: (PluginProcess) -> Void
@@ -183,6 +187,25 @@ final class PluginProcess: @unchecked Sendable {
     init(entry: PluginEntry, dataFolder: URL, onMessage: @escaping (PluginMessage) -> Void,
          onExit: @escaping (PluginProcess) -> Void) {
         self.entry = entry; self.dataFolder = dataFolder; self.onMessage = onMessage; self.onExit = onExit
+        stamp = Self.stamp(of: entry)
+    }
+
+    /// The name, the size and the change date of the program and of each file directly in the plugin folder.
+    /// A new build of the plugin changes it, also when plugin.json stays the same. The read is not recursive,
+    /// so a large folder below the plugin folder does not slow it.
+    static func stamp(of entry: PluginEntry) -> String {
+        let fm = FileManager.default
+        let first = entry.manifest.run.first ?? ""
+        let program = first.hasPrefix("/") ? URL(fileURLWithPath: first) : entry.folder.appendingPathComponent(first)
+        let keys: [URLResourceKey] = [.contentModificationDateKey, .fileSizeKey, .isRegularFileKey]
+        let inFolder = (try? fm.contentsOfDirectory(at: entry.folder, includingPropertiesForKeys: keys)) ?? []
+        var lines: [String] = []
+        for file in [program.resolvingSymlinksInPath()] + inFolder.map({ $0.resolvingSymlinksInPath() }) {
+            guard let v = try? file.resourceValues(forKeys: Set(keys)), v.isRegularFile == true else { continue }
+            let date = v.contentModificationDate?.timeIntervalSince1970 ?? 0
+            lines.append("\(file.path) \(v.fileSize ?? 0) \(date)")
+        }
+        return Set(lines).sorted().joined(separator: "\n")
     }
 
     var isRunning: Bool { stateLock.lock(); defer { stateLock.unlock() }; return alive }

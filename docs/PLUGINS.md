@@ -28,6 +28,8 @@ The plugins folder is `~/Library/Application Support/earshot/plugins/`. Each plu
 
 If the `plugin.json` file changes, the approval stops. Approve the plugin again.
 
+If you install a new build of the plugin program, click "Read again". earshot stops the old program and starts the new one. The approval stays. earshot sees a change in the program file and in each file directly in the plugin folder.
+
 ## 3. The manifest: plugin.json
 
 ```json
