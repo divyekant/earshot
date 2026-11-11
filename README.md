@@ -15,7 +15,19 @@ You look at the screen and say what you want. earshot finds the correct app, foc
 
 ## Status
 
-earshot is early software. The first full build of the app is in progress. Expect bugs and changes to the settings format.
+earshot is early software. Expect bugs and changes to the settings format.
+
+What works now:
+- Hold key: chat commands in Slack, Messages and WhatsApp, voice clicks, "show numbers", web addresses, chains of up to 10 commands, dictation into the focused field, spoken keys and "undo that".
+- Always-on mode, off by default: a wake phrase and a check of your voice. The end-of-turn rules still change after live tests.
+- A "not sure" note with two choices. earshot learns from your answer.
+- Plugins, experimental (`docs/PLUGINS.md`).
+
+What does not work yet:
+- "Mail <name>" opens Mail only. It does not start a new mail.
+- There is no signed download. You must build the app from source (see [Build](#build)).
+
+[docs/DESIGN.md](docs/DESIGN.md), section 5, gives the status of each phase.
 
 Each release has a tag `vX.Y.Z` and notes on the [Releases](https://github.com/divyekant/earshot/releases) page. [CHANGELOG.md](CHANGELOG.md) lists the changes. The `main` branch holds the latest release. The `develop` branch holds the work for the next release.
 
