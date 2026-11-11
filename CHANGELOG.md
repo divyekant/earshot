@@ -6,6 +6,10 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+### Changed
+
+- In hold mode, earshot closes the microphone after 2 minutes with no command, so the macOS microphone indicator goes off. The next hold-key press opens it again. That one command has no 450 ms preroll, so speak after the start sound. Always-on mode keeps the microphone open (R-ON-4, R-MD-1).
+
 ## [0.3.0] - 2026-11-03
 
 This release adds several commands in one sentence, a small on-Mac turn model for always-on mode, one voice profile for each microphone, a new ear icon, and a project web page. The voice check now uses the whole turn, and the voice print learns from good wake turns. Many always-on fixes stop the loss of long dictation and of follow-up turns.

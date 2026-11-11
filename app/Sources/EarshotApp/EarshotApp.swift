@@ -256,9 +256,11 @@ final class AppController: ObservableObject {
 
     /// In always-on mode, the speech engine gets the wake phrase as context, so that Apple speech spells it right more
     /// often (D-11). In hold mode, no hints.
+    /// In hold mode, the microphone also closes after 2 minutes with no command (`MicIdle`).
     private func applyPhraseHints() {
         let hints = settings.mode == .alwaysOn ? [settings.wakePhrase] : []
         (pipeline.engine as? PhraseHintControl)?.setPhraseHints(hints)
+        (pipeline.engine as? MicIdleControl)?.setMicIdleClose(seconds: MicIdle.seconds(for: settings.mode))
     }
 
     private func startInput() {

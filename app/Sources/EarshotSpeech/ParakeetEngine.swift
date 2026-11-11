@@ -11,7 +11,7 @@ import Foundation
 /// With 0.3.1, the load copied about 700 MB of weights into app memory (memory study 2026-11-03, R-MD-3).
 /// The file must not change in place while the model is loaded. A changed page stops the app (SIGBUS).
 /// The model weights are CC BY 4.0 (NVIDIA Parakeet). Credit them in the app's About text.
-public final class ParakeetEngine: TurnSpeechEngine, PrerollControl, CaptureControl, @unchecked Sendable {
+public final class ParakeetEngine: TurnSpeechEngine, PrerollControl, CaptureControl, MicIdleControl, @unchecked Sendable {
     public static let engineID = "parakeet"
     public let id = ParakeetEngine.engineID
     public let modelPath: String
@@ -98,12 +98,13 @@ public final class ParakeetEngine: TurnSpeechEngine, PrerollControl, CaptureCont
 
     public func setNextPreroll(seconds: Double) { mic.setNextPreroll(seconds: seconds) }
     public func setNextCapture(seconds: Double) { mic.setNextCapture(seconds: seconds) }
+    public func setMicIdleClose(seconds: Double?) { mic.setIdleClose(seconds: seconds) }
 
     public func begin() throws {
         guard useMicrophone else { throw SpeechError("this Parakeet engine has no microphone") }
         guard mic.isRunning else { throw SpeechError("Parakeet is not ready: call prepare() first") }
         startTurn()
-        mic.begin { [weak self] buffer in self?.feed(AudioUtil.floats(buffer)) }
+        try mic.begin { [weak self] buffer in self?.feed(AudioUtil.floats(buffer)) }
     }
 
     /// Starts a turn with no microphone. The caller gives the audio with `feed`. For measurements.
