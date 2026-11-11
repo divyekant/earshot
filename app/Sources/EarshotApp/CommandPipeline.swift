@@ -57,6 +57,8 @@ final class CommandPipeline {
     /// The last typing that worked: the time and the front app. In always-on mode, "send" alone may follow it
     /// within `sendAfterTypingSeconds`, in the same app (the owner's choice, D-12, R-ON-5).
     private(set) var lastTyped: (at: Date, app: String?)?
+    /// The text of the last typing, for "undo that" (I-34). In memory only: never in the log, never on disk.
+    var lastTypedText: String?
     static let sendAfterTypingSeconds: TimeInterval = 5
     /// After earshot typed in always-on mode, a turn that starts within this time goes on with the text.
     static let continueTypingSeconds: TimeInterval = 3
@@ -321,7 +323,7 @@ final class CommandPipeline {
             let outcome = await actions.run(.typeText(body ?? text), context: context, command: CommandInfo(mode: .hold, tier: .rules))
             pauseAlwaysOn(false)
             for (k, ms) in outcome.stages { stages["action." + k] = ms }
-            if outcome.ok { noteTyped(mode: .hold) }
+            if outcome.ok { noteTyped(mode: .hold, text: body ?? text) }
             var (ok, note) = (outcome.ok, outcome.note)
             if body != nil, outcome.ok { (ok, note) = await sendAfterTyping(mode: .hold, note: note, context: context, stages: &stages) }
             return done(heard: text, intent: IntentText.describe(.typeText(body ?? text), apps: rows, screen: context.screen),
@@ -348,7 +350,7 @@ final class CommandPipeline {
             return done(heard: text, intent: describe, tier: result.tier, ok: false, note: note, stages: stages, clock, why: why)
         }
 
-        let intent = result.intent
+        var intent = result.intent
         // A false wake must never send (R-ON-5, R-NV-5). In always-on mode, "send" alone sends only in the checked
         // voice of the owner, within 5 s after earshot typed in the same app (D-12). The action rules check it again.
         var ownerSend = false
@@ -363,6 +365,12 @@ final class CommandPipeline {
             return done(heard: text, intent: "none", tier: result.tier, ok: false, note: "not a command", stages: stages, clock,
                         quiet: followUpMissed, why: why)
         }
+        // Spoken keys and "undo that" (I-34): their own rules, in CommandPipeline+Keys.swift.
+        let keyed = keyRule(intent, mode: mode, ownerVoice: ownerVoice, front: front, now: started)
+        if let block = keyed.block {
+            return done(heard: text, intent: describe, tier: result.tier, ok: false, note: block, stages: stages, clock, why: why)
+        }
+        intent = keyed.intent
 
         let types = Self.types(intent)
         if types { pauseAlwaysOn(true) }
@@ -372,7 +380,8 @@ final class CommandPipeline {
         if types { pauseAlwaysOn(false) }
         for (k, v) in outcome.stages { stages["action." + k] = v }
         if intent == .send { lastTyped = nil; sentThisTurn = outcome.ok }
-        if types, outcome.ok { noteTyped(mode: mode) }
+        if types, outcome.ok { noteTyped(mode: mode, text: Self.typedText(intent)) }
+        afterKey(intent, ok: outcome.ok)
         var (ok, note) = (outcome.ok, outcome.note)
         // "type X and send" (RouteResult.sendAfter): the router removed the send words. Type, then send.
         if result.sendAfter, types, outcome.ok {
@@ -497,7 +506,7 @@ final class CommandPipeline {
         let outcome = await actions.run(.typeText(typed), context: context, command: CommandInfo(mode: mode, tier: .rules))
         pauseAlwaysOn(false)
         for (k, ms) in outcome.stages { stages["action." + k] = ms }
-        if outcome.ok { noteTyped(mode: mode) }
+        if outcome.ok { noteTyped(mode: mode, text: typed) }
         var (ok, note) = (outcome.ok, outcome.note)
         if body != nil, outcome.ok { (ok, note) = await sendAfterTyping(mode: mode, note: note, context: context, stages: &stages) }
         return done(heard: heard, intent: "Type \(words) word\(words == 1 ? "" : "s")", tier: .rules, ok: ok,
@@ -515,12 +524,16 @@ final class CommandPipeline {
     }
 
     /// Records a typing that worked, with the front app, for an always-on "send" alone (D-12).
-    private func noteTyped(mode: InputMode) {
+    private func noteTyped(mode: InputMode, text: String?) {
         lastTyped = (now(), frontBundleID().flatMap { $0 == ownBundleID ? nil : $0 })
+        lastTypedText = text
         lastTypedAlwaysOn = mode == .alwaysOn
         typedThisTurn = true
         if mode == .alwaysOn { expectsText = true }
     }
+
+    /// Forgets the last typing (after "undo that" removed it).
+    func forgetTyping() { lastTyped = nil }
 
     /// After "… and send": with the hold key, send now through the normal send rules. In always-on mode, type
     /// only: the owner says "send" on its own (D-12).
@@ -568,7 +581,9 @@ final class CommandPipeline {
                 stages["step\(n).route"] = c.ms
             }
             turnTyped += Self.typedTexts(routed)
-            let (intent, tier, confidence, why, sendAfter) = (routed.intent, routed.tier, routed.confidence, routed.why,
+            // A chain has no voice check of its own here: in always-on mode, a chain never presses Return (I-34).
+            let keyed = keyRule(routed.intent, mode: mode, ownerVoice: false, front: context.frontBundleID, now: now())
+            let (intent, tier, confidence, why, sendAfter) = (keyed.intent, routed.tier, routed.confidence, routed.why,
                                                               routed.sendAfter)
             lastTier = tier
             let describe = IntentText.describe(intent, apps: rows, screen: context.screen)
@@ -584,6 +599,8 @@ final class CommandPipeline {
             } else if intent == .send, mode == .alwaysOn {
                 // dk's rule (D-12): in always-on mode, only "send" alone sends.
                 block = "say \"send\" on its own to send"
+            } else if let b = keyed.block {
+                block = b
             }
             if let block {
                 return stopChain(steps, at: i, guess: guess, heard: heard, ran: ran, describe: describe, reason: block,
@@ -597,7 +614,8 @@ final class CommandPipeline {
             if types { pauseAlwaysOn(false) }
             for (k, v) in outcome.stages { stages["step\(n).action.\(k)"] = v }
             if intent == .send { lastTyped = nil; sentThisTurn = outcome.ok }
-            if types, outcome.ok { noteTyped(mode: mode) }
+            if types, outcome.ok { noteTyped(mode: mode, text: Self.typedText(intent)) }
+            afterKey(intent, ok: outcome.ok)
             var (ok, note) = (outcome.ok, outcome.note)
             if sendAfter, types, outcome.ok {
                 (ok, note) = await sendAfterTyping(mode: mode, note: note, context: context, stages: &stages)

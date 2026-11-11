@@ -46,6 +46,7 @@ earshot uses one model for all apps. A command is one verb and one target.
 | scroll | `scroll` | "scroll down", "go to the top" |
 | back | `back` | "go back" |
 | send | `send` | "send" (hold key; in always-on, only "send" alone after typing, D-12, R-NV-5) |
+| key | `pressKey`, `undoTyping` | "backspace three times", "new line", "press tab", "undo that" (D-13) |
 
 "Show numbers" and "hide numbers" are display helpers for press.
 
@@ -65,6 +66,8 @@ earshot uses one model for all apps. A command is one verb and one target.
 4. Facts about one app are data (`apps.json`, `names.json`, `focus-methods.json`). They are never code.
 
 Plain words with no command word are dictation: with the hold key, the pipeline types them into the focused text field (`typeText`), if `ScreenSnapshot.focusedID` names an editable field that is not a password field and the page is not a sign-in, code or payment page. Dictation never presses Return. Always-on mode dictates only after a bare "type": the router sets `RouteResult.awaitsText`, and the next turn that starts within 5 s (in the owner's voice, so it passed the voice check) types its words into the focused field with the same field check. A command word in that turn runs as a command. It is one turn only. The log keeps the word count, not the words. Only a turn whose FIRST sentence is a command runs as a command; a command word later in the text is typed. After earshot typed in always-on mode, a turn that starts within 3 s in the same app, with no command in its first sentence, goes on with the text (one space before it, never Return). Each result plays a short system sound if "Play sounds" is on: one for done, one for sent, one for failed, blocked or not sure. When earshot waits for the owner's words (after "type", or after a typing), it plays no result sound: the note on screen is the cue, and the owner can go on talking at once. A quiet start sound (Tink, volume 0.3) plays the moment earshot starts to listen: on hold-key down, and on the wake phrase (also inside a follow-up turn). It is loaded and warmed up at start, so it plays 20-31 ms after the event. The voice check never hears it: a wake uses the audio of the phrase, before the sound. If earshot's own window is in front, the pipeline first brings back the app that was in front before it; earshot's own window is never a target.
+
+**Spoken keys and "undo that" (I-34, D-13).** The router reads a fixed key list from the words, with a count ("backspace three times", "left arrow twice"). It is text only (under 1 ms) and runs before the screen rules. A key phrase is a command, so dictation never types it. The action module checks the focused element first (`KeyRules`): Backspace and Forward Delete only in a text field, Return only in a text area that is not a message box, and no key on a sign-in, code or payment page. "undo that" removes the last text that earshot typed with Backspace presses, only in the same app and only if the field still ends with that text. A chain can hold a key step after "press" ("type hello, then press tab"). The text of the last typing stays in memory only.
 
 **A chain of commands (I-28).** One sentence can hold up to 10 steps: "click on this, click on that, type this and press send". `CommandRouter.steps` cuts the words at a comma, a sentence end, "and", "then", "and then" or "after that", but only where the next part starts with a step verb and the part before it is a command. After a text verb ("type", "message"), only "then", "and then", "after that" or a sentence end can end the text. A send phrase at the end stays on the text step as "and send", so the send rules of one command hold. The cut is text only (under 1 ms). It adds no verb and no intent. The pipeline routes each step on a new screen read, after the step before it ran and the screen settled (after "open <app>": until the app is in front, at most 2 s). Each step has its own confidence check and action safety check. If a step is not a command, is not sure, is blocked or fails, the chain stops and asks (dk, 2026-11-03): for 10 s, "go on" skips the step and runs the rest, "stop" ends the chain, "yes" runs the best guess of an unsure step, and other words replace the step. In always-on mode, only the owner's voice can answer, and a chain never sends: the owner says "send" on its own (D-12). One sound plays at the end of the chain.
 
@@ -227,6 +230,8 @@ Show a small overlay near the menu bar, for example "→ Slack · Ravi" or "✗ 
 ### 3.7 Optional text cleanup
 
 The oMLX server can clean up dictated text: punctuation and filler words. Make it optional, because it adds latency.
+
+Measured on 2026-11-11 ([experiments/text-cleanup-omlx.md](experiments/text-cleanup-omlx.md)): `qwen3.5-0.8b-mlx-4bit` takes 285 ms (median, warm), but it cleaned only 3 of 10 sentences and changed words in 2. earshot has no cleanup setting until a larger general model passes with 0 changed words.
 
 ## 4. Permissions
 

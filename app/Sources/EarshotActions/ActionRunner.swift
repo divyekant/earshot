@@ -60,6 +60,8 @@ public final class EarshotActionRunner: ActionRunner {
             overlay.hide()
             out = ok("numbers hidden")
         case .send: out = await send(command: command, watch: watch)
+        case let .pressKey(key, times): out = await pressKey(key, times: times, command: command, watch: watch)
+        case .undoTyping(let text): out = await undoTyping(text, watch: watch)
         }
         watch.mark("total")
         out.stages = watch.stages.merging(out.stages) { a, _ in a }
@@ -96,7 +98,7 @@ public final class EarshotActionRunner: ActionRunner {
     }
 
     /// Held modifier keys, for example the hold key, would change the keys and clicks that earshot sends.
-    private func waitForKeysUp(_ watch: Stopwatch) async {
+    func waitForKeysUp(_ watch: Stopwatch) async {
         guard Keys.modifiersDown() else { return }
         _ = await waitUntil(timeoutMs: 1500) { !Keys.modifiersDown() }
         watch.mark("keys_up")
@@ -848,6 +850,6 @@ public final class EarshotActionRunner: ActionRunner {
         return ok("menu \(path.joined(separator: " › "))")
     }
 
-    private func ok(_ note: String) -> ActionOutcome { ActionOutcome(ok: true, note: note) }
-    private func fail(_ note: String) -> ActionOutcome { ActionOutcome(ok: false, note: note) }
+    func ok(_ note: String) -> ActionOutcome { ActionOutcome(ok: true, note: note) }
+    func fail(_ note: String) -> ActionOutcome { ActionOutcome(ok: false, note: note) }
 }
