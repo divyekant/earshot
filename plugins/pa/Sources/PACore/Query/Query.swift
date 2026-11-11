@@ -120,34 +120,20 @@ extension Engine {
     }
 
     func whereIs(id: String, text: String) -> Outgoing {
-        guard let store else { return .note(id, "The PA store does not open.") }
+        guard store != nil else { return .note(id, "The PA store does not open.") }
         // A long text: the first 12 different words only. A query with 2,000 words took seconds (replay, phase 2).
         let words = Array(Fusion.unique(Engine.searchWords(String(text.prefix(Engine.maxRead)))).prefix(12))
         let shownWords = String(Engine.clean(text).prefix(80))
         guard !words.isEmpty else { return .note(id, "Nothing found for \(shownWords).") }
-        let hits = store.search(words, limit: 20)
-        var records: [(RecordKind, Int64, String)] = []
-        for (kind, rid) in hits {
-            switch kind {
-            case .item:
-                guard let it = store.item(rid), it.state != .dropped else { continue }
-                var parts = [it.title.isEmpty ? it.said : it.title, Engine.kindLabel(it)]
-                if let p = projectName(it.projectID) { parts.append(p) }
-                records.append((.item, rid, parts.joined(separator: " · ")))
-            case .doc:
-                guard let d = store.doc(rid), d.droppedAt == nil else { continue }
-                var parts = [d.title, "document"]
-                if let p = projectName(d.projectID) { parts.append(p) }
-                records.append((.doc, rid, parts.joined(separator: " · ")))
-            case .project:
-                guard let p = store.project(rid), p.state == "open" else { continue }
-                records.append((.project, rid, p.name + " · project"))
-            default: continue
-            }
-            if records.count == 5 { break }
-        }
-        guard !records.isEmpty else { return .note(id, "Nothing found for \(shownWords).") }
-        return listAnswer(id, title: "Found", records: records)
+        let start = Date()
+        let (results, byNumbers) = searchResults(words: words, query: shownWords, limit: 10)
+        writeSearchPage(query: shownWords, results: results)
+        sendTargets()
+        log.write(clock.now, "search", ["results": String(results.count), "numbers": byNumbers ? "yes" : "no",
+                                        "ms": String(Int(Date().timeIntervalSince(start) * 1000))])
+        let shown = results.prefix(5)
+        guard !shown.isEmpty else { return .note(id, "Nothing found for \(shownWords).") }
+        return listAnswer(id, title: "Found", records: shown.map { ($0.record.0, $0.record.1, $0.line) })
     }
 
     static func kindLabel(_ it: Item) -> String {

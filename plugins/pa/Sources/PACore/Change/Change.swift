@@ -185,7 +185,9 @@ extension Engine {
             it.projectBy = project == nil ? nil : "owner"
             it.projectScore = nil
             it.updatedAt = clock.now
+            countCorrection(old: old, new: it)
             guard save(it, old: old, event: "move") else { return .note(id, "The store had an error. Nothing changed.") }
+            if project == nil { endFocus() }
             return .note(id, "Moved · \(project?.name ?? "no project") · \(it.title)")
         }
     }

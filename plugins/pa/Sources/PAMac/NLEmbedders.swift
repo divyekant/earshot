@@ -109,9 +109,10 @@ public func makeEmbedder(_ name: String, allowAssetRequest: Bool = false, modelF
     switch name {
     case "hash": return HashEmbedder()
     #if canImport(llama)
-    case "qwen3", "gemma":
+    case "qwen3", "gemma", "gemma2":
         guard let modelFile else { throw EmbedderError(description: "\(name) needs --model <file.gguf>") }
-        return try LlamaEmbedder(path: modelFile, spec: name == "qwen3" ? LlamaEmbedder.qwen3 : LlamaEmbedder.gemma, gpu: gpu)
+        let spec = name == "qwen3" ? LlamaEmbedder.qwen3 : (name == "gemma2" ? LlamaEmbedder.gemma2 : LlamaEmbedder.gemma)
+        return try LlamaEmbedder(path: modelFile, spec: spec, gpu: gpu)
     #endif
     #if canImport(NaturalLanguage)
     case "nl-sentence":
@@ -124,6 +125,36 @@ public func makeEmbedder(_ name: String, allowAssetRequest: Bool = false, modelF
     default:
         throw BenchNameError(name: name)
     }
+}
+
+/// The model of the search by sense for the PA (phase 2, Q3), or nil for keywords only. The model file is in
+/// `<data folder>/models/`, where the install script puts it. The model loads at the first use, on the GPU.
+public func makeSearchModel(_ name: String, folder: URL) -> ModelHost? {
+    #if canImport(llama)
+    let spec: LlamaEmbedder.Spec
+    let file: String
+    // The rule values come from the development files of the bench, with all numbers of the model (E10).
+    let rules: ModelRules
+    switch name {
+    case "gemma":
+        spec = LlamaEmbedder.gemma; file = "embeddinggemma-300M-Q8_0.gguf"
+        rules = ModelRules(projectA: 0.542, projectB: 0.025, duplicateC: 0.806)
+    case "qwen3":
+        spec = LlamaEmbedder.qwen3; file = "Qwen3-Embedding-0.6B-Q8_0.gguf"
+        rules = ModelRules(projectA: 0.632, projectB: 0.035, duplicateC: 0.800)
+    case "gemma2":
+        spec = LlamaEmbedder.gemma2; file = "embeddinggemma-2-Q8_0.gguf"
+        rules = ModelRules(projectA: 0.791, projectB: 0.0175, duplicateC: 0.842)
+    default: return nil
+    }
+    let path = folder.appendingPathComponent("models").appendingPathComponent(file).path
+    guard FileManager.default.fileExists(atPath: path) else { return nil }
+    let host = ModelHost(modelID: spec.id) { try LlamaEmbedder(path: path, spec: spec, gpu: true) }
+    host.rules = rules
+    return host
+    #else
+    return nil
+    #endif
 }
 
 public struct BenchNameError: Error, CustomStringConvertible {

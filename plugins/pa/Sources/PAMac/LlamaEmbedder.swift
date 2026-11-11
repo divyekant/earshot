@@ -25,6 +25,11 @@ public final class LlamaEmbedder: Embedder {
         id: "embeddinggemma-300m-q8_0",
         queryPrefix: "task: search result | query: ", passagePrefix: "title: none | text: ", endToken: false)
 
+    /// EmbeddingGemma 2 (Apache 2.0), text model only: the same prompts as EmbeddingGemma, mean pooling.
+    public static let gemma2 = Spec(
+        id: "embeddinggemma-2-q8_0",
+        queryPrefix: "task: search result | query: ", passagePrefix: "title: none | text: ", endToken: false)
+
     public let id: String
     public let dimension: Int
     let spec: Spec
@@ -55,7 +60,10 @@ public final class LlamaEmbedder: Embedder {
         model = m
         ctx = c
         vocab = llama_model_get_vocab(m)
-        dimension = Int(llama_model_n_embd(m))
+        // The size of the output. EmbeddingGemma 2 has a projection after the model (512 to 768), so the width of
+        // the model is not the size of the output.
+        let out = Int(llama_model_n_embd_out(m))
+        dimension = out > 0 ? out : Int(llama_model_n_embd(m))
         self.spec = spec
         id = spec.id
     }

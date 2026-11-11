@@ -8,6 +8,8 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Added
 
+- PA: after "new project kitchen", the next captures go to Kitchen for 5 minutes. A capture like an open item gets a second note: "To-do · like one that you have: order the paint". Project proposals with a "?" are available with the setting `proposeProject`, off by default (R-PA-4).
+- PA: "where is" finds the text of kept files, also in other words. The install script downloads a search model (EmbeddingGemma-300M, about 334 MB) with a SHA-256 check. The model loads at the first search and unloads after 5 minutes with no use. "open search" shows the full results (R-PA-4, R-PA-8).
 - Two plugin context keys: `document` (the file path of the front document) and `selection` (the selected text, up to 2,000 characters). A plugin gets them only if its manifest names them, never on a sign-in, code or payment page. The Plugins tab says that `selection` gives the plugin your selected text (R-PL-2).
 - The PA plugin, phase 1 start: a separate program in `plugins/pa/` with its plugin file, its store and the script `install-pa.sh`. Each command answers "Not built yet" for now. At its first start, the PA asks macOS for access to Reminders and shows the result (R-PA-1, R-PA-2, R-PL-1).
 - "open <target>" opens a target that a plugin gave, for example "open today". An app name wins. earshot opens only a web address, a document or a folder, never a program or a script (R-PL-3, R-PL-4).

@@ -43,6 +43,8 @@ func makeEngine(now: Date = wed(10), reminders: ReminderStore? = nil) -> (Engine
     let out = MemoryOutput()
     let e = Engine(folder: tempFolder(), clock: clock, output: out, reminders: reminders)
     e.start()
+    // The phase 1 tests check captures with no project focus. ProposalTests checks the focus (phase 2, 8.3).
+    e.settings.projectFocusMinutes = 0
     return (e, out, clock)
 }
 

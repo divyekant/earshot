@@ -59,7 +59,7 @@ extension Engine {
         }
         let lis = items.map { it -> String in
             var label = it.title.isEmpty ? it.said : it.title
-            if let p = projectName(it.projectID) { label += " · " + p }
+            if let p = projectLabel(it) { label += " · " + p }
             let when = shortTime(it).map { "<span class=\"when\">\(Engine.escape($0))</span>" } ?? ""
             return "<li\(late ? " class=\"late\"" : "")><span>\(Engine.escape(label))</span>\(when)</li>"
         }.joined()
@@ -122,9 +122,17 @@ extension Engine {
             ("Dropped", counts["drop", default: 0]),
             ("Alerts shown", counts["alert-shown", default: 0] + counts["alert-repeat", default: 0]),
             ("Alerts with no answer", counts["alert-no-answer", default: 0]),
+            ("Project proposals", counts["proposal", default: 0]),
+            ("Project proposals corrected", counts["proposal-corrected", default: 0]),
         ]
         let table = "<h2>The last 7 days</h2><table>" + rows.map { "<tr><td>\($0.0)</td><td class=\"n\">\($0.1)</td></tr>" }.joined() + "</table>"
-        let todayBody = section("Late", late, late: true) + section("Today", todayItems, empty: "Nothing for today.")
+        // 8.1, step 6: the PA does not change the setting by itself.
+        var warning = ""
+        let made = counts["proposal", default: 0], corrected = counts["proposal-corrected", default: 0]
+        if made >= 10, Double(corrected) / Double(made) > 0.2 {
+            warning = "<p class=\"empty\">Many project proposals were wrong. Set proposeProject to false in the settings to stop them.</p>"
+        }
+        let todayBody = warning + section("Late", late, late: true) + section("Today", todayItems, empty: "Nothing for today.")
             + section("Tomorrow", tomorrowItems) + section("Quiet", quiet) + table
         let dateLine = TimeText.fullDay(today, cal)
         write(page(title: "Today", sub: dateLine, body: todayBody), "today.html")
@@ -173,6 +181,10 @@ extension Engine {
             Target(id: "page-today", name: "today", kind: "page", open: pagesFolder.appendingPathComponent("today.html").path),
             Target(id: "page-all-open", name: "all open", kind: "page", open: pagesFolder.appendingPathComponent("all-open.html").path),
         ]
+        // "open search" shows the full results of the last search (phase 2 build spec, 7.7).
+        if FileManager.default.fileExists(atPath: searchPageURL.path) {
+            out.append(Target(id: "page-search", name: "search", kind: "page", open: searchPageURL.path))
+        }
         for p in store?.projects() ?? [] {
             out.append(Target(id: "project-\(p.id)", name: p.name, kind: "project",
                               open: pagesFolder.appendingPathComponent("project-\(p.slug).html").path))

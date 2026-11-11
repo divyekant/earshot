@@ -95,6 +95,9 @@ let engine = Engine(folder: folder, clock: SystemClock(), output: output, remind
 // The reads of kept files run at background priority, one at a time, so that they do not slow a command
 // (phase 2 build rule 6).
 let backgroundQueue = DispatchQueue(label: "earshot.pa.background", qos: .utility)
+// The model of the search by sense (phase 2, Q3). With no model file, the search uses keywords only.
+engine.models = makeSearchModel(PASettings.load(folder.appendingPathComponent("settings.json")).settings.searchModel,
+                                folder: folder)
 queue.sync {
     engine.runLater = { delay, block in queue.asyncAfter(deadline: .now() + delay, execute: block) }
     engine.background = { block in backgroundQueue.async(execute: block) }
