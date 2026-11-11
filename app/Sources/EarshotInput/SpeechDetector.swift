@@ -27,6 +27,10 @@ public struct DetectorConfig: Sendable, Equatable {
     /// In a turn, a frame below this level in dB full scale is always quiet. It is lower than `minimumSpeechDb`, so
     /// speech from a quiet microphone keeps the turn open (Hex issue 841).
     public var quietMinimumDb: Double = -70
+    /// In a turn, a run of fewer frames than this between the quiet level and the speech level does not stop the
+    /// quiet time: it is a click or a breath, not speech. A longer run starts the quiet time again. Live test
+    /// 2026-11-11 (E7): single soft frames in each pause kept a dictation open for 60 s.
+    public var softBlipFrames: Int = 3
     /// A frame between the two levels can also be noise that changes (keys, a TV), not speech. So frames that are not
     /// speech also end the turn after the end silence plus this time, as a fallback.
     public var softEndExtraMs: Double = 1000
@@ -70,6 +74,8 @@ public struct SpeechDetector: Sendable {
     private var quietMs: Double = 0
     /// The time since the last speech frame, quiet or not (for `DetectorConfig.softEndExtraMs`).
     private var softMs: Double = 0
+    /// The soft frames in a row in the open pause (for `DetectorConfig.softBlipFrames`).
+    private var softRun = 0
     private var speechMs: Double = 0
     private var turnMs: Double = 0
     /// After a forced stop, wait for quiet before the next turn. So a TV does not make turn after turn.
@@ -163,11 +169,17 @@ public struct SpeechDetector: Sendable {
         // Measure against the floor before this frame moved it. The floor moves little in one frame.
         let quiet = level <= quietDbBefore
         if loud {
-            speechMs += config.frameMs; checkSpeechMs += config.frameMs; quietMs = 0; softMs = 0
+            speechMs += config.frameMs; checkSpeechMs += config.frameMs; quietMs = 0; softMs = 0; softRun = 0
             pauseChecked = false; pauseCheckDue = false; pauseWaitMs = nil
         } else {
             softMs += config.frameMs
-            quietMs = quiet ? quietMs + config.frameMs : 0
+            if quiet {
+                quietMs += config.frameMs
+                softRun = 0
+            } else {
+                softRun += 1
+                if softRun >= config.softBlipFrames { quietMs = 0 }
+            }
             if pauseChecks, !pauseChecked, softMs >= config.pauseCheckMs,
                checkSpeechMs >= config.pauseCheckMinimumSpeechMs {
                 pauseChecked = true
@@ -272,6 +284,7 @@ public struct SpeechDetector: Sendable {
         checkSpeechMs = 0
         self.quietMs = max(0, quietMs)
         softMs = self.quietMs
+        softRun = 0
         pauseChecked = false; pauseCheckDue = false; pauseWaitMs = nil
         speechMs = config.minimumSpeechMs
         turnMs = 0

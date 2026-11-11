@@ -8,11 +8,14 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Fixed
 
+- In always-on mode, a dictation now ends at a pause of 1.2 s. Before, a click or a breath in the pause, or an unsure turn model, kept it open up to the 60 s limit, so the text came late (R-ON-1, E7).
+- After the wake phrase, the echo of the start sound no longer ends the turn before the command (R-ON-1, E7).
 - In always-on mode, room sound no longer matches the wake phrase every 4 to 6 s. A match now needs each 200 ms part of the phrase to fit, not only the mean. The log counts the stopped matches (R-ON-1, D-11, E7).
 - "Slack <name>" opens the chat again. Slack now lists "Search for: <name>" rows in Command-K, and earshot pressed Return on a search. earshot now skips search rows, and stops if a search row is above the chat. WhatsApp chats open too: earshot clicks the new-chat field and presses the result row when Return does not open it. Measured: Slack 437 ms, Messages 682 ms, WhatsApp 1,475 ms to the focused box (R-NV-2, R-NV-6, R-SP-1, E7).
 
 ### Added
 
+- A "Listening" note stays on screen for the whole turn, from the start (or the wake) to the end. In always-on mode, it has a level bar (R-FB-1).
 - A "not sure" note now shows up to two choices and stays on screen for 10 s. Say "yes" or "the first one", "the second one", or "no". In always-on mode, only your checked voice can answer. An answer never sends, unless you used the hold key for the command and for the answer (R-FB-1, R-NV-5, D-12).
 - In always-on mode, earshot keeps the numbers of each turn and each rejected wake for 7 days: sound levels, scores, the turn checks, the wake frames of the spotter, and the words as the activity log has them. No audio, and earshot cannot play the wake frames back. Tests can run the wake and end-of-turn rules again on them. A switch in Manage > General turns it off and deletes them (R-ON-1, R-ON-3, R-MD-1, D-11).
 - The menu bar icon shows what earshot does: it waits (ear), it listens to a command (filled ear), the follow-up window is open (ear with sound waves), it waits for text to type (text cursor), or it is paused (pause sign). The first menu line says the same in words (R-ON-2, R-FB-1).

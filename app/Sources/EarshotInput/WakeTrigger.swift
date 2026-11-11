@@ -29,8 +29,11 @@ public struct WakeConfig: Sendable, Equatable {
     /// If the model hears a pause inside the turn, the turn ends only after this much quiet (a command turn).
     /// Smart Turn's own pipeline and Hex used 2 s.
     public var turnWaitMs: Double = 2000
-    /// The same for a dictation turn. Hex's "patient" preset used 3 s.
-    public var dictationTurnWaitMs: Double = 3000
+    /// The detector ignores this much more time after each sound that earshot plays: the sound comes out of the
+    /// speaker later than the call to play it, and the room keeps it for a moment. Live test 2026-11-11 (E7): the
+    /// echo of the start sound after a mute of the sound length started a command with no words, and the turn
+    /// model ended the turn 680 ms after the wake.
+    public var soundTailSeconds: Double = 0.3
     /// The limits of the owner voice check (E6). The phrase alone must pass `voice.gate` to start a turn. At the end
     /// of the turn, the voice of the whole turn decides.
     public var voice = VoiceRule()
@@ -92,6 +95,12 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
     /// before `onTurnVoice`, and before `onStop`, `onCancel` or `onRejected` of the same turn. Set it before `start()`.
     /// If it is nil, the trigger keeps no numbers.
     public var onRecord: ((TurnRecord) -> Void)?
+    /// The sound level of an open turn, about 10 times each second, on the main thread: the loudest frame of the last
+    /// 100 ms in dB above the noise floor. For the "Listening" note. Set it before `start()`.
+    public var onTurnLevel: ((Double) -> Void)?
+    // Used only on `queue`.
+    private var levelPeak = -Double.infinity
+    private var levelFrames = 0
 
     public let config: WakeConfig
     private let listener: WakeListener
@@ -228,9 +237,22 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
         queue.async { [self] in muteLocked(seconds) }
     }
 
+    /// Sends the loudest level of each 5 frames (100 ms) of a turn to `onTurnLevel`.
+    private func reportLevel(_ db: Double) {
+        guard onTurnLevel != nil else { return }
+        levelPeak = max(levelPeak, db - detector.floorDb)
+        levelFrames += 1
+        guard levelFrames >= 5 else { return }
+        let peak = levelPeak
+        levelPeak = -.infinity
+        levelFrames = 0
+        DispatchQueue.main.async { [weak self] in self?.onTurnLevel?(peak) }
+    }
+
     private func muteLocked(_ seconds: Double) {
         guard seconds > 0 else { return }
-        muteUntilClock = max(muteUntilClock, clock + Int(seconds * Double(Self.rate)))
+        let total = seconds + max(0, config.soundTailSeconds)
+        muteUntilClock = max(muteUntilClock, clock + Int(total * Double(Self.rate)))
     }
 
     /// The sample clock until which the detector ignores the audio (`mute`).
@@ -277,6 +299,7 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
             offset += frame
             recentLevels.append(db)
             traceLevel(db)
+            if inTurn { reportLevel(db) }
             if let event = level(db) {
                 events.append(event)
                 if event == .start, records { traceSpeechStart = traceLevels.count - 1 }
@@ -581,10 +604,11 @@ public final class WakeTrigger: CancellableTrigger, PausableTrigger, @unchecked 
         let done = probability >= config.turnThreshold
         if detector.dictationTurn {
             // A sentence end in dictated text is not the end of the turn (live test 2026-11-03: P 0.88 to 0.93 cut
-            // the text). The model only makes the turn wait longer; it never ends a dictation turn early.
-            if done { return (nil, .none) }
-            detector.answerPauseCheck(waitMs: config.dictationTurnWaitMs)
-            return (nil, .wait)
+            // the text). An unsure answer does not make the pause longer either: live test 2026-11-11 (E7), the
+            // model gave P 0.01 to 0.15 in the owner's real end pauses, and a 3 s wait kept the dictation open for
+            // 60 s. Only the dictation silence ends a dictation turn. The check stays for the log.
+            _ = done
+            return (nil, .none)
         }
         if done { return (detector.endTurnNow(), .end) }
         detector.answerPauseCheck(waitMs: config.turnWaitMs)
