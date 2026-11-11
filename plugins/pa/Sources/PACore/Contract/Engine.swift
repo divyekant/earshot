@@ -15,6 +15,8 @@ public final class Engine {
     var pendingNotice: String?
     var settingsStamp: Date?
     var lastCapture: LastCapture?
+    var helloDone = false
+    var startedAt: Date?
 
     public var storeURL: URL { folder.appendingPathComponent("pa.sqlite") }
     public var settingsURL: URL { folder.appendingPathComponent("settings.json") }
@@ -34,6 +36,7 @@ public final class Engine {
     /// Opens the store and reads the settings. Call it one time, before the first message.
     public func start() {
         let now = clock.now
+        startedAt = now
         log.write(now, "start")
         loadSettings(announce: true)
         do {
@@ -115,6 +118,11 @@ public final class Engine {
 
     /// Later packages add the targets, the missed list and the morning list here.
     func afterHello() {
+        if !helloDone {
+            helloDone = true
+            missedList(at: startedAt ?? clock.now)
+        }
+        tick()
         probeReminders()
     }
 
@@ -168,6 +176,7 @@ public final class Engine {
         case .snooze: return snooze(id: id, text: text)
         case .drop: return drop(id: id, text: text)
         case .move: return move(id: id, text: text)
+        case .quiet: return quiet(id: id, text: text)
         default: return .note(id, "Not built yet")
         }
     }
@@ -175,7 +184,9 @@ public final class Engine {
     // MARK: - Changes
 
     /// An item is new or changed. The clock, the pages and the copy in Reminders act on it.
-    func itemChanged(_ it: Item, old: Item?) {}
+    func itemChanged(_ it: Item, old: Item?) {
+        planAlerts(it, old: old)
+    }
 
     /// A document is new or changed.
     func docsChanged() {}

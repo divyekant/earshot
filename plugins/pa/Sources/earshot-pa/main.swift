@@ -58,6 +58,28 @@ let engine = Engine(folder: folder, clock: SystemClock(), output: output, remind
                     detector: SystemDateDetector())
 queue.sync { engine.start() }
 
+// The clock: one timer for the next check, and a check at least each 60 s (build spec 10.1). The timer uses the
+// wall clock, so it fires at the right time after a sleep of the Mac.
+let timer = DispatchSource.makeTimerSource(queue: queue)
+func scheduleCheck() {
+    let now = Date()
+    var delay: TimeInterval = 60
+    if let next = engine.nextCheck() { delay = min(60, max(0.05, next.timeIntervalSince(now) + 0.05)) }
+    timer.schedule(wallDeadline: .now() + delay, leeway: .milliseconds(100))
+}
+timer.setEventHandler {
+    engine.tick()
+    scheduleCheck()
+}
+queue.sync { scheduleCheck() }
+timer.resume()
+let systemEvents = SystemEvents { _ in
+    queue.async {
+        engine.tick()
+        scheduleCheck()
+    }
+}
+
 // Read stdin on its own thread. Each line goes to the engine queue. At the end of stdin, stop.
 let reader = Thread {
     let input = FileHandle.standardInput
@@ -71,7 +93,10 @@ let reader = Thread {
             let line = buffer.subdata(in: buffer.startIndex..<nl)
             buffer.removeSubrange(buffer.startIndex...nl)
             if line.isEmpty { continue }
-            queue.async { engine.receive(line) }
+            queue.async {
+                engine.receive(line)
+                scheduleCheck()
+            }
         }
         // A line with no end that is too long: drop it.
         if buffer.count > maxLine { buffer.removeAll() }
