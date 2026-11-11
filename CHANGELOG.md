@@ -9,6 +9,8 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 ### Added
 
 - A "not sure" note now shows up to two choices and stays on screen for 10 s. Say "yes" or "the first one", "the second one", or "no". In always-on mode, only your checked voice can answer. An answer never sends, unless you used the hold key for the command and for the answer (R-FB-1, R-NV-5, D-12).
+- The menu bar icon shows what earshot does: it waits (ear), it listens to a command (filled ear), the follow-up window is open (ear with sound waves), it waits for text to type (text cursor), or it is paused (pause sign). The first menu line says the same in words (R-ON-2, R-FB-1).
+- The menu has "Pause for 1 hour" and a mode switch (hold key or always on). While paused, no input runs and the microphone closes. The pause ends after 1 hour, with "Resume listening", or when earshot starts again (R-ON-4, R-MD-1).
 
 ### Changed
 
