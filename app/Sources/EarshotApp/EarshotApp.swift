@@ -256,7 +256,7 @@ final class AppController: ObservableObject {
 
     /// In always-on mode, the speech engine gets the wake phrase as context, so that Apple speech spells it right more
     /// often (D-11). In hold mode, no hints.
-    /// In hold mode, the microphone also closes after 2 minutes with no command (`MicIdle`).
+    /// In hold mode, the microphone is open only while the key is down (`MicIdle`).
     private func applyPhraseHints() {
         let hints = settings.mode == .alwaysOn ? [settings.wakePhrase] : []
         (pipeline.engine as? PhraseHintControl)?.setPhraseHints(hints)
@@ -271,9 +271,12 @@ final class AppController: ObservableObject {
         let pipeline = self.pipeline, menus = self.menus, feedback = self.feedback
         let gate = settings.voiceGate
         input.onStart = { [weak self, weak input] in
-            // The start sound first, before any other work (hold key; a wake plays it in onWake).
+            // Hold key: open the microphone first, then the start sound. The microphone is closed between commands
+            // (`MicIdle`), and the sound set-up takes about 150 ms. So the sound now says: the microphone is live.
+            // A wake plays the sound in onWake.
+            let problem = pipeline.begin()
             if input?.current == .hold { self?.playStartSound() }
-            if let problem = pipeline.begin() { self?.feedback.show(problem, ok: false) }
+            if let problem { self?.feedback.show(problem, ok: false) }
         }
         input.onCancel = { why in
             // Log the voice score of a turn that the voice check dropped, for the limits (no text).
