@@ -59,6 +59,50 @@ final class ChatStageBench: XCTestCase {
         if let outURL { try (lines.joined(separator: "\n") + "\n").write(to: outURL, atomically: true, encoding: .utf8) }
     }
 
+    /// A look at the switcher list, for a failure study: it presses the switcher keys, types the name, and prints
+    /// each row below the field with its role and whether it is selected. Then it presses Escape. It presses no Return.
+    /// Set `EARSHOT_BENCH_DUMP` to an app id.
+    func testSwitcherRows() async throws {
+        let env = ProcessInfo.processInfo.environment
+        guard env["EARSHOT_LIVE_CHAT"] == "1", let appID = env["EARSHOT_BENCH_DUMP"] else { throw XCTSkip("live dump only") }
+        let store = Store()
+        guard let e = store.apps.first(where: { $0.id == appID }), case .switcher(let keys) = e.openChat,
+              let own = store.names.first(where: { $0.appID == appID && $0.isSelf }),
+              let running = NSRunningApplication.runningApplications(withBundleIdentifier: e.bundleID).first else { throw XCTSkip("no app") }
+        running.activate()
+        try await Task.sleep(nanoseconds: 700_000_000)
+        let app = AX.appElement(running.processIdentifier)
+        if e.electron { _ = AX.set(app, "AXManualAccessibility", kCFBooleanTrue) }
+        print("DUMP focus before: \(AX.describeFocus(app))")
+        if let combo = Keys.parse(keys) { Keys.press(combo) }
+        try await Task.sleep(nanoseconds: 400_000_000)
+        print("DUMP focus after keys: \(AX.describeFocus(app))")
+        Keys.type(own.name)
+        for wait in [150, 300, 600] {
+            try await Task.sleep(nanoseconds: UInt64(wait) * 1_000_000)
+            guard let field = AX.focused(app), let f = AX.frame(field) else { print("DUMP no focus"); continue }
+            print("DUMP t+\(wait) field \(AX.role(field)) value=\(AX.value(field) ?? "-") active=\(AX.element(field, "AXActiveDescendant").map { AX.label($0) } ?? "-")")
+            var queue = AX.elements(app, "AXWindows")
+            var i = 0
+            var rows = 0
+            while i < queue.count, i < 4000, rows < 40 {
+                let el = queue[i]; i += 1
+                let r = AX.role(el)
+                if let ef = AX.frame(el), ef.y >= f.maxY - 2, ef.y < f.maxY + 500, ef.x < f.maxX, ef.maxX > f.x,
+                   ["AXRow", "AXCell", "AXButton", "AXLink", "AXMenuItem", "AXListItem", "AXOption", "AXGroup", "AXStaticText"].contains(r) {
+                    let sel = AX.bool(el, "AXSelected").map { $0 ? "SEL" : "-" } ?? "?"
+                    let text = [AX.string(el, "AXTitle"), AX.string(el, "AXDescription"), AX.value(el)].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " | ")
+                    if !text.isEmpty || sel == "SEL" {
+                        print("DUMP   \(r)/\(AX.subrole(el)) \(sel) y=\(Int(ef.y)) \(String(text.prefix(80)))")
+                        rows += 1
+                    }
+                }
+                queue.append(contentsOf: AX.elements(el, "AXChildren"))
+            }
+        }
+        Keys.press(Keys.escape)
+    }
+
     /// Puts Finder in front, so that each run starts from another app, as a voice command does.
     private func frontFinder() async {
         NSWorkspace.shared.runningApplications.first { $0.bundleIdentifier == "com.apple.finder" }?.activate()
