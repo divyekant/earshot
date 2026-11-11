@@ -49,6 +49,9 @@ if let i = args.firstIndex(of: "--embed-bench"), i + 1 < args.count {
         args.firstIndex(of: flag).flatMap { $0 + 1 < args.count ? args[$0 + 1] : nil }
     }
     let name = value("--embedder") ?? "hash"
+    // The bench runs in a function, so that the embedder is freed before exit. A GPU model that is still
+    // loaded at exit stops the program in the Metal teardown of llama.cpp.
+    func runBench() -> Int32 {
     do {
         let fx = try BenchFixtures.load(URL(fileURLWithPath: args[i + 1], isDirectory: true))
         let before = memoryFootprint()
@@ -66,11 +69,13 @@ if let i = args.firstIndex(of: "--embed-bench"), i + 1 < args.count {
             result.rows.append(("Memory footprint", String(format: "%.1f MB before the model, %.1f MB after the bench", Double(b) / 1e6, Double(a) / 1e6)))
         }
         print(EmbedBench.table(result))
-        exit(0)
+        return 0
     } catch {
         print("Bench error: \(error)")
-        exit(1)
+        return 1
     }
+    }
+    exit(runBench())
 }
 
 let env = ProcessInfo.processInfo.environment
