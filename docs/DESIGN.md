@@ -206,7 +206,7 @@ E1 built the app rows from each app's menu bar, with no row written by hand: the
 
 E0 used each app's own search in place of links, so the owner gives names only. Slack: Command-K. Messages: File > New Message (Command-N) and the "To:" field. WhatsApp (left out of E0): Command-F; the search also lists message hits, so a later design must check the type of the top result before Return.
 
-E7 (2026-11-11, [E7-chat-stages.md](experiments/E7-chat-stages.md)) measured the chat flow in each app and changed the switcher. A switcher list can hold query rows that repeat the typed name, for example Slack "Search for: <name>". earshot groups the list texts into rows, skips query rows, and stops if a query row is above the chat row. If a new field does not take the focus from accessibility (WhatsApp), earshot clicks it. If Return leaves the field open with the name, earshot presses the result row that matches the name. earshot learns the click and the row press for each app.
+E9 (2026-11-11, [E9-chat-stages.md](experiments/E9-chat-stages.md)) measured the chat flow in each app and changed the switcher. A switcher list can hold query rows that repeat the typed name, for example Slack "Search for: <name>". earshot groups the list texts into rows, skips query rows, and stops if a query row is above the chat row. If a new field does not take the focus from accessibility (WhatsApp), earshot clicks it. If Return leaves the field open with the name, earshot presses the result row that matches the name. earshot learns the click and the row press for each app.
 
 **Generic focus.** Run a depth-limited accessibility search of the focused window. Find the lowest and widest editable element (`AXTextArea`, `AXTextField`, or an editable web area), then focus it. For Electron apps, first set `AXManualAccessibility`, then poll `AXChildren` for up to 200 ms. Never walk the full tree of an Electron app.
 
@@ -293,13 +293,13 @@ Status on 2026-11-11 (v0.3.0 is the last release; `develop` holds the gap work f
 
 | Phase | Status | Evidence |
 |---|---|---|
-| 0. Measure | Done | E0 to E8 in [experiments/](experiments/) |
-| 1. Push-to-talk MVP | Done. Slack, Messages and WhatsApp open a chat and focus the message box: 437 ms, 682 ms and 1,475 ms (E7). WhatsApp is above the 1 s goal (R-SP-1). "Mail <name>" opens Mail only. A new mail from a name waits for the owner's choice (E7, section 6). | E0, E7 |
+| 0. Measure | Done | E0 to E9 in [experiments/](experiments/) |
+| 1. Push-to-talk MVP | Done. Slack, Messages and WhatsApp open a chat and focus the message box: 437 ms, 682 ms and 1,475 ms (E9). WhatsApp is above the 1 s goal (R-SP-1). "Mail <name>" opens Mail only. A new mail from a name waits for the owner's choice (E7, section 6). | E0, E7 |
 | 2. Voice clicks | Done: label match, ordinal match, "show numbers", OCR fallback, and the opt-in screenshot fallback (D-10) | E2, E3 |
 | 3. Always on | In progress. The wake phrase, the owner voice check and the follow-up window are built (D-11). The end-of-turn rules still change after live tests. The turn recorder keeps numbers, not audio, so tests can run the rules again (E7 turn recorder). | E5, E6, E7 turn recorder |
 | 4. Learn | Started. earshot learns from the owner's answers to "not sure" notes: habit memory and misheard names (3.6). The own small router model is not started. | E8 |
 
-Gap work of 2026-11-11 (after the evaluation of v0.3.0): the activity numbers and a weekly report, the chat flow (E7), the answer to a "not sure" note, habit memory, the menu bar state and pause, a cue for a dropped wake turn, the dictation set (D-13), the turn recorder, misheard names (E8), plugins (D-14) and the talk state (3.9). Install for other people waits for an Apple Developer ID.
+Gap work of 2026-11-11 (after the evaluation of v0.3.0): the activity numbers and a weekly report, the chat flow (E9), the answer to a "not sure" note, habit memory, the menu bar state and pause, a cue for a dropped wake turn, the dictation set (D-13), the turn recorder, misheard names (E8), plugins (D-14) and the talk state (3.9). Install for other people waits for an Apple Developer ID.
 
 The plans below are the original plans. They stay for reference.
 
