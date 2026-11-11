@@ -348,6 +348,7 @@ final class AppController: ObservableObject {
             Task { if cue { await pipeline.dropWakeTurn(wake) } else { await pipeline.cancel() } }
         }
         input.onStop = { [weak self, weak input] in
+            feedback.endListening()
             let mode = input?.current ?? .hold
             let turn = mode == .alwaysOn ? turns.take() : nil
             Task { @MainActor in
@@ -380,8 +381,9 @@ final class AppController: ObservableObject {
                     (pipeline.engine as? PrerollControl)?.setNextPreroll(seconds: hit.prerollSeconds)
                 }
                 pipeline.pendingWake = hit
-                if self?.settings.showFeedback == true { feedback.show("Listening…", ok: true) }
+                if self?.settings.showFeedback == true { feedback.showListening() }
             }
+            trigger.onTurnLevel = { feedback.listeningLevel($0) }
             trigger.onRejected = { hit in turns.write(turns.take(), activity: pipeline.rejectedWake(hit, threshold: gate)) }
             trigger.onRecord = { record in turns.hold(record) }
             trigger.onTurnVoice = { voice in pipeline.turnVoice = voice }

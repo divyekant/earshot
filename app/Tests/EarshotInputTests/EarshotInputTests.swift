@@ -273,6 +273,24 @@ final class SpeechDetectorTests: XCTestCase {
         return d
     }
 
+    // E7, live test 2026-11-11: one or two soft frames (a click, a breath) in a pause do not start the quiet time again.
+    func testShortSoftBlipsDoNotRestartTheQuietTime() {
+        var d = openTurn(checks: false)
+        XCTAssertEqual(run(&d, -65, ms: 400), [])
+        XCTAssertEqual(run(&d, -57, ms: 40), [], "2 soft frames: they do not count, and they do not reset")
+        XCTAssertEqual(run(&d, -65, ms: 140), [], "540 ms of quiet in total")
+        XCTAssertEqual(run(&d, -65, ms: 20), [.end])
+        XCTAssertEqual(d.lastEnd?.rule, .quiet)
+    }
+
+    func testThreeSoftFramesRestartTheQuietTime() {
+        var d = openTurn(checks: false)
+        XCTAssertEqual(run(&d, -65, ms: 400), [])
+        XCTAssertEqual(run(&d, -57, ms: 60), [], "3 soft frames: a soft word, so the quiet time starts again")
+        XCTAssertEqual(run(&d, -65, ms: 540), [])
+        XCTAssertEqual(run(&d, -65, ms: 20), [.end])
+    }
+
     // R-ON-1, I-2: the turn model gets one check at the first pause, after 300 ms with no speech frame.
     func testPauseCheckIsDueOnceAtTheFirstPause() {
         var d = openTurn()
@@ -1033,6 +1051,28 @@ final class WakeTriggerTests: XCTestCase {
         t.stop()
     }
 
+    // E7, live test 2026-11-11: the sound comes out of the speaker later than the call to play it. The detector also
+    // ignores `soundTailSeconds` after the mute, so the echo opens no turn.
+    func testTheTailOfAMutedSoundOpensNoTurn() {
+        let listener = FakeListener()
+        listener.hitAfterSamples = 16000
+        let (t, mic, rec) = make(listener)
+        let first = rec.expect("stop", self)
+        mic.emit(quiet, ms: 1000)
+        mic.emit(speech, ms: 500)
+        mic.emit(quiet, ms: 700)
+        wait(for: [first], timeout: 2)
+        t.openFollowUp()
+        t.mute(seconds: 0.5)
+        mic.emit(speech, ms: 700)   // the sound and its echo: 200 ms longer than the mute
+        mic.emit(quiet, ms: 800)
+        let done = expectation(description: "audio fed")
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.3) { done.fulfill() }
+        wait(for: [done], timeout: 2)
+        XCTAssertEqual(rec.log, ["wake", "start", "stop"], "the echo after the mute opens no turn")
+        t.stop()
+    }
+
     func testMuteOpensNoTurnInTheWindow() {
         let listener = FakeListener()
         listener.hitAfterSamples = 16000
@@ -1141,6 +1181,31 @@ final class WakeTriggerTests: XCTestCase {
         mic.emit(quiet, ms: 1300)
         wait(for: [second], timeout: 3)
         XCTAssertEqual(checks.map(\.decision), [.none, .none])
+        XCTAssertTrue(checks.allSatisfy(\.dictation))
+        t.stop()
+    }
+
+    // E7, live test 2026-11-11: the model was unsure (P 0.01 to 0.15) in the owner's real end pauses, and a 3 s wait
+    // kept the dictation open for 60 s. An unsure answer no longer makes a dictation pause longer.
+    func testAnUnsureModelDoesNotLengthenADictationPause() {
+        let listener = FakeListener()
+        listener.hitAfterSamples = 16000
+        let (t, mic, rec) = make(listener)
+        let first = rec.expect("stop", self)
+        mic.emit(quiet, ms: 1000)
+        mic.emit(speech, ms: 500)
+        mic.emit(quiet, ms: 700)
+        wait(for: [first], timeout: 2)
+        listener.turnProbability = 0.05
+        var checks: [TurnCheck] = []
+        t.onTurnCheck = { checks.append($0) }
+        t.openFollowUp(longPause: true)
+        let second = rec.expect("stop", self, count: 2)
+        mic.emit(speech, ms: 1000)
+        mic.emit(quiet, ms: 1400)     // more than the 1200 ms dictation silence, less than the old 3 s wait
+        wait(for: [second], timeout: 3)
+        XCTAssertEqual(rec.log, ["wake", "start", "stop", "start", "stop"])
+        XCTAssertEqual(checks.map(\.decision), [.none])
         XCTAssertTrue(checks.allSatisfy(\.dictation))
         t.stop()
     }

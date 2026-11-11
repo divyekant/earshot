@@ -1,6 +1,6 @@
 # E7. Turn recorder, and why room sounds match the wake templates
 
-Status: recorder built. Worst-part limit 0.7 added. The live session is open.
+Status: recorder built. Worst-part limit 0.7 added. Live session part 1 done; end-of-turn fixes added. Part 2 is open.
 
 Requirements: R-ON-1, R-ON-2, R-ON-3, R-MD-1. Decisions: D-11, D-12.
 
@@ -70,7 +70,37 @@ Time between two rejected wakes: min 3.69 s, p10 4.91 s, median 5.29 s, p90 5.90
 
 The live session is not done yet. It needs dk's "go" and a build on the Mac.
 
-### 5.3 Limits of the replay
+### 5.3 Live session, part 1 (2026-11-11, build af7705c, dk at the Mac)
+
+From 04:29 to 04:32 UTC: 2 wake turns, 2 follow-up turns, 0 rejected wakes, 0 dropped turns. The worst-part limit stopped 24 room matches (21 in the first 83 s, then 3).
+
+| Turn | What the records show |
+|---|---|
+| Wake 1 (voice 0.42, match 0.13, worst part 0.46) | The detector was muted for 520 ms (the start sound). After the mute, 340 ms of loud frames gave no words: the echo of the start sound. They started the command, and the turn model ended the turn at the first 300 ms pause (P 0.99, 680 ms). The real command was lost. |
+| Wake 2 (voice 0.71, match 0.14, worst part 0.28) | About 540 ms of speech after the mute, then the model end (P 0.97, 880 ms). 4 words, not a command. |
+| Dictation (follow-up after "type", 82 words) | It ended at the 60 s limit, not at a pause. dk said "send" and the wake phrase again inside it, so the text came late and held them. |
+
+A Python copy of the detector, fed with the kept levels and the kept model answers, gives the same live result (27 checks, no end before 60 s). It shows two causes:
+
+1. In 9 of 18 pauses of 600 ms or more, the model was unsure (P below 0.5). In a dictation turn, an unsure answer made the pause wait 3 s. The real end pauses had P 0.03 and 0.15.
+2. In each pause, single frames between the quiet level and the speech level (4 to 12 dB above the floor) set the quiet time back to zero. The longest quiet run in a 3.04 s pause was 1.46 s.
+
+| Rule on the kept dictation | The turn ends at | Before "send" (18.4 s)? |
+|---|---|---|
+| Live rule (3 s wait, every soft frame resets) | not before 60 s | no |
+| Soft runs of 3 frames or more reset; 3 s wait | 27.0 s | no |
+| Every soft frame resets; no wait in dictation | 18.3 s | yes, by 0.1 s |
+| Soft runs of 3 frames or more reset; no wait in dictation | 17.8 s | yes |
+| Soft runs of 3 frames or more reset; 2 s wait | 21.3 s | no |
+
+Changes (PR after #122):
+
+- In a dictation turn, the model answer does not change the pause. The 1.2 s dictation silence ends the turn. The check stays in the log.
+- A run of 1 or 2 soft frames does not reset the quiet time (`softBlipFrames` 3).
+- The detector ignores 0.3 s more after each sound of earshot (`soundTailSeconds`). In the kept wake 1, this leaves 140 ms of echo, less than the 200 ms that starts a command. So the turn keeps the 2 s grace time for the command.
+- A "Listening" note stays on screen for the whole turn, with a level bar (dk, 2026-11-11).
+
+### 5.4 Limits of the replay
 
 The record ends with the live turn. So a replay with a shorter end silence shows where the turn would end, but a replay with a longer end silence runs out of kept levels: the end is not known.
 

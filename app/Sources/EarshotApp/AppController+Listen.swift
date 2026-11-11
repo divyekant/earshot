@@ -33,6 +33,8 @@ extension AppController {
         }
         let state = listenClock.state(at: now)
         if state != listen { listen = state }
+        // The "Listening" note stays for the whole open turn (dk, 2026-11-11), not 2 s.
+        if state == .listening, settings.showFeedback { feedback.showListening() } else { feedback.endListening() }
         listenTimer?.cancel()
         guard let next = listenClock.nextChange(after: now) else { return }
         let work = DispatchWorkItem { [weak self] in MainActor.assumeIsolated { self?.refreshListen() } }
