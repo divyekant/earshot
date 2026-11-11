@@ -106,10 +106,25 @@ jobs:
         if: always()
         run: grep -E "PROBE|MARK|CONTRACT" "$RUNNER_TEMP/pa-test.log" || true
 
+      # Phase 2, Q1: the GGUF files of candidates 3 and 4, at a fixed revision with a SHA-256 check.
+      # CI only checks the download. The bench of candidates 3 and 4 runs on the Mac (Apple GPU):
+      # on the CI machine one run used all of the 30 minutes.
+      - name: Cache the embedding models
+        uses: actions/cache@v4
+        with:
+          path: ~/pa-models
+          key: pa-models-qwen3-370f27d-gemma-0f741b5
+
+      - name: Get the embedding models
+        run: |
+          scripts/get-model.sh qwen3 ~/pa-models
+          scripts/get-model.sh gemma ~/pa-models
+
       # Phase 2, Q1: the embedding bench on the made-up fixtures (docs/experiments/E10-pa-embedding.md).
       # The models of macOS only. The contextual model may need a one-time download of macOS data.
       - name: Embedding bench
         if: always()
+        timeout-minutes: 12
         run: |
           set -uo pipefail
           swift build -c release --product earshot-pa

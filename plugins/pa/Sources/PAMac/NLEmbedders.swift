@@ -23,9 +23,6 @@ public final class NLSentenceEmbedder: Embedder {
     }
 }
 
-public struct EmbedderError: Error, CustomStringConvertible {
-    public var description: String
-}
 
 /// Candidate 2 (6.2): the contextual embedding of macOS. macOS can download its data one time. The list of a text
 /// is the mean of the lists of its tokens.
@@ -84,6 +81,11 @@ public final class NLContextualEmbedder: Embedder {
 }
 #endif
 
+public struct EmbedderError: Error, CustomStringConvertible {
+    public var description: String
+    public init(description: String) { self.description = description }
+}
+
 /// The memory footprint of this program in bytes (the number that Activity Monitor shows), or nil.
 public func memoryFootprint() -> Int? {
     #if os(macOS)
@@ -100,10 +102,17 @@ public func memoryFootprint() -> Int? {
     #endif
 }
 
-/// The embedder for a name of the bench: "hash", "nl-sentence", "nl-contextual".
-public func makeEmbedder(_ name: String, allowAssetRequest: Bool = false) throws -> Embedder {
+/// The embedder for a name of the bench: "hash", "nl-sentence", "nl-contextual", "qwen3", "gemma".
+/// "qwen3" and "gemma" need `modelFile`, a GGUF file.
+public func makeEmbedder(_ name: String, allowAssetRequest: Bool = false, modelFile: String? = nil,
+                         gpu: Bool = false) throws -> Embedder {
     switch name {
     case "hash": return HashEmbedder()
+    #if canImport(llama)
+    case "qwen3", "gemma":
+        guard let modelFile else { throw EmbedderError(description: "\(name) needs --model <file.gguf>") }
+        return try LlamaEmbedder(path: modelFile, spec: name == "qwen3" ? LlamaEmbedder.qwen3 : LlamaEmbedder.gemma, gpu: gpu)
+    #endif
     #if canImport(NaturalLanguage)
     case "nl-sentence":
         guard let e = NLSentenceEmbedder() else { throw EmbedderError(description: "no sentence embedding on this Mac") }
