@@ -294,6 +294,46 @@ final class ActionRunnerTests: XCTestCase {
             return "to-field"
         }
         func setFocus(_ f: String) { focusSets += 1; if acceptsAXFocus { focusedField = true } }
+        var clicks = 0
+        /// A click gives the focus, also in an app that ignores AXFocused (WhatsApp).
+        func click(_ f: String) { clicks += 1; focusedField = true }
+    }
+
+    /// WhatsApp: the new-chat field shows but ignores AXFocused. earshot clicks it one time at the next scan.
+    func testFieldThatIgnoresAXFocusGetsOneClick() async {
+        let runner = EarshotActionRunner(store: nil)
+        let fake = FakeSwitcher(showsAt: 0, ownFocus: false, acceptsAX: false)
+        let (field, why, stats) = await runner.waitForSwitcherField(scanDelayMs: 0, focused: fake.focused, newField: fake.newField,
+                                                                   setFocus: fake.setFocus, click: fake.click)
+        XCTAssertEqual(field, "to-field")
+        XCTAssertNil(why)
+        XCTAssertEqual(fake.focusSets, 1)
+        XCTAssertEqual(fake.clicks, 1)
+        XCTAssertTrue(stats.clicked)
+        XCTAssertLessThan(Clock.ms(since: fake.t0), Double(3 * SwitcherTiming.scanMs) + 200)
+    }
+
+    /// Slack (2026) Cmd-K: query rows hold the typed name. They are not results, and Return on them runs a search.
+    func testQueryRowsAreNotChatResults() {
+        let name = "Sam Rivera"
+        func t(_ s: String, _ y: Double, _ h: Double = 20) -> (String, Frame) { (s, Frame(x: 400, y: y, w: 500, h: h)) }
+        let searchOnly = [t("Search for: Sam Rivera", 131, 40), t("Show results for:", 141), t("Sam Rivera", 141),
+                          t("Ask Slackbot about Sam Rivera", 171, 40), t("Ask Slackbot:", 181), t("Sam Rivera", 181)]
+        XCTAssertEqual(ActionRules.switcherResult(searchOnly, name: name, baseline: []), .none)
+        XCTAssertFalse(ActionRules.resultShows(searchOnly, name: name, baseline: []))
+        // The chat row first: Return opens the chat.
+        let chatFirst = [t("Sam Rivera, Direct Message", 131, 40), t("Sam Rivera", 141), t("(you)", 141)]
+            + searchOnly.map { ($0.0, Frame(x: 400, y: $0.1.y + 40, w: 500, h: $0.1.h)) }
+        XCTAssertEqual(ActionRules.switcherResult(chatFirst, name: name, baseline: []), .chat)
+        // The chat row below a search row: Return would run the search.
+        let chatBelow = searchOnly + [t("Sam Rivera, Direct Message", 211, 40), t("Sam Rivera", 221)]
+        XCTAssertEqual(ActionRules.switcherResult(chatBelow, name: name, baseline: []), .searchFirst)
+    }
+
+    func testRowsGroupTextsOfOneRow() {
+        let rows = ActionRules.rows([("b", Frame(x: 0, y: 141, w: 10, h: 20)), ("a", Frame(x: 0, y: 131, w: 10, h: 40)),
+                                     ("c", Frame(x: 0, y: 171, w: 10, h: 40))])
+        XCTAssertEqual(rows.map { $0.map(\.0) }, [["a", "b"], ["c"]])
     }
 
     func testSwitcherFieldShowsLate() async {

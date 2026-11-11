@@ -247,10 +247,16 @@ public final class EarshotActionRunner: ActionRunner {
                 guard let oldFields, let win = AX.window(app) else { return nil }
                 return AX.switcherFields(in: win, budgetMs: 30).first { f in !oldFields.contains { CFEqual($0, f) } }
             },
-            setFocus: { AX.set($0, "AXFocused", kCFBooleanTrue) })
+            setFocus: { AX.set($0, "AXFocused", kCFBooleanTrue) },
+            click: { [weak self] f in
+                // Some apps (WhatsApp) show the field but ignore AXFocused. A click on the field is not a send.
+                guard let self, let fr = AX.frame(f), let p = self.safePoint(f, fr) else { return }
+                Mouse.click(p)
+            })
         watch.note("field_polls", Double(stats.polls))
         watch.note("field_poll_ms", stats.pollMs)
         watch.note("field_scan_ms", stats.scanMs)
+        if stats.clicked { watch.note("field_clicked", 1) }
         if found == nil, learnedSwitcher == "own" { forget(Self.switcherKey(appID)) }
         if found != nil { learn(Self.switcherKey(appID), stats.setFocus ? "set" : "own") }
         guard let field = found else { return "\(failure ?? "no search field") (\(AX.describeFocus(app)))" }
@@ -281,13 +287,17 @@ public final class EarshotActionRunner: ActionRunner {
         }
         searchField = target
         watch.mark("name")
-        // Wait until the result list shows a new text that matches the name, in place of a fixed sleep.
-        let shown = await waitForResult(name: name, baseline: baseline) {
+        // Wait until the result list shows a new chat row that matches the name, in place of a fixed sleep.
+        let result = await waitForSwitcherResult(name: name, baseline: baseline) {
             guard let f = AX.frame(target) ?? fieldFrame else { return [] }
             return AX.textsBelow(f, app: app, skip: target)
         }
-        guard shown else {
+        guard result == .chat else {
             Keys.press(Keys.escape)
+            if result == .searchFirst {
+                // Return would run a search (Slack "Search for: <name>"), not open the chat.
+                return "the first result is a search, not the chat \"\(name)\": nothing opened"
+            }
             return "the search results did not show \"\(name)\" in \(SwitcherTiming.resultMs) ms"
         }
         watch.mark("result")
@@ -308,6 +318,8 @@ public final class EarshotActionRunner: ActionRunner {
         var scanMs = 0.0
         /// True if earshot set the focus on a new field.
         var setFocus = false
+        /// True if earshot clicked the field, because it did not take the focus from accessibility.
+        var clicked = false
     }
 
     /// Waits until the focus is in a new switcher field. `focused` gives the focused element, whether it is a new
@@ -316,7 +328,7 @@ public final class EarshotActionRunner: ActionRunner {
     /// It returns the field, or the reason for the time-out. The caller types nothing on a time-out.
     func waitForSwitcherField<T>(timeoutMs: Int = SwitcherTiming.fieldMs, scanDelayMs: Int = SwitcherTiming.scanDelayMs,
                                  focused: () -> (T?, Bool, Bool), newField: () -> T?,
-                                 setFocus: (T) -> Void) async -> (T?, String?, FieldWaitStats) {
+                                 setFocus: (T) -> Void, click: (T) -> Void = { _ in }) async -> (T?, String?, FieldWaitStats) {
         let t0 = Clock.nowNs()
         var stats = FieldWaitStats()
         var lastScan = -Double(SwitcherTiming.scanMs)
@@ -336,9 +348,16 @@ public final class EarshotActionRunner: ActionRunner {
                 let f = newField()
                 stats.scanMs += Clock.ms(since: ts)
                 if let f {
+                    // The first find sets the focus through accessibility. If the field is still without focus
+                    // at the next scan, the app ignores AXFocused: click the field one time.
+                    if sawField && !stats.clicked {
+                        stats.clicked = true
+                        click(f)
+                    } else {
+                        stats.setFocus = true
+                        setFocus(f)
+                    }
                     sawField = true
-                    stats.setFocus = true
-                    setFocus(f)
                     continue
                 }
             }
@@ -353,9 +372,19 @@ public final class EarshotActionRunner: ActionRunner {
     /// Polls `read` until a text that matches the name and is not in `baseline` shows on screen.
     func waitForResult(name: String, baseline: Set<String>, timeoutMs: Int = SwitcherTiming.resultMs,
                        read: () -> [(String, Frame)]) async -> Bool {
-        await waitUntil(timeoutMs: timeoutMs, intervalMs: SwitcherTiming.pollMs) {
-            ActionRules.resultShows(read(), name: name, baseline: baseline)
+        await waitForSwitcherResult(name: name, baseline: baseline, timeoutMs: timeoutMs, read: read) == .chat
+    }
+
+    /// Polls `read` until a chat row that matches the name shows (`.chat`). On a time-out it returns the last state:
+    /// `.searchFirst` if a search row stays above the chat row, else `.none`.
+    func waitForSwitcherResult(name: String, baseline: Set<String>, timeoutMs: Int = SwitcherTiming.resultMs,
+                               read: () -> [(String, Frame)]) async -> SwitcherResult {
+        var last = SwitcherResult.none
+        _ = await waitUntil(timeoutMs: timeoutMs, intervalMs: SwitcherTiming.pollMs) {
+            last = ActionRules.switcherResult(read(), name: name, baseline: baseline)
+            return last == .chat
         }
+        return last
     }
 
     /// For an app with no search keys: focus the search field through accessibility, else click it.

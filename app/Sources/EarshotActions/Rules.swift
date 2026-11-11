@@ -102,6 +102,13 @@ enum ScrollTiming {
     static let limitMs = 300
 }
 
+/// What the switcher list shows after the name (see ActionRules.switcherResult).
+enum SwitcherResult: Equatable {
+    case none
+    case chat
+    case searchFirst
+}
+
 /// The result of the chat check.
 enum ChatCheck: String, Equatable {
     /// A text on screen is the chat name and nothing more. Typing needs this.
@@ -241,9 +248,50 @@ enum ActionRules {
         Set(texts.filter { chatCheck(texts: [$0.0], names: [name]) != .none }.map { placeKey($0.0, $0.1) })
     }
 
-    /// True if a text that matches the name shows at a place where it was not before typing.
+    /// True if a chat row that matches the name shows at a place where it was not before typing.
     static func resultShows(_ texts: [(String, Frame)], name: String, baseline: Set<String>) -> Bool {
-        !matchKeys(texts, name: name).subtracting(baseline).isEmpty
+        switcherResult(texts, name: name, baseline: baseline) == .chat
+    }
+
+    /// The start words of a row that runs the typed text as a query, not a chat. Slack (2026) shows
+    /// "Search for: <name>", "Show results for: <name>" and "Ask Slackbot about <name>" in its Cmd-K list.
+    /// Such a row holds the typed name, so the name alone does not make it a result.
+    static let queryRowStarts = ["search for", "show results", "search in", "search all", "ask "]
+
+    /// True if one text of the row starts with a query word.
+    static func isQueryRow(_ texts: [String]) -> Bool {
+        texts.contains { t in
+            let s = t.lowercased().trimmingCharacters(in: .whitespaces)
+            return queryRowStarts.contains { s.hasPrefix($0) }
+        }
+    }
+
+    /// Groups the texts of a result list into rows, from top to bottom. A text joins the row above it
+    /// if it starts before that row ends.
+    static func rows(_ texts: [(String, Frame)]) -> [[(String, Frame)]] {
+        var out: [[(String, Frame)]] = []
+        var rowEnd = -Double.infinity
+        for t in texts.sorted(by: { $0.1.y < $1.1.y }) {
+            if !out.isEmpty, t.1.y < rowEnd - 2 {
+                out[out.count - 1].append(t)
+                rowEnd = max(rowEnd, t.1.maxY)
+            } else {
+                out.append([t])
+                rowEnd = t.1.maxY
+            }
+        }
+        return out
+    }
+
+    /// What Return in the switcher would open. `.chat`: the first result row is a new row that matches the name.
+    /// `.searchFirst`: a query row stays above that row, so Return would run a search. `.none`: no such row yet.
+    static func switcherResult(_ texts: [(String, Frame)], name: String, baseline: Set<String>) -> SwitcherResult {
+        var queryAbove = false
+        for row in rows(texts) {
+            if isQueryRow(row.map(\.0)) { queryAbove = true; continue }
+            if !matchKeys(row, name: name).subtracting(baseline).isEmpty { return queryAbove ? .searchFirst : .chat }
+        }
+        return .none
     }
 
     /// The reason not to type the dictated text into the chat, or nil (R-NV-4).
