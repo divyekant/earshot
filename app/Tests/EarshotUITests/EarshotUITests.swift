@@ -82,15 +82,24 @@ final class CatalogueEditTests: XCTestCase {
 }
 
 final class ActivityStatsTests: XCTestCase {
-    private func record(_ ok: Bool, _ stages: [String: Double], tier: RouterTier = .rules) -> ActivityRecord {
-        ActivityRecord(heard: "h", intent: "i", tier: tier, ok: ok, note: "", stages: stages)
+    private func record(_ ok: Bool, _ stages: [String: Double], tier: RouterTier = .rules, heard: String = "h") -> ActivityRecord {
+        ActivityRecord(heard: heard, intent: "i", tier: tier, ok: ok, note: "", stages: stages)
     }
 
     func testTotalAndStageLine() {
         let r = record(true, ["route": 135, "text": 120, "chat": 380])
-        XCTAssertEqual(ActivityStats.total(r), 380)
+        XCTAssertEqual(ActivityStats.total(r), 380, "an older record with no total stage uses its largest time")
         XCTAssertEqual(ActivityStats.stageLine(r), "text 120 · route 135 · chat 380")
         XCTAssertNil(ActivityStats.total(record(true, [:])))
+    }
+
+    func testTotalIsTheTotalStageNotTheAudioLength() {
+        // A live record: the audio length (4.2 s) is larger than the time from the end of speech (612 ms).
+        let r = record(true, ["speech": 210, "speech.audio": 4200, "route": 2, "action.total": 380, "total": 612])
+        XCTAssertEqual(ActivityStats.total(r), 612)
+        // A bare "type" waits 8 s for the text. That wait is not the command time.
+        XCTAssertEqual(ActivityStats.total(record(true, ["speech": 200, "dictation.armed": 8000, "route": 3])), 200)
+        XCTAssertEqual(ActivityStats.total(record(true, ["speech": 200, "speech.audio": 3000])), 200)
     }
 
     func testPercentile() {
@@ -101,12 +110,31 @@ final class ActivityStatsTests: XCTestCase {
     }
 
     func testSummary() {
-        let s = ActivityStats.summary([record(true, ["a": 100]), record(false, ["a": 300], tier: .jev), record(true, [:])])
+        let s = ActivityStats.summary([record(true, ["total": 100]), record(false, ["total": 300], tier: .jev),
+                                       record(true, ["total": 200, "speech.audio": 5000])])
         XCTAssertEqual(s.count, 3)
         XCTAssertEqual(s.okCount, 2)
-        XCTAssertEqual(s.medianMs, 100)
+        XCTAssertEqual(s.medianMs, 200)
         XCTAssertEqual(s.byTier, ["rules": 2, "jev": 1])
-        XCTAssertEqual(ActivityStats.summaryLine(s), "3 commands · 2 OK · median 100 ms · p90 300 ms")
+        XCTAssertEqual(ActivityStats.summaryLine(s), "3 commands · 2 OK · median 200 ms · p90 300 ms")
+    }
+
+    func testSummaryCountsOnlyTurnsWithWords() {
+        let turn = record(true, ["speech": 150, "total": 400])
+        let typed = record(true, ["speech": 150, "total": 500], heard: "(4 words)")
+        let noWords = record(false, ["speech": 90, "speech.audio": 1200, "total": 95], tier: .none, heard: "")
+        let rejectedWake = record(false, [:], tier: .none, heard: "")
+        let nearMiss = record(false, [:], tier: .none, heard: "")
+        let s = ActivityStats.summary([turn, typed, noWords, rejectedWake, nearMiss])
+        XCTAssertEqual(s.count, 2)
+        XCTAssertEqual(s.okCount, 2)
+        XCTAssertEqual(s.medianMs, 400)
+        XCTAssertEqual(s.byTier, ["rules": 2])
+        XCTAssertEqual(s.otherCount, 3)
+        XCTAssertEqual(ActivityStats.summaryLine(s), "2 commands · 2 OK · median 400 ms · p90 500 ms · 3 other records")
+        XCTAssertFalse(ActivityStats.hasWords(noWords))
+        XCTAssertFalse(ActivityStats.hasWords(rejectedWake))
+        XCTAssertTrue(ActivityStats.hasWords(typed))
     }
 
     func testReadsLogFromStore() throws {
