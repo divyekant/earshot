@@ -184,7 +184,7 @@ extension Engine {
             case .item(let rid):
                 guard let it = store.item(rid), it.state != .dropped else { continue }
                 var parts = [it.title.isEmpty ? it.said : it.title, Engine.kindLabel(it)]
-                if let p = projectName(it.projectID) { parts.append(p) }
+                if let p = projectLabel(it) { parts.append(p) }
                 let line = parts.joined(separator: " · ")
                 out.append(Found(hit: hit, record: (.item, rid), line: line, pageLine: line))
             case .doc(let rid):

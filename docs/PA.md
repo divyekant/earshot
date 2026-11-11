@@ -106,6 +106,8 @@ The settings file is `~/Library/Application Support/earshot/plugin-data/pa/setti
 | `rules` | time alert, due list, silence list, nearEvent alert, newArrival list | Each rule is `"alert"`, `"list"` or `"off"`. |
 | `projects` | `{}` | Rules for one project. Example: `{"kitchen": {"due": "alert"}}`. |
 | `reminders` | `{"copy": true, "list": "earshot", "alertBy": "reminders"}` | The copy in Apple Reminders. If `alertBy` is `"pa"`, the PA gives the alerts. |
+| `projectFocusMinutes` | `5` | After "new project kitchen", your next captures go to Kitchen for this count of minutes. Each capture starts the minutes again. `0` switches it off. |
+| `proposeProject` | `false` | If `true`, the PA proposes a project for a capture with no project, with a "?" ("To-do · Kitchen? · call the tiler"). Off by default: the proposals did not pass the test of E10. |
 | `searchModel` | `"gemma"` | The search model: `"gemma"`, `"qwen3"` or `"none"` (keywords only). The PA reads it at its start. Run `PA_MODEL=<name> scripts/install-pa.sh` to download another model. |
 
 If the file has an error, the PA uses the default values and shows one note.

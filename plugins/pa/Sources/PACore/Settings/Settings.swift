@@ -132,6 +132,11 @@ public struct PASettings: Codable, Equatable, Sendable {
     /// The embedding model of the search by sense (phase 2, D-16): "gemma", "qwen3" or "none" (keywords only).
     /// The install script downloads the model file. A change takes effect at the next start of the PA.
     public var searchModel = "gemma"
+    /// Project proposals for a capture with no project (8.1). Off by default: no model passed the Project mark
+    /// of E10 (D-16).
+    public var proposeProject = false
+    /// After "new project", the next captures go to it for this count of minutes (8.3). 0 switches it off.
+    public var projectFocusMinutes = 5
 
     public init() {}
 
@@ -151,6 +156,8 @@ public struct PASettings: Codable, Equatable, Sendable {
         projects = try c.decodeIfPresent([String: ProjectRules].self, forKey: .projects) ?? d.projects
         reminders = try c.decodeIfPresent(ReminderSettings.self, forKey: .reminders) ?? d.reminders
         searchModel = try c.decodeIfPresent(String.self, forKey: .searchModel) ?? d.searchModel
+        proposeProject = try c.decodeIfPresent(Bool.self, forKey: .proposeProject) ?? d.proposeProject
+        projectFocusMinutes = try c.decodeIfPresent(Int.self, forKey: .projectFocusMinutes) ?? d.projectFocusMinutes
     }
 
     /// The rules for an item in a project: the value of the project if it has one, or the general value.

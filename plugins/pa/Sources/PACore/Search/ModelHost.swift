@@ -15,6 +15,8 @@ public final class ModelHost: @unchecked Sendable {
     var lastUse: Date?
     /// The load failed one time. The PA does not try again until the next start, and uses keywords only.
     var failed = false
+    /// The values of the proposal and duplicate rules for this model (E10). Nil: no proposals and no notice.
+    public var rules: ModelRules?
     /// The time of the last load, for the log.
     public private(set) var lastLoadTime: TimeInterval?
 

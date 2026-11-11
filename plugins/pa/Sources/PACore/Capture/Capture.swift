@@ -73,6 +73,12 @@ extension Engine {
 
     func projectName(_ id: Int64?) -> String? { id.flatMap { store?.project($0)?.name } }
 
+    /// The project of an item for a list or a page. A "?" shows that the search set it and the owner did not
+    /// confirm it yet (phase 2 build spec, 8.1, step 7).
+    func projectLabel(_ it: Item) -> String? {
+        projectName(it.projectID).map { it.projectBy == "search" ? $0 + "?" : $0 }
+    }
+
     /// The note for a saved item: the label, the time, the project, the title.
     func captureNote(_ it: Item, unsure: Bool) -> String {
         var parts: [String] = []
@@ -135,6 +141,8 @@ extension Engine {
             if kind == .reminder { rest = Engine.dropFirst(rest, ["to", "about", "that"]) }
             let (project, cut) = readProject(rest)
             if let project { it.projectID = project.id; it.projectBy = "owner"; rest = cut }
+            // The project focus (8.3): a capture with no project in the words goes to the focus project.
+            else if let focus = focusProject() { it.projectID = focus.id; it.projectBy = "owner" }
             // "remind me about this", "todo this": the document or page in front.
             if kind != .note, rest.lowercased() == "this" {
                 guard let doc = docFromContext(context, projectID: it.projectID) else {
@@ -153,6 +161,8 @@ extension Engine {
             return .note(id, "The store had an error. Your words are kept in a spare file.")
         }
         itemChanged(it, old: nil)
+        renewFocus()
+        afterCapture(it)
         let note = captureNote(it, unsure: unsure)
         rememberCapture(cmd, text, note: note)
         return .note(id, note)
@@ -198,17 +208,21 @@ extension Engine {
         var name = Engine.dropFirst(Engine.clean(raw), ["called", "named"])
         name = TimeReader.tidy(name)
         guard !name.isEmpty else { return .note(id, "No words. Nothing saved.") }
-        if let p = store.project(named: name) { return .note(id, "Project \(p.name) is there already.") }
+        if let p = store.project(named: name) {
+            let focus = setFocus(p).map { " " + $0.prefix(1).uppercased() + $0.dropFirst() + "." } ?? ""
+            return .note(id, "Project \(p.name) is there already.\(focus)")
+        }
         if let p = store.project(named: name, includeClosed: true) {
             do { try store.setProjectState(p.id, open: true, at: clock.now) } catch { return .note(id, "The store had an error. Nothing saved.") }
             projectsChanged()
-            return .note(id, "Project · \(p.name) · open again")
+            return .note(id, (["Project · \(p.name) · open again"] + [setFocus(p)].compactMap { $0 }).joined(separator: " · "))
         }
         // Only the first letter changes to a capital, for the name on screen. The words stay the owner's.
         let shown = name.prefix(1).uppercased() + name.dropFirst()
-        do { _ = try store.insertProject(String(shown), at: clock.now) } catch { return .note(id, "The store had an error. Nothing saved.") }
+        let p: Project
+        do { p = try store.insertProject(String(shown), at: clock.now) } catch { return .note(id, "The store had an error. Nothing saved.") }
         projectsChanged()
-        return .note(id, "Project · \(shown)")
+        return .note(id, (["Project · \(shown)"] + [setFocus(p)].compactMap { $0 }).joined(separator: " · "))
     }
 
     // MARK: - The spare file

@@ -9,6 +9,7 @@ final class DocumentTests: XCTestCase {
         let out = MemoryOutput()
         let e = Engine(folder: tempFolder(), clock: clock, output: out, textReader: FileTextReader())
         e.start()
+        e.settings.projectFocusMinutes = 0
         return (e, out, clock)
     }
 
