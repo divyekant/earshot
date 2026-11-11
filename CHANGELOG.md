@@ -6,6 +6,10 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+### Added
+
+- A weekly report script, `app/scripts/weekly-report.py`. It reads the activity log and prints the success rate for each command type, wakes and rejects for each hour, dropped turns, turns with no words for each mode, and the time with the end wait. It prints no message text (R-MD-1, gap item 1).
+
 ### Changed
 
 - The activity log keeps no typed text. For a "type …" command, the message of a chat command and hold-key dictation, it keeps the command words and a word count. The note on screen still shows the text. The log keeps 30 days, and the Activity tab reads only the end of the file (R-MD-1, gap item 11).

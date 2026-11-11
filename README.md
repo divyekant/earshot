@@ -84,6 +84,13 @@ To update the installed app to the latest `develop` with no clicks, run `scripts
 
 If the new build does not start, the script puts back the old app. If the installed app is already on the `develop` commit, the script does nothing. `--dry-run` shows the steps and changes nothing. `--skip-tests`, `--now` (no idle wait) and `--force` (install again) change the steps. `EARSHOT_APP` sets another installed app. The log goes to `~/Library/Logs/earshot-mem/`.
 
+To see how earshot works for you, run the weekly report. It reads the activity log and prints, for the last 7 days: the success rate for each command type, the wakes and rejects for each hour, the dropped turns, the turns with no words for each mode, and the time with the end wait. It prints no message text, labels or names.
+
+```sh
+uv run app/scripts/weekly-report.py
+uv run app/scripts/weekly-report.py --since 2026-11-03 --until 2026-11-10
+```
+
 ## Set up
 
 1. Open `app/build/Earshot.app`. An ear icon shows in the menu bar. earshot has no Dock icon.
