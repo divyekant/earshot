@@ -79,6 +79,10 @@ extension Engine {
                 link = "<a href=\"\(Engine.escape(URL(fileURLWithPath: path).absoluteString))\">\(link)</a>"
             }
             if d.textState == .gone { link += " (file moved or deleted)" }
+            if d.kind == .folder, let store {
+                let n = store.docs(where: "dropped_at IS NULL AND parent_doc_id = ?", [.int(d.id)]).count
+                link += " · folder, \(n) file\(n == 1 ? "" : "s")"
+            }
             return "<li><span>\(link)</span></li>"
         }.joined()
         return "<h2>Documents</h2><ul>\(lis)</ul>"
@@ -158,7 +162,12 @@ extension Engine {
             let done = store.items(where: "state = 'done' AND project_id = ? AND done_at >= ?", [.int(p.id), .real(since)],
                                    order: "done_at DESC")
             let notes = open.filter { $0.kind == .note && $0.projectID == p.id }
-            let body = section("Open", items, empty: "Nothing open.") + docSection(store.docs(project: p.id))
+            // The files of a kept folder are not listed one by one: the folder line gives the count.
+            let docs = store.docs(project: p.id).filter { $0.parentDocID == nil }
+            let new = arrivals(since: now.addingTimeInterval(-7 * 86400), project: p.id)
+            let newSection = new.isEmpty ? "" : "<h2>New</h2><ul>" + new.reversed().map {
+                "<li><span>\(Engine.escape(arrivalText($0)))</span></li>" }.joined() + "</ul>"
+            let body = section("Open", items, empty: "Nothing open.") + newSection + docSection(docs)
                 + section("Notes", notes) + section("Done in the last 30 days", done)
             let name = "project-\(p.slug).html"
             keep.insert(name)

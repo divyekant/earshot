@@ -94,6 +94,15 @@ extension Engine {
             d.droppedAt = clock.now
             do { try store?.updateDoc(d, event: "drop", at: clock.now) } catch { return .note(id, "The store had an error. Nothing changed.") }
             forgetText(d.id)
+            // A kept folder: its files go too, with their text (R-PA-9). The watch stops.
+            if d.kind == .folder, let store {
+                for var f in store.docs(where: "dropped_at IS NULL AND parent_doc_id = ?", [.int(d.id)]) {
+                    f.droppedAt = clock.now
+                    try? store.updateDoc(f, event: "drop", at: clock.now)
+                    forgetText(f.id)
+                }
+                watchFolders()
+            }
             docsChanged()
             return .note(id, "Dropped · \(d.title)")
         case .item(var it):

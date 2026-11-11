@@ -35,6 +35,7 @@ Hold the earshot key and say one of these commands.
 | "what is due" | Shows late items, the reminders of today, and the to-dos of today and tomorrow. "what's due" is the same. |
 | "what about kitchen" | Shows the open items of the project. |
 | "where is passport" | Shows the items, documents, projects and passages of kept files that match. With the search model, it also finds results in other words ("the offer for the tiles" finds a quote). "open search" shows 10 results with more text. |
+| "keep this folder for kitchen" | Keeps the front folder in Finder and reads its files (3 levels or fewer, 500 files or fewer). A new file in the folder is read at once and shows as "New in Kitchen · quote-2.pdf" in the morning list and on the project page (rule `newArrival`). |
 | "main points of this" | Shows 5 sentences of the front document that give its main points. "main points of the roof estimate" uses the best kept document for the words. "main points 2" uses item 2 of the last list. "summarize" is the same. "open main points" shows the full sentences. The PA selects sentences of the document. It writes no new words. |
 | "done 2" | Marks item 2 of the last list as done. "done that" uses the last alert. |
 | "snooze 2 to tomorrow" | Moves the time of item 2. With no time, the PA uses 10 minutes. |

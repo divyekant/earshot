@@ -259,9 +259,13 @@ extension Engine {
         guard morningShownDay != today.description, now >= morningTime(on: today), !isQuiet(now) else { return }
         morningShownDay = today.description
         let items = morningItems(now)
-        store?.log("morning", .list, Int64(items.count), at: now)
-        guard !items.isEmpty else { return }
-        output.send(listAnswer(nil, title: "Today", records: items.map { (.item, $0.id, line($0)) }, max: 7))
+        // Rule "new arrival" (phase 2, 8.5): the files that came in a kept folder in the last day.
+        let new = arrivals(since: now.addingTimeInterval(-86400))
+            .filter { settings.rules(project: projectName($0.projectID)).newArrival == .list }
+        store?.log("morning", .list, Int64(items.count + new.count), at: now)
+        guard !items.isEmpty || !new.isEmpty else { return }
+        output.send(listAnswer(nil, title: "Today", records: items.map { (.item, $0.id, line($0)) }
+                               + new.map { (.doc, $0.id, arrivalText($0)) }, max: 7))
     }
 
     // MARK: - Quiet
