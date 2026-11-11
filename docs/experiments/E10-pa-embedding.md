@@ -51,6 +51,27 @@ CI run on `macos-26`, PR #142, 2026-11-11. "Keywords only" is the base with no m
 
 The full-length run of candidate 2 (768 numbers) did not start in this CI run: the first request for the system data gave no answer in time. The run with 256 numbers then found the data. The bench now checks the state of the data after the request.
 
+## Results: candidate 5, EmbeddingGemma 2
+
+The owner asked for a run of EmbeddingGemma 2 (Apache 2.0, September 2026, after the spec). The run uses the text model only (`embeddinggemma-2-Q8_0.gguf` of ggml-org, 310 MB). The image and audio part (`mmproj`, 555 MB) is not used. The same Mac, llama.cpp b12284, Metal, 2026-11-11.
+
+| Measure | 4: Gemma, 768 | 5: Gemma 2, 768 | 5: Gemma 2, 256 |
+|---|---|---|---|
+| Search holdout, first 3 (merged) | **92** | 87 | 86 |
+| Search holdout, numbers only | 94 | 83 | 77 |
+| Search development, first 3 (merged) | 92 | 89 | 90 |
+| Project holdout: proposals, correct, wrong | 48, 41, 7 (85%) | 43, 38, 5 (88%) | **33, 30, 3 (91%)** |
+| Project, dk's items (rule of the development set): proposals, correct, wrong | 13, 12, 1 | 8, 7, 1 | 8, 7, 1 |
+| Project, dk's items, best project with no threshold (of 75) | 58 | 54 | 52 |
+| Duplicates: same pairs found, different pairs called the same (of 20 each) | 19, 0 | 20, 2 | 19, 1 |
+| One query, median | 4.6 ms | 6.4 ms | 6.3 ms |
+| One passage, median | 12.0 ms | 17.4 ms | 17.8 ms |
+| Footprint with the model loaded | 322 MB | 392 MB | 290 MB |
+
+EmbeddingGemma 2 fails Search (87 and 86). With 256 numbers, it passes Project on the holdout (91% correct, 3 wrong). On dk's items, the rule makes only 8 proposals for 75 items with a project.
+
+The first run read only 512 of the 768 numbers, because the code took the width of the model (512) as the size of the output. The code now asks llama.cpp for the size of the output.
+
 ## Finding
 
 - Both macOS candidates fail Search and Project. The merged list is worse than the keywords alone, because the list by numbers puts the correct result in the first 3 for only about 1 question in 4.
@@ -88,6 +109,7 @@ The 4B model of dk's research put 90% of dk's items in the correct project. With
 - Candidate 3 (Qwen3-Embedding-0.6B, Apache 2.0) fails Search: 86 of 100. It also fails Project.
 - Candidate 4 (EmbeddingGemma-300M, Gemma terms) passes Search: 92 with 768 numbers, 90 with 256. It fails Project: 85% correct and 7 wrong proposals. The marks are 90% and 5.
 - So no candidate passes Project. By section 6.5 of the build spec, the PA builds search (Q3) and main points (Q5) with the model that passes Search, and the project proposals of Q4 stay off by default (`"proposeProject": false`).
+- Candidate 5 (EmbeddingGemma 2, Apache 2.0) fails Search: 87 of 100. With 256 numbers it passes Project, but it is a second model, so the PA does not use it now.
 - The only model that passes Search does not have an open-source license. R-MD-4 prefers an open-source license, so the owner decides (D-16).
 - The 768 numbers of candidate 4 are 2 points better on the holdout than 256 numbers, for 107 MB more memory while the model is loaded. The compare of 50,000 passages takes 23 ms with 768 numbers and 6 ms with 256.
 - In bench mode, the program stopped at exit in the Metal teardown of llama.cpp, after the table, because the model was still loaded. The bench now frees the model before exit. The PA must also free the model before it stops (Q3).

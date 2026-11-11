@@ -60,7 +60,10 @@ public final class LlamaEmbedder: Embedder {
         model = m
         ctx = c
         vocab = llama_model_get_vocab(m)
-        dimension = Int(llama_model_n_embd(m))
+        // The size of the output. EmbeddingGemma 2 has a projection after the model (512 to 768), so the width of
+        // the model is not the size of the output.
+        let out = Int(llama_model_n_embd_out(m))
+        dimension = out > 0 ? out : Int(llama_model_n_embd(m))
         self.spec = spec
         id = spec.id
     }
