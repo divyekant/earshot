@@ -80,7 +80,7 @@ jobs:
   pa:
     name: PA plugin build and test
     runs-on: macos-26
-    timeout-minutes: 20
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: plugins/pa
@@ -105,6 +105,22 @@ jobs:
       - name: Probe and mark lines
         if: always()
         run: grep -E "PROBE|MARK|CONTRACT" "$RUNNER_TEMP/pa-test.log" || true
+
+      # Phase 2, Q1: the embedding bench on the made-up fixtures (docs/experiments/E10-pa-embedding.md).
+      # The models of macOS only. The contextual model may need a one-time download of macOS data.
+      - name: Embedding bench
+        if: always()
+        run: |
+          set -uo pipefail
+          swift build -c release --product earshot-pa
+          fx=Tests/PACoreTests/Fixtures/phase2
+          for e in hash nl-sentence nl-contextual; do
+            for d in full 256; do
+              echo "=== bench $e, numbers: $d"
+              if [ "$d" = full ]; then extra=""; else extra="--dims 256"; fi
+              .build/release/earshot-pa --embed-bench "$fx" --embedder "$e" --get-assets $extra 2>/dev/null || echo "bench $e failed"
+            done
+          done
 
       - name: Build the app bundle (no install)
         env:
