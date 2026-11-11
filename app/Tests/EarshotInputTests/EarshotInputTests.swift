@@ -239,7 +239,7 @@ final class SpeechDetectorTests: XCTestCase {
         _ = run(&d, -65, ms: 1000)
         XCTAssertEqual(run(&d, -25, ms: 500), [.start])
         var events: [SpeechEvent] = []
-        for i in 0..<100 { if let e = d.feed(db: i % 2 == 0 ? -58 : -66) { events.append(e) } }
+        for i in 0..<100 { if let e = d.feed(db: i % 4 != 3 ? -58 : -66) { events.append(e) } }
         XCTAssertEqual(events, [.end], "ends after 550 ms + 1000 ms with no speech frame")
         XCTAssertFalse(d.inTurn)
     }
@@ -339,7 +339,8 @@ final class SpeechDetectorTests: XCTestCase {
 
         XCTAssertEqual(run(&d, -25, ms: 500), [.start])
         var events: [SpeechEvent] = []
-        for i in 0..<100 { if let e = d.feed(db: i % 2 == 0 ? -58 : -66) { events.append(e) } }
+        // Soft runs of 3 frames (as a soft word) start the quiet time again each time: the soft rule ends the turn.
+        for i in 0..<100 { if let e = d.feed(db: i % 4 != 3 ? -58 : -66) { events.append(e) } }
         XCTAssertEqual(events, [.end])
         XCTAssertEqual(d.lastEnd?.rule, .soft)
 
