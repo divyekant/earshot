@@ -10,7 +10,8 @@ import Speech
 /// macOS downloads the speech model for the locale one time.
 /// It needs macOS 26. On older macOS, and if it does not load, `AppleSpeech.make` uses DictationEngine.
 @available(macOS 26, *)
-public final class AppleSpeechEngine: TurnSpeechEngine, PrerollControl, CaptureControl, PhraseHintControl, @unchecked Sendable {
+public final class AppleSpeechEngine: TurnSpeechEngine, PrerollControl, CaptureControl, PhraseHintControl, MicIdleControl,
+                                      @unchecked Sendable {
     public static let engineID = AppleSpeech.engineID
     public let id = AppleSpeechEngine.engineID
     public let locale: Locale
@@ -32,6 +33,8 @@ public final class AppleSpeechEngine: TurnSpeechEngine, PrerollControl, CaptureC
     private var turnPreroll: Double = 0
     /// Words to expect, such as the wake phrase (D-11). They go to the analyzer as context.
     private var hints: [String] = []
+    /// The idle time of the microphone (`MicIdleControl`). The feed gets it when `prepare` makes the feed.
+    private var idleClose: Double?
     let activity = TurnActivity()
 
     public init(locale: Locale = Locale(identifier: "en_US")) { self.locale = locale }
@@ -48,6 +51,7 @@ public final class AppleSpeechEngine: TurnSpeechEngine, PrerollControl, CaptureC
     public func prepare() async throws {
         let format = try await prepareModel()
         let feed = MicrophoneFeed(format: format)
+        feed.setIdleClose(seconds: lock.withLock { idleClose })
         try feed.start()
         lock.withLock { mic = feed }
     }
@@ -77,6 +81,9 @@ public final class AppleSpeechEngine: TurnSpeechEngine, PrerollControl, CaptureC
 
     public func setNextPreroll(seconds: Double) { lock.withLock { mic }?.setNextPreroll(seconds: seconds) }
     public func setNextCapture(seconds: Double) { lock.withLock { mic }?.setNextCapture(seconds: seconds) }
+    public func setMicIdleClose(seconds: Double?) {
+        lock.withLock { () -> MicrophoneFeed? in idleClose = seconds; return mic }?.setIdleClose(seconds: seconds)
+    }
 
     public func setPhraseHints(_ phrases: [String]) { lock.withLock { hints = phrases.filter { !$0.isEmpty } } }
 
@@ -85,7 +92,7 @@ public final class AppleSpeechEngine: TurnSpeechEngine, PrerollControl, CaptureC
         guard let mic = lock.withLock({ self.mic }) else {
             throw SpeechError("Apple speech is not ready: call prepare() first")
         }
-        let preroll = mic.begin(try startTurn())
+        let preroll = try mic.begin(try startTurn())
         lock.withLock { turnPreroll = preroll }
     }
 

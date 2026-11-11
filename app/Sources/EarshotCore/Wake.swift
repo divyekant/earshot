@@ -316,6 +316,22 @@ public protocol CaptureControl: AnyObject {
     func setNextCapture(seconds: Double)
 }
 
+/// A speech engine that can close its microphone after a time with no command, so that the macOS microphone
+/// indicator goes off. The next command opens it again, with no preroll for that command.
+public protocol MicIdleControl: AnyObject {
+    /// Nil keeps the microphone open. Always-on needs that: the turn starts up to 3 s before the wake hit (D-11).
+    func setMicIdleClose(seconds: Double?)
+}
+
+/// When the speech engine closes its microphone.
+public enum MicIdle {
+    /// Hold mode: close the microphone after 2 minutes with no command (dk chose this on 2026-11-11).
+    public static let holdSeconds = 120.0
+
+    /// The idle time for an input mode. Always-on keeps the microphone open.
+    public static func seconds(for mode: InputMode) -> Double? { mode == .hold ? holdSeconds : nil }
+}
+
 /// The sound pattern of one teach take: the encoder frames of the spotter model for the spoken part of the phrase
 /// (D-11, E5). It is not audio: earshot cannot play it back. It stays on the Mac in `voice.json` (R-MD-1).
 public struct WakeTemplate: Codable, Equatable, Sendable {
