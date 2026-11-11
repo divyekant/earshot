@@ -23,9 +23,14 @@ final class ContractTests: XCTestCase {
         private let lock = NSLock()
         private var lines: [[String: Any]] = []
 
-        init(folder: URL? = nil) throws {
+        init(folder: URL? = nil, sandbox: String? = nil) throws {
             self.folder = folder ?? FileManager.default.temporaryDirectory.appendingPathComponent("pa-contract-\(UUID().uuidString)")
-            process.executableURL = ContractTests.program
+            if let sandbox {
+                process.executableURL = URL(fileURLWithPath: "/usr/bin/sandbox-exec")
+                process.arguments = ["-p", sandbox, ContractTests.program.path]
+            } else {
+                process.executableURL = ContractTests.program
+            }
             // The same environment as earshot gives: nothing else.
             process.environment = ["EARSHOT_PLUGIN_DATA": self.folder.path, "EARSHOT_CONTRACT": "1",
                                    "PATH": "/usr/bin:/bin", "HOME": NSHomeDirectory(), "LANG": "en_GB.UTF-8",
@@ -49,6 +54,8 @@ final class ContractTests: XCTestCase {
         }
 
         func send(_ s: String) { stdin.fileHandleForWriting.write(Data((s + "\n").utf8)) }
+
+        func send(_ lines: [[String: Any]]) { for l in lines { send(l) } }
 
         func send(_ obj: [String: Any]) {
             let d = try! JSONSerialization.data(withJSONObject: obj)

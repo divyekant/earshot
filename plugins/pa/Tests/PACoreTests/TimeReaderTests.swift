@@ -57,6 +57,17 @@ final class TimeReaderTests: XCTestCase {
         XCTAssertEqual(r.kind, .none)
         XCTAssertEqual(r.rest, "call the plumber at 5ish tomorrowish pm")
     }
+
+    /// A "#" and a number in the words is not a day of the month. An ordinal above 31 is not a day.
+    func testHashNumberIsNotADate() {
+        let reader = TimeReader(calendar: cal)
+        for text in ["ring the plumber at 9 #43", "ring the plumber at 9 #3", "order the forty-first box"] {
+            let r = reader.read(text, now: wed(10), todo: true)
+            let day = r.day?.day ?? 0
+            XCTAssertFalse([3, 41, 43].contains(day), text)
+        }
+        XCTAssertEqual(reader.read("call the plumber #43 at 5", now: wed(10)).rest, "call the plumber #43")
+    }
 }
 
 /// A second set of 30 phrases, written after the rules. It shows how the rules do on phrases that they were not
@@ -81,4 +92,5 @@ final class TimeReaderHoldoutTests: XCTestCase {
         }
         print("MARK holdout phrases: correct \(correct), wrong \(wrong), no time \(none) (of 30)")
     }
+
 }

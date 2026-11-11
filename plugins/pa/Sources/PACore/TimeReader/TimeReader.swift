@@ -99,6 +99,8 @@ public struct TimeReader: Sendable {
             if w == "o'clock" || w == "oclock" { out.append(Tok(w: "oclock", src: i)); continue }
             w = w.replacingOccurrences(of: "'s", with: "")
             if w.isEmpty { continue }
+            // The reader marks an ordinal as "#20". A "#" in the owner's words ("#43") is not an ordinal.
+            if w.hasPrefix("#") { w = "no" + w.dropFirst() }
             // "5pm", "5:30pm", "11am"
             for suffix in ["pm", "am", "p.m.", "a.m.", "p.m", "a.m"] where w.hasSuffix(suffix) && w.count > suffix.count {
                 let head = String(w.dropLast(suffix.count))
@@ -191,8 +193,8 @@ public struct TimeReader: Sendable {
     func word(_ t: [Tok], _ i: Int) -> String { i < t.count ? t[i].w : "" }
     func ordinal(_ t: [Tok], _ i: Int) -> Int? {
         let w = word(t, i)
-        guard w.hasPrefix("#") else { return nil }
-        return Int(w.dropFirst())
+        guard w.hasPrefix("#"), let n = Int(w.dropFirst()), (1...31).contains(n) else { return nil }
+        return n
     }
 
     /// "in 20 minutes", "in an hour", "in half an hour", "in 2 days", "20 minutes from now".
