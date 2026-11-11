@@ -77,6 +77,12 @@ final class ChatStageBench: XCTestCase {
         if let combo = Keys.parse(keys) { Keys.press(combo) }
         try await Task.sleep(nanoseconds: 400_000_000)
         print("DUMP focus after keys: \(AX.describeFocus(app))")
+        // Type only into a switcher field, never into a message box.
+        guard let field0 = AX.focused(app), let win = AX.window(app), AX.isSwitcherField(field0, in: win),
+              !AX.isComposer(field0, in: win), !AX.looksLikeComposer(field0) else {
+            Keys.press(Keys.escape)
+            throw XCTSkip("the focus is not in a switcher field: nothing typed")
+        }
         Keys.type(env["EARSHOT_BENCH_NAME"] ?? own.name)
         for wait in [150, 300, 600, 900] {
             try await Task.sleep(nanoseconds: UInt64(wait) * 1_000_000)
