@@ -59,4 +59,4 @@ if ! cmp -s "$here/plugin.json" "$dest/plugin.json"; then
     echo "plugin.json is new or changed. Approve the plugin in Manage > Plugins."
 fi
 echo "Installed: $dest"
-echo "earshot starts the new program at its next start, or after \"Read again\" in the Plugins tab."
+echo "earshot starts the new program at its next start. To start it now, turn Approved off and on for PA in Manage > Plugins."
