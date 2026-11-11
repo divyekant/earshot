@@ -21,6 +21,17 @@ public enum PluginRouter {
     /// - Its first word is not a filler: the router removes fillers before it reads the lead.
     /// - Its first word is not a core command word, and it does not start with an app name.
     public static func refusal(_ lead: String, apps: [AppEntry]) -> String? {
+        refusal(lead, appKeys: appKeys(apps))
+    }
+
+    /// The spoken keys of the app names, with no spaces, to the app name.
+    static func appKeys(_ apps: [AppEntry]) -> [String: String] {
+        var out: [String: String] = [:]
+        for app in apps { for name in app.aliases + [app.name] { out[TextKit.key(name)] = app.name } }
+        return out
+    }
+
+    static func refusal(_ lead: String, appKeys: [String: String]) -> String? {
         let words = TextKit.words(lead)
         guard !words.isEmpty else { return "no words" }
         guard words.count <= PluginContract.maxLeadWords else { return "more than \(PluginContract.maxLeadWords) words" }
@@ -30,7 +41,7 @@ public enum PluginRouter {
         if coreWords.contains(words[0]) { return "\"\(words[0])\" starts a core command" }
         for span in 1...min(3, words.count) {
             let key = words[0..<span].joined()
-            if apps.contains(where: { ($0.aliases + [$0.name]).map(TextKit.key).contains(key) }) {
+            if appKeys[key] != nil {
                 return "\"\(words[0..<span].joined(separator: " "))\" is an app name"
             }
         }
@@ -40,9 +51,10 @@ public enum PluginRouter {
     /// The leads of the plugins that the router can use: each good lead once. If two plugins have the same lead,
     /// the plugin with the first id keeps it.
     public static func usable(_ leads: [PluginLead], apps: [AppEntry]) -> [PluginLead] {
+        let keys = appKeys(apps)
         var seen = Set<String>()
         var out: [PluginLead] = []
-        for l in leads.sorted(by: { ($0.pluginID, $0.lead) < ($1.pluginID, $1.lead) }) where refusal(l.lead, apps: apps) == nil {
+        for l in leads.sorted(by: { ($0.pluginID, $0.lead) < ($1.pluginID, $1.lead) }) where refusal(l.lead, appKeys: keys) == nil {
             let key = TextKit.words(l.lead).joined(separator: " ")
             if seen.insert(key).inserted { out.append(l) }
         }
@@ -55,10 +67,16 @@ public enum PluginRouter {
     /// do not count. Nil if no lead matches.
     public static func match(_ text: String, plugins: [PluginLead], apps: [AppEntry]) -> (lead: PluginLead, rest: String)? {
         guard !plugins.isEmpty else { return nil }
+        // Most commands have no lead: a cheap first pass on all the leads, before the full check of the leads.
+        guard first(text, keys: plugins.map { ($0, TextKit.words($0.lead).joined()) }) != nil else { return nil }
+        return first(text, keys: usable(plugins, apps: apps).map { ($0, TextKit.words($0.lead).joined()) })
+    }
+
+    /// The longest lead in `keys` at the start of the text, after lead fillers. Each lead is one key with no spaces:
+    /// "todo" matches the spoken "to do" and "to-do" too.
+    static func first(_ text: String, keys: [(PluginLead, String)]) -> (lead: PluginLead, rest: String)? {
         let tokens = Tokens(text)
         let words = tokens.words
-        // Each lead as one key with no spaces: "todo" matches the spoken "to do" and "to-do" too.
-        let keys = usable(plugins, apps: apps).map { ($0, TextKit.words($0.lead).joined()) }
         var start = 0
         while start < words.count {
             var best: (lead: PluginLead, length: Int, end: Int)?
