@@ -41,6 +41,12 @@ final class PAPluginLeadsTests: XCTestCase {
             ("Where is the tile quote", "where is", "the tile quote"),
             ("done 2", "done", "2"),
             ("note the landlord wants two months notice", "note", "the landlord wants two months notice"),
+            // Phase 2 (phase 2 build spec 7.1).
+            ("Main points of this", "main points", "of this"),
+            ("Summarize the tile quote", "summarize", "the tile quote"),
+            ("What projects", "what projects", ""),
+            ("Finish project kitchen", "finish project", "kitchen"),
+            ("Note this for kitchen", "note", "this for kitchen"),
         ]
         for (text, lead, rest) in cases {
             let m = PluginRouter.match(text, plugins: leads, apps: apps)

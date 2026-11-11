@@ -10,7 +10,8 @@ final class ReplayTests: XCTestCase {
     func replayLines() -> (lines: [[String: Any]], captures: Int, odd: [String]) {
         var lines: [[String: Any]] = []
         var captures = 0
-        let leads = ["remind me", "todo", "note", "task", "what is due", "where is", "new project", "snooze", "quiet", "what about"]
+        let leads = ["remind me", "todo", "note", "task", "what is due", "where is", "new project", "snooze", "quiet", "what about",
+                     "what projects", "finish project", "main points", "keep this"]
         for n in 0..<200 {
             let lead = leads[n % leads.count]
             let w = ReplayTests.words[n % ReplayTests.words.count]
@@ -23,7 +24,13 @@ final class ReplayTests: XCTestCase {
             default: text = "check the \(w) number \(n) by Friday"
             }
             if ["remind me", "todo", "note", "task"].contains(lead), !text.isEmpty { captures += 1 }
-            lines.append(["type": "command", "id": "r\(n)", "lead": lead, "text": text, "context": ["app": "com.example.app"]])
+            // Phase 2: the context keys "document" and "selection" (5,000 characters, cut to 2,000 by earshot or the PA).
+            var context = ["app": "com.example.app"]
+            if n % 3 == 0 {
+                context["selection"] = "sel\(n) " + String(repeating: "the \(w) made-up text ", count: 250)
+                context["document"] = "/tmp/pa-replay-none/made-up-\(n).txt"
+            }
+            lines.append(["type": "command", "id": "r\(n)", "lead": lead, "text": text, "context": context])
         }
         let odd = ["not json at all", #"{"type":"mystery","x":1}"#, #"{"type":"command","id":"odd1","lead":"sing a song","text":"la"}"#,
                    #"{"type":"command"}"#, "{", String(repeating: "z", count: 70_000)]

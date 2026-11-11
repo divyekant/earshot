@@ -121,8 +121,9 @@ extension Engine {
 
     func whereIs(id: String, text: String) -> Outgoing {
         guard let store else { return .note(id, "The PA store does not open.") }
-        let words = Engine.searchWords(text)
-        let shownWords = Engine.clean(text)
+        // A long text: the first 12 different words only. A query with 2,000 words took seconds (replay, phase 2).
+        let words = Array(Fusion.unique(Engine.searchWords(String(text.prefix(Engine.maxRead)))).prefix(12))
+        let shownWords = String(Engine.clean(text).prefix(80))
         guard !words.isEmpty else { return .note(id, "Nothing found for \(shownWords).") }
         let hits = store.search(words, limit: 20)
         var records: [(RecordKind, Int64, String)] = []

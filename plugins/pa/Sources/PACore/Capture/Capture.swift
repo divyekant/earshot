@@ -104,6 +104,7 @@ extension Engine {
         guard let store else { return .note(id, "The PA store does not open. Nothing saved.") }
         let text = Engine.clean(raw)
         guard !text.isEmpty else { return .note(id, "No words. Nothing saved.") }
+        if cmd == .note, let answer = noteThis(id: id, text: text, context: context) { return answer }
         if let again = duplicateNote(cmd, text) { return .note(id, again) }
         let now = clock.now
         let kind: ItemKind = cmd == .remindMe ? .reminder : (cmd == .note ? .note : .todo)
@@ -133,7 +134,7 @@ extension Engine {
             }
             if kind == .reminder { rest = Engine.dropFirst(rest, ["to", "about", "that"]) }
             let (project, cut) = readProject(rest)
-            if let project { it.projectID = project.id; rest = cut }
+            if let project { it.projectID = project.id; it.projectBy = "owner"; rest = cut }
             // "remind me about this", "todo this": the document or page in front.
             if kind != .note, rest.lowercased() == "this" {
                 guard let doc = docFromContext(context, projectID: it.projectID) else {
@@ -160,6 +161,7 @@ extension Engine {
     /// A document reference from the context: the address and the window title. The PA does not read the page or
     /// the file, and does not fetch the address.
     func docFromContext(_ context: [String: String], projectID: Int64?) -> Doc? {
+        if let file = fileDoc(context, projectID: projectID) { return file }
         let url = context["url"].flatMap { $0.isEmpty ? nil : $0 }
         let title = context["windowTitle"].flatMap { $0.isEmpty ? nil : $0 }
         guard url != nil || title != nil else { return nil }
@@ -172,6 +174,10 @@ extension Engine {
         guard let store else { return .note(id, "The PA store does not open. Nothing saved.") }
         let text = Engine.clean(raw)
         let (project, _) = readProject("x " + text)
+        // Phase 2: a file in front (context key "document"). The PA reads its text in the background.
+        if let file = fileDoc(context, projectID: project?.id), textReader != nil {
+            return keepFile(id: id, file, project: project)
+        }
         guard var doc = docFromContext(context, projectID: project?.id) else {
             return .note(id, "Nothing kept. No page or document here.")
         }
@@ -193,6 +199,11 @@ extension Engine {
         name = TimeReader.tidy(name)
         guard !name.isEmpty else { return .note(id, "No words. Nothing saved.") }
         if let p = store.project(named: name) { return .note(id, "Project \(p.name) is there already.") }
+        if let p = store.project(named: name, includeClosed: true) {
+            do { try store.setProjectState(p.id, open: true, at: clock.now) } catch { return .note(id, "The store had an error. Nothing saved.") }
+            projectsChanged()
+            return .note(id, "Project · \(p.name) · open again")
+        }
         // Only the first letter changes to a capital, for the name on screen. The words stay the owner's.
         let shown = name.prefix(1).uppercased() + name.dropFirst()
         do { _ = try store.insertProject(String(shown), at: clock.now) } catch { return .note(id, "The store had an error. Nothing saved.") }

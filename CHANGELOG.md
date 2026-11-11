@@ -16,6 +16,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - The PA plugin writes local pages: today, all open items, and one page for each project. It sends these pages to earshot as targets (R-PA-3).
 - The PA plugin copies each open to-do and reminder to the Reminders list "earshot", so that you see them on your iPhone. A tick, a change, a delete or a new reminder in that list goes back to the PA (R-PA-2, R-PA-3).
 - `docs/PA.md` tells how to install and use the PA plugin. Say "open today" or "open <project>" to open a PA page (R-PA-3).
+- The PA plugin, phase 2 start: "keep this" with a file in front keeps the file and reads its text on this Mac (PDF, text, Markdown, RTF, Word, HTML) into `index.sqlite`. "note this" saves the selected text. "what projects" lists the open projects, and "finish project <name>" closes one. If you drop a document, the PA deletes its text at once. The plugin file changes, so approve the PA again (R-PA-3, R-PA-9).
 - A command line in the app program: `earshot settings set <name> <value>`, `earshot plugins restart <id>`, `earshot run <words>`, `earshot status`. The running app uses a change at once. The command line cannot approve a plugin. `docs/CONTROL.md` gives the commands (R-CT-1 to R-CT-4).
 
 ### Fixed

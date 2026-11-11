@@ -75,7 +75,10 @@ extension Engine {
             if let a = d.address, a.hasPrefix("http://") || a.hasPrefix("https://") || a.hasPrefix("/") {
                 let href = a.hasPrefix("/") ? "file://" + a : a
                 link = "<a href=\"\(Engine.escape(href))\">\(link)</a>"
+            } else if let path = d.path {
+                link = "<a href=\"\(Engine.escape(URL(fileURLWithPath: path).absoluteString))\">\(link)</a>"
             }
+            if d.textState == .gone { link += " (file moved or deleted)" }
             return "<li><span>\(link)</span></li>"
         }.joined()
         return "<h2>Documents</h2><ul>\(lis)</ul>"
@@ -139,7 +142,9 @@ extension Engine {
 
         // One page for each open project.
         let since = now.addingTimeInterval(-30 * 86400).timeIntervalSince1970
-        var keep: Set<String> = ["today.html", "all-open.html"]
+        var keep: Set<String> = ["today.html", "all-open.html", "search.html", "main-points.html"]
+        // The page of a closed project stays in the folder (phase 2 build spec 7.5).
+        for p in store.projects(openOnly: false) where p.state == "closed" { keep.insert("project-\(p.slug).html") }
         for p in projects {
             let items = tasks.filter { $0.projectID == p.id }.sorted { when($0) < when($1) }
             let done = store.items(where: "state = 'done' AND project_id = ? AND done_at >= ?", [.int(p.id), .real(since)],

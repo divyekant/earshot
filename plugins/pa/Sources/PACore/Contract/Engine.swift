@@ -8,7 +8,14 @@ public final class Engine {
     public let output: Output
     public let reminders: ReminderStore?
     public let detector: TimeDetector?
+    /// Reads the text of kept files (phase 2). Nil: the PA keeps references only.
+    public let textReader: TextReader?
     public internal(set) var store: Store?
+    /// index.sqlite: passages and numbers (phase 2).
+    public internal(set) var index: IndexStore?
+    var lastFileCheck: Date?
+    /// Runs a block at background priority, off the engine queue (phase 2 build rule 6). Tests run it at once.
+    public var background: (@escaping () -> Void) -> Void = { block in block() }
     public internal(set) var settings = PASettings()
     let log: PALog
     /// A note for the next answer, for example after a new store started.
@@ -29,8 +36,10 @@ public final class Engine {
     public var pagesFolder: URL { folder.appendingPathComponent("pages", isDirectory: true) }
     public var backupsFolder: URL { folder.appendingPathComponent("backups", isDirectory: true) }
 
-    public init(folder: URL, clock: Clock, output: Output, reminders: ReminderStore? = nil, detector: TimeDetector? = nil) {
+    public init(folder: URL, clock: Clock, output: Output, reminders: ReminderStore? = nil, detector: TimeDetector? = nil,
+                textReader: TextReader? = nil) {
         self.folder = folder
+        self.textReader = textReader
         self.clock = clock
         self.output = output
         self.reminders = reminders
@@ -55,6 +64,8 @@ public final class Engine {
             }
             log.write(now, "store-open", ["search": s.searchKind.rawValue])
             saveSpares()
+            openIndex()
+            checkFilesIfDue(force: true)
         } catch {
             log.write(now, "store-failed")
         }
@@ -97,6 +108,7 @@ public final class Engine {
     public func stop() {
         log.write(clock.now, "stop")
         store?.db.close()
+        index?.db.close()
     }
 
     // MARK: - Messages
@@ -177,6 +189,9 @@ public final class Engine {
         case .drop: return drop(id: id, text: text)
         case .move: return move(id: id, text: text)
         case .quiet: return quiet(id: id, text: text)
+        case .whatProjects: return whatProjects(id: id)
+        case .finishProject: return finishProject(id: id, text: text)
+        case .mainPoints: return .note(id, "Main points are not ready yet.")
         }
     }
 

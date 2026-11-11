@@ -16,7 +16,7 @@ public final class Store {
     public private(set) var recoveredFrom: URL?
 
     /// The schema version. Each change is one numbered migration.
-    public static let schemaVersion = 1
+    public static let schemaVersion = 2
 
     public init(url: URL, now: Date = Date()) throws {
         self.url = url
@@ -59,6 +59,28 @@ public final class Store {
     func migrate() throws {
         let version = try db.query("PRAGMA user_version").first?.first?.int ?? 0
         if version < 1 { try migration1() }
+        if version < 2 { try migration2() }
+    }
+
+    /// Phase 2 (build spec 7.2): kept files, proposals of the search, closed projects.
+    func migration2() throws {
+        try db.transaction {
+            let cols: [(String, String)] = [
+                ("doc", "path TEXT"), ("doc", "kind TEXT NOT NULL DEFAULT 'page'"), ("doc", "size INTEGER"),
+                ("doc", "modified_at REAL"), ("doc", "text_state TEXT NOT NULL DEFAULT 'none'"),
+                ("doc", "passages INTEGER NOT NULL DEFAULT 0"), ("doc", "parent_doc_id INTEGER"),
+                ("item", "project_by TEXT"), ("item", "project_score REAL"),
+                ("project", "closed_at REAL"),
+            ]
+            for (table, col) in cols {
+                let name = String(col.prefix { $0 != " " })
+                let have = try db.query("PRAGMA table_info(\(table))").contains { $0[1].text == name }
+                if !have { try db.exec("ALTER TABLE \(table) ADD COLUMN \(col)") }
+            }
+            // A project with an item set by the owner keeps "owner".
+            try db.exec("UPDATE item SET project_by = 'owner' WHERE project_id IS NOT NULL AND project_by IS NULL")
+            try db.exec("PRAGMA user_version = 2")
+        }
     }
 
     func migration1() throws {
@@ -238,7 +260,7 @@ public final class Store {
 
     // MARK: - Items
 
-    static let itemColumns = "id, kind, said, title, state, remind_at, due_on, has_clock, project_id, doc_id, context_app, created_at, updated_at, done_at, dropped_at"
+    static let itemColumns = "id, kind, said, title, state, remind_at, due_on, has_clock, project_id, doc_id, context_app, created_at, updated_at, done_at, dropped_at, project_by, project_score"
 
     static func date(_ v: SQLValue) -> Date? { v.real.map { Date(timeIntervalSince1970: $0) } }
     static func value(_ d: Date?) -> SQLValue { d.map { .real($0.timeIntervalSince1970) } ?? .null }
@@ -258,6 +280,10 @@ public final class Store {
         it.contextApp = r[10].text
         it.updatedAt = date(r[12]) ?? it.createdAt
         it.doneAt = date(r[13])
+        if r.count > 16 {
+            it.projectBy = r[15].text
+            it.projectScore = r[16].real
+        }
         it.droppedAt = date(r[14])
         return it
     }
@@ -266,7 +292,7 @@ public final class Store {
         [.text(it.kind.rawValue), .text(it.said), .text(it.title), .text(it.state.rawValue), Store.value(it.remindAt),
          Store.value(it.dueOn?.description), .int(it.hasClock ? 1 : 0), Store.value(it.projectID), Store.value(it.docID),
          Store.value(it.contextApp), .real(it.createdAt.timeIntervalSince1970), .real(it.updatedAt.timeIntervalSince1970),
-         Store.value(it.doneAt), Store.value(it.droppedAt)]
+         Store.value(it.doneAt), Store.value(it.droppedAt), Store.value(it.projectBy), it.projectScore.map { .real($0) } ?? .null]
     }
 
     /// Saves a new item, its search entry and its event in one transaction. Gives the id.
@@ -275,8 +301,8 @@ public final class Store {
         try db.transaction {
             try db.run("""
             INSERT INTO item(kind, said, title, state, remind_at, due_on, has_clock, project_id, doc_id, context_app,
-                             created_at, updated_at, done_at, dropped_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                             created_at, updated_at, done_at, dropped_at, project_by, project_score)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, itemParams(it))
             let id = db.lastInsertID
             try index(.item, id, it.state == .dropped ? nil : it.title + " " + it.said)
@@ -292,7 +318,8 @@ public final class Store {
             p.append(.int(it.id))
             try db.run("""
             UPDATE item SET kind = ?, said = ?, title = ?, state = ?, remind_at = ?, due_on = ?, has_clock = ?,
-              project_id = ?, doc_id = ?, context_app = ?, created_at = ?, updated_at = ?, done_at = ?, dropped_at = ?
+              project_id = ?, doc_id = ?, context_app = ?, created_at = ?, updated_at = ?, done_at = ?, dropped_at = ?,
+              project_by = ?, project_score = ?
             WHERE id = ?
             """, p)
             try index(.item, it.id, it.state == .dropped ? nil : it.title + " " + it.said)
@@ -348,7 +375,7 @@ public final class Store {
     }
 
     public func projects(openOnly: Bool = true) -> [Project] {
-        let rows = (try? db.query("SELECT id, name, slug, state, created_at FROM project \(openOnly ? "WHERE state = 'open'" : "") ORDER BY name COLLATE NOCASE")) ?? []
+        let rows = (try? db.query("SELECT id, name, slug, state, created_at, closed_at FROM project \(openOnly ? "WHERE state = 'open'" : "") ORDER BY name COLLATE NOCASE")) ?? []
         let aliasRows = (try? db.query("SELECT project_id, name FROM project_alias")) ?? []
         var aliases: [Int64: [String]] = [:]
         for a in aliasRows { if let id = a[0].int, let n = a[1].text { aliases[id, default: []].append(n) } }
@@ -356,6 +383,7 @@ public final class Store {
             var p = Project(name: r[1].text ?? "", slug: r[2].text ?? "", createdAt: Store.date(r[4]) ?? Date(timeIntervalSince1970: 0))
             p.id = r[0].int ?? 0
             p.state = r[3].text ?? "open"
+            p.closedAt = Store.date(r[5])
             p.aliases = aliases[p.id] ?? []
             return p
         }
@@ -364,21 +392,55 @@ public final class Store {
     public func project(_ id: Int64) -> Project? { projects(openOnly: false).first { $0.id == id } }
 
     /// The open project whose name or alias has this key (lower case, no spaces and no hyphens).
-    public func project(named words: String) -> Project? {
+    public func project(named words: String, includeClosed: Bool = false) -> Project? {
         let k = Store.key(words)
         guard !k.isEmpty else { return nil }
-        return projects().first { p in Store.key(p.name) == k || p.aliases.contains { Store.key($0) == k } }
+        return projects(openOnly: !includeClosed).first { p in Store.key(p.name) == k || p.aliases.contains { Store.key($0) == k } }
+    }
+
+    /// "finish project" (closed) and "new project" for a closed project (open).
+    public func setProjectState(_ id: Int64, open: Bool, at: Date) throws {
+        try db.transaction {
+            try db.run("UPDATE project SET state = ?, closed_at = ? WHERE id = ?",
+                       [.text(open ? "open" : "closed"), open ? .null : .real(at.timeIntervalSince1970), .int(id)])
+            try index(.project, id, open ? project(id)?.name : nil)
+            log(open ? "project-open" : "project-close", .project, id, at: at)
+        }
+    }
+
+    /// The count of open items of each project.
+    public func openCounts() -> [Int64: Int] {
+        let rows = (try? db.query("SELECT project_id, COUNT(*) FROM item WHERE state = 'open' AND project_id IS NOT NULL GROUP BY project_id")) ?? []
+        var out: [Int64: Int] = [:]
+        for r in rows { if let p = r[0].int, let n = r[1].int { out[p] = Int(n) } }
+        return out
     }
 
     // MARK: - Documents
 
+    static let docColumns = "id, address, title, app, project_id, created_at, dropped_at, path, kind, size, modified_at, text_state, passages, parent_doc_id"
+
+    func docParams(_ d: Doc) -> [SQLValue] {
+        [Store.value(d.address), .text(d.title), Store.value(d.app), Store.value(d.projectID),
+         .real(d.createdAt.timeIntervalSince1970), Store.value(d.droppedAt), Store.value(d.path), .text(d.kind.rawValue),
+         Store.value(d.size), Store.value(d.modifiedAt), .text(d.textState.rawValue), .int(Int64(d.passages)),
+         Store.value(d.parentDocID)]
+    }
+
+    /// The words of a reference in the keyword index of pa.sqlite: the title and the address, not the path.
+    static func docBody(_ d: Doc) -> String? {
+        d.droppedAt == nil ? d.title + " " + (d.address ?? "") : nil
+    }
+
     public func insertDoc(_ d: Doc) throws -> Int64 {
         try db.transaction {
-            try db.run("INSERT INTO doc(address, title, app, project_id, created_at, dropped_at) VALUES (?, ?, ?, ?, ?, ?)",
-                       [Store.value(d.address), .text(d.title), Store.value(d.app), Store.value(d.projectID),
-                        .real(d.createdAt.timeIntervalSince1970), Store.value(d.droppedAt)])
+            try db.run("""
+            INSERT INTO doc(address, title, app, project_id, created_at, dropped_at, path, kind, size, modified_at,
+                            text_state, passages, parent_doc_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, docParams(d))
             let id = db.lastInsertID
-            try index(.doc, id, d.title + " " + (d.address ?? ""))
+            try index(.doc, id, Store.docBody(d))
             log("keep", .doc, id, at: d.createdAt)
             return id
         }
@@ -389,30 +451,47 @@ public final class Store {
                     createdAt: date(r[5]) ?? Date(timeIntervalSince1970: 0))
         d.id = r[0].int ?? 0
         d.droppedAt = date(r[6])
+        if r.count > 13 {
+            d.path = r[7].text
+            d.kind = DocKind(rawValue: r[8].text ?? "") ?? .page
+            d.size = r[9].int
+            d.modifiedAt = date(r[10])
+            d.textState = TextState(rawValue: r[11].text ?? "") ?? .none
+            d.passages = Int(r[12].int ?? 0)
+            d.parentDocID = r[13].int
+        }
         return d
     }
 
     public func doc(_ id: Int64) -> Doc? {
-        (try? db.query("SELECT id, address, title, app, project_id, created_at, dropped_at FROM doc WHERE id = ?", [.int(id)]))?
-            .first.map(Store.doc)
+        (try? db.query("SELECT \(Store.docColumns) FROM doc WHERE id = ?", [.int(id)]))?.first.map(Store.doc)
     }
 
+    /// The kept references that are not dropped, of one project or of all.
     public func docs(project: Int64?) -> [Doc] {
-        let rows: [[SQLValue]]
-        if let project {
-            rows = (try? db.query("SELECT id, address, title, app, project_id, created_at, dropped_at FROM doc WHERE dropped_at IS NULL AND project_id = ? ORDER BY id", [.int(project)])) ?? []
-        } else {
-            rows = (try? db.query("SELECT id, address, title, app, project_id, created_at, dropped_at FROM doc WHERE dropped_at IS NULL ORDER BY id")) ?? []
-        }
-        return rows.map(Store.doc)
+        if let project { return docs(where: "dropped_at IS NULL AND project_id = ?", [.int(project)]) }
+        return docs(where: "dropped_at IS NULL")
+    }
+
+    public func docs(where cond: String, _ params: [SQLValue] = []) -> [Doc] {
+        ((try? db.query("SELECT \(Store.docColumns) FROM doc WHERE \(cond) ORDER BY id", params)) ?? []).map(Store.doc)
+    }
+
+    /// The kept file with this path that is not dropped.
+    public func doc(path: String) -> Doc? {
+        docs(where: "dropped_at IS NULL AND path = ?", [.text(path)]).first
     }
 
     public func updateDoc(_ d: Doc, event: String, at: Date) throws {
         try db.transaction {
-            try db.run("UPDATE doc SET address = ?, title = ?, app = ?, project_id = ?, dropped_at = ? WHERE id = ?",
-                       [Store.value(d.address), .text(d.title), Store.value(d.app), Store.value(d.projectID),
-                        Store.value(d.droppedAt), .int(d.id)])
-            try index(.doc, d.id, d.droppedAt == nil ? d.title + " " + (d.address ?? "") : nil)
+            var p = docParams(d)
+            p.append(.int(d.id))
+            try db.run("""
+            UPDATE doc SET address = ?, title = ?, app = ?, project_id = ?, created_at = ?, dropped_at = ?, path = ?,
+              kind = ?, size = ?, modified_at = ?, text_state = ?, passages = ?, parent_doc_id = ?
+            WHERE id = ?
+            """, p)
+            try index(.doc, d.id, Store.docBody(d))
             log(event, .doc, d.id, at: at)
         }
     }

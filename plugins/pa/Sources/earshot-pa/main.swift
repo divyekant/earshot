@@ -84,9 +84,13 @@ if let path = env["EARSHOT_PLUGIN_DATA"], !path.isEmpty {
 let queue = DispatchQueue(label: "earshot.pa.engine")
 let output = StdoutOutput()
 let engine = Engine(folder: folder, clock: SystemClock(), output: output, reminders: reminderStore(),
-                    detector: SystemDateDetector())
+                    detector: SystemDateDetector(), textReader: makeTextReader())
+// The reads of kept files run at background priority, one at a time, so that they do not slow a command
+// (phase 2 build rule 6).
+let backgroundQueue = DispatchQueue(label: "earshot.pa.background", qos: .utility)
 queue.sync {
     engine.runLater = { delay, block in queue.asyncAfter(deadline: .now() + delay, execute: block) }
+    engine.background = { block in backgroundQueue.async(execute: block) }
     engine.start()
 }
 
