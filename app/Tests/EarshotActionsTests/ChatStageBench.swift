@@ -84,7 +84,7 @@ final class ChatStageBench: XCTestCase {
             throw XCTSkip("the focus is not in a switcher field: nothing typed")
         }
         Keys.type(env["EARSHOT_BENCH_NAME"] ?? own.name)
-        for wait in [150, 300, 600, 900] {
+        for wait in [300, 600, 1000, 1500] {
             try await Task.sleep(nanoseconds: UInt64(wait) * 1_000_000)
             guard let field = AX.focused(app), let f = AX.frame(field) else { print("DUMP no focus"); continue }
             print("DUMP t+\(wait) field \(AX.role(field)) value=\(AX.value(field) ?? "-") active=\(AX.element(field, "AXActiveDescendant").map { AX.label($0) } ?? "-")")
