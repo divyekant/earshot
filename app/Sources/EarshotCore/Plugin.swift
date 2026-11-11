@@ -14,7 +14,37 @@ public enum PluginContract {
     /// The owner's approvals: plugin id to the SHA-256 of the approved manifest.
     public static let approvalsFile = "plugins-approved.json"
     /// The context keys that a manifest can ask for. Nothing else goes to a plugin.
-    public static let contextKeys: Set<String> = ["app", "windowTitle", "url"]
+    public static let contextKeys: Set<String> = ["app", "windowTitle", "url", "document", "selection"]
+    /// The context keys that need an extra read of the front window. earshot reads them only for a plugin that names them.
+    public static let focusKeys: Set<String> = ["document", "selection"]
+    /// The longest selected text that a plugin gets, in characters.
+    public static let maxSelectionCharacters = 2000
+
+    /// What each context key gives the plugin, in words for the Plugins tab.
+    public static func contextText(_ key: String) -> String {
+        switch key {
+        case "app": return "the front app"
+        case "windowTitle": return "the title of the front window"
+        case "url": return "the address of the page in the front window"
+        case "document": return "the file path of the document in the front window"
+        case "selection": return "the text that you selected (the plugin gets the text and can keep it)"
+        default: return key
+        }
+    }
+
+    /// The file path in an AXDocument value: a "file:" address or a path. Nil for other values.
+    public static func documentPath(_ raw: String) -> String? {
+        let s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if s.hasPrefix("/") { return s }
+        guard let url = URL(string: s), url.isFileURL, !url.path.isEmpty else { return nil }
+        return url.path
+    }
+
+    /// The selected text for a plugin: nil if empty, else cut at `maxSelectionCharacters`.
+    public static func selectionText(_ raw: String?) -> String? {
+        guard let raw, !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        return String(raw.prefix(maxSelectionCharacters))
+    }
     /// The most lead words in one lead.
     public static let maxLeadWords = 5
     /// The longest text of one answer on screen, in characters.
@@ -101,6 +131,14 @@ public struct PluginLead: Hashable, Sendable {
     public var lead: String
 
     public init(pluginID: String, lead: String) { self.pluginID = pluginID; self.lead = lead }
+}
+
+/// The extra context of the front window for a plugin: the document path and the selected text.
+public struct PluginFocus: Equatable, Sendable {
+    public var document: String?
+    public var selection: String?
+
+    public init(document: String? = nil, selection: String? = nil) { self.document = document; self.selection = selection }
 }
 
 /// One target of a running plugin, for the router: "open today" (docs/PLUGINS.md, section 5.2).
