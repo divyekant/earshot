@@ -9,6 +9,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 ### Added
 
 - The menu bar icon shows what earshot does: it waits (ear), it listens to a command (filled ear), the follow-up window is open (ear with sound waves), it waits for text to type (text cursor), or it is paused (pause sign). The first menu line says the same in words (R-ON-2, R-FB-1).
+- In always-on mode, a wake turn that got the start sound and then failed the voice check of the turn now gets a soft "Pop" and a short note. Its words stay in memory for 20 s, never on disk. One hold-key press with no words types them into the focused field. It never sends (R-ON-3, R-FB-1, R-NV-5).
 - The menu has "Pause for 1 hour" and a mode switch (hold key or always on). While paused, no input runs and the microphone closes. The pause ends after 1 hour, with "Resume listening", or when earshot starts again (R-ON-4, R-MD-1).
 
 ### Changed
