@@ -65,7 +65,7 @@ final class AppController: ObservableObject {
     @Published var status = "Starting…"
     @Published var startsAtLogin = SMAppService.mainApp.status == .enabled
     /// What earshot does with the microphone now, for the menu bar icon (gap list item 10).
-    @Published private(set) var listen = ListenState.idle
+    @Published var listen = ListenState.idle
     /// The facts that give `listen`. Change it only with `updateListen`.
     var listenClock = ListenClock()
     /// Reads `listen` again when a window or the pause ends.
