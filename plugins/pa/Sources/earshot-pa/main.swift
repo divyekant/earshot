@@ -83,6 +83,32 @@ let systemEvents = SystemEvents { _ in
     }
 }
 
+// A watch on the data folder: a new settings.json (an editor saves it as a new file) takes effect in about 1 s,
+// not at the next 60 s check (build spec 10.4).
+#if os(macOS)
+let folderFD = open(folder.path, O_EVTONLY)
+let folderWatch = folderFD >= 0
+    ? DispatchSource.makeFileSystemObjectSource(fileDescriptor: folderFD, eventMask: [.write, .rename], queue: queue) : nil
+let settingsFD = open(folder.appendingPathComponent("settings.json").path, O_EVTONLY)
+let settingsWatch = settingsFD >= 0
+    ? DispatchSource.makeFileSystemObjectSource(fileDescriptor: settingsFD, eventMask: [.write, .extend], queue: queue) : nil
+var settingsCheckPending = false
+func settingsMayHaveChanged() {
+    guard !settingsCheckPending else { return }
+    settingsCheckPending = true
+    // Wait a short time, so that the editor has finished the write.
+    queue.asyncAfter(deadline: .now() + 0.5) {
+        settingsCheckPending = false
+        if engine.reloadSettingsIfChanged() { engine.flushPages() }
+        scheduleCheck()
+    }
+}
+folderWatch?.setEventHandler(handler: settingsMayHaveChanged)
+settingsWatch?.setEventHandler(handler: settingsMayHaveChanged)
+folderWatch?.resume()
+settingsWatch?.resume()
+#endif
+
 // Read stdin on its own thread. Each line goes to the engine queue. At the end of stdin, stop.
 let reader = Thread {
     let input = FileHandle.standardInput

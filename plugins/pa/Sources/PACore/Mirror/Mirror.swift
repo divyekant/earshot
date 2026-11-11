@@ -220,7 +220,7 @@ extension Engine {
         pull()
         settings = real
         if let id = store.meta(listIDKey) { try? reminders.removeList(id: id) }
-        try? store.db.run("DELETE FROM mirror")
+        _ = try? store.db.run("DELETE FROM mirror")
         try? store.setMeta(listIDKey, nil)
         store.log("sync-off", nil, nil, at: clock.now)
     }

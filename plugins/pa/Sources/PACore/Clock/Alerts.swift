@@ -188,6 +188,7 @@ extension Engine {
             output.send(.alert(alertText(it)))
             a.state = .repeated; a.shownAt = now; try? store.updateAlert(a)
             store.log("alert-repeat", .item, iid, at: now)
+            log.write(now, "alert-repeat", ["item": String(iid)])
         }
     }
 

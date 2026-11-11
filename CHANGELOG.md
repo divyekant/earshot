@@ -18,6 +18,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Fixed
 
+- The PA plugin reads a changed `settings.json` in about 1 s. Before, it waited for the next check, up to 60 s (R-PA-7).
 - The PA plugin stopped on a capture with "#" and a number above 31, for example "#43". Now the PA reads "#43" as words, not as a day (R-PA-6).
 
 ## [0.4.0] - 2026-11-11
