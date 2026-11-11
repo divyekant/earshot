@@ -221,6 +221,8 @@ Show a small overlay near the menu bar, for example "→ Slack · Ravi" or "✗ 
 
 The oMLX server can clean up dictated text: punctuation and filler words. Make it optional, because it adds latency.
 
+Measured on 2026-11-11 ([experiments/text-cleanup-omlx.md](experiments/text-cleanup-omlx.md)): `qwen3.5-0.8b-mlx-4bit` takes 285 ms (median, warm), but it cleaned only 3 of 10 sentences and changed words in 2. earshot has no cleanup setting until a larger general model passes with 0 changed words.
+
 ## 4. Permissions
 
 - Microphone
