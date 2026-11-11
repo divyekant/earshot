@@ -72,6 +72,8 @@ final class AppController: ObservableObject {
     var listenTimer: DispatchWorkItem?
 
     let store = Store()
+    /// The owner's last answers to ties (gap item 6), in the store folder.
+    let habits = TieHabits(store: Store())
     let feedback = FeedbackNote()
     let catalogue = MenuCatalogue()
     let names: NameIndex
@@ -133,6 +135,7 @@ final class AppController: ObservableObject {
 
     init() {
         let store = self.store
+        let habits = self.habits
         let settings = store.settings
         self.settings = settings
         applied = settings
@@ -144,10 +147,11 @@ final class AppController: ObservableObject {
         engineWhy = why
         let names = self.names
         let lastNotReady = Counter()
-        pipeline = CommandPipeline(engine: engine, router: Self.router(settings), actions: runner, names: names,
+        pipeline = CommandPipeline(engine: engine, router: Self.router(settings, habits: habits), actions: runner, names: names,
                                    apps: { store.apps }, allNames: { await Self.chatNames(names, apps: store.apps, notReady: { lastNotReady.value = $0 }) },
                                    frontBundleID: { NSWorkspace.shared.frontmostApplication?.bundleIdentifier })
         pipeline.namesNotReady = { lastNotReady.value }
+        pipeline.habits = habits
         let frontTracker = FrontTracker(own: Bundle.main.bundleIdentifier)
         pipeline.ownBundleID = Bundle.main.bundleIdentifier
         pipeline.restoreFront = { await frontTracker.restore() }
@@ -265,13 +269,15 @@ final class AppController: ObservableObject {
 
     /// Makes the Jev router and the screenshot picker again: at start, after a settings change, and after a new key.
     private func applyJev() {
-        pipeline.router = Self.router(settings)
+        pipeline.router = Self.router(settings, habits: habits)
         pipeline.picker = ScreenPickerFactory.make(settings, jevKey: settings.jevSeesScreen ? KeychainSecret.jev.read() : nil)
         pipeline.jevScreenBudgetMs = settings.jevScreenBudgetMs
     }
 
-    static func router(_ settings: EarshotSettings) -> CommandRouter {
-        CommandRouter(settings: settings, jevKey: settings.tier2 == .jev ? KeychainSecret.jev.read() : nil)
+    static func router(_ settings: EarshotSettings, habits: TieHabits) -> CommandRouter {
+        var router = CommandRouter(settings: settings, jevKey: settings.tier2 == .jev ? KeychainSecret.jev.read() : nil)
+        router.habits = habits
+        return router
     }
 
     /// Loads the speech model in the background. Parakeet takes about 15 s; commands before that get an error note.

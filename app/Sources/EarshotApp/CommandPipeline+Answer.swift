@@ -24,6 +24,8 @@ extension CommandPipeline {
         /// For a click or a typing into a field: the element of the screen of the note. The answer turn reads the
         /// screen again and finds the same element there.
         var element: ScreenElement?
+        /// The target key for the habit memory (TieHabits.key). Nil if the target cannot have a habit.
+        var habitKey: String? = nil
     }
 
     /// The choices of a "not sure" note, and what the answer needs. Memory only. It holds the message text of a chat
@@ -72,7 +74,8 @@ extension CommandPipeline {
                 }
             default: break
             }
-            out.append(Choice(intent: intent, describe: IntentText.describe(intent, apps: rows, screen: screen), element: element))
+            out.append(Choice(intent: intent, describe: IntentText.describe(intent, apps: rows, screen: screen), element: element,
+                              habitKey: TieHabits.key(intent, screen: screen)))
         }
         return out
     }
@@ -155,6 +158,11 @@ extension CommandPipeline {
         guard let intent = Self.refresh(choice, pending: pending, screen: context.screen) else {
             return done(heard: text, intent: choice.describe, tier: .fuzzy, ok: false,
                         note: "the screen changed: say the command again", stages: stages, clock, why: why)
+        }
+        // The habit memory (gap item 6): this answer breaks the same tie the next time. Target keys only, no text.
+        if pending.choices.count >= 2, let chosen = choice.habitKey {
+            let others = pending.choices.indices.filter { $0 != i }.compactMap { pending.choices[$0].habitKey }
+            if others.count == pending.choices.count - 1 { habits?.record(chosen: chosen, over: others, at: now()) }
         }
         var stages = stages
         // The tier is never .rules: a choice never presses a risky element (SafetyPolicy.mayPress) and never sends.

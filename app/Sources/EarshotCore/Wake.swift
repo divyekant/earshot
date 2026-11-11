@@ -193,9 +193,12 @@ public struct NearMisses: Sendable, Equatable {
     public var best: Double
     /// The audio templates: the lowest score of the near misses (the wake limit is lower). Nil for the spotter.
     public var bestScore: Double?
+    /// The audio templates: the matches below the score limit that the worst-part limit stopped (E7). 0 for the
+    /// spotter.
+    public var blocked: Int
 
-    public init(count: Int, best: Double, bestScore: Double? = nil) {
-        self.count = count; self.best = best; self.bestScore = bestScore
+    public init(count: Int, best: Double, bestScore: Double? = nil, blocked: Int = 0) {
+        self.count = count; self.best = best; self.bestScore = bestScore; self.blocked = blocked
     }
 
     /// Adds other near misses to these.
@@ -203,6 +206,7 @@ public struct NearMisses: Sendable, Equatable {
         count += other.count
         best = max(best, other.best)
         if let score = other.bestScore { bestScore = min(bestScore ?? score, score) }
+        blocked += other.blocked
     }
 }
 

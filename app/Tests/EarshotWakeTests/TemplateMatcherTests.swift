@@ -103,6 +103,37 @@ final class TemplateMatcherTests: XCTestCase {
         XCTAssertEqual(matcher.takeNearMisses().count, 0)
     }
 
+    func testAHighWorstPartDoesNotWake() {
+        // E7: room sound matched the mean of the templates, but one part of 200 ms did not match at all.
+        let take = frames(20, seed: 90)
+        var speech = take
+        speech.replaceSubrange(8..<13, with: frames(5, seed: 91))
+        let stream = frames(10, seed: 92) + speech + frames(10, seed: 93)
+        let open = TemplateMatcher(templates: [take, take, take], worstLimit: 2)
+        let matches = run(open, stream)
+        XCTAssertEqual(matches.count, 1, "the mean is below the limit")
+        XCTAssertLessThan(matches.first?.score ?? 1, TemplateMatcher.defaultLimit)
+        XCTAssertGreaterThan(matches.first?.worst ?? 0, TemplateMatcher.defaultWorstLimit)
+
+        let matcher = TemplateMatcher(templates: [take, take, take])
+        XCTAssertTrue(run(matcher, stream).isEmpty, "the worst part stops the match")
+        let misses = matcher.takeNearMisses()
+        XCTAssertEqual(misses.blocked, 1)
+        XCTAssertEqual(misses.count, 0, "a blocked match is not a near miss")
+        XCTAssertEqual(matcher.takeNearMisses().blocked, 0, "taken: the count starts again")
+    }
+
+    func testABlockedMatchDoesNotStopTheNextWake() {
+        let take = frames(20, seed: 94)
+        var room = take
+        room.replaceSubrange(8..<13, with: frames(5, seed: 95))
+        // The phrase comes 10 frames (400 ms) after the blocked match: less than the refractory time of a wake.
+        let matcher = TemplateMatcher(templates: [take, take, take])
+        let matches = run(matcher, frames(10, seed: 96) + room + frames(10, seed: 97) + take + frames(5, seed: 98))
+        XCTAssertEqual(matches.count, 1)
+        XCTAssertEqual(matches.first?.startFrame, 40)
+    }
+
     func testResetStartsAgain() {
         let take = frames(20, seed: 70)
         let matcher = TemplateMatcher(templates: [take, take])

@@ -10,6 +10,8 @@ public struct CommandRouter: Router {
     public var tier2: Tier2Chooser?
     /// The longest wait for tier 2. After it, the rules answer stays.
     public var tier2BudgetMs: Int
+    /// The owner's last answers to ties (gap item 6). Nil: no habit. The app sets it from the store folder.
+    public var habits: TieHabits?
 
     /// Confidence of a sure rules answer.
     public static let sureConfidence = 0.9
@@ -33,7 +35,8 @@ public struct CommandRouter: Router {
     public func route(_ text: String, context: RouteContext) async -> RouteResult {
         let t0 = DispatchTime.now().uptimeNanoseconds
         func ms() -> Double { Double(DispatchTime.now().uptimeNanoseconds &- t0) / 1_000_000 }
-        let d = Self.rules(text, context: context)
+        var d = Self.rules(text, context: context)
+        if let habits, let broken = Self.breakTie(d, habits: habits, screen: context.screen) { d = broken }
         let alternatives = { (chosen: Intent) in Array(d.options.map(\.intent).filter { $0 != chosen }.prefix(3)) }
 
         if !d.sure, let tier2, !d.options.isEmpty {

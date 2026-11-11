@@ -87,8 +87,9 @@ final class PhraseListener: WakeListener {
     /// No audio and no text (D-11).
     func takeNearMisses() -> NearMisses? {
         if let matcher {
-            let (count, best) = matcher.takeNearMisses()
-            return count > 0 ? NearMisses(count: count, best: 0, bestScore: best) : nil
+            let (count, best, blocked) = matcher.takeNearMisses()
+            guard count > 0 || blocked > 0 else { return nil }
+            return NearMisses(count: count, best: 0, bestScore: best.isFinite ? best : nil, blocked: blocked)
         }
         let (count, best) = session.takeNearMisses()
         return count > 0 ? NearMisses(count: count, best: best) : nil

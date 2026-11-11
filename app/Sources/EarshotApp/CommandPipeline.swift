@@ -115,6 +115,8 @@ final class CommandPipeline {
     static let chainAnswerSeconds: TimeInterval = 10
     /// The choices of a "not sure" note for one command (CommandPipeline+Answer.swift). Nil if no note waits.
     var pendingChoice: PendingChoice?
+    /// The owner's last answers to ties (gap item 6). The answer to a note keeps one. Nil: no habit.
+    var habits: TieHabits?
     /// The wait after a step, before earshot reads the screen again. After "open <app>", earshot first waits until
     /// the app is in front, for at most `chainFrontWaitMs`.
     static let chainSettleMs = 400
@@ -438,11 +440,16 @@ final class CommandPipeline {
     /// The record has only a count and the best part of the phrase: no audio and no text.
     @discardableResult
     func nearMisses(_ misses: NearMisses) -> ActivityRecord {
-        let note: String
+        var note: String
         if let score = misses.bestScore {
             note = String(format: "wake phrase near misses: %ld, best template score %.2f", misses.count, score)
+        } else if misses.blocked > 0 {
+            note = "wake phrase near misses: \(misses.count)"
         } else {
             note = String(format: "wake phrase near misses: %ld, best %.0f %% of the phrase pieces", misses.count, misses.best * 100)
+        }
+        if misses.blocked > 0 {
+            note += ", \(misses.blocked) template matches stopped by the worst part"
         }
         let record = ActivityRecord(heard: "", intent: "none", tier: .none, ok: false, note: note, stages: [:])
         try? log?.append(record)
