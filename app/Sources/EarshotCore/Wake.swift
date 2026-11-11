@@ -329,8 +329,9 @@ public protocol MicIdleControl: AnyObject {
 
 /// When the speech engine closes its microphone.
 public enum MicIdle {
-    /// Hold mode: close the microphone after 2 minutes with no command (dk chose this on 2026-11-11).
-    public static let holdSeconds = 120.0
+    /// Hold mode: the microphone is open only while the hold key is down (dk, 2026-11-11). It closes at once after
+    /// the end of each turn. This is the "Turn off the mic when not dictating" setting of Hex. The cost: no preroll.
+    public static let holdSeconds = 0.0
 
     /// The idle time for an input mode. Always-on keeps the microphone open.
     public static func seconds(for mode: InputMode) -> Double? { mode == .hold ? holdSeconds : nil }

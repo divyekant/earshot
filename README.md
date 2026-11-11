@@ -37,7 +37,9 @@ App support is data, not code. earshot reads the menus, sidebars and search resu
 
 - All audio stays on your Mac. earshot saves no audio.
 - All decisions stay on your Mac by default.
-- One optional cloud model, Jev, can help when the rules are unsure. Jev is off by default. If you turn it on, earshot sends only text to Jev: the command words and the short list of labels on screen. It never sends audio, screenshots or message text. See [docs/DECISIONS.md](docs/DECISIONS.md), D-9.
+- One optional cloud model, Jev, can help when the rules are unsure. Jev is off by default. If you turn it on, earshot sends only text to Jev: the command words and the short list of labels on screen. It never sends audio or message text. See [docs/DECISIONS.md](docs/DECISIONS.md), D-9.
+- A separate setting, "Jev sees the screen", is also off by default. If you turn it on, a hold-key click with no sure target can send one picture of the front window to Jev. It never does this on a sign-in, code or payment page. See D-10.
+- The activity log (`activity.jsonl`) keeps the command words, the result and the stage times for 30 days. For the text that earshot types (a "type …" command, a chat message, dictation), it keeps only a word count.
 - earshot keeps the Jev key in the macOS Keychain, not in a settings file.
 - Settings, the app list and the name list are JSON files in `~/Library/Application Support/earshot`.
 

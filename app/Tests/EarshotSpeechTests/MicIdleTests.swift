@@ -2,10 +2,10 @@ import XCTest
 import EarshotCore
 @testable import EarshotSpeech
 
-/// The microphone closes after 2 minutes with no command in hold mode, and stays open in always-on mode.
+/// In hold mode, the microphone closes after each turn. In always-on mode, it stays open.
 final class MicIdleTests: XCTestCase {
-    func testHoldModeClosesAfterTwoMinutesAndAlwaysOnKeepsTheMicrophoneOpen() {
-        XCTAssertEqual(MicIdle.seconds(for: .hold), 120)
+    func testHoldModeClosesAtOnceAndAlwaysOnKeepsTheMicrophoneOpen() {
+        XCTAssertEqual(MicIdle.seconds(for: .hold), 0)
         XCTAssertNil(MicIdle.seconds(for: .alwaysOn))
     }
 
@@ -15,6 +15,14 @@ final class MicIdleTests: XCTestCase {
         let ran = expectation(description: "idle action")
         timer.arm { ran.fulfill() }
         wait(for: [ran], timeout: 2)
+    }
+
+    func testZeroSecondsRunsTheActionAtOnce() {
+        let timer = MicIdleTimer()
+        timer.seconds = 0
+        let ran = expectation(description: "idle action")
+        timer.arm { ran.fulfill() }
+        wait(for: [ran], timeout: 1)
     }
 
     func testCancelStopsTheTimer() {
