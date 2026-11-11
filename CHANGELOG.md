@@ -8,6 +8,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Added
 
+- Two plugin context keys: `document` (the file path of the front document) and `selection` (the selected text, up to 2,000 characters). A plugin gets them only if its manifest names them, never on a sign-in, code or payment page. The Plugins tab says that `selection` gives the plugin your selected text (R-PL-2).
 - The PA plugin, phase 1 start: a separate program in `plugins/pa/` with its plugin file, its store and the script `install-pa.sh`. Each command answers "Not built yet" for now. At its first start, the PA asks macOS for access to Reminders and shows the result (R-PA-1, R-PA-2, R-PL-1).
 - "open <target>" opens a target that a plugin gave, for example "open today". An app name wins. earshot opens only a web address, a document or a folder, never a program or a script (R-PL-3, R-PL-4).
 - The PA plugin can capture and list. Say "remind me ...", "todo ...", "note ...", "keep this" or "new project ...". The PA reads the time with fixed rules and shows it in the note. Say "what is due", "what about <project>" or "where is <words>" for a list, and "done 2", "snooze 2 to tomorrow", "drop that" or "move 2 to <project>" for a change. If the PA is not sure of a time, it saves the words with no time (R-PA-4, R-PA-6).

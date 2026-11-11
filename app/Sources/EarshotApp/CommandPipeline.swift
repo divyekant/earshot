@@ -15,12 +15,16 @@ protocol CommandActions: AnyObject {
     func run(_ intent: Intent, context: RouteContext, command: CommandInfo) async -> ActionOutcome
     /// The screenshot fallback (D-10). EarshotActionRunner has it in VisionFallback.swift.
     func visionTarget(_ command: String, mode: InputMode, picker: ScreenPicker, budgetMs: Int) async -> VisionTarget
+    /// The context keys "document" and "selection" for a plugin. EarshotActionRunner has it in PluginFocus.swift.
+    func pluginFocus(document: Bool, selection: Bool) async -> PluginFocus
 }
 
 extension CommandActions {
     func visionTarget(_ command: String, mode: InputMode, picker: ScreenPicker, budgetMs: Int) async -> VisionTarget {
         VisionTarget(elementID: nil, label: "", note: "no screenshot fallback", stages: [:])
     }
+
+    func pluginFocus(document: Bool, selection: Bool) async -> PluginFocus { PluginFocus() }
 }
 
 extension EarshotActionRunner: CommandActions {}
@@ -285,8 +289,9 @@ final class CommandPipeline {
 
         // A plugin lead: hand the words off and return at once (R-PL-2, R-PL-5). See CommandPipeline+Plugins.swift.
         if case let .handOff(pluginID, lead, words) = result.intent {
-            let h = handOffToPlugin(pluginID: pluginID, lead: lead, text: words, context: context)
+            let h = await handOffToPlugin(pluginID: pluginID, lead: lead, text: words, context: context)
             stages["plugin.handoff"] = h.ms
+            if let ms = h.contextMs { stages["plugin.context"] = ms }
             return done(heard: h.heard, intent: h.intent, tier: result.tier, ok: h.ok, note: h.note, stages: stages, clock, why: result.why)
         }
 
@@ -783,7 +788,7 @@ final class CommandPipeline {
         context.screen = withMenus(await actions.screen(), front: context.frontBundleID)
         let result = await router.route(text, context: context)
         if runActions, case let .handOff(pluginID, lead, words) = result.intent {
-            let h = handOffToPlugin(pluginID: pluginID, lead: lead, text: words, context: context)
+            let h = await handOffToPlugin(pluginID: pluginID, lead: lead, text: words, context: context)
             return TestReport(heard: text, route: result, outcome: ActionOutcome(ok: h.ok, note: h.note, stages: ["plugin.handoff": h.ms]))
         }
         guard runActions, result.confidence >= SafetyPolicy.minimumConfidence, result.intent != .none else {

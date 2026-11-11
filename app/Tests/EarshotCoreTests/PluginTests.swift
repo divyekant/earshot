@@ -36,6 +36,20 @@ final class PluginTests: XCTestCase {
         XCTAssertEqual(p.count, 5, "\(p)")
     }
 
+    /// The keys "document" and "selection" (docs/PLUGINS.md 5.1).
+    func testDocumentAndSelectionKeys() {
+        let m = PluginManifest(id: "pa", name: "PA", leads: ["note"], context: ["app", "document", "selection"], run: ["./pa"])
+        XCTAssertTrue(m.problems.isEmpty, "\(m.problems)")
+        XCTAssertEqual(PluginContract.documentPath("file:///Users/me/My%20Lease.pdf"), "/Users/me/My Lease.pdf")
+        XCTAssertEqual(PluginContract.documentPath("/Users/me/notes.txt"), "/Users/me/notes.txt")
+        XCTAssertNil(PluginContract.documentPath("https://example.com/a.pdf"))
+        XCTAssertNil(PluginContract.documentPath(""))
+        XCTAssertNil(PluginContract.selectionText("  \n"))
+        XCTAssertNil(PluginContract.selectionText(nil))
+        XCTAssertEqual(PluginContract.selectionText(String(repeating: "a", count: 5000))?.count, PluginContract.maxSelectionCharacters)
+        XCTAssertTrue(PluginContract.contextText("selection").contains("selected"))
+    }
+
     func testScanAndApproval() throws {
         try write("pa", good)
         let catalog = PluginCatalog(store: Store(folder: folder))

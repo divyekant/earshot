@@ -52,7 +52,7 @@ If you install a new build of the plugin program, click "Read again". earshot st
 | `name` | No | The name on screen. The default is the id. |
 | `version` | No | The version of the plugin. |
 | `leads` | Yes | The words that start a command for the plugin. 1 to 5 words each. |
-| `context` | No | The context for each command: `app` (the bundle id of the front app), `windowTitle`, `url`. The default is none. |
+| `context` | No | The context for each command: `app` (the bundle id of the front app), `windowTitle`, `url`, `document`, `selection`. The default is none. See section 5.1. |
 | `run` | Yes | The program and its arguments. A relative path starts at the plugin folder. |
 | `network` | No | The network hosts that the plugin says it uses. The default is none. earshot shows it in the Plugins tab. earshot does not enforce it. |
 
@@ -119,6 +119,22 @@ earshot starts the program with posix_spawn. The program reads JSON lines from s
 
 The text can be empty, for example for a lead such as "what is due".
 
+The context keys:
+
+| Key | Value |
+|---|---|
+| `app` | The bundle id of the front app. |
+| `windowTitle` | The title of the front window. |
+| `url` | The address of the page in the front window. |
+| `document` | The file path of the document in the front window (the `AXDocument` attribute). For a Finder window, the folder, if Finder gives it. |
+| `selection` | The selected text of the focused element (`AXSelectedText`), cut at 2,000 characters. Never the text of a password field. |
+
+- earshot sends only the keys that the manifest names. A key with no value is absent.
+- earshot reads `document` and `selection` only for a plugin that names them. The read comes before the command goes to the plugin. The note does not wait for the plugin.
+- On a sign-in, code or payment page, earshot sends no context.
+- The Plugins tab shows each key in words. It shows `selection` in orange: the plugin gets the text that you selected, and can keep it.
+- The activity log keeps no context value.
+
 ### 5.2 From the plugin to earshot
 
 `answer`: a note on screen.
@@ -173,5 +189,4 @@ earshot drops a message of an unknown type. So a newer plugin can talk to an old
 
 ## 7. Not in version 1
 
-- More context keys, for example the selected text or the file of the front window.
 - "undo that" for the last plugin answer.

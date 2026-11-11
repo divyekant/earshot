@@ -14,6 +14,8 @@ protocol PluginHandOff: AnyObject {
     /// Sends the words to the plugin, and returns at once (R-PL-5). Nil if the words went out, else a short reason.
     /// `available` is the context that earshot can give. The host sends only the keys that the manifest names.
     func handOff(pluginID: String, lead: String, text: String, available: [String: String]) -> String?
+    /// The context keys that the manifest of the plugin names.
+    func contextKeys(of pluginID: String) -> [String]
     /// The targets with an `open` value of the approved plugins that run. The router uses them for "open <target>".
     var targetNames: [PluginTargetName] { get }
 }
@@ -70,6 +72,8 @@ final class PluginHost: PluginHandOff, @unchecked Sendable {
     }
 
     func name(of pluginID: String) -> String { all.first { $0.id == pluginID }?.manifest.name ?? pluginID }
+
+    func contextKeys(of pluginID: String) -> [String] { all.first { $0.id == pluginID }?.manifest.context ?? [] }
 
     /// The targets that the plugin gave last (contract part 3).
     func targets(of pluginID: String) -> [PluginTarget] { lock.lock(); defer { lock.unlock() }; return targetCache[pluginID] ?? [] }
