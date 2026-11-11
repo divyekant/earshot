@@ -78,6 +78,46 @@ if let i = args.firstIndex(of: "--embed-bench"), i + 1 < args.count {
     exit(runBench())
 }
 
+// The bench of the phase 2 follow-up (R1, R2): earshot-pa --followup-bench <fixtures folder> --embedder <name>
+// [--model <file.gguf>] [--gpu] [--explain | --final <variant> [--needs n,k]] [--bakeoff <folder>] [--verbose] [--weights a,d,r,s,f,t,tmax,w,n,b].
+if let i = args.firstIndex(of: "--followup-bench"), i + 1 < args.count {
+    func value(_ flag: String) -> String? {
+        args.firstIndex(of: flag).flatMap { $0 + 1 < args.count ? args[$0 + 1] : nil }
+    }
+    func runFollowUp() -> Int32 {
+        do {
+            let embedder = try makeEmbedder(value("--embedder") ?? "hash", allowAssetRequest: false, modelFile: value("--model"),
+                                            gpu: args.contains("--gpu"))
+            let bench = try FollowUpBench(folder: URL(fileURLWithPath: args[i + 1], isDirectory: true), embedder: embedder)
+            bench.verbose = args.contains("--verbose")
+            if let n = value("--needs")?.split(separator: ",").compactMap({ Int($0) }), n.count == 2 { bench.needs = (n[0], n[1]) }
+            bench.bakeoff = value("--bakeoff").map { URL(fileURLWithPath: $0, isDirectory: true) }
+            if let w = value("--weights")?.split(separator: ",").compactMap({ Float($0) }), w.count == 10 {
+                var x = MainPointsV2.Weights()
+                (x.amount, x.date, x.request, x.result, x.opening) = (w[0], w[1], w[2], w[3], w[4])
+                (x.titleWord, x.titleMax, x.centralWords, x.centralNumbers, x.boilerplate) = (w[5], w[6], w[7], w[8], w[9])
+                bench.weights = x
+            }
+            if args.contains("--explain") {
+                try bench.explain()
+            } else if let v = value("--final") {
+                guard let variant = ProjectRuleV2.Variant.allCases.first(where: { "\($0)" == v }) else {
+                    print("Unknown variant \(v). Use one of: \(ProjectRuleV2.Variant.allCases.map { "\($0)" })")
+                    return 1
+                }
+                try bench.final(variant: variant)
+            } else {
+                try bench.development()
+            }
+            return 0
+        } catch {
+            print("Bench error: \(error)")
+            return 1
+        }
+    }
+    exit(runFollowUp())
+}
+
 let env = ProcessInfo.processInfo.environment
 let folder: URL
 if let path = env["EARSHOT_PLUGIN_DATA"], !path.isEmpty {
