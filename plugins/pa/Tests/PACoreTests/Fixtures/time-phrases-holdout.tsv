@@ -1,0 +1,31 @@
+# A second set, written after the rule table. The rules were not changed for it. Made-up phrases.
+remind me	2026-11-11T10:00	ring the garage at 4:45	remind	2026-11-11 16:45
+remind me	2026-11-11T10:00	empty the dishwasher at 1	remind	2026-11-11 13:00
+remind me	2026-11-11T18:00	bring in the washing at 8	remind	2026-11-11 20:00
+remind me	2026-11-11T10:00	phone the landlord at 9 am tomorrow	remind	2026-11-12 09:00
+remind me	2026-11-11T10:00	phone the landlord tomorrow 9am	remind	2026-11-12 09:00
+remind me	2026-11-11T10:00	check the score at 21:15	remind	2026-11-11 21:15
+remind me	2026-11-11T10:00	go to the gym in 3 hours	remind	2026-11-11 13:00
+remind me	2026-11-11T10:00	pay the window cleaner in 10 minutes	remind	2026-11-11 10:10
+remind me	2026-11-11T10:00	order the cake in 4 days	remind	2026-11-15 09:00
+remind me	2026-11-11T10:00	cancel the trial on Tuesday	remind	2026-11-17 09:00
+remind me	2026-11-11T10:00	cancel the trial Tuesday at 6 pm	remind	2026-11-17 18:00
+remind me	2026-11-13T09:30	collect the keys on Friday	remind	2026-11-20 09:00
+remind me	2026-11-11T10:00	book the MOT on the 2nd of December	remind	2026-12-02 09:00
+remind me	2026-11-11T10:00	book the MOT December 2nd	remind	2026-12-02 09:00
+remind me	2026-11-11T10:00	take the cake out at a quarter past three	remind	2026-11-11 15:15
+remind me	2026-11-11T10:00	start dinner at seven thirty	remind	2026-11-11 19:30
+remind me	2026-11-11T10:00	call the plumber at 5 o'clock tomorrow	remind	2026-11-12 17:00
+remind me	2026-11-11T10:00	phone Leo tomorrow afternoon	remind	2026-11-12 15:00
+remind me	2026-11-11T10:00	read the contract tonight at 9	remind	2026-11-11 21:00
+remind me	2026-11-11T10:00	read the contract this weekend	remind	2026-11-14 09:00
+todo	2026-11-11T10:00	renew the domain by next Monday	due	2026-11-16
+todo	2026-11-11T10:00	submit the claim before Friday	due	2026-11-12
+todo	2026-11-11T10:00	send the quote by 3 pm	due	2026-11-11 15:00
+todo	2026-11-11T10:00	clear the loft next week	due	2026-11-16
+todo	2026-11-11T10:00	paint the fence on the 28th	due	2026-11-28
+todo	2026-11-11T10:00	sort the receipts tomorrow	due	2026-11-12
+remind me	2026-11-11T10:00	buy a present for Ana	none	none
+remind me	2026-11-11T10:00	call the 24 hour helpline	none	none
+todo	2026-11-11T10:00	fix the 3 chairs in the shed	none	none
+remind me	2026-11-11T10:00	watch episode 5	none	none
