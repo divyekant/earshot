@@ -4,7 +4,7 @@
   "name": "PA",
   "version": "0.1.0",
   "leads": ["remind me", "todo", "task", "note", "keep this", "new project",
-            "what is due", "whats due", "what about", "where is", "wheres",
+            "what is due", "what due", "what about", "where is",
             "done", "snooze", "drop", "move", "quiet"],
   "context": ["app", "windowTitle", "url"],
   "run": ["./EarshotPA.app/Contents/MacOS/earshot-pa"],

@@ -5,12 +5,13 @@ import Foundation
 public enum PACommand: String, CaseIterable, Sendable {
     case remindMe, todo, note, keepThis, newProject, whatIsDue, whatAbout, whereIs, done, snooze, drop, move, quiet
 
-    /// The leads of plugin.json for each command. "whats due" and "wheres" are the forms with an apostrophe
-    /// ("what's due", "where's"): earshot removes the apostrophe before it reads a lead.
+    /// The leads of plugin.json for each command. "what due" is the form with an apostrophe: earshot removes "'s"
+    /// before it reads a lead, so "what's due" reaches the PA as the lead "what due". "where's" becomes "where",
+    /// which is too wide for a lead (a dictated "where are you" would go to the PA), so it is not a lead.
     public static let leads: [String: PACommand] = [
         "remind me": .remindMe, "todo": .todo, "task": .todo, "note": .note, "keep this": .keepThis,
-        "new project": .newProject, "what is due": .whatIsDue, "whats due": .whatIsDue, "what about": .whatAbout,
-        "where is": .whereIs, "wheres": .whereIs, "done": .done, "snooze": .snooze, "drop": .drop, "move": .move,
+        "new project": .newProject, "what is due": .whatIsDue, "what due": .whatIsDue, "what about": .whatAbout,
+        "where is": .whereIs, "done": .done, "snooze": .snooze, "drop": .drop, "move": .move,
         "quiet": .quiet,
     ]
 

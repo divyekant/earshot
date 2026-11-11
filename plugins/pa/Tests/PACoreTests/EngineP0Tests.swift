@@ -54,7 +54,7 @@ final class EngineP0Tests: XCTestCase {
 
     func testLeadMatchIgnoresSpacesAndCase() {
         XCTAssertEqual(PACommand.from(lead: "to do"), .todo)
-        XCTAssertEqual(PACommand.from(lead: "What's due"), .whatIsDue)
+        XCTAssertEqual(PACommand.from(lead: "what due"), .whatIsDue)
         XCTAssertEqual(PACommand.from(lead: "Remind me"), .remindMe)
         XCTAssertNil(PACommand.from(lead: "search my"))
     }

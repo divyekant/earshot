@@ -37,8 +37,8 @@ final class PAPluginLeadsTests: XCTestCase {
         let cases: [(String, String, String)] = [
             ("Remind me to call the plumber at 5.", "remind me", "to call the plumber at 5"),
             ("To do send the tax papers by Friday", "todo", "send the tax papers by Friday"),
-            ("What's due?", "whats due", ""),
-            ("Where's the tile quote", "wheres", "the tile quote"),
+            ("What's due?", "what due", ""),
+            ("Where is the tile quote", "where is", "the tile quote"),
             ("done 2", "done", "2"),
             ("note the landlord wants two months notice", "note", "the landlord wants two months notice"),
         ]
@@ -47,6 +47,8 @@ final class PAPluginLeadsTests: XCTestCase {
             XCTAssertEqual(m?.lead.lead, lead, text)
             XCTAssertEqual(m?.rest, rest, text)
         }
+        // "where's" reads as "where": no lead, so a dictated question stays dictation.
+        XCTAssertNil(PluginRouter.match("Where's my coat", plugins: leads, apps: apps))
         // "search my" is a core word: earshot refuses it, so it is not a lead of the PA.
         XCTAssertNotNil(PluginRouter.refusal("search my", apps: apps))
     }
