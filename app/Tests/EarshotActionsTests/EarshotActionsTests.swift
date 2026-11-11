@@ -330,6 +330,22 @@ final class ActionRunnerTests: XCTestCase {
         XCTAssertEqual(ActionRules.switcherResult(chatBelow, name: name, baseline: []), .searchFirst)
     }
 
+    /// WhatsApp: Return does not open the result. earshot presses the top new row that matches the name.
+    func testPickResultRow() {
+        let old = ("Sam Rivera", Frame(x: 350, y: 537, w: 380, h: 37))
+        let baseline = ActionRules.matchKeys([old], name: "Sam Rivera")
+        let rows: [(label: String, frame: Frame)] = [
+            ("New group", Frame(x: 350, y: 357, w: 380, h: 37)),
+            ("Search for: Sam Rivera", Frame(x: 350, y: 300, w: 380, h: 37)),
+            old,
+            ("Sam Rivera", Frame(x: 350, y: 381, w: 380, h: 37)),
+        ]
+        XCTAssertEqual(ActionRules.pickResultRow(rows, name: "Sam Rivera", baseline: baseline), 3)
+        XCTAssertNil(ActionRules.pickResultRow([old], name: "Sam Rivera", baseline: baseline))
+        XCTAssertNil(ActionRules.pickResultRow([("Delete chat Sam Rivera", Frame(x: 350, y: 381, w: 380, h: 37))],
+                                               name: "Sam Rivera", baseline: []))
+    }
+
     func testRowsGroupTextsOfOneRow() {
         let rows = ActionRules.rows([("b", Frame(x: 0, y: 141, w: 10, h: 20)), ("a", Frame(x: 0, y: 131, w: 10, h: 40)),
                                      ("c", Frame(x: 0, y: 171, w: 10, h: 40))])

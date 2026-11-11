@@ -95,6 +95,8 @@ enum SwitcherTiming {
     static let typedMs = 1000
     /// From the name in the field to a result that shows the name. It replaces the fixed 250 ms sleep of E0.
     static let resultMs = 800
+    /// After Return in the switcher: the longest wait for the field to close before earshot presses the result row.
+    static let returnMs = 250
 }
 
 /// The time limit for "scroll into view" before a click (E2, section 7).
@@ -297,6 +299,19 @@ enum ActionRules {
             if !matchKeys(row, name: name).subtracting(baseline).isEmpty { return queryAbove ? .searchFirst : .chat }
         }
         return .none
+    }
+
+    /// The result row to press when Return does not open the chat (WhatsApp): the top row that is new,
+    /// matches the name, is not a query row and has no risky word. Returns its index in `rows`, or nil.
+    static func pickResultRow(_ rows: [(label: String, frame: Frame)], name: String, baseline: Set<String>) -> Int? {
+        let order = rows.indices.sorted { rows[$0].frame.y < rows[$1].frame.y }
+        for i in order {
+            let (label, f) = rows[i]
+            if isQueryRow([label]) || SafetyPolicy.isRisky(label) { continue }
+            if baseline.contains(placeKey(label, f)) { continue }
+            if chatCheck(texts: [label], names: [name]) != .none { return i }
+        }
+        return nil
     }
 
     /// The reason not to type the dictated text into the chat, or nil (R-NV-4).
