@@ -110,10 +110,12 @@ final class ReplayTests: XCTestCase {
         guard FileManager.default.fileExists(atPath: "/usr/bin/sandbox-exec") else { throw XCTSkip("no sandbox-exec") }
         let p = try ContractTests.Plugin(sandbox: "(version 1)(allow default)(deny network*)")
         p.send(["type": "hello", "contract": 1])
-        p.send(["type": "command", "id": "n1", "lead": "remind me", "text": "to call the plumber at 5", "context": [:]])
+        // A to-do due today is in the list at any time of day. ("at 5" after 17:00 is tomorrow, and the list of
+        // "what is due" has no reminder of tomorrow: the test failed in the evening.)
+        p.send(["type": "command", "id": "n1", "lead": "todo", "text": "call the plumber today", "context": [:]])
         p.send(["type": "command", "id": "n2", "lead": "what is due", "text": "", "context": [:]])
         let a1 = p.answer("n1"), a2 = p.answer("n2")
-        XCTAssertEqual((a1?["text"] as? String)?.hasPrefix("Reminder · "), true)
+        XCTAssertEqual((a1?["text"] as? String)?.hasPrefix("To-do · "), true)
         XCTAssertEqual(a2?["kind"] as? String, "list")
         print("MARK network denied: capture and list work")
         XCTAssertNotNil(p.close())

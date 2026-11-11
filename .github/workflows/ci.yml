@@ -100,7 +100,10 @@ jobs:
 
       # The probes and the go marks print lines that start with PROBE or MARK. The pull request records them.
       - name: Test
-        run: swift test 2>&1 | tee "$RUNNER_TEMP/pa-test.log"
+        # pipefail: a failed test must fail the step. Without it, tee hid a failure.
+        run: |
+          set -o pipefail
+          swift test 2>&1 | tee "$RUNNER_TEMP/pa-test.log"
 
       - name: Probe and mark lines
         if: always()
@@ -121,7 +124,8 @@ jobs:
           scripts/get-model.sh gemma ~/pa-models
 
       # Phase 2, Q1: the embedding bench on the made-up fixtures (docs/experiments/E10-pa-embedding.md).
-      # The models of macOS only. The contextual model may need a one-time download of macOS data.
+      # The hash model and the macOS sentence model only. The contextual model is out: E10 has its numbers, and its
+      # request for macOS data can wait for many minutes on the CI machine.
       - name: Embedding bench
         if: always()
         timeout-minutes: 12
@@ -129,7 +133,7 @@ jobs:
           set -uo pipefail
           swift build -c release --product earshot-pa
           fx=Tests/PACoreTests/Fixtures/phase2
-          for e in hash nl-sentence nl-contextual; do
+          for e in hash nl-sentence; do
             for d in full 256; do
               echo "=== bench $e, numbers: $d"
               if [ "$d" = full ]; then extra=""; else extra="--dims 256"; fi
