@@ -87,7 +87,12 @@ public enum MainPointsV2 {
                                  "no later than", "deadline", "due", "confirm", "sign", "pay", "send", "return",
                                  "agree", "agreed", "decided", "approved"]
     static let resultPhrases = ["total", "sum", "price", "cost", "fee", "valid until", "starts", "ends", "cancelled",
-                                "changed", "moved"]
+                                "changed", "moved",
+                                // Other common names of an amount of money (tuned on the development documents).
+                                "premium", "rent", "charge", "estimate", "balance", "deposit", "refund", "amount"]
+    static let numberWords = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven",
+                              "twelve", "a", "few", "several"]
+    static let timeUnits = ["day", "days", "week", "weeks", "month", "months", "year", "years", "working"]
     static let boilerStarts = ["dear ", "hello", "hi ", "kind regards", "best regards", "regards", "yours sincerely",
                                "yours faithfully", "best wishes", "many thanks", "thank you for", "thanks for"]
     static let boilerPhrases = ["if you have any questions", "do not hesitate", "please contact us if",
@@ -147,8 +152,11 @@ public enum MainPointsV2 {
             if parts.count == 3, parts.allSatisfy({ $0.allSatisfy(\.isNumber) }) { return true }
             if x.contains(":"), x.split(separator: ":").count == 2, x.split(separator: ":").allSatisfy({ $0.allSatisfy(\.isNumber) }) { return true }
             if isNumber(x), i + 1 < w.count, ["am", "pm"].contains(w[i + 1]) { return true }
-            // "within 30 days", "in 14 days", "two weeks before"
-            if x == "within", i + 2 < w.count, ["day", "days", "week", "weeks", "month", "months", "working"].contains(w[i + 2]) { return true }
+            // "within 30 days", "in four months", "after two weeks", "before the winter"
+            if ["within", "in", "after", "before", "until"].contains(x), i + 2 < w.count,
+               isNumber(w[i + 1]) || numberWords.contains(w[i + 1]), timeUnits.contains(w[i + 2]) { return true }
+            if ["before", "after", "by", "until"].contains(x), i + 2 < w.count, w[i + 1] == "the",
+               ["winter", "spring", "summer", "autumn", "end", "start", "renewal", "deadline"].contains(w[i + 2]) { return true }
         }
         return datePhrases.contains { has(w, $0) }
     }
@@ -188,7 +196,9 @@ public enum MainPointsV2 {
             let lower = line.lowercased()
             let subject = lower.hasPrefix("subject") || lower.hasPrefix("re:") || lower.hasPrefix("re ")
             var first = true
-            for s in TextCut.sentences(line) {
+            // A heading is a title, not a sentence: it is not a candidate.
+            let heading = isHeading(line)
+            for s in TextCut.sentences(line) where !heading {
                 let n = s.split(whereSeparator: { $0 == " " || $0 == "\t" }).count
                 if n >= 6 && n <= 60 {
                     out.append(Sentence(text: s, index: index, opening: (afterHeading && first) || out.isEmpty))

@@ -35,6 +35,7 @@ public struct ProjectRuleV2: Equatable, Sendable {
         public var nearest: Float = -1
         /// The project of the first 3 keyword results (2 or 3 of 3).
         public var keywords: String?
+        public var keywordsCount = 0
         public init() {}
     }
 
@@ -67,8 +68,9 @@ public struct ProjectRuleV2: Equatable, Sendable {
         if n.count == 1 { s.name = n[0] }
         let top = nearest.prefix(5).filter { $0.1 >= floor }
         s.nearest = nearest.first?.1 ?? -1
-        if let m = Self.majority(top.map(\.0), need: neighborsNeed) { s.neighbors = m.0; s.neighborsCount = m.1 }
-        if let m = Self.majority(Array(keywordHits.prefix(3)), need: keywordsNeed) { s.keywords = m.0 }
+        // The signals keep the best project and its count. `propose` checks the count against the need.
+        if let m = Self.majority(top.map(\.0), need: 1) { s.neighbors = m.0; s.neighborsCount = m.1 }
+        if let m = Self.majority(Array(keywordHits.prefix(3)), need: 1) { s.keywords = m.0; s.keywordsCount = m.1 }
         return s
     }
 
@@ -77,7 +79,10 @@ public struct ProjectRuleV2: Equatable, Sendable {
         propose(s, variant: high == nil ? .fullNoH : .fullWithH)
     }
 
-    public func propose(_ s: Signals, variant: Variant) -> String? {
+    public func propose(_ s0: Signals, variant: Variant) -> String? {
+        var s = s0
+        if s.neighborsCount < neighborsNeed { s.neighbors = nil }
+        if s.keywordsCount < keywordsNeed { s.keywords = nil }
         switch variant {
         case .name: return s.name
         case .neighbors: return s.neighbors

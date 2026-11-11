@@ -9,6 +9,10 @@ public final class FollowUpBench {
     let embedder: Embedder
     public var bakeoff: URL?
     public var weights = MainPointsV2.weights
+    /// Prints the 8 best sentences of each document, with their features and points.
+    public var verbose = false
+    /// The needs of the project rule for the final run: neighbors of 5, keywords of 3.
+    public var needs = (neighbors: 4, keywords: 2)
     public var out: (String) -> Void = { print($0) }
 
     public init(folder: URL, embedder: Embedder) throws {
@@ -183,6 +187,13 @@ public final class FollowUpBench {
         for v in ProjectRuleV2.Variant.allCases {
             out(Self.line(v.rawValue, Self.count(sig.map(\.truth), sig.map { rule.propose($0.signals, variant: v) })))
         }
+        // Stricter needs, on the same data (tuning on the development data only).
+        for (n, k) in [(5, 2), (4, 3), (5, 3)] {
+            var r2 = rule
+            r2.neighborsNeed = n; r2.keywordsNeed = k
+            out(Self.line("Full rule without line 3, neighbors \(n) of 5, keywords \(k) of 3",
+                          Self.count(sig.map(\.truth), sig.map { r2.propose($0.signals, variant: .fullNoH) })))
+        }
         for (s, t, w) in sig {
             if let p = rule.propose(s, variant: .fullWithH), p != t { out("wrong: \(w) | truth \(t) | proposal \(p) | \(s)") }
         }
@@ -212,6 +223,12 @@ public final class FollowUpBench {
                 return "\(feats[k].label) (\(pts[k]), \((order.firstIndex(of: k) ?? -1) + 1))"
             }
             out("| \(p.name) | \(n) | \(missed.joined(separator: "; ")) |")
+            if verbose {
+                for k in order.prefix(8) {
+                    let mark = p.marks.contains(sents[k].text) ? "*" : " "
+                    out("  \(mark) \(pts[k]) \(feats[k].label) [\(k + 1)] \(sents[k].text.prefix(90))")
+                }
+            }
         }
         out("Main points (\(label)): \(good) of \(docs.count) documents with 2 or more marks; \(found) of \(docs.count * 3) marks; \(notInText) sentences not in the text")
     }
@@ -256,12 +273,14 @@ public final class FollowUpBench {
         let r = try records()
         let dev = (fx.captures["dev"] ?? []) + (fx.captures["holdout"] ?? [])
         var rule = ProjectRuleV2()
+        rule.neighborsNeed = needs.neighbors
+        rule.keywordsNeed = needs.keywords
         rule.high = ProjectRuleV2.fitHigh(try signals(dev, r, rule: rule).map { ($0.signals, $0.truth) })
         let caps = try BenchFixtures.rows(folder.appendingPathComponent("capture-holdout-2.tsv")).filter { $0.count >= 2 }
             .map { BenchFixtures.Capture(words: $0[0], project: $0[1]) }
         let sig = try signals(caps, r, rule: rule)
         let c = Self.count(sig.map(\.truth), sig.map { rule.propose($0.signals, variant: variant) })
-        out("## Final run: project rule version 2 (\(variant.rawValue)) on capture-holdout-2.tsv")
+        out("## Final run: project rule version 2 (\(variant.rawValue), neighbors \(needs.neighbors) of 5, keywords \(needs.keywords) of 3) on capture-holdout-2.tsv")
         out("| Variant | Proposals | Correct | Wrong | Captures with a project that got a correct proposal |")
         out("|---|---|---|---|---|")
         out(Self.line(variant.rawValue, c))

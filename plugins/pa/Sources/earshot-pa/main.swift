@@ -79,7 +79,7 @@ if let i = args.firstIndex(of: "--embed-bench"), i + 1 < args.count {
 }
 
 // The bench of the phase 2 follow-up (R1, R2): earshot-pa --followup-bench <fixtures folder> --embedder <name>
-// [--model <file.gguf>] [--gpu] [--explain | --final <variant>] [--bakeoff <folder>] [--weights a,d,r,s,f,t,tmax,w,n,b].
+// [--model <file.gguf>] [--gpu] [--explain | --final <variant> [--needs n,k]] [--bakeoff <folder>] [--verbose] [--weights a,d,r,s,f,t,tmax,w,n,b].
 if let i = args.firstIndex(of: "--followup-bench"), i + 1 < args.count {
     func value(_ flag: String) -> String? {
         args.firstIndex(of: flag).flatMap { $0 + 1 < args.count ? args[$0 + 1] : nil }
@@ -89,6 +89,8 @@ if let i = args.firstIndex(of: "--followup-bench"), i + 1 < args.count {
             let embedder = try makeEmbedder(value("--embedder") ?? "hash", allowAssetRequest: false, modelFile: value("--model"),
                                             gpu: args.contains("--gpu"))
             let bench = try FollowUpBench(folder: URL(fileURLWithPath: args[i + 1], isDirectory: true), embedder: embedder)
+            bench.verbose = args.contains("--verbose")
+            if let n = value("--needs")?.split(separator: ",").compactMap({ Int($0) }), n.count == 2 { bench.needs = (n[0], n[1]) }
             bench.bakeoff = value("--bakeoff").map { URL(fileURLWithPath: $0, isDirectory: true) }
             if let w = value("--weights")?.split(separator: ",").compactMap({ Float($0) }), w.count == 10 {
                 var x = MainPointsV2.Weights()
