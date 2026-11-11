@@ -294,6 +294,79 @@ final class ActionRunnerTests: XCTestCase {
             return "to-field"
         }
         func setFocus(_ f: String) { focusSets += 1; if acceptsAXFocus { focusedField = true } }
+        var clicks = 0
+        /// A click gives the focus, also in an app that ignores AXFocused (WhatsApp).
+        func click(_ f: String) { clicks += 1; focusedField = true }
+    }
+
+    /// WhatsApp: the new-chat field shows but ignores AXFocused. earshot clicks it one time at the next scan.
+    func testFieldThatIgnoresAXFocusGetsOneClick() async {
+        let runner = EarshotActionRunner(store: nil)
+        let fake = FakeSwitcher(showsAt: 0, ownFocus: false, acceptsAX: false)
+        let (field, why, stats) = await runner.waitForSwitcherField(scanDelayMs: 0, focused: fake.focused, newField: fake.newField,
+                                                                   setFocus: fake.setFocus, click: fake.click)
+        XCTAssertEqual(field, "to-field")
+        XCTAssertNil(why)
+        XCTAssertEqual(fake.focusSets, 1)
+        XCTAssertEqual(fake.clicks, 1)
+        XCTAssertTrue(stats.clicked)
+        XCTAssertLessThan(Clock.ms(since: fake.t0), Double(3 * SwitcherTiming.scanMs) + 200)
+    }
+
+    /// An app learned as "click" gets the click at the first find, with no AXFocused try before it.
+    func testLearnedClickClicksAtFirstFind() async {
+        let runner = EarshotActionRunner(store: nil)
+        let fake = FakeSwitcher(showsAt: 0, ownFocus: false, acceptsAX: false)
+        let (field, _, stats) = await runner.waitForSwitcherField(scanDelayMs: 0, clickFirst: true, focused: fake.focused,
+                                                                 newField: fake.newField, setFocus: fake.setFocus, click: fake.click)
+        XCTAssertEqual(field, "to-field")
+        XCTAssertEqual(fake.focusSets, 0)
+        XCTAssertEqual(fake.clicks, 1)
+        XCTAssertTrue(stats.clicked)
+    }
+
+    /// Slack (2026) Cmd-K: query rows hold the typed name. They are not results, and Return on them runs a search.
+    func testQueryRowsAreNotChatResults() {
+        let name = "Sam Rivera"
+        func t(_ s: String, _ y: Double, _ h: Double = 20) -> (String, Frame) { (s, Frame(x: 400, y: y, w: 500, h: h)) }
+        let searchOnly = [t("Search for: Sam Rivera", 131, 40), t("Show results for:", 141), t("Sam Rivera", 141),
+                          t("Ask Slackbot about Sam Rivera", 171, 40), t("Ask Slackbot:", 181), t("Sam Rivera", 181)]
+        XCTAssertEqual(ActionRules.switcherResult(searchOnly, name: name, baseline: []), .none)
+        XCTAssertFalse(ActionRules.resultShows(searchOnly, name: name, baseline: []))
+        // The chat row first: Return opens the chat.
+        let chatFirst = [t("Suggestions", 131, 132), t("Sam Rivera, Direct Message", 131, 40), t("Sam Rivera", 141), t("(you)", 141)]
+            + searchOnly.map { ($0.0, Frame(x: 400, y: $0.1.y + 40, w: 500, h: $0.1.h)) }
+        XCTAssertEqual(ActionRules.switcherResult(chatFirst, name: name, baseline: []), .chat)
+        // The chat row below a search row: Return would run the search.
+        let chatBelow = searchOnly + [t("Sam Rivera, Direct Message", 211, 40), t("Sam Rivera", 221)]
+        XCTAssertEqual(ActionRules.switcherResult(chatBelow, name: name, baseline: []), .searchFirst)
+    }
+
+    /// WhatsApp: Return does not open the result. earshot presses the top new row that matches the name.
+    func testPickResultRow() {
+        let old = ("Sam Rivera", Frame(x: 350, y: 537, w: 380, h: 37))
+        let baseline = ActionRules.matchKeys([old], name: "Sam Rivera")
+        let rows: [(label: String, frame: Frame)] = [
+            ("New group", Frame(x: 350, y: 357, w: 380, h: 37)),
+            ("Search for: Sam Rivera", Frame(x: 350, y: 300, w: 380, h: 37)),
+            old,
+            ("Sam Rivera", Frame(x: 350, y: 381, w: 380, h: 37)),
+        ]
+        XCTAssertEqual(ActionRules.pickResultRow(rows, name: "Sam Rivera", baseline: baseline), 3)
+        XCTAssertNil(ActionRules.pickResultRow([old], name: "Sam Rivera", baseline: baseline))
+        XCTAssertNil(ActionRules.pickResultRow([("Delete chat Sam Rivera", Frame(x: 350, y: 381, w: 380, h: 37))],
+                                               name: "Sam Rivera", baseline: []))
+    }
+
+    func testRowsGroupTextsOfOneRow() {
+        let rows = ActionRules.rows([("b", Frame(x: 0, y: 141, w: 10, h: 20)), ("a", Frame(x: 0, y: 131, w: 10, h: 40)),
+                                     ("c", Frame(x: 0, y: 171, w: 10, h: 40))])
+        XCTAssertEqual(rows.map { $0.map(\.0) }, [["a", "b"], ["c"]])
+        // A section label that covers the rows does not join them (Slack "Suggestions").
+        let withSection = ActionRules.rows([("Suggestions", Frame(x: 0, y: 131, w: 10, h: 132)), ("a", Frame(x: 0, y: 131, w: 10, h: 40)),
+                                            ("b", Frame(x: 0, y: 141, w: 10, h: 20)), ("c", Frame(x: 0, y: 171, w: 10, h: 40)),
+                                            ("d", Frame(x: 0, y: 211, w: 10, h: 40))])
+        XCTAssertEqual(withSection.map { $0.map(\.0) }, [["a", "b"], ["c"], ["d"]])
     }
 
     func testSwitcherFieldShowsLate() async {

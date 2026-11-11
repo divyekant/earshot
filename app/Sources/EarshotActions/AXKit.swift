@@ -344,6 +344,38 @@ enum AX {
         return out
     }
 
+    /// The pressable rows below a field and in its column, in all windows of the app, with their labels:
+    /// the result rows of a switcher. A row without its own label takes the texts of its children.
+    static func resultRows(below field: Frame, app: AXUIElement, skip: AXUIElement?, budgetMs: Int = 60,
+                           maxNodes: Int = 2500) -> [(AXUIElement, String, Frame)] {
+        let t0 = Clock.nowNs()
+        var queue: [AXUIElement] = elements(app, "AXWindows")
+        var index = 0
+        var out: [(AXUIElement, String, Frame)] = []
+        let left = field.x - 0.5 * field.w, right = field.maxX + 0.5 * field.w
+        while index < queue.count, index < maxNodes, Clock.ms(since: t0) < Double(budgetMs) {
+            let element = queue[index]
+            index += 1
+            if let skip, CFEqual(element, skip) { continue }
+            let r = role(element)
+            if r == "AXMenuBar" || r == "AXImage" || r == "AXScrollBar" { continue }
+            let f = frame(element)
+            if let f, f.w > 0, f.h > 0, f.maxY <= field.maxY - 2 || f.maxX < left || f.x > right { continue }
+            if ["AXButton", "AXRow", "AXCell"].contains(r), let f, f.y >= field.maxY - 2, actions(element).contains("AXPress") {
+                var label = [string(element, "AXTitle"), string(element, "AXDescription")].compactMap { $0 }
+                    .filter { !$0.isEmpty }.joined(separator: " ")
+                if label.isEmpty {
+                    label = elements(element, "AXChildren").compactMap { value($0) ?? string($0, "AXTitle") }
+                        .filter { !$0.isEmpty }.joined(separator: " ")
+                }
+                if !label.isEmpty { out.append((element, label, f)) }
+                continue
+            }
+            queue.append(contentsOf: elements(element, "AXChildren"))
+        }
+        return out
+    }
+
     /// The app's own search field: an editable field in the upper part of the window that is a search field
     /// or has "search" in its label. It returns the highest one.
     static func findSearchField(in window: AXUIElement, budgetMs: Int = 300, maxNodes: Int = 4000) -> AXUIElement? {

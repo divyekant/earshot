@@ -6,6 +6,10 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+### Fixed
+
+- "Slack <name>" opens the chat again. Slack now lists "Search for: <name>" rows in Command-K, and earshot pressed Return on a search. earshot now skips search rows, and stops if a search row is above the chat. WhatsApp chats open too: earshot clicks the new-chat field and presses the result row when Return does not open it. Measured: Slack 437 ms, Messages 682 ms, WhatsApp 1,475 ms to the focused box (R-NV-2, R-NV-6, R-SP-1, E7).
+
 ### Added
 
 - The menu bar icon shows what earshot does: it waits (ear), it listens to a command (filled ear), the follow-up window is open (ear with sound waves), it waits for text to type (text cursor), or it is paused (pause sign). The first menu line says the same in words (R-ON-2, R-FB-1).
