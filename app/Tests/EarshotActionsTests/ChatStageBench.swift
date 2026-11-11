@@ -99,10 +99,20 @@ final class ChatStageBench: XCTestCase {
             Keys.press(Keys.escape)
             throw XCTSkip("the focus is not in a switcher field: nothing typed")
         }
-        Keys.type(env["EARSHOT_BENCH_NAME"] ?? own.name)
+        let typedName = env["EARSHOT_BENCH_NAME"] ?? own.name
+        let fieldFrame = AX.frame(field0)
+        let before = fieldFrame.map { AX.textsBelow($0, app: app, skip: field0) } ?? []
+        let baseline = ActionRules.matchKeys(before, name: typedName)
+        print("DUMP baseline: \(before.count) texts, \(baseline.count) match keys: \(baseline.sorted())")
+        Keys.type(typedName)
         for wait in [300, 600, 1000, 1500] {
             try await Task.sleep(nanoseconds: UInt64(wait) * 1_000_000)
             guard let field = AX.focused(app), let f = AX.frame(field) else { print("DUMP no focus"); continue }
+            let below = AX.textsBelow(f, app: app, skip: field)
+            print("DUMP t+\(wait) result=\(ActionRules.switcherResult(below, name: typedName, baseline: baseline))")
+            for row in ActionRules.rows(below).prefix(6) {
+                print("DUMP   ROW " + row.map { "\($0.0.prefix(40))@\(Int($0.1.y))h\(Int($0.1.h))" }.joined(separator: " ; "))
+            }
             print("DUMP t+\(wait) field \(AX.role(field)) value=\(AX.value(field) ?? "-") active=\(AX.element(field, "AXActiveDescendant").map { AX.label($0) } ?? "-")")
             var queue = AX.elements(app, "AXWindows")
             var i = 0
