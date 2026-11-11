@@ -126,7 +126,7 @@ The context keys:
 | `app` | The bundle id of the front app. |
 | `windowTitle` | The title of the front window. |
 | `url` | The address of the page in the front window. |
-| `document` | The file path of the document in the front window (the `AXDocument` attribute). For a Finder window, the folder, if Finder gives it. |
+| `document` | The file path of the document in the front window (the `AXDocument` attribute). A Finder window gives no `AXDocument`. For it, earshot reads the file addresses (`AXURL`) of the items in the window and gives the folder whose name is the window title. |
 | `selection` | The selected text of the focused element (`AXSelectedText`), cut at 2,000 characters. Never the text of a password field. |
 
 - earshot sends only the keys that the manifest names. A key with no value is absent.

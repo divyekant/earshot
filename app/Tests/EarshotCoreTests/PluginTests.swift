@@ -44,6 +44,24 @@ final class PluginTests: XCTestCase {
         XCTAssertEqual(PluginContract.documentPath("/Users/me/notes.txt"), "/Users/me/notes.txt")
         XCTAssertNil(PluginContract.documentPath("https://example.com/a.pdf"))
         XCTAssertNil(PluginContract.documentPath(""))
+    }
+
+    func testWindowFolderFromItemAddresses() {
+        let base = "file:///private/tmp/made-up/garden-papers/"
+        // List or icon view: the items of the folder.
+        XCTAssertEqual(PluginContract.windowFolder(title: "garden-papers", urls: [base + "seed-order.txt", base + "shed-plan.txt"]),
+                       "/private/tmp/made-up/garden-papers")
+        // The path bar alone (an empty folder).
+        XCTAssertEqual(PluginContract.windowFolder(title: "garden-papers", urls: ["file:///private/tmp/made-up/", base]),
+                       "/private/tmp/made-up/garden-papers")
+        // Column view: other columns from the root, and an open subfolder of the same window.
+        let columns = ["file:///Applications/", "file:///private/", "file:///private/tmp/made-up/", base,
+                       base + "plans/", base + "plans/shed.txt", base + "hedge-quote.txt"]
+        XCTAssertEqual(PluginContract.windowFolder(title: "garden-papers", urls: columns), "/private/tmp/made-up/garden-papers")
+        // No folder with the name of the title, or no title.
+        XCTAssertNil(PluginContract.windowFolder(title: "Recents", urls: [base + "seed-order.txt"]))
+        XCTAssertNil(PluginContract.windowFolder(title: "", urls: [base + "seed-order.txt"]))
+        XCTAssertNil(PluginContract.windowFolder(title: "garden-papers", urls: ["https://example.com/garden-papers/a"]))
         XCTAssertNil(PluginContract.selectionText("  \n"))
         XCTAssertNil(PluginContract.selectionText(nil))
         XCTAssertEqual(PluginContract.selectionText(String(repeating: "a", count: 5000))?.count, PluginContract.maxSelectionCharacters)
