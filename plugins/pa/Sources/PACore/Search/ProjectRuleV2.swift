@@ -105,4 +105,53 @@ public struct ProjectRuleV2: Equatable, Sendable {
         let right = cases.filter { $0.signals.neighborsCount == 5 && $0.signals.neighbors == $0.truth && $0.signals.nearest > h }
         return right.isEmpty ? nil : h
     }
+
+    // MARK: - The rule in the PA
+
+    static let timeWords: Set<String> = ["today", "tomorrow", "tonight", "morning", "afternoon", "evening", "week",
+                                         "weekend", "month", "monday", "tuesday", "wednesday", "thursday", "friday",
+                                         "saturday", "sunday", "next", "before", "after", "by", "until", "noon"]
+
+    /// The words of a title for the keyword search: no time words and no numbers.
+    public static func keywordText(_ title: String) -> String {
+        Words.terms(title).filter { !timeWords.contains($0) && !$0.allSatisfy(\.isNumber) }.joined(separator: " ")
+    }
+
+    /// One record of the owner: an item that the owner put in a project, or a passage of a document with a project.
+    public struct Record: Sendable {
+        public var project: String
+        public var vector: [Float]
+        public var text: String
+        public init(project: String, vector: [Float], text: String) {
+            self.project = project
+            self.vector = vector
+            self.text = text
+        }
+    }
+
+    /// The proposal for one capture, with the score of the nearest record of that project.
+    /// Only the projects with `minRecords` or more records count. Runs off the engine queue: it makes a keyword
+    /// index in memory for each call.
+    public func propose(title: String, vector: [Float], records all: [Record], projects all2: [(id: String, name: String)],
+                        floor: Float) -> (project: String, score: Float)? {
+        var count: [String: Int] = [:]
+        for r in all { count[r.project, default: 0] += 1 }
+        let records = all.filter { (count[$0.project] ?? 0) >= minRecords }
+        let projects = all2.filter { (count[$0.id] ?? 0) >= minRecords }
+        guard !records.isEmpty, !projects.isEmpty else { return nil }
+        let scores = records.map { Vectors.dot($0.vector, vector) }
+        let order = records.indices.sorted { scores[$0] > scores[$1] }.prefix(5)
+        var hits: [String] = []
+        if let db = try? SQLite(path: ":memory:"), let kw = try? KeywordIndex(db: db, table: "rule_fts") {
+            for (i, r) in records.enumerated() { try? kw.add(Int64(i + 1), r.text) }
+            hits = kw.search(Self.keywordText(title), limit: 3).compactMap { i in
+                records.indices.contains(Int(i) - 1) ? records[Int(i) - 1].project : nil
+            }
+        }
+        let s = signals(words: title, projects: projects, nearest: order.map { (records[$0].project, scores[$0]) },
+                        floor: floor, keywordHits: hits)
+        guard let p = propose(s) else { return nil }
+        let best = records.indices.filter { records[$0].project == p }.map { scores[$0] }.max() ?? 0
+        return (p, best)
+    }
 }

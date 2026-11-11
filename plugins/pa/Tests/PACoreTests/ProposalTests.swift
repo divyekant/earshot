@@ -76,12 +76,13 @@ final class ProposalTests: XCTestCase {
         XCTAssertEqual(say(e, out, "note", "order the green paint").later, [])
     }
 
-    func testProposalsAreOffByDefault() {
+    func testProposalsCanBeOff() {
         let (e, out, _) = engine()
         e.settings.projectFocusMinutes = 0
+        XCTAssertTrue(e.settings.proposeProject)
+        e.settings.proposeProject = false
         say(e, out, "new project", "kitchen")
         for t in ["kitchen tiles floor", "kitchen tiles wall", "kitchen tiles grout"] { say(e, out, "todo", t + " for kitchen") }
-        XCTAssertFalse(e.settings.proposeProject)
         let r = say(e, out, "todo", "kitchen tiles order")
         XCTAssertEqual(r.later, [])
         XCTAssertNil(e.store!.openItems().last!.projectID)
@@ -109,6 +110,35 @@ final class ProposalTests: XCTestCase {
         XCTAssertEqual(say(e, out, "move", "it to garden").answer, "Moved · Garden · kitchen tiles order")
         XCTAssertEqual(e.store!.eventCounts(since: wed(0))["proposal-corrected"], 1)
         XCTAssertEqual(e.store!.item(it.id)!.projectBy, "owner")
+    }
+
+    /// Project rule version 2: a project with fewer than 3 owner records gets no proposal, even if its name is in
+    /// the capture. A proposal does not count as an owner record.
+    func testNoProposalForAProjectWithFewRecords() {
+        let (e, out, _) = engine()
+        e.settings.projectFocusMinutes = 0
+        say(e, out, "new project", "garden")
+        for t in ["seeds", "hose"] { say(e, out, "todo", "garden " + t + " for garden") }
+        let r = say(e, out, "todo", "garden spade")
+        XCTAssertEqual(r.later, [])
+        XCTAssertNil(e.store!.openItems().last!.projectID)
+    }
+
+    /// Without the name: the 5 nearest records and the first 3 keyword results must agree.
+    func testProposalFromNeighborsAndKeywords() {
+        var rule = ProjectRuleV2()
+        rule.minRecords = 3
+        func rec(_ p: String, _ t: String, _ v: [Float]) -> ProjectRuleV2.Record { .init(project: p, vector: v, text: t) }
+        let a: [Float] = [1, 0], b: [Float] = [0, 1]
+        let records = [rec("1", "tile glue and grout", a), rec("1", "grout colour grey", a), rec("1", "grout float", a),
+                       rec("1", "tile spacers", a), rec("1", "tile cutter hire", a),
+                       rec("2", "seeds", b), rec("2", "hose", b), rec("2", "spade", b)]
+        let projects = [(id: "1", name: "Kitchen"), (id: "2", name: "Garden")]
+        XCTAssertEqual(rule.propose(title: "buy more grout", vector: a, records: records, projects: projects, floor: 0)?.project, "1")
+        // The neighbors agree, but no keyword result: no proposal.
+        XCTAssertNil(rule.propose(title: "call the fitter", vector: a, records: records, projects: projects, floor: 0))
+        // Below the floor: no neighbor counts.
+        XCTAssertNil(rule.propose(title: "buy more grout", vector: [0.1, 0], records: records, projects: projects, floor: 0.5))
     }
 
     func testAMoveToTheSameProjectConfirms() {
