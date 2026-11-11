@@ -170,4 +170,23 @@ final class ClockTests: XCTestCase {
         print("MARK alert delay after its time: \(Int(delay * 1000)) ms")
         XCTAssertLessThan(delay, 5)
     }
+
+    /// Silence (build spec 10.2): an open to-do with no change for 7 days, or 3 days for "waiting for", is a quiet
+    /// line in the morning list. Made-up items only.
+    func testSilenceGivesQuietLines() {
+        let (e, out, clock) = makeEngine()
+        e.handle(.hello(contract: 1)); _ = out.take()
+        say(e, out, "todo", "order the tiles")
+        say(e, out, "todo", "waiting for the plumber quote")
+        func quiet(_ days: Double) -> [String] {
+            clock.now = wed(10).addingTimeInterval(days * 86400)
+            return e.morningItems(clock.now).map(\.title)
+        }
+        XCTAssertEqual(quiet(2.9), [])
+        XCTAssertEqual(quiet(3), ["waiting for the plumber quote"])
+        XCTAssertEqual(Set(quiet(7)), ["order the tiles", "waiting for the plumber quote"])
+        var s = e.settings; s.rules.silence = .off; e.settings = s
+        XCTAssertEqual(quiet(8), [])
+    }
 }
+
