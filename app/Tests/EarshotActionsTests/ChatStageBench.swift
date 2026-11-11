@@ -77,15 +77,15 @@ final class ChatStageBench: XCTestCase {
         if let combo = Keys.parse(keys) { Keys.press(combo) }
         try await Task.sleep(nanoseconds: 400_000_000)
         print("DUMP focus after keys: \(AX.describeFocus(app))")
-        Keys.type(own.name)
-        for wait in [150, 300, 600] {
+        Keys.type(env["EARSHOT_BENCH_NAME"] ?? own.name)
+        for wait in [150, 300, 600, 900] {
             try await Task.sleep(nanoseconds: UInt64(wait) * 1_000_000)
             guard let field = AX.focused(app), let f = AX.frame(field) else { print("DUMP no focus"); continue }
             print("DUMP t+\(wait) field \(AX.role(field)) value=\(AX.value(field) ?? "-") active=\(AX.element(field, "AXActiveDescendant").map { AX.label($0) } ?? "-")")
             var queue = AX.elements(app, "AXWindows")
             var i = 0
             var rows = 0
-            while i < queue.count, i < 4000, rows < 40 {
+            while i < queue.count, i < 4000, rows < 25 {
                 let el = queue[i]; i += 1
                 let r = AX.role(el)
                 if let ef = AX.frame(el), ef.y >= f.maxY - 2, ef.y < f.maxY + 500, ef.x < f.maxX, ef.maxX > f.x,
