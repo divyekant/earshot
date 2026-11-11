@@ -83,6 +83,11 @@ final class ChatStageBench: XCTestCase {
             if let field = AX.switcherFields(in: w, budgetMs: 60).first {
                 print("DUMP field found at +\(Int(Clock.ms(since: tScan)) + 400) ms: \(AX.role(field)) \(AX.label(field)); focus set: \(AX.set(field, "AXFocused", kCFBooleanTrue))")
                 try await Task.sleep(nanoseconds: 100_000_000)
+                if !AX.same(AX.focused(app), field), let fr = AX.frame(field) {
+                    print("DUMP focus did not move: click the field")
+                    Mouse.click(CGPoint(x: fr.x + fr.w / 2, y: fr.y + fr.h / 2))
+                    try await Task.sleep(nanoseconds: 150_000_000)
+                }
                 break
             }
             try await Task.sleep(nanoseconds: 50_000_000)
