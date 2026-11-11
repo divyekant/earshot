@@ -54,7 +54,9 @@ public final class NLContextualEmbedder: Embedder {
                 }
                 sem.signal()
             }
-            if sem.wait(timeout: .now() + 600) == .timedOut || outcome != "available" {
+            _ = sem.wait(timeout: .now() + 600)
+            // The answer can come before the data is ready. The state of the data decides.
+            if !m.hasAvailableAssets {
                 throw EmbedderError(description: "the data of the contextual embedding: \(outcome)")
             }
         }

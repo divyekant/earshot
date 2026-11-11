@@ -286,6 +286,7 @@ public final class EmbedBench {
         for i in flat.indices { flat[i] = Float(rng.next() % 2000) / 1000 - 1 }
         let q = Vectors.normalized((0..<dim).map { _ in Float(rng.next() % 2000) / 1000 - 1 })
         var times: [TimeInterval] = []
+        var checksum: Float = 0
         for _ in 0..<5 {
             let t = Date()
             var best: Float = -2
@@ -300,8 +301,10 @@ public final class EmbedBench {
                 }
             }
             times.append(Date().timeIntervalSince(t))
+            checksum += best
         }
-        row("Compare 50,000 passages", "median \(Self.ms(Self.median(times))) (numbers in memory)")
+        // The sum is printed, so that the optimizer keeps the loop.
+        row("Compare 50,000 passages", "median \(Self.ms(Self.median(times))) (numbers in memory; best \(String(format: "%.3f", checksum / 5)))")
         return res
     }
 
