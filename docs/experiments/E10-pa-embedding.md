@@ -72,6 +72,17 @@ EmbeddingGemma 2 fails Search (87 and 86). With 256 numbers, it passes Project o
 
 The first run read only 512 of the 768 numbers, because the code took the width of the model (512) as the size of the output. The code now asks llama.cpp for the size of the output.
 
+## The floor of the search (after the Mac test)
+
+The Mac test of Q3 found that "where is passport" gave results, also with no match: the list by numbers had no minimum score. The bench now finds a floor on the development questions: the score of the correct result that 95 of 100 questions reach or pass. Then it checks the holdout with the floor.
+
+| Candidate 4, Gemma, 768 | Value |
+|---|---|
+| Floor (from the development set) | 0.411 |
+| Search holdout, first 3, merged, with the floor | 90 of 100 (92 with no floor) |
+
+With the floor, Gemma is at the Search mark (90), with no margin.
+
 ## Finding
 
 - Both macOS candidates fail Search and Project. The merged list is worse than the keywords alone, because the list by numbers puts the correct result in the first 3 for only about 1 question in 4.

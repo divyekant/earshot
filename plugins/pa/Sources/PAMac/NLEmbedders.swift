@@ -138,7 +138,7 @@ public func makeSearchModel(_ name: String, folder: URL) -> ModelHost? {
     switch name {
     case "gemma":
         spec = LlamaEmbedder.gemma; file = "embeddinggemma-300M-Q8_0.gguf"
-        rules = ModelRules(projectA: 0.542, projectB: 0.025, duplicateC: 0.806)
+        rules = ModelRules(projectA: 0.542, projectB: 0.025, duplicateC: 0.806, searchFloor: 0.411)
     case "qwen3":
         spec = LlamaEmbedder.qwen3; file = "Qwen3-Embedding-0.6B-Q8_0.gguf"
         rules = ModelRules(projectA: 0.632, projectB: 0.035, duplicateC: 0.800)
