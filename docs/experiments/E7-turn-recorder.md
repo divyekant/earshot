@@ -25,7 +25,7 @@ earshot keeps no audio (dk, 2026-11-11: "no audio on disk"). So the evidence mus
 
 For each always-on turn and each rejected wake, earshot keeps one record for 7 days (DESIGN 3.1). The record has the sound levels, the wake scores, a trace of the match (the score of each encoder frame and the encoder frames), the turn checks, the end and the voice check. The `EarshotReplayTests` target runs the rules again on the records.
 
-dk's choices of 2026-11-11 (card in the thread "Record turn numbers and fix wake"): see section 6.
+dk chose on a card on 2026-11-11: keep the wake frames and the scores for 7 days, with the switch on by default (option "Frames + scores, switch on").
 
 ## 3. Candidate causes, and the number that tests each
 
@@ -50,4 +50,5 @@ Not yet. The live session needs dk's "go" and a build on the Mac.
 
 ## 6. Decisions
 
-Not yet.
+- 2026-11-11, dk: the recorder keeps the wake frames and the scores for 7 days, on by default. No audio on disk.
+- The gate decision: not yet.
