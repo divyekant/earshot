@@ -143,4 +143,62 @@ final class PluginRouterTests: XCTestCase {
         XCTAssertEqual(r.tier, .rules)
         XCTAssertTrue(spy.asked.isEmpty, "\(spy.asked)")
     }
+
+    // MARK: - "open <target>" (docs/PLUGINS.md, section 5.2)
+
+    let targets = [
+        PluginTargetName(pluginID: "pa", name: "today", open: "/tmp/pa/today.html"),
+        PluginTargetName(pluginID: "pa", name: "all open", open: "/tmp/pa/all-open.html"),
+        PluginTargetName(pluginID: "pa", name: "Kitchen", open: "/tmp/pa/kitchen.html"),
+        PluginTargetName(pluginID: "pa", name: "Notes", open: "/tmp/pa/notes.html"),
+    ]
+
+    private func routeTarget(_ text: String) async -> RouteResult {
+        await CommandRouter().route(text, context: RouteContext(apps: Fixtures.apps, names: Fixtures.names, targets: targets))
+    }
+
+    func testOpenTarget() async {
+        for (spoken, name) in [("open today", "today"), ("Open the kitchen page.", "Kitchen"), ("go to all open", "all open"),
+                               ("hey, open my kitchen", "Kitchen"), ("open all-open", "all open")] {
+            let r = await routeTarget(spoken)
+            guard case let .openTarget(id, n, _) = r.intent else { XCTFail("\(spoken): \(r.intent)"); continue }
+            XCTAssertEqual(id, "pa", spoken)
+            XCTAssertEqual(n, name, spoken)
+            XCTAssertEqual(r.tier, .rules, spoken)
+        }
+    }
+
+    /// An app name wins over a target with the same name (R-PL-4).
+    func testAppWinsOverTarget() async {
+        let r = await routeTarget("open Notes")
+        XCTAssertEqual(r.intent, .openApp(appID: "notes"))
+        let page = await routeTarget("open the notes page")
+        if case .openTarget = page.intent { XCTFail("an app name is never a target") }
+    }
+
+    /// Only the whole name counts. Other words go to the other rules, as before.
+    func testTargetNeedsTheWholeName() async {
+        for spoken in ["open today's mail", "open kitchen timer", "type open today", "remind me today"] {
+            let r = await routeTarget(spoken)
+            if case .openTarget = r.intent { XCTFail(spoken) }
+        }
+        let none = await CommandRouter().route("open today", context: RouteContext(apps: Fixtures.apps, names: Fixtures.names))
+        if case .openTarget = none.intent { XCTFail("no targets, no target") }
+    }
+
+    func testSameTargetNameFirstIDWins() {
+        let two = [PluginTargetName(pluginID: "zeta", name: "today", open: "/z"), PluginTargetName(pluginID: "alpha", name: "today", open: "/a")]
+        XCTAssertEqual(PluginRouter.target(["open", "today"], targets: two, apps: [])?.pluginID, "alpha")
+    }
+
+    /// The target check runs on each "open" command (R-SP-1). 1,000 checks with 200 targets.
+    func testTargetIsFast() {
+        let many = (0..<200).map { PluginTargetName(pluginID: "pa", name: "project \($0)", open: "/tmp/\($0).html") }
+        let words = ["open", "project", "150"]
+        let t0 = DispatchTime.now().uptimeNanoseconds
+        for _ in 0..<1000 { _ = PluginRouter.target(words, targets: many, apps: Fixtures.apps) }
+        let ms = Double(DispatchTime.now().uptimeNanoseconds - t0) / 1_000_000 / 1000
+        print("plugin target match: \(String(format: "%.4f", ms)) ms each")
+        XCTAssertLessThan(ms, 1.0)
+    }
 }

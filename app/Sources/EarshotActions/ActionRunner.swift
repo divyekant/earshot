@@ -64,6 +64,7 @@ public final class EarshotActionRunner: ActionRunner {
         case .undoTyping(let text): out = await undoTyping(text, watch: watch)
         // The app hands this off to the plugin. The actions never act for a plugin (R-PL-3).
         case .handOff: out = fail("a plugin hand-off is not an action")
+        case let .openTarget(_, name, open): out = openTarget(name, open: open, watch: watch)
         }
         watch.mark("total")
         out.stages = watch.stages.merging(out.stages) { a, _ in a }
@@ -149,6 +150,16 @@ public final class EarshotActionRunner: ActionRunner {
         guard NSWorkspace.shared.open(url) else { return fail("the browser did not open \(url.host ?? address)") }
         watch.mark("opened")
         return ok("opened \(url.host ?? address)")
+    }
+
+    /// Opens a plugin target: a web address in the browser, a document in its app, a folder in Finder.
+    /// Never a program, a script or an installer (PluginTargetOpen, R-PL-3). It presses no key.
+    private func openTarget(_ name: String, open: String, watch: Stopwatch) -> ActionOutcome {
+        let (url, why) = PluginTargetOpen.url(open)
+        guard let url else { return fail("\(name): \(why ?? "earshot cannot open it")") }
+        guard NSWorkspace.shared.open(url) else { return fail("macOS did not open \(name)") }
+        watch.mark("opened")
+        return ok("opened \(name)")
     }
 
     private func openApp(_ appID: String, context: RouteContext, watch: Stopwatch) async -> ActionOutcome {

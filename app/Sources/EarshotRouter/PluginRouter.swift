@@ -94,6 +94,42 @@ public enum PluginRouter {
         return nil
     }
 
+    /// The verbs that open a plugin target: "open today", "go to all open".
+    static let targetVerbs: [[String]] = [["open"], ["go", "to"], ["switch", "to"]]
+    /// Words after the name that the owner can add: "open the kitchen page".
+    static let targetAfter: Set<String> = ["page", "list", "project"]
+
+    /// The plugin target that the words name after an open verb, or nil (docs/PLUGINS.md, section 5.2).
+    /// - The name must match all the words after the verb. The match ignores spaces and hyphens, as for a lead.
+    ///   A leading "the" or "my", and a trailing "page", "list" or "project", can stay out.
+    /// - An app name wins: "open notes" opens the app Notes, also if a plugin has a target "Notes" (R-PL-4).
+    /// - If two plugins have a target with the same name, the plugin with the first id gets it.
+    public static func target(_ words: [String], targets: [PluginTargetName], apps: [AppEntry]) -> PluginTargetName? {
+        guard !targets.isEmpty, let verb = targetVerbs.first(where: { words.starts(with: $0) }) else { return nil }
+        let after = Array(words.dropFirst(verb.count))
+        guard !after.isEmpty, after.count <= 8 else { return nil }
+        var bare = after
+        while let f = bare.first, ["the", "my"].contains(f), bare.count > 1 { bare.removeFirst() }
+        var forms = [after, bare]
+        if bare.count > 1, let l = bare.last, targetAfter.contains(l) { forms.append(Array(bare.dropLast())) }
+        let keys = appKeys(apps)
+        // An app name wins, also with the extra words: "open the notes page" does not open a target "Notes".
+        if forms.contains(where: { keys[$0.joined()] != nil }) { return nil }
+        let sorted = targets.sorted { ($0.pluginID, $0.name) < ($1.pluginID, $1.name) }
+        for form in forms {
+            let key = form.joined()
+            if let t = sorted.first(where: { TextKit.key($0.name) == key }) { return t }
+        }
+        return nil
+    }
+
+    /// The rules decision for "open <plugin target>", or nil.
+    static func decideTarget(_ words: [String], context: RouteContext) -> RulesDecision? {
+        guard let t = target(words, targets: context.targets, apps: context.apps) else { return nil }
+        return RulesDecision(intent: .openTarget(pluginID: t.pluginID, name: t.name, open: t.open), sure: true, exact: true,
+                             why: "plugin target \"\(t.name)\"", options: [])
+    }
+
     /// The rules decision for a plugin lead, or nil.
     static func decide(_ text: String, context: RouteContext) -> RulesDecision? {
         guard let m = match(text, plugins: context.plugins, apps: context.apps) else { return nil }

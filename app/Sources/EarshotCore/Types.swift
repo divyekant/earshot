@@ -127,6 +127,10 @@ public enum Intent: Codable, Hashable, Sendable {
     /// Give the words after a plugin lead to that plugin (R-PL-2, docs/PLUGINS.md). One intent for all plugins.
     /// The app hands the text off and shows a note. It never clicks, types or sends for it (R-PL-3).
     case handOff(pluginID: String, lead: String, text: String)
+    /// Open a target of a plugin: "open today" (docs/PLUGINS.md, section 5.2). `open` is the file path or the web
+    /// address that the plugin gave. The action module opens only a web address or a document, never a program
+    /// (`PluginTargetOpen`). The plugin runs no action (R-PL-3).
+    case openTarget(pluginID: String, name: String, open: String)
 }
 
 /// Which router tier made the decision.
@@ -165,11 +169,13 @@ public struct RouteContext: Sendable {
     public var screen: ScreenSnapshot?
     /// The leads of the approved plugins that run (R-PL-4). Empty if no plugin runs.
     public var plugins: [PluginLead]
+    /// The targets of the approved plugins that run, with an `open` value. Empty if no plugin gave targets.
+    public var targets: [PluginTargetName]
 
     public init(apps: [AppEntry], names: [NameEntry], frontBundleID: String? = nil, screen: ScreenSnapshot? = nil,
-                plugins: [PluginLead] = []) {
+                plugins: [PluginLead] = [], targets: [PluginTargetName] = []) {
         self.apps = apps; self.names = names; self.frontBundleID = frontBundleID; self.screen = screen
-        self.plugins = plugins
+        self.plugins = plugins; self.targets = targets
     }
 }
 

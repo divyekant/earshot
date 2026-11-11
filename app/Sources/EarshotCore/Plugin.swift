@@ -103,6 +103,54 @@ public struct PluginLead: Hashable, Sendable {
     public init(pluginID: String, lead: String) { self.pluginID = pluginID; self.lead = lead }
 }
 
+/// One target of a running plugin, for the router: "open today" (docs/PLUGINS.md, section 5.2).
+public struct PluginTargetName: Hashable, Sendable {
+    public var pluginID: String
+    public var name: String
+    /// The file path or the web address that the plugin gave.
+    public var open: String
+
+    public init(pluginID: String, name: String, open: String) { self.pluginID = pluginID; self.name = name; self.open = open }
+}
+
+/// What "open <target>" can open (R-PL-3). earshot opens a web address (http or https), a document or a folder.
+/// It never opens a program, a script, an installer or a package: a plugin cannot make earshot run code.
+public enum PluginTargetOpen {
+    /// The file types that earshot opens. All other types are refused, also a file with no type.
+    public static let documentTypes: Set<String> = ["html", "htm", "pdf", "txt", "md", "markdown", "rtf", "csv",
+                                                     "png", "jpg", "jpeg", "gif", "heic", "webp"]
+
+    /// The address to open, or the reason not to open it.
+    /// - A web address must use http or https, and must have a host.
+    /// - A file path must be absolute ("/" or "~/"). earshot follows links before it checks the type.
+    /// - A file must have a type in `documentTypes`. A folder must not be a package (a folder with a type, such as an app).
+    public static func url(_ open: String, fileManager: FileManager = .default) -> (url: URL?, why: String?) {
+        let raw = open.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !raw.isEmpty else { return (nil, "the target has no address") }
+        if let u = URL(string: raw), let scheme = u.scheme?.lowercased(), !raw.hasPrefix("/") {
+            guard ["http", "https"].contains(scheme), let host = u.host, !host.isEmpty else {
+                return (nil, "earshot opens only http and https addresses")
+            }
+            return (u, nil)
+        }
+        var path = raw
+        if path.hasPrefix("~/") { path = fileManager.homeDirectoryForCurrentUser.path + String(path.dropFirst(1)) }
+        guard path.hasPrefix("/") else { return (nil, "not a file path or a web address") }
+        let file = URL(fileURLWithPath: path).standardizedFileURL.resolvingSymlinksInPath()
+        var folder: ObjCBool = false
+        guard fileManager.fileExists(atPath: file.path, isDirectory: &folder) else { return (nil, "the file is not there") }
+        if folder.boolValue {
+            guard file.pathExtension.isEmpty else { return (nil, "earshot does not open a package") }
+            return (file, nil)
+        }
+        let type = file.pathExtension.lowercased()
+        guard documentTypes.contains(type) else {
+            return (nil, type.isEmpty ? "earshot opens only documents" : "earshot does not open a .\(type) file")
+        }
+        return (file, nil)
+    }
+}
+
 /// Finds the plugins in the store folder and keeps the owner's approvals.
 public struct PluginCatalog: Sendable {
     public let store: Store

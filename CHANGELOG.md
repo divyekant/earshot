@@ -9,6 +9,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 ### Added
 
 - The PA plugin, phase 1 start: a separate program in `plugins/pa/` with its plugin file, its store and the script `install-pa.sh`. Each command answers "Not built yet" for now. At its first start, the PA asks macOS for access to Reminders and shows the result (R-PA-1, R-PA-2, R-PL-1).
+- "open <target>" opens a target that a plugin gave, for example "open today". An app name wins. earshot opens only a web address, a document or a folder, never a program or a script (R-PL-3, R-PL-4).
 
 ## [0.4.0] - 2026-11-11
 

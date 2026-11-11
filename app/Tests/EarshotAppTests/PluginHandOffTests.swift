@@ -7,6 +7,7 @@ import XCTest
 /// A fake hand-off: it keeps each call.
 final class FakePlugins: PluginHandOff {
     var leads: [PluginLead] = [PluginLead(pluginID: "pa", lead: "remind me to")]
+    var targetNames: [PluginTargetName] = []
     var calls: [(String, String, String, [String: String])] = []
     var reason: String?
     func name(of pluginID: String) -> String { "Helper" }
@@ -41,6 +42,19 @@ final class PluginHandOffTests: XCTestCase {
         XCTAssertFalse(r.note.contains("plants"), r.note)
         XCTAssertNotNil(r.stages["plugin.handoff"])
         XCTAssertEqual(fake.calls.first?.3["app"], "com.anthropic.claudefordesktop")
+    }
+
+    /// "open today" runs the core open action with the target of the plugin. The plugin gets no command (R-PL-3).
+    func testOpenTargetIsTheCoreOpen() async {
+        let fake = FakePlugins()
+        fake.targetNames = [PluginTargetName(pluginID: "pa", name: "today", open: "/tmp/pa/today.html")]
+        let runner = FieldRunner()
+        let (p, e) = pipeline(fake, runner: runner)
+        e.text = "Open today."
+        let r = await p.finish(mode: .hold)
+        XCTAssertTrue(r.ok, r.note)
+        XCTAssertEqual(runner.runs.first?.0, .openTarget(pluginID: "pa", name: "today", open: "/tmp/pa/today.html"))
+        XCTAssertTrue(fake.calls.isEmpty)
     }
 
     func testFailedHandOffShowsTheReason() async {
