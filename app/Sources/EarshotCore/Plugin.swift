@@ -40,6 +40,28 @@ public enum PluginContract {
         return url.path
     }
 
+    /// The folder of a file window that gives no AXDocument (for example a Finder window). The window shows items
+    /// with file addresses (AXURL). The folder is a folder of these addresses, or the parent of an address, whose name
+    /// is the window title. If more than one matches, the deepest one wins. Nil if no folder matches the title.
+    public static func windowFolder(title: String, urls: [String]) -> String? {
+        let name = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return nil }
+        var best: String?
+        func consider(_ path: String) {
+            let p = path.count > 1 && path.hasSuffix("/") ? String(path.dropLast()) : path
+            guard p.hasPrefix("/"), p != "/" else { return }
+            let last = (p as NSString).lastPathComponent
+            guard last == name || p == name || (name.hasPrefix("~") && p.hasSuffix(String(name.dropFirst()))) else { return }
+            if best == nil || p.split(separator: "/").count > best!.split(separator: "/").count { best = p }
+        }
+        for raw in urls {
+            guard let url = URL(string: raw), url.isFileURL, !url.path.isEmpty else { continue }
+            if raw.hasSuffix("/") { consider(url.path) }
+            consider(url.deletingLastPathComponent().path)
+        }
+        return best
+    }
+
     /// The selected text for a plugin: nil if empty, else cut at `maxSelectionCharacters`.
     public static func selectionText(_ raw: String?) -> String? {
         guard let raw, !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
