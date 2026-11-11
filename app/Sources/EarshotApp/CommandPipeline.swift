@@ -121,6 +121,8 @@ final class CommandPipeline {
     private var speechSummary = ""
     /// The turn model checks of the open always-on turn, for its log note (R-ON-1, I-2).
     private var turnChecks: [String] = []
+    /// The texts that this turn types or could type. The log record keeps a word count in their place (gap item 11).
+    var turnTyped: [String] = []
 
     init(engine: SpeechEngine, router: Router, actions: CommandActions, names: NameFinder,
          apps: @escaping () -> [AppEntry], allNames: @escaping () async -> [NameEntry],
@@ -277,6 +279,7 @@ final class CommandPipeline {
             }
         }
 
+        turnTyped += Self.typedTexts(result)
         // A bare "type": wait for the text in the next turn (hold key, or the owner's voice in always-on mode).
         if result.awaitsText {
             armedUntil = now().addingTimeInterval(Self.armedSeconds)
@@ -303,6 +306,7 @@ final class CommandPipeline {
             why += " · dictation into the focused field"
             // A trailing "and send" is never text (router contract): type the rest, then send with the hold key.
             let body = CommandRouter.withoutTrailingSend(text)
+            turnTyped.append(body ?? text)
             pauseAlwaysOn(true)
             let outcome = await actions.run(.typeText(body ?? text), context: context, command: CommandInfo(mode: .hold, tier: .rules))
             pauseAlwaysOn(false)
@@ -551,6 +555,7 @@ final class CommandPipeline {
                 routed = await router.route(step, context: context)
                 stages["step\(n).route"] = c.ms
             }
+            turnTyped += Self.typedTexts(routed)
             let (intent, tier, confidence, why, sendAfter) = (routed.intent, routed.tier, routed.confidence, routed.why,
                                                               routed.sendAfter)
             lastTier = tier
@@ -746,7 +751,9 @@ final class CommandPipeline {
         // (for example "open Slack" when Slack had no chat keys). The note on screen stays short.
         var logNote = why.isEmpty || note.contains(why) ? note : "\(note) · route: \(why)"
         if !speechSummary.isEmpty { logNote += " · speech: \(speechSummary)" }
-        let record = ActivityRecord(heard: heard, intent: intent, tier: tier, ok: ok, note: logNote, stages: stages)
+        let record = Self.forLog(ActivityRecord(heard: heard, intent: intent, tier: tier, ok: ok, note: logNote, stages: stages),
+                                 typed: turnTyped)
+        turnTyped = []
         try? log?.append(record)
         if showFeedback, !quiet {
             feedback?.show(ok ? "→ \(intent)" : "✗ \(note)", ok: ok)
