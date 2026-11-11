@@ -14,6 +14,7 @@ import XCTest
 /// - `EARSHOT_LIVE_CHAT=1`: run the bench.
 /// - `EARSHOT_BENCH_RUNS`: runs for each app (default 5).
 /// - `EARSHOT_BENCH_APPS`: app ids, separated by commas (default: every approved chat app with an own chat).
+/// - `EARSHOT_BENCH_TARGET`: the own chat name to use in place of the one in `names.json`.
 /// - `EARSHOT_BENCH_OUT`: a file for the results as JSON lines. The lines have no chat names.
 @MainActor
 final class ChatStageBench: XCTestCase {
@@ -37,7 +38,9 @@ final class ChatStageBench: XCTestCase {
         let runner = EarshotActionRunner(options: ActionOptions(), store: temp)
         let context = RouteContext(apps: apps, names: names)
         for app in apps where app.isChat && app.approved && app.enabled && (only?.contains(app.id) ?? true) {
-            guard let own = names.first(where: { $0.appID == app.id && $0.isSelf }) else {
+            // EARSHOT_BENCH_TARGET: the name of the owner's own chat as the app shows it, if names.json has another name.
+            let override = env["EARSHOT_BENCH_TARGET"].map { NameEntry(appID: app.id, name: $0, isSelf: true, source: .manual) }
+            guard let own = override ?? names.first(where: { $0.appID == app.id && $0.isSelf }) else {
                 print("BENCH \(app.id): no own chat in names.json, skipped")
                 continue
             }
