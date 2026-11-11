@@ -21,9 +21,9 @@ final class MovingRunner: CommandActions {
         reads += 1
         let k = reads * 10
         return ScreenSnapshot(bundleID: bundleID, windowTitle: "Page", url: "https://example.com/", elements: [
-            ScreenElement(id: "e\(k + 1)", role: "AXButton", label: "Reports", risky: false, x: 10, y: 10),
-            ScreenElement(id: "e\(k + 2)", role: "AXButton", label: "Report", risky: false, x: 10, y: 40),
-            ScreenElement(id: "e\(k + 3)", role: "AXButton", label: "Delete report", risky: true, x: 10, y: 70),
+            ScreenElement(id: "e\(k + 1)", role: "AXButton", label: "Projects", risky: false, x: 10, y: 10),
+            ScreenElement(id: "e\(k + 2)", role: "AXButton", label: "Project", risky: false, x: 10, y: 40),
+            ScreenElement(id: "e\(k + 3)", role: "AXButton", label: "Delete project", risky: true, x: 10, y: 70),
         ])
     }
     func run(_ intent: Intent, context: RouteContext, command: CommandInfo) async -> ActionOutcome {
@@ -188,9 +188,9 @@ final class ChoiceTests: XCTestCase {
                                 apps: { Fixture.apps }, allNames: { [] }, frontBundleID: { "com.google.Chrome" })
         p.now = { [unowned self] in self.clock }
         p.playSounds = false
-        engine.text = "click report"
+        engine.text = "click project"
         let r = await p.finish(mode: .hold)
-        XCTAssertEqual(p.pendingChoice?.choices.map(\.describe), ["Click \"Reports\"", "Click \"Report\""], r.note)
+        XCTAssertEqual(p.pendingChoice?.choices.map(\.describe), ["Click \"Projects\"", "Click \"Project\""], r.note)
         engine.text = "the second one"
         let r2 = await p.finish(mode: .hold)
         XCTAssertTrue(r2.ok, r2.note)
@@ -207,7 +207,7 @@ final class ChoiceTests: XCTestCase {
                                 apps: { Fixture.apps }, allNames: { [] }, frontBundleID: { "com.google.Chrome" })
         p.now = { [unowned self] in self.clock }
         p.playSounds = false
-        engine.text = "click report"
+        engine.text = "click project"
         _ = await p.finish(mode: .hold)
         runner.bundleID = "com.apple.Notes"
         engine.text = "yes"
