@@ -166,17 +166,22 @@ The safety rule stays: actions that cannot be undone, such as Send, need the hol
 
 ### 3.4 Router: "System 1" (R-SP-2, R-MD-2)
 
-| Tier | Method | Speed |
-|---|---|---|
-| 0 | Rule match on app names, verbs and grammar | under 1 ms |
-| 1 | Sentence embedding + nearest intent; fuzzy match of names against Contacts and per-app caches | a few ms |
-| 2 | FunctionGemma 270M, fine-tuned on a few hundred of the owner's commands, through MLX | measure in Phase 0 |
+The router (`app/Sources/EarshotRouter`) turns the words of one turn into one intent, for example `openChat(slack, "Ravi", "running late")` or `click(e12)`. It makes no agent loop: it calls a model one time for each command at most. All steps except tier 2 run on the Mac.
 
-Output: one action with arguments, for example `{action: "message", app: "slack", target: "Ravi", text: "running late"}`.
+The steps, in order:
 
-free-mac-voice (MIT) already uses the same tiers. Read its code before you write the router.
+| Step | What it does | Tier in the log | Speed |
+|---|---|---|---|
+| 1. Rules | Plugin leads (3.8), "send", "show numbers", spoken keys and "undo that" (D-13), a bare "type", a screen command for one app, web addresses, scroll and back, then the chat rules and the screen rules. A chain of commands is cut into steps before the route (I-28). | `rules` if exact, `fuzzy` if by sound or fuzzy match | under 1 ms to a few ms |
+| 2. Habit memory | Only for a tie between targets of the same score. The owner's last answer picks the target (3.6). | `fuzzy` | under 1 ms |
+| 3. Misheard names | Only for a route that is not sure or found nothing. Heard words become label words, then the rules run again (3.6, E8). | `fuzzy` | a few ms |
+| 4. Tier 2: Jev | Only if the owner turned it on (D-9), and only if the rules are not sure. One text-only call picks from the short list of options. The rules answer stays after the 1 s budget. | `jev` | about 90 ms median in E1 |
 
-Measured in E1 (2026-11-02, [E1-generic-router.md](experiments/E1-generic-router.md)): rules with fuzzy match (tiers 0 and 1) were sure for 30 of 42 test commands and correct for all 30, in about 20 ms. For the other 12, one text-only call to Jev (a cloud model, test only, see R-MD-1) picked from a short list in about 90 ms median (568 ms at most). Together: 42 of 42, with no wrong chat. The tier-2 model is still open: the owner plans an own small model, trained on the logs.
+A sure route has a confidence of 0.9 (rules) or 0.8 (tier 2). Below `SafetyPolicy.minimumConfidence`, earshot does nothing and shows a "not sure" note with choices (3.6).
+
+The first design had a fine-tuned FunctionGemma 270M model as tier 2. It is not built. The owner allows only small local models (R-MD-2, D-5), and the Phase 4 plan keeps an own small model, trained on the logs, as an option.
+
+Measured in E1 (2026-11-02, [E1-generic-router.md](experiments/E1-generic-router.md)): rules with fuzzy match were sure for 30 of 42 test commands and correct for all 30, in about 20 ms. For the other 12, one text-only call to Jev picked from a short list in about 90 ms median (568 ms at most). Together: 42 of 42, with no wrong chat. With 200 misheard-name pairs, the route takes 2.33 ms median (E8).
 
 ### 3.5 Actions (R-NV-*, R-CL-*, R-MT-*)
 
@@ -251,6 +256,31 @@ A plugin is a separate program with a manifest (`docs/PLUGINS.md`). The parts in
 
 The answers show as a note. An alert also goes to the Notification Center. A plugin also gives targets (names with ids). earshot keeps them for a later target source: "open <target>" with the core verb.
 
+### 3.9 Talk state (gap item 13, 2026-11-11)
+
+The talk state is what the next turn can mean. One value holds it: `TalkState` in `app/Sources/EarshotApp/TalkState.swift`. It is in memory only, never in the log and never on disk.
+
+It has one wait at a time. A new wait replaces the old wait, because the note on screen shows only the newest question.
+
+| State | Starts when | The next turn | Ends |
+|---|---|---|---|
+| idle | earshot starts, or a wait ends | is a new command | — |
+| waits for text | a bare "type" (R-NV-4) | is text for the focused field, unless its first sentence is a command | after 5 s, or after one turn |
+| waits for a chain answer | a chain stops at a step (I-28) | can say "go on", "stop", "yes" or the step again | after 10 s, or after one turn |
+| waits for a choice answer | a "not sure" note shows its choices (3.6) | can say "yes", "the first one", "the second one" or "no" | after 10 s, or after one turn |
+| keeps dropped words | the voice check drops a wake turn that played the start sound (gap item 7) | with the hold key and no words, types the kept words | after 20 s, or after one turn |
+
+In always-on mode, only the owner's checked voice can answer a chain or a choice.
+
+The talk state also keeps the last typing that worked: the time, the front app, the text and the mode. These rules use it:
+- In always-on mode, "send" alone sends within 5 s in the same app (D-12).
+- In always-on mode, a turn within 3 s in the same app goes on with the text, unless its first sentence is a command.
+- "undo that" removes the text within 120 s, in the same app only (D-13).
+
+A send and "undo that" clear the last typing. A wait does not change it.
+
+The menu bar icon (`ListenState`) shows "waits for text" as the text cursor. The other waits show as a note on screen. The wake rules and the end-of-turn rules (3.1) are in `WakeTrigger`, not in the talk state.
+
 ## 4. Permissions
 
 - Microphone
@@ -258,6 +288,20 @@ The answers show as a note. An alert also goes to the Notification Center. A plu
 - Screen Recording (only for the OCR fallback)
 
 ## 5. Phase plan
+
+Status on 2026-11-11 (v0.3.0 is the last release; `develop` holds the gap work for the next release):
+
+| Phase | Status | Evidence |
+|---|---|---|
+| 0. Measure | Done | E0 to E8 in [experiments/](experiments/) |
+| 1. Push-to-talk MVP | Done. Slack, Messages and WhatsApp open a chat and focus the message box: 437 ms, 682 ms and 1,475 ms (E7). WhatsApp is above the 1 s goal (R-SP-1). "Mail <name>" opens Mail only. A new mail from a name waits for the owner's choice (E7, section 6). | E0, E7 |
+| 2. Voice clicks | Done: label match, ordinal match, "show numbers", OCR fallback, and the opt-in screenshot fallback (D-10) | E2, E3 |
+| 3. Always on | In progress. The wake phrase, the owner voice check and the follow-up window are built (D-11). The end-of-turn rules still change after live tests. The turn recorder keeps numbers, not audio, so tests can run the rules again (E7 turn recorder). | E5, E6, E7 turn recorder |
+| 4. Learn | Started. earshot learns from the owner's answers to "not sure" notes: habit memory and misheard names (3.6). The own small router model is not started. | E8 |
+
+Gap work of 2026-11-11 (after the evaluation of v0.3.0): the activity numbers and a weekly report, the chat flow (E7), the answer to a "not sure" note, habit memory, the menu bar state and pause, a cue for a dropped wake turn, the dictation set (D-13), the turn recorder, misheard names (E8), plugins (D-14) and the talk state (3.9). Install for other people waits for an Apple Developer ID.
+
+The plans below are the original plans. They stay for reference.
 
 ### Phase 0: Measure (do this first)
 

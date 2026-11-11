@@ -54,16 +54,13 @@ final class CommandPipeline {
     /// The voice check of the always-on turn that ends now (WakeTrigger.onTurnVoice), for the log and for an
     /// always-on "send" (D-12). Nil if no check ran: no voice is enrolled, or the turn was too short.
     var turnVoice: TurnVoice?
-    /// The last typing that worked: the time and the front app. In always-on mode, "send" alone may follow it
-    /// within `sendAfterTypingSeconds`, in the same app (the owner's choice, D-12, R-ON-5).
-    private(set) var lastTyped: (at: Date, app: String?)?
-    /// The text of the last typing, for "undo that" (I-34). In memory only: never in the log, never on disk.
-    var lastTypedText: String?
+    /// The talk state (TalkState.swift): what the next turn can mean, and the last typing. In always-on mode, "send"
+    /// alone may follow the last typing within `sendAfterTypingSeconds`, in the same app (the owner's choice, D-12,
+    /// R-ON-5). "undo that" uses its text (I-34). In memory only: never in the log, never on disk.
+    var talk = TalkState()
     static let sendAfterTypingSeconds: TimeInterval = 5
     /// After earshot typed in always-on mode, a turn that starts within this time goes on with the text.
     static let continueTypingSeconds: TimeInterval = 3
-    /// True if the last typing was in always-on mode.
-    private var lastTypedAlwaysOn = false
     /// True if the next turn is expected to hold dictated text (armed, or right after typing in always-on). The app
     /// gives it to the trigger, so that turn gets the long end silence (WakeTrigger.dictationEndSilenceMs).
     private(set) var expectsText = false
@@ -79,9 +76,6 @@ final class CommandPipeline {
     /// True if the last turn was a follow-up turn that was not a command (`isFollowUpMiss`). It showed no note and
     /// played no sound, and the follow-up window does not open again after it.
     private(set) var followUpMissed = false
-    /// The words of the last wake turn that the voice check dropped after the start sound, in memory only, never on
-    /// disk (gap item 7, `CommandPipeline+Dropped.swift`).
-    var keptText: KeptText?
     /// True if a send worked in this turn, for the "sent" sound.
     private var sentThisTurn = false
     /// The start of the open turn (begin()). The armed window and the send window test the start of the next turn,
@@ -96,11 +90,11 @@ final class CommandPipeline {
     var restoreFront: () async -> Double? = { nil }
     /// earshot's own bundle id. earshot's own window is never a target of a voice command.
     var ownBundleID: String?
-    /// After a bare "type" (RouteResult.awaitsText), the end of the window in which the next turn types its words
-    /// into the focused field (the owner's choice, R-NV-4). One turn only. Nil when not armed.
-    private(set) var armedUntil: Date?
+    /// After a bare "type" (RouteResult.awaitsText), the window in which the next turn types its words into the
+    /// focused field (the owner's choice, R-NV-4). One turn only. The talk state keeps it (`armedUntil`).
     static let armedSeconds: TimeInterval = 5
-    /// A chain of commands that stopped at a step (I-28). The next turn within `chainAnswerSeconds` can answer it:
+    /// A chain of commands that stopped at a step (I-28). The talk state keeps it (`pendingChain`).
+    /// The next turn within `chainAnswerSeconds` can answer it:
     /// "go on" (skip the step and run the rest), "stop", "yes" (run the best guess), or the step again in new words.
     /// dk (2026-11-03): ask first when a step fails.
     struct PendingChain {
@@ -111,10 +105,7 @@ final class CommandPipeline {
         var guess: (Intent, RouterTier)?
         var until: Date
     }
-    private(set) var pendingChain: PendingChain?
     static let chainAnswerSeconds: TimeInterval = 10
-    /// The choices of a "not sure" note for one command (CommandPipeline+Answer.swift). Nil if no note waits.
-    var pendingChoice: PendingChoice?
     /// The owner's last answers to ties (gap item 6). The answer to a note keeps one. Nil: no habit.
     var habits: TieHabits?
     /// Words that speech wrote for a label (gap item 12). The answer to a note keeps a pair. Nil: no correction.
@@ -399,7 +390,7 @@ final class CommandPipeline {
         let outcome = await actions.run(intent, context: context, command: command)
         if types { pauseAlwaysOn(false) }
         for (k, v) in outcome.stages { stages["action." + k] = v }
-        if intent == .send { lastTyped = nil; sentThisTurn = outcome.ok }
+        if intent == .send { talk.lastTyping = nil; sentThisTurn = outcome.ok }
         if types, outcome.ok { noteTyped(mode: mode, text: Self.typedText(intent)) }
         afterKey(intent, ok: outcome.ok)
         var (ok, note) = (outcome.ok, outcome.note)
@@ -550,15 +541,14 @@ final class CommandPipeline {
 
     /// Records a typing that worked, with the front app, for an always-on "send" alone (D-12).
     func noteTyped(mode: InputMode, text: String?) {
-        lastTyped = (now(), frontBundleID().flatMap { $0 == ownBundleID ? nil : $0 })
-        lastTypedText = text
-        lastTypedAlwaysOn = mode == .alwaysOn
+        talk.lastTyping = TalkState.Typing(at: now(), app: frontBundleID().flatMap { $0 == ownBundleID ? nil : $0 },
+                                           text: text, alwaysOn: mode == .alwaysOn)
         typedThisTurn = true
         if mode == .alwaysOn { expectsText = true }
     }
 
     /// Forgets the last typing (after "undo that" removed it).
-    func forgetTyping() { lastTyped = nil }
+    func forgetTyping() { talk.lastTyping = nil }
 
     /// After "… and send": with the hold key, send now through the normal send rules. In always-on mode, type
     /// only: the owner says "send" on its own (D-12).
@@ -567,7 +557,7 @@ final class CommandPipeline {
         guard mode == .hold else { return (true, note + " · say \"send\" on its own to send") }
         let out = await actions.run(.send, context: context, command: CommandInfo(mode: .hold, tier: .rules, spokenTarget: "send"))
         for (k, ms) in out.stages { stages["send." + k] = ms }
-        lastTyped = nil
+        talk.lastTyping = nil
         sentThisTurn = out.ok
         return (out.ok, note + " · " + out.note)
     }
@@ -638,7 +628,7 @@ final class CommandPipeline {
             let outcome = await actions.run(intent, context: context, command: command)
             if types { pauseAlwaysOn(false) }
             for (k, v) in outcome.stages { stages["step\(n).action.\(k)"] = v }
-            if intent == .send { lastTyped = nil; sentThisTurn = outcome.ok }
+            if intent == .send { talk.lastTyping = nil; sentThisTurn = outcome.ok }
             if types, outcome.ok { noteTyped(mode: mode, text: Self.typedText(intent)) }
             afterKey(intent, ok: outcome.ok)
             var (ok, note) = (outcome.ok, outcome.note)

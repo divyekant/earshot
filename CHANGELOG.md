@@ -27,6 +27,8 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Changed
 
+- Only the newest question waits for an answer. A new question (a bare "type", a stopped chain, a "not sure" note, or the words of a dropped wake turn) replaces the older one, the same as the note on screen. Before, an older wait could take the next turn (R-FB-1, gap item 13).
+- The README status and `docs/DESIGN.md` (the router in section 3.4, the new talk state in section 3.9, and the phase status in section 5) describe the app as it is now (gap item 13).
 - The activity log keeps no typed text. For a "type …" command, the message of a chat command and hold-key dictation, it keeps the command words and a word count. The note on screen still shows the text. The log keeps 30 days, and the Activity tab reads only the end of the file (R-MD-1, gap item 11).
 - The Activity tab shows the time from the end of speech to the end of the command. Before, it showed the audio length for most turns. The summary line counts only turns with words. It gives the other records (rejected wakes, near misses, turns with no words) as one count (R-SP-1, R-FB-1).
 - In hold mode, the microphone is open only while you hold the key. The macOS microphone indicator is off between commands. The start sound now plays when the microphone is live: speak after it. There is no 450 ms preroll in hold mode. Always-on mode keeps the microphone open (R-ON-4, R-MD-1).
