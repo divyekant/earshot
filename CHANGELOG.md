@@ -9,6 +9,8 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 ### Added
 
 - The PA plugin, phase 1 start: a separate program in `plugins/pa/` with its plugin file, its store and the script `install-pa.sh`. Each command answers "Not built yet" for now. At its first start, the PA asks macOS for access to Reminders and shows the result (R-PA-1, R-PA-2, R-PL-1).
+- The PA plugin can capture and list. Say "remind me ...", "todo ...", "note ...", "keep this" or "new project ...". The PA reads the time with fixed rules and shows it in the note. Say "what is due", "what about <project>" or "where is <words>" for a list, and "done 2", "snooze 2 to tomorrow", "drop that" or "move 2 to <project>" for a change. If the PA is not sure of a time, it saves the words with no time (R-PA-4, R-PA-6).
+- The PA plugin shows an alert at the time of a reminder, one more time after 10 minutes, and a morning list at 09:00. It shows 3 alerts or fewer in one hour, and none in quiet hours (22:00 to 08:00). "quiet for 2 hours" stops the alerts. Each rule has a setting in `settings.json` in the PA data folder: alert, list or off (R-PA-7).
 
 ## [0.4.0] - 2026-11-11
 
