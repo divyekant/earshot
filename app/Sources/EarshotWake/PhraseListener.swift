@@ -22,7 +22,7 @@ final class PhraseListener: WakeListener {
     /// The match of the last push, if the templates found the phrase.
     private var pendingMatch: TemplateMatcher.Match?
     /// The last encoder frames and their scores, for the turn recorder (E7). Memory only.
-    private var ring = FrameRing()
+    private var frameRing = FrameRing()
     /// The trace of the last hit, until `takeTrace`.
     private var pendingTrace: WakeTrace?
 
@@ -71,7 +71,7 @@ final class PhraseListener: WakeListener {
         session.frameSink = { [weak self] frame in
             let match = matcher.push(frame)
             guard let self else { return }
-            self.ring.add(frame, score: matcher.lastScore)
+            self.frameRing.add(frame, score: matcher.lastScore)
             if let match, self.pendingMatch == nil { self.pendingMatch = match }
         }
     }
@@ -113,7 +113,7 @@ final class PhraseListener: WakeListener {
         if matcher != nil {
             guard let match = pendingMatch else { return nil }
             pendingMatch = nil
-            pendingTrace = ring.trace(matchStart: match.startFrame, matchEnd: match.endFrame, limit: matcher?.limit ?? 0)
+            pendingTrace = frameRing.trace(matchStart: match.startFrame, matchEnd: match.endFrame, limit: matcher?.limit ?? 0)
             // The first and the last frame of the match take the place of the time stamps of the word pieces.
             return hit(stamps: [match.startFrame, match.endFrame], matchScore: match.score, matchWorst: match.worst)
         }
@@ -180,7 +180,7 @@ final class PhraseListener: WakeListener {
         total = 0
         matcher?.reset()
         pendingMatch = nil
-        ring.reset()
+        frameRing.reset()
         do { try models.locked { try session.reset() } } catch {
             NSLog("earshot wake: the spotter reset failed: %@", "\(error)")
         }
