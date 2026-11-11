@@ -112,11 +112,13 @@ Experimental, phase 1. The PA (personal assistant) is the first plugin of earsho
 | R-PA-1 | The PA is one local program with one store file. It needs no server software and no account. | Must |
 | R-PA-2 | No PA data leaves the Mac. Exception, chosen by the owner: the titles, times and project names of open to-dos and reminders go to Apple Reminders, which syncs through iCloud. A later exception for research is not in phase 1. | Must |
 | R-PA-3 | The PA changes only its own store, its own pages and its own list in Apple Reminders. It never sends, books, pays, or changes a file of the owner. | Must |
-| R-PA-4 | Rules decide what to do and when. Search finds. No model writes text. The PA shows the owner's words, fixed labels, times and counts. | Must |
+| R-PA-4 | Rules decide what to do and when. Search finds. No model writes text. The PA shows the owner's words, words of the owner's kept documents, fixed labels, times and counts. One embedding model of 0.6B or less can compare text. | Must |
 | R-PA-5 | A to-do that the PA found in a source is a proposal until the owner confirms it. (Not used in phase 1.) | Must |
 | R-PA-6 | If the PA is not sure of a time, it saves the item with no time and says so. The PA never loses a capture. | Must |
 | R-PA-7 | The PA interrupts the owner only by a rule that is set to "alert". By default, only time interrupts. | Must |
-| R-PA-8 | The PA answers a command in 100 ms or less. A PA command does not slow earshot (R-PL-5). | Must |
+| R-PA-8 | The PA answers a capture or a change in 100 ms or less, and a search in 300 ms or less. A PA command does not slow earshot (R-PL-5). | Must |
+| R-PA-9 | The PA keeps the text of a document only if the owner kept the document or its folder. If the owner drops it, the PA deletes its text and its numbers at once. | Must |
+| R-PA-10 | A project that the search set has a mark and shows with "?". The owner can correct it with one command. The PA counts the corrections and shows them. | Must |
 
 ### 3.10 Command line
 
