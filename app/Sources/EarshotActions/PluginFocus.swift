@@ -17,7 +17,8 @@ extension EarshotActionRunner {
                 out.document = PluginContract.documentPath(raw)
             } else if let title = AX.string(window, "AXTitle") {
                 // A file window with no AXDocument (Finder): read the file addresses of its items.
-                out.document = PluginContract.windowFolder(title: title, urls: AX.fileURLs(in: window))
+                // Stop at the first address that gives the folder: the walk costs about 0.5 ms for each element.
+                out.document = AX.fileURLs(in: window) { PluginContract.windowFolder(title: title, urls: $0) }
             }
         }
         if selection, let focused = AX.focused(app), AX.role(focused) != "AXSecureTextField",
@@ -29,9 +30,11 @@ extension EarshotActionRunner {
 }
 
 extension AX {
-    /// The file addresses (AXURL with "file:") of the elements of a window. Web content is skipped. The walk stops
-    /// after `budgetMs` or `maxNodes` elements.
-    static func fileURLs(in window: AXUIElement, budgetMs: Int = 80, maxNodes: Int = 800) -> [String] {
+    /// Walks the elements of a window (breadth first) and reads their file addresses (AXURL with "file:"). Web
+    /// content is skipped. After each new address, `answer` gets all addresses so far, and the first non-nil answer
+    /// ends the walk. The walk also stops after `budgetMs` or `maxNodes` elements.
+    static func fileURLs(in window: AXUIElement, budgetMs: Int = 80, maxNodes: Int = 800,
+                         answer: ([String]) -> String?) -> String? {
         let t0 = Clock.nowNs()
         var queue: [AXUIElement] = [window]
         var index = 0
@@ -42,10 +45,13 @@ extension AX {
             if role(element) == "AXWebArea" { continue }
             if let u = copy(element, "AXURL") {
                 let s = (u as? URL)?.absoluteString ?? text(u)
-                if let s, s.hasPrefix("file:") { out.append(s) }
+                if let s, s.hasPrefix("file:") {
+                    out.append(s)
+                    if let a = answer(out) { return a }
+                }
             }
             queue.append(contentsOf: elements(element, "AXChildren"))
         }
-        return out
+        return answer(out)
     }
 }
