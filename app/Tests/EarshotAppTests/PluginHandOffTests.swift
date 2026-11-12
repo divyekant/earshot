@@ -205,6 +205,62 @@ final class PluginHandOffTests: XCTestCase {
         XCTAssertEqual(host.targets(of: "echo"), [PluginTarget(id: "t1", name: "stamps", kind: "todo")])
     }
 
+    /// The page text plugin: it asks for page text twice after each command, and says what came back.
+    private let asker = """
+    #!/bin/sh
+    while IFS= read -r line; do
+      case "$line" in
+        *'"type":"command"'*)
+          id=$(printf '%s' "$line" | sed -n 's/.*"id":"\\([^"]*\\)".*/\\1/p')
+          printf '{"type":"pageText","re":"%s"}\\n' "$id"
+          printf '{"type":"pageText","re":"%s"}\\n' "$id"
+          ;;
+        *'"error"'*)
+          e=$(printf '%s' "$line" | sed -n 's/.*"error":"\\([^"]*\\)".*/\\1/p')
+          printf '{"type":"answer","kind":"note","text":"error %s"}\\n' "$e"
+          ;;
+        *'"blocks"'*)
+          printf '{"type":"answer","kind":"note","text":"blocks"}\\n'
+          ;;
+      esac
+    done
+    """
+
+    /// docs/PLUGINS.md 5.3: the first ask gets the page, the second ask gets an error. The ask carries the address
+    /// at the time of the command.
+    func testPageTextAsk() throws {
+        let host = try install("asker", run: ["./plugin.sh"], script: asker, context: ["pageText"])
+        defer { host.stopAll() }
+        var asked: [PageTextAsks.Command] = []
+        host.onPageTextAsk = { command, manifest, reply in
+            XCTAssertEqual(manifest.id, "asker")
+            asked.append(command)
+            reply(PageText.lines(re: command.id, url: command.url, title: "Fox", blocks: [PageBlock(t: "The fox")], complete: true))
+        }
+        let answered = expectation(description: "answers")
+        answered.expectedFulfillmentCount = 2
+        var got: [String] = []
+        host.onAnswer = { message, _ in got.append(message.shownText ?? ""); answered.fulfill() }
+        XCTAssertNil(host.handOff(pluginID: "asker", lead: "note", text: "x", available: ["url": "https://fox.example"]))
+        wait(for: [answered], timeout: 5)
+        XCTAssertEqual(Set(got), ["blocks", "error one ask for each command"])
+        XCTAssertEqual(asked.map(\.url), ["https://fox.example"])
+    }
+
+    /// A plugin whose manifest does not name "pageText" gets no page text and no answer to its ask.
+    func testPageTextAskNeedsTheKey() throws {
+        let host = try install("asker", run: ["./plugin.sh"], script: asker, context: ["app"])
+        defer { host.stopAll() }
+        var asked = false
+        host.onPageTextAsk = { _, _, _ in asked = true }
+        var answers = 0
+        host.onAnswer = { _, _ in answers += 1 }
+        XCTAssertNil(host.handOff(pluginID: "asker", lead: "note", text: "x", available: ["url": "https://fox.example"]))
+        RunLoop.current.run(until: Date().addingTimeInterval(1))
+        XCTAssertFalse(asked)
+        XCTAssertEqual(answers, 0)
+    }
+
     func testNotApprovedDoesNotStart() throws {
         let host = try install("echo", run: ["./plugin.sh"], script: echo, approve: false)
         XCTAssertTrue(host.leads.isEmpty)

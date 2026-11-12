@@ -1,4 +1,5 @@
 import AppKit
+import EarshotActions
 import EarshotCore
 import Foundation
 import UserNotifications
@@ -15,6 +16,7 @@ extension AppController {
     func startPlugins() {
         plugins.reload()
         pipeline.plugins = plugins
+        connectPageText()
         let feedback = self.feedback
         plugins.onAnswer = { [weak self] message, manifest in
             // An answer is text to show. earshot never runs it as a command (R-PL-3).
@@ -33,6 +35,34 @@ extension AppController {
                     // The note goes after some seconds. An alert also goes to the Notification Center, so that the
                     // owner sees it after time away from the Mac.
                     if alert { Self.notify(title: manifest.name, body: text) }
+                }
+            }
+        }
+    }
+
+    /// Page reads run here, one at a time, off the main thread: a read does not slow a command (R-PL-5).
+    nonisolated static let pageReads = DispatchQueue(label: "earshot.plugin.page-text", qos: .utility)
+
+    /// Connects the asks for page text (docs/PLUGINS.md 5.3). Each read shows the note "→ <plugin> · reads this page",
+    /// also with the notes off: the owner always sees that a plugin gets the text of the page.
+    /// The page text goes only to the plugin. It never goes to the activity log or to Jev.
+    func connectPageText() {
+        let feedback = self.feedback
+        plugins.onPageTextAsk = { [weak self] command, manifest, reply in
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    self?.control?.collect("→ \(manifest.name) · reads this page")
+                    feedback.show("→ \(manifest.name) · reads this page", ok: true, seconds: 2)
+                }
+            }
+            let re = command.id
+            Self.pageReads.async {
+                let result = PageTextReader.read(expectURL: command.url)
+                if let error = result.error {
+                    reply([PageText.errorLine(re: re, error)])
+                } else {
+                    reply(PageText.lines(re: re, url: result.url, title: result.title, blocks: result.blocks,
+                                         complete: result.complete))
                 }
             }
         }

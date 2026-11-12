@@ -6,6 +6,10 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+### Added
+
+- A plugin can ask for the text of the web page in front after a command (context key `pageText`). earshot shows "→ <plugin> · reads this page" for each read. It sends no text on a sign-in, code or payment page, and never the value of a one-line field (R-PL-2, R-PL-5).
+
 ## [0.5.0] - 2026-11-12
 
 This release adds the PA plugin, phases 1 to 3. The PA captures reminders, to-dos and notes by voice, shows alerts, copies open items to the Reminders list "earshot", and writes local pages. It keeps files and folders and finds their text with "where is". It reads Notes, Mail and Calendar while those apps run, and never changes them. It reads and searches the text on this Mac. earshot also gets a command line and two plugin context keys.
