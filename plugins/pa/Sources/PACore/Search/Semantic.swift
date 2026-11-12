@@ -109,8 +109,17 @@ extension Engine {
         guard let models else { return }
         if models.unloadIfIdle(now: Date(), after: Engine.modelIdleUnload) {
             vectorCache = nil
+            Engine.returnFreeMemory()
             log.write(clock.now, "model-unloaded")
         }
+    }
+
+    /// Gives the free pages of the heap back to macOS. After a search, the heap keeps the pages of the freed numbers,
+    /// and the memory figure of the PA counts them (24.9 MB on the Mac, with 5.3 MB in use; E12).
+    static func returnFreeMemory() {
+        #if canImport(Darwin)
+        malloc_zone_pressure_relief(nil, 0)
+        #endif
     }
 
     /// The numbers in memory, read from index.sqlite at the first search with a loaded model.
