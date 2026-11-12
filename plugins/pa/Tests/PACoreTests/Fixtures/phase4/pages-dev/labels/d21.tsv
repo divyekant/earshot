@@ -1,0 +1,14 @@
+main	Pebblecal 3.8
+neutral	Released 19 June
+main	New
+main	Travel time: an event with a place can show the time to get there, by car or by public transport. Turn it on in Settings, Events.
+main	Week numbers in the month view.
+main	Import of .ics files with more than 10,000 events.
+main	Changed
+main	The default reminder for all-day events is now 9:00 on the day, not midnight.
+main	Pebblecal needs macOS 13 or later.
+main	Fixed
+main	A repeating event moved by one hour after a change of daylight saving time.
+main	Search did not find events with an accent in the title.
+main	The app used too much memory with many shared calendars.
+main	Before you upgrade, export a backup in File, Export. Version 3.8 changes the database, and an older version cannot open it.

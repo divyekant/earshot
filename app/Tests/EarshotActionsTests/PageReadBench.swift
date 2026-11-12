@@ -50,6 +50,7 @@ final class PageReadBench: XCTestCase {
             if probes.contains(6) { try await probe6(browser, dir) }
         }
         if probes.contains(6), let electron = env["EARSHOT_PAGE_ELECTRON"] { probe6Electron(electron) }
+        if probes.contains(7) { try await probe2Fresh(dir) }
         if let out = env["EARSHOT_PAGE_OUT"] {
             let lines = rows.compactMap { row -> String? in
                 guard let d = try? JSONSerialization.data(withJSONObject: row, options: [.sortedKeys]) else { return nil }
@@ -152,6 +153,59 @@ final class PageReadBench: XCTestCase {
         }
         log("P2", row)
         await close(tab)
+    }
+
+    /// P2 with a browser that starts just before the read: a second Chrome process with an empty profile in a
+    /// temporary folder. It never quits the owner's browser. It ends only the process that it started.
+    /// Probe 7, not in the default list: `EARSHOT_PAGE_PROBES=7`.
+    func probe2Fresh(_ dir: URL) async throws {
+        let chrome = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+        guard FileManager.default.isExecutableFile(atPath: chrome) else { log("P2fresh", ["error": "no Chrome"]); return }
+        let profile = FileManager.default.temporaryDirectory.appendingPathComponent("earshot-probe-chrome-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: profile, withIntermediateDirectories: true)
+        let page = dir.appendingPathComponent("news.html")
+        let labels = Self.labels(dir.appendingPathComponent("news.labels.tsv"))
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: chrome)
+        proc.arguments = ["--user-data-dir=\(profile.path)", "--no-first-run", "--no-default-browser-check", page.absoluteString]
+        let t0 = Clock.nowNs()
+        try proc.run()
+        defer {
+            proc.terminate()
+            try? FileManager.default.removeItem(at: profile)
+        }
+        let app = AX.appElement(proc.processIdentifier)
+        var area: AXUIElement?
+        var window: AXUIElement?
+        while Clock.ms(since: t0) < 15_000 {
+            for w in AX.elements(app, "AXWindows") where (AX.string(w, "AXTitle") ?? "").contains("Probe news") {
+                window = w
+                area = ScreenReader.findWebArea(in: w)?.0
+            }
+            if area != nil { break }
+            await sleepMs(50)
+        }
+        guard let area, window != nil else { log("P2fresh", ["error": "no web area within 15 s"]); return }
+        var row: [String: Any] = ["areaAfterMs": Clock.ms(since: t0)]
+        let url = ScreenReader.address(area)
+        // The first read at once, then a read every 500 ms until the words stay the same (3 s at most), then after 5 s.
+        let first = PageProbeReader.readA(area: area, url: url)
+        row["firstA"] = Self.found(first.text, labels.main)
+        row["firstWords"] = Self.words(first.text).values.reduce(0, +)
+        var retry = first
+        var waited = 0
+        while waited < 3000 {
+            await sleepMs(500); waited += 500
+            let again = PageProbeReader.readA(area: area, url: url)
+            let same = again.text == retry.text
+            retry = again
+            if same { break }
+        }
+        row["retryA"] = Self.found(retry.text, labels.main)
+        row["retryWaitMs"] = waited
+        await sleepMs(5000)
+        row["after5sA"] = Self.found(PageProbeReader.readA(area: area, url: url).text, labels.main)
+        log("P2fresh", row)
     }
 
     // MARK: - P3 No change
