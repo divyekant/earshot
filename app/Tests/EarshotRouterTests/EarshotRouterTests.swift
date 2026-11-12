@@ -891,23 +891,27 @@ final class EarshotRouterTests: XCTestCase {
         for options in fake.calls { XCTAssertFalse(options.contains { $0.contains("\"hide\"") }, "\(options)") }
     }
 
-    /// A page that a plugin wrote, or a sign-in page: tier 2 gets no label of the page (R-MD-1). Made-up paths.
+    /// A page that a plugin wrote, or a sign-in page: tier 2 gets no label of the page (R-MD-1). Made-up pages.
     func testTier2GetsNoLabelOfAPrivatePage() async {
+        // Two links with the same label and different addresses: the rules are not sure, so tier 2 is asked.
+        var page = ScreenSnapshot(bundleID: "com.apple.Safari", windowTitle: "Today", url: "https://notes.example/today", elements: [
+            Fixtures.el("p1", "AXLink", "Budget plan", y: 10, url: "https://notes.example/a"),
+            Fixtures.el("p2", "AXLink", "Budget plan", y: 40, url: "https://notes.example/b"),
+        ])
         func labels(_ screen: ScreenSnapshot) async -> [String] {
             let fake = FakeChooser { _ in nil }
-            _ = await route("click 383 comments", RouteContext(apps: Fixtures.apps, names: Fixtures.names, screen: screen),
+            _ = await route("click budget plan", RouteContext(apps: Fixtures.apps, names: Fixtures.names, screen: screen),
                             router: CommandRouter(tier2: fake))
             return fake.calls.flatMap { $0 }
         }
-        let open = await labels(Fixtures.news)
-        XCTAssertTrue(open.contains { $0.hasPrefix("Click the") }, "\(open)")
-        var page = Fixtures.news
+        let open = await labels(page)
+        XCTAssertTrue(open.contains { $0.contains("Budget plan") }, "\(open)")
         page.url = "file:///Users/me/Library/Application%20Support/earshot/plugin-data/pa/today.html"
         let plugin = await labels(page)
-        XCTAssertFalse(plugin.contains { $0.hasPrefix("Click the") }, "\(plugin)")
-        page.url = "https://news.example/login"
+        XCTAssertFalse(plugin.contains { $0.contains("Budget plan") }, "\(plugin)")
+        page.url = "https://notes.example/login"
         let signIn = await labels(page)
-        XCTAssertFalse(signIn.contains { $0.hasPrefix("Click the") }, "\(signIn)")
+        XCTAssertFalse(signIn.contains { $0.contains("Budget plan") }, "\(signIn)")
     }
 
     // MARK: - Jev client
