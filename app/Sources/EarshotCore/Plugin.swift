@@ -14,11 +14,13 @@ public enum PluginContract {
     /// The owner's approvals: plugin id to the SHA-256 of the approved manifest.
     public static let approvalsFile = "plugins-approved.json"
     /// The context keys that a manifest can ask for. Nothing else goes to a plugin.
-    public static let contextKeys: Set<String> = ["app", "windowTitle", "url", "document", "selection"]
+    public static let contextKeys: Set<String> = ["app", "windowTitle", "url", "document", "selection", "pageText"]
     /// The context keys that need an extra read of the front window. earshot reads them only for a plugin that names them.
     public static let focusKeys: Set<String> = ["document", "selection"]
     /// The longest selected text that a plugin gets, in characters.
     public static let maxSelectionCharacters = 2000
+    /// The context keys that give the plugin text that the owner can see. The Plugins tab shows them in orange.
+    public static let textKeys: Set<String> = ["selection", "pageText"]
 
     /// What each context key gives the plugin, in words for the Plugins tab.
     public static func contextText(_ key: String) -> String {
@@ -28,6 +30,7 @@ public enum PluginContract {
         case "url": return "the address of the page in the front window"
         case "document": return "the file path of the document in the front window"
         case "selection": return "the text that you selected (the plugin gets the text and can keep it)"
+        case "pageText": return "the text of the web page in front, when the plugin asks after your command (the plugin can keep it)"
         default: return key
         }
     }

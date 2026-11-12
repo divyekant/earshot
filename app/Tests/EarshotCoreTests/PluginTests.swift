@@ -38,7 +38,7 @@ final class PluginTests: XCTestCase {
 
     /// The keys "document" and "selection" (docs/PLUGINS.md 5.1).
     func testDocumentAndSelectionKeys() {
-        let m = PluginManifest(id: "pa", name: "PA", leads: ["note"], context: ["app", "document", "selection"], run: ["./pa"])
+        let m = PluginManifest(id: "pa", name: "PA", leads: ["note"], context: ["app", "document", "selection", "pageText"], run: ["./pa"])
         XCTAssertTrue(m.problems.isEmpty, "\(m.problems)")
         XCTAssertEqual(PluginContract.documentPath("file:///Users/me/My%20Lease.pdf"), "/Users/me/My Lease.pdf")
         XCTAssertEqual(PluginContract.documentPath("/Users/me/notes.txt"), "/Users/me/notes.txt")

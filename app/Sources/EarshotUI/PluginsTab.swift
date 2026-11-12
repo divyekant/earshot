@@ -53,7 +53,7 @@ struct PluginsTab: View {
                  + " (the plugin says so; earshot does not check it)").foregroundStyle(.secondary)
             if !p.manifest.context.isEmpty {
                 Text("Gets: the words after the lead, and " + p.manifest.context.map(PluginContract.contextText).joined(separator: ", "))
-                    .foregroundStyle(p.manifest.context.contains("selection") ? .orange : .secondary)
+                    .foregroundStyle(p.manifest.context.contains(where: PluginContract.textKeys.contains) ? .orange : .secondary)
             }
             ForEach(p.problems, id: \.self) { Text("Problem: \($0)").foregroundStyle(.red) }
         }
