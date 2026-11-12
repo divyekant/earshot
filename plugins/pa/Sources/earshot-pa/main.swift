@@ -96,7 +96,7 @@ if let i = args.firstIndex(of: "--embed-worker"), i + 1 < args.count {
 }
 
 // The bench of the phase 2 follow-up (R1, R2): earshot-pa --followup-bench <fixtures folder> --embedder <name>
-// [--model <file.gguf>] [--gpu] [--explain | --final <variant> [--needs n,k]] [--bakeoff <folder>] [--verbose] [--weights a,d,r,s,f,t,tmax,w,n,b].
+// [--model <file.gguf>] [--gpu] [--by-name] [--explain | --names | --final <variant> [--needs n,k]] [--bakeoff <folder>] [--verbose] [--weights a,d,r,s,f,t,tmax,w,n,b].
 if let i = args.firstIndex(of: "--followup-bench"), i + 1 < args.count {
     func value(_ flag: String) -> String? {
         args.firstIndex(of: flag).flatMap { $0 + 1 < args.count ? args[$0 + 1] : nil }
@@ -107,6 +107,7 @@ if let i = args.firstIndex(of: "--followup-bench"), i + 1 < args.count {
                                             gpu: args.contains("--gpu"))
             let bench = try FollowUpBench(folder: URL(fileURLWithPath: args[i + 1], isDirectory: true), embedder: embedder)
             bench.verbose = args.contains("--verbose")
+            bench.byName = args.contains("--by-name")
             if let n = value("--needs")?.split(separator: ",").compactMap({ Int($0) }), n.count == 2 { bench.needs = (n[0], n[1]) }
             bench.bakeoff = value("--bakeoff").map { URL(fileURLWithPath: $0, isDirectory: true) }
             if let w = value("--weights")?.split(separator: ",").compactMap({ Float($0) }), w.count == 10 {
@@ -117,6 +118,8 @@ if let i = args.firstIndex(of: "--followup-bench"), i + 1 < args.count {
             }
             if args.contains("--explain") {
                 try bench.explain()
+            } else if args.contains("--names") {
+                try bench.names()
             } else if let v = value("--final") {
                 guard let variant = ProjectRuleV2.Variant.allCases.first(where: { "\($0)" == v }) else {
                     print("Unknown variant \(v). Use one of: \(ProjectRuleV2.Variant.allCases.map { "\($0)" })")

@@ -23,6 +23,9 @@ public struct ProjectRuleV2: Equatable, Sendable {
     public var high: Float?
     /// A project needs this many owner records before the rule can propose it.
     public var minRecords = 3
+    /// The name line: propose the project whose name is in the capture. Off by default: it matches words, not
+    /// meaning (10 of 10 wrong for a name in another sense, capture-names.tsv).
+    public var byName = false
 
     public init(high: Float? = nil) { self.high = high }
 
@@ -91,7 +94,7 @@ public struct ProjectRuleV2: Equatable, Sendable {
         case .neighborsAndKeywords:
             return s.neighbors != nil && s.neighbors == s.keywords ? s.neighbors : nil
         case .fullNoH, .fullWithH:
-            if let n = s.name { return n }
+            if byName, let n = s.name { return n }
             if let n = s.neighbors, n == s.keywords { return n }
             if variant == .fullWithH, let h = high, let n = s.neighbors, s.neighborsCount == 5, s.nearest > h { return n }
             return nil
@@ -132,13 +135,20 @@ public struct ProjectRuleV2: Equatable, Sendable {
     /// The proposal for one capture, with the score of the nearest record of that project.
     /// Only the projects with `minRecords` or more records count. Runs off the engine queue: it makes a keyword
     /// index in memory for each call.
-    public func propose(title: String, vector: [Float], records all: [Record], projects all2: [(id: String, name: String)],
+    public func propose(title: String, vector: [Float], records: [Record], projects: [(id: String, name: String)],
                         floor: Float) -> (project: String, score: Float)? {
+        let e = evaluate(title: title, vector: vector, records: records, projects: projects, floor: floor)
+        return e.proposal.map { ($0, e.score) }
+    }
+
+    /// The signals and the proposal for one capture. `records` is the count of the records of each project.
+    public func evaluate(title: String, vector: [Float], records all: [Record], projects all2: [(id: String, name: String)],
+                         floor: Float) -> (signals: Signals, proposal: String?, score: Float, records: [String: Int]) {
         var count: [String: Int] = [:]
         for r in all { count[r.project, default: 0] += 1 }
         let records = all.filter { (count[$0.project] ?? 0) >= minRecords }
         let projects = all2.filter { (count[$0.id] ?? 0) >= minRecords }
-        guard !records.isEmpty, !projects.isEmpty else { return nil }
+        guard !records.isEmpty, !projects.isEmpty else { return (Signals(), nil, 0, count) }
         let scores = records.map { Vectors.dot($0.vector, vector) }
         let order = records.indices.sorted { scores[$0] > scores[$1] }.prefix(5)
         var hits: [String] = []
@@ -150,8 +160,8 @@ public struct ProjectRuleV2: Equatable, Sendable {
         }
         let s = signals(words: title, projects: projects, nearest: order.map { (records[$0].project, scores[$0]) },
                         floor: floor, keywordHits: hits)
-        guard let p = propose(s) else { return nil }
+        guard let p = propose(s) else { return (s, nil, 0, count) }
         let best = records.indices.filter { records[$0].project == p }.map { scores[$0] }.max() ?? 0
-        return (p, best)
+        return (s, p, best, count)
     }
 }

@@ -91,8 +91,10 @@ extension Engine {
         let records = ownerRecords(model: model)
         let projects = store.projects().map { (id: String($0.id), name: $0.name) }
         let title = it.title.isEmpty ? it.said : it.title
+        var rule = ProjectRuleV2()
+        rule.byName = settings.proposeByName
         background { [weak self] in
-            let found = ProjectRuleV2().propose(title: title, vector: v, records: records, projects: projects,
+            let found = rule.propose(title: title, vector: v, records: records, projects: projects,
                                                 floor: rules.searchFloor)
             self?.runLater(0) { [weak self] in
                 self?.finishNote(itemID, v, proposal: found, duplicates: duplicates, rules: rules, model: model)
