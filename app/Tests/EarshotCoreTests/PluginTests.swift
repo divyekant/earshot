@@ -142,6 +142,7 @@ final class PluginTests: XCTestCase {
         XCTAssertNotNil(PluginTargetOpen.url(page).url)
         XCTAssertNotNil(PluginTargetOpen.url(try file("lease.PDF")).url)
         XCTAssertNotNil(PluginTargetOpen.url("https://example.com/today").url)
+        XCTAssertNotNil(PluginTargetOpen.url("message://%3Cabc123@mail.example.com%3E").url, "one mail in Mail")
         XCTAssertNotNil(PluginTargetOpen.url(folder.path).url, "a plain folder opens in Finder")
 
         for name in ["run.sh", "run.command", "tool", "setup.pkg", "x.scpt", "x.webloc", "x.terminal"] {
@@ -156,7 +157,7 @@ final class PluginTests: XCTestCase {
         try fm.createSymbolicLink(atPath: link.path, withDestinationPath: try file("evil.sh"))
         XCTAssertNil(PluginTargetOpen.url(link.path).url)
 
-        for bad in ["", "today.html", "file:///etc/hosts", "ftp://example.com/x", "javascript:alert(1)",
+        for bad in ["", "today.html", "file:///etc/hosts", "ftp://example.com/x", "javascript:alert(1)", "message:", "message://",
                     "x-apple.systempreferences:com.apple.preference.security", folder.appendingPathComponent("gone.html").path] {
             XCTAssertNil(PluginTargetOpen.url(bad).url, bad)
             XCTAssertNotNil(PluginTargetOpen.url(bad).why, bad)

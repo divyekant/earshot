@@ -162,7 +162,7 @@ The context keys:
 {"type":"targets","targets":[{"id":"t1","name":"the lease","kind":"document","open":"/Users/me/Documents/lease.pdf"}]}
 ```
 
-Each `targets` message replaces the list from before. `open` is an absolute file path or an http or https address. A target with no `open` value is kept, but "open" does not use it.
+Each `targets` message replaces the list from before. `open` is an absolute file path, an http or https address, or a `message://` address of one mail. A target with no `open` value is kept, but "open" does not use it.
 
 #### 5.2.1 "open <target>"
 
@@ -172,7 +172,7 @@ The core verb "open" opens a target, for example "open today" or "open the lease
 - An app name wins. If a plugin has a target "Notes", "open Notes" opens the app Notes.
 - A target comes before the names of chats and the labels on the screen.
 - If two plugins have a target with the same name, the plugin with the first id gets it.
-- earshot opens a web address in the browser, a document in its app, and a folder in Finder.
+- earshot opens a web address in the browser, a `message://` address in Mail (it shows one mail and sends nothing), a document in its app, and a folder in Finder.
 - The document types are `html`, `htm`, `pdf`, `txt`, `md`, `markdown`, `rtf`, `csv`, `png`, `jpg`, `jpeg`, `gif`, `heic` and `webp`.
 - earshot never opens a program, a script, an installer or a package (a folder with a type, such as an app). It refuses other address types, such as `file:` and `ftp:`. It follows a link to its file before it checks the type.
 

@@ -8,6 +8,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Added
 
+- "open <target>" also opens a plugin target with a `message://` address: Mail shows that one mail. It sends nothing (R-PL-3).
 - PA: the search model runs in a separate worker process. When the worker stops, its memory goes back to the Mac. If the worker fails, the PA still answers each command (R-PA-8).
 - PA: project proposals are on by default. A new rule proposes a project only if the nearest records and the keyword results agree. The setting `proposeByName` (off by default) also proposes a project whose name is in the capture. "main points" gives points to sentences with an amount, a date, a request or a result (R-PA-4).
 - PA: `pa.log` has the line `index-done texts=N ms=M` at the end of each run of index jobs, so that a speed test can see when the background index ends (R-PA-8).
