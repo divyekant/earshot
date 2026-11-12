@@ -42,10 +42,17 @@ public struct CommandRouter: Router {
         if let heardFixes, let fixed = Self.fixHeard(text, d, fixes: heardFixes, context: context) { d = fixed }
         let alternatives = { (chosen: Intent) in Array(d.options.map(\.intent).filter { $0 != chosen }.prefix(3)) }
 
-        if !d.sure, let tier2, !d.options.isEmpty {
-            let labels = d.options.map(\.label)
-            if let i = await Self.ask(tier2, text, labels, budgetMs: tier2BudgetMs), i >= 0, i < d.options.count {
-                let intent = d.options[i].intent
+        if !d.sure, let tier2 {
+            // No label of a sign-in, code or payment page, or of a page that a plugin wrote, goes to Jev (R-MD-1).
+            // Such a page keeps app and chat names only.
+            var options = d.options
+            if let why = SafetyPolicy.noCloud(context.screen) {
+                options = options.filter { !Self.onScreen($0.intent) }
+                if options.count < d.options.count { d.why += " · no screen labels to tier 2: \(why)" }
+            }
+            if !options.isEmpty, let i = await Self.ask(tier2, text, options.map(\.label), budgetMs: tier2BudgetMs),
+               i >= 0, i < options.count {
+                let intent = options[i].intent
                 return RouteResult(intent: intent, confidence: Self.tier2Confidence, tier: .jev, ms: ms(),
                                    why: "tier 2: \(d.why)", alternatives: alternatives(intent),
                                    sendAfter: d.sendAfter && Self.hasText(intent))
@@ -461,6 +468,14 @@ public struct CommandRouter: Router {
     }
 
     /// Runs tier 2, and stops waiting after `budgetMs`. The router does not trust the chooser to keep its budget.
+    /// True for an intent that names an element of the screen. Its label comes from the page.
+    static func onScreen(_ intent: Intent) -> Bool {
+        switch intent {
+        case .click, .typeInto: return true
+        default: return false
+        }
+    }
+
     static func ask(_ chooser: Tier2Chooser, _ text: String, _ options: [String], budgetMs: Int) async -> Int? {
         let box = ChooserBox(chooser)
         return await withBudget(budgetMs) { await box.chooser.choose(text, options: options, budgetMs: budgetMs) }

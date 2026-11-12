@@ -97,6 +97,7 @@ earshot starts the program with posix_spawn. The program reads JSON lines from s
   - Test on the Mac, 2026-11-11, PA plugin at commit e8e87cf: earshot started the PA (`EarshotPA.app/Contents/MacOS/earshot-pa`) as a plugin. The PA asked for full access to Reminders. macOS gave the access to the PA 3 s after its start. The program has an `Info.plist` in its app bundle and in the linker section `__TEXT,__info_plist`, and a stable code signature. Use the same layout for a plugin that needs a permission.
 - The program gets only these environment variables: `EARSHOT_PLUGIN_DATA` (a data folder for the plugin), `EARSHOT_CONTRACT` (`1`), `PATH`, `HOME`, `LANG` and `TMPDIR`.
 - The data folder is `~/Library/Application Support/earshot/plugin-data/<id>/`. An update of the plugin does not change this folder.
+- A page in this folder is a plugin page. If a plugin page is in the front window, no label of the page goes to Jev (tier 2), and "Jev sees the screen" takes no picture (R-MD-1, D-10).
 - stderr goes to `/dev/null`.
 - earshot starts each approved plugin when earshot starts. The plugin runs while earshot runs.
 - If the plugin stops, earshot starts it again after 2 s. After 3 starts in 60 s, the plugin stays off until the next change in the Plugins tab, or the next start of earshot.

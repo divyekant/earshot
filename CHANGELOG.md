@@ -14,6 +14,10 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - PA: the Today page counts the web pages kept with text and the web pages kept as a link only, for the last 7 days (R-PA-9).
 - PA: "drop" for a kept web page deletes its text, its search numbers and its text copy at once (R-PA-9, R-PA-13).
 
+### Changed
+
+- If a page that a plugin wrote, or a sign-in, code or payment page, is in front, no label of the page goes to Jev, and "Jev sees the screen" takes no picture (R-MD-1, D-10).
+
 ## [0.5.0] - 2026-11-12
 
 This release adds the PA plugin, phases 1 to 3. The PA captures reminders, to-dos and notes by voice, shows alerts, copies open items to the Reminders list "earshot", and writes local pages. It keeps files and folders and finds their text with "where is". It reads Notes, Mail and Calendar while those apps run, and never changes them. It reads and searches the text on this Mac. earshot also gets a command line and two plugin context keys.

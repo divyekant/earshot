@@ -108,6 +108,24 @@ public enum SafetyPolicy {
         return nil
     }
 
+    /// The part of a file path that marks the data folder of the plugins (<store>/plugin-data/, docs/PLUGINS.md 5).
+    public static let pluginDataPath = "/earshot/plugin-data/"
+
+    /// True for a page that a plugin wrote: a file in the plugin data folder. Such a page holds the owner's private
+    /// data, for example the to-dos or the mail flags of the PA.
+    public static func pluginPage(url: String?) -> Bool {
+        guard let url, let u = URL(string: url), u.isFileURL else { return false }
+        return u.standardizedFileURL.path.contains(pluginDataPath)
+    }
+
+    /// The reason, if no part of the page may go to Jev: no labels for tier 2 and no picture (R-MD-1, D-10).
+    /// A sign-in, code or payment page, or a page that a plugin wrote.
+    public static func noCloud(_ screen: ScreenSnapshot?) -> String? {
+        guard let screen else { return nil }
+        if pluginPage(url: screen.url) { return "a plugin page" }
+        return sensitive(url: screen.url, elements: screen.elements)
+    }
+
     /// True if the address is on the host or one of its subdomains. "www." does not count.
     public static func onHost(_ url: String, _ host: String) -> Bool {
         let want = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
