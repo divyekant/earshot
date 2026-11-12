@@ -232,6 +232,7 @@ The rules of the read:
 - earshot sends no text on a sign-in, code or payment page.
 - The page in front must be the page of the command. earshot compares the page address at the time of the command, before the read and after the read. It also compares the front app and the front window before and after the read. If one is different, the reason is "the page changed".
 - If earshot had no page address at the time of the command, it sends no text.
+- A page that is still loading gives few words. If a read gives fewer than 50 words, earshot reads again after 1 s, for 3 s at most. It sends the last read.
 - A second ask for the same command, an ask after 10 s, and an ask with an unknown id get an error line.
 - A plugin whose manifest does not name `pageText` gets no answer to its ask.
 - The page text goes only to the plugin. It never goes to the activity log or to Jev.

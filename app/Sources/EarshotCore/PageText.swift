@@ -61,6 +61,30 @@ public enum PageText {
     /// The longest text of one block in a line. A longer block becomes more blocks of the same kind.
     static let maxBlockCharacters = 8_000
 
+    /// A page that is still loading gives few words. If a read gives fewer words than this, earshot reads again
+    /// after `settleStepSeconds`, until `settleSeconds` after the first read.
+    public static let settleWords = 50
+    public static let settleStepSeconds: Double = 1
+    public static let settleSeconds: Double = 3
+
+    /// The number of words in the blocks.
+    public static func words(_ blocks: [PageBlock]) -> Int {
+        blocks.reduce(0) { $0 + $1.t.split(whereSeparator: { $0.isWhitespace }).count }
+    }
+
+    /// Reads until the page has `settleWords` words, an error comes, or the time is over. `read` gives the blocks,
+    /// or nil for an error. Gives the last read.
+    public static func settled<R>(read: () -> R, blocks: (R) -> [PageBlock]?, wait: (Double) -> Void = { Thread.sleep(forTimeInterval: $0) }) -> R {
+        var result = read()
+        var waited: Double = 0
+        while let b = blocks(result), words(b) < settleWords, waited + settleStepSeconds <= settleSeconds {
+            wait(settleStepSeconds)
+            waited += settleStepSeconds
+            result = read()
+        }
+        return result
+    }
+
     /// The JSON lines of a read: one or more parts, in order, each under `maxLineBytes`, with a newline at the end.
     public static func lines(re: String, url: String?, title: String?, blocks: [PageBlock], complete: Bool) -> [Data] {
         let encoder = JSONEncoder()

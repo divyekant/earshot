@@ -98,4 +98,29 @@ final class PageTextTests: XCTestCase {
         asks.sent(id: "new", pluginID: "pa", url: nil, at: t0.addingTimeInterval(PageText.askSeconds * 7))
         XCTAssertEqual(asks.ask(re: "old", pluginID: "pa", at: t0), .failure(.init("no command with this id")))
     }
+
+    /// A page that is still loading: earshot reads again after 1 s, for 3 s at most (W1 follow-up).
+    func testSettle() {
+        let few = [PageBlock(t: "Loading")]
+        let many = [PageBlock(t: String(repeating: "word ", count: PageText.settleWords))]
+        var reads = 0, waits: [Double] = []
+        var got = PageText.settled(read: { () -> [PageBlock] in reads += 1; return reads < 3 ? few : many },
+                                   blocks: { $0 }, wait: { waits.append($0) })
+        XCTAssertEqual(got, many)
+        XCTAssertEqual(reads, 3)
+        XCTAssertEqual(waits, [1, 1])
+        // Never enough words: 4 reads in 3 s, then the last read.
+        reads = 0; waits = []
+        got = PageText.settled(read: { reads += 1; return few }, blocks: { $0 }, wait: { waits.append($0) })
+        XCTAssertEqual(got, few)
+        XCTAssertEqual(reads, 4)
+        XCTAssertEqual(waits.reduce(0, +), PageText.settleSeconds)
+        // An error or a full page: one read only.
+        reads = 0
+        _ = PageText.settled(read: { reads += 1; return few }, blocks: { _ in nil }, wait: { _ in XCTFail("waited") })
+        XCTAssertEqual(reads, 1)
+        reads = 0
+        _ = PageText.settled(read: { reads += 1; return many }, blocks: { $0 }, wait: { _ in XCTFail("waited") })
+        XCTAssertEqual(reads, 1)
+    }
 }
