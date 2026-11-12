@@ -224,6 +224,7 @@ extension Engine {
         d.textWords = sel.words
         try? store.updateDoc(d, event: "page-read", at: now)
         writeKeptCopy(d, sel.blocks)
+        writeKeptText(d.id, sel.blocks)
         log.write(now, "page-read", ["doc": String(id), "state": d.textState.rawValue, "passages": String(d.passages),
                                      "words": String(sel.words)])
         docsChanged()
@@ -334,8 +335,19 @@ extension Engine {
         write(page(title: "Kept pages", sub: "\(docs.count) page\(docs.count == 1 ? "" : "s")", body: body), "kept.html")
     }
 
-    /// Removes the text copy of a page.
+    /// The main text of a kept page for "main points": one block on each line. It is in the data folder of the PA,
+    /// not in the pages.
+    var keptTextFolder: URL { folder.appendingPathComponent("kept-text", isDirectory: true) }
+    func keptTextURL(_ docID: Int64) -> URL { keptTextFolder.appendingPathComponent("\(docID).txt") }
+
+    func writeKeptText(_ docID: Int64, _ blocks: [PageBlock]) {
+        try? FileManager.default.createDirectory(at: keptTextFolder, withIntermediateDirectories: true)
+        try? Data(blocks.map(\.text).joined(separator: "\n").utf8).write(to: keptTextURL(docID), options: .atomic)
+    }
+
+    /// Removes the text copy and the main text of a page.
     func removeKeptCopy(_ docID: Int64) {
         try? FileManager.default.removeItem(at: keptCopyURL(docID))
+        try? FileManager.default.removeItem(at: keptTextURL(docID))
     }
 }

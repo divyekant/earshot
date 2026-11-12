@@ -32,7 +32,10 @@ extension Engine {
             doc = d
         } else if words.isEmpty || ["this", "that", "it", "this document", "this file"].contains(words.lowercased()) {
             // "main points of this": the document in front. If it is not kept, keep it first.
-            guard let f = fileDoc(context, projectID: nil) else { return .note(id, "No document here. Nothing to show.") }
+            guard let f = fileDoc(context, projectID: nil) else {
+                // Phase 4: a web page in front.
+                return mainPointsOfPage(id: id, context: context) ?? .note(id, "No document here. Nothing to show.")
+            }
             if let d = f.path.flatMap(store.doc(path:)), d.droppedAt == nil {
                 doc = d
             } else {
@@ -55,6 +58,7 @@ extension Engine {
     }
 
     func mainPoints(id: String, doc: Doc) -> Outgoing {
+        if doc.kind == .page { return mainPointsOfKeptPage(id: id, doc: doc) }
         guard let path = doc.path, doc.kind == .file, let reader = textReader else {
             return .note(id, "No text for \(doc.title). Nothing to show.")
         }

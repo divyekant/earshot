@@ -247,4 +247,45 @@ public final class PageBench {
         let c = try search(qs, texts: ceiling(), headingFront: headingFront, extra: extra)
         progress("Ceiling: \(c.hits) of \(qs.count)")
     }
+
+    // MARK: - Main points of a page (spec section 10, W5)
+
+    /// True if a selected sentence is the marked sentence. Spaces and case do not count. A selected sentence that
+    /// holds the marked sentence also counts.
+    static func samePoint(_ selected: String, _ marked: String) -> Bool {
+        let a = WebPageText.words(selected).joined(separator: " "), b = WebPageText.words(marked).joined(separator: " ")
+        return !b.isEmpty && (a == b || a.contains(b))
+    }
+
+    /// For each marked page: how many of its marked sentences are in the 5 that the rule selects. A page passes
+    /// with 2 or more. Prints counts only.
+    @discardableResult
+    public func points(file: String, variant: MainText.Variant) throws -> (passed: Int, pages: Int) {
+        let text = (try? String(contentsOf: folder.appendingPathComponent(file), encoding: .utf8)) ?? ""
+        var marked: [String: [String]] = [:]
+        var order: [String] = []
+        for line in text.split(separator: "\n").dropFirst() {
+            let f = line.split(separator: "\t", maxSplits: 1).map(String.init)
+            guard f.count == 2 else { continue }
+            if marked[f[0]] == nil { order.append(f[0]) }
+            marked[f[0], default: []].append(f[1])
+        }
+        var passed = 0
+        var counts: [Int] = []
+        for p in order {
+            guard let page = source.page(p) else { progress("Points: \(p) has no blocks"); counts.append(0); continue }
+            let sel = MainText.select(page.blocks, variant: variant)
+            let body = sel.blocks.map(\.text).joined(separator: "\n")
+            let chosen = try MainPointsV2.select(body, title: page.title ?? "", embedder: embedder)
+            // Each selected sentence must be a part of the page text, character for character.
+            let inText = chosen.allSatisfy { body.contains($0) }
+            let n = (marked[p] ?? []).filter { m in chosen.contains { Self.samePoint($0, m) } }.count
+            counts.append(n)
+            if n >= 2 { passed += 1 }
+            progress("Points: \(p) \(n) of \(marked[p]?.count ?? 0)\(inText ? "" : " (a sentence is not in the text)")")
+        }
+        progress("Points: \(passed) of \(order.count) pages with 2 or more of 3 (pass: 8 of 10)")
+        return (passed, order.count)
+    }
 }
+

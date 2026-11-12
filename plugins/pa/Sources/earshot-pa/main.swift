@@ -139,7 +139,8 @@ if let i = args.firstIndex(of: "--followup-bench"), i + 1 < args.count {
 }
 
 // The bench of the page text (phase 4, section 8, E12): earshot-pa --page-bench <pages folder> [--corpus <phase 2
-// fixtures folder>] [--embedder <name> [--model <file.gguf>] [--gpu]] [--final <a|b|c> [--heading] [--dev <folder>]].
+// fixtures folder>] [--embedder <name> [--model <file.gguf>] [--gpu]] [--final <a|b|c> [--heading] [--dev <folder>]]
+// [--points <points tsv> [--variant <a|b|c>]].
 // It prints counts and shares only, never a text of a page.
 if let i = args.firstIndex(of: "--page-bench"), i + 1 < args.count {
     func value(_ flag: String) -> String? {
@@ -151,7 +152,10 @@ if let i = args.firstIndex(of: "--page-bench"), i + 1 < args.count {
                                             gpu: args.contains("--gpu"))
             let corpus = try value("--corpus").map { try BenchFixtures.load(URL(fileURLWithPath: $0, isDirectory: true)) }
             let bench = PageBench(folder: URL(fileURLWithPath: args[i + 1], isDirectory: true), corpus: corpus, embedder: embedder)
-            if let v = value("--final") {
+            if let pf = value("--points") {
+                let variant = value("--variant").flatMap(MainText.Variant.init(rawValue:)) ?? .full
+                try bench.points(file: pf, variant: variant)
+            } else if let v = value("--final") {
                 guard let variant = MainText.Variant(rawValue: v) else { print("Unknown variant \(v). Use a, b or c."); return 1 }
                 let dev = value("--dev").map { PageBench(folder: URL(fileURLWithPath: $0, isDirectory: true), corpus: nil, embedder: embedder) }
                 try bench.final(variant: variant, headingFront: args.contains("--heading"), devPages: dev)
