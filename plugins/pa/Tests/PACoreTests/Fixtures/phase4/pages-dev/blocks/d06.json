@@ -1,0 +1,174 @@
+{
+  "blocks": [
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 1,
+      "t": "The Patient Pot Soups Bread Index About",
+      "zone": "nav"
+    },
+    {
+      "inMain": true,
+      "k": "h",
+      "level": 1,
+      "links": 0,
+      "t": "Grandmother Beatriz's lentil soup with lemon",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "Posted by Carmen Duarte on 4 November · Serves 4",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "When I was nine, my family spent a whole winter in my grandmother's house in the hills. The house had one stove, and the stove always had a pot on it. Most days that pot was this soup. She stirred it with a wooden spoon that had a burnt end, and she never measured anything. I asked her many times how much lemon she put in, and she always said \"enough\".",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "Years later I tried to make it from memory, and it took me about twenty attempts to get close. My mother helped with the cumin, which I had forgotten completely. My brother says it is still not right. He may be correct, but this is the version my children ask for.",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0.16,
+      "t": "Sponsored: Copperline pans, made to last. Shop now",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "A note on lentils: the small brown ones work best here. Red lentils turn to mush, which is not bad, but it is a different soup.",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "h",
+      "level": 2,
+      "links": 0,
+      "t": "Ingredients",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "li",
+      "links": 0,
+      "t": "250 g small brown lentils, rinsed",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "li",
+      "links": 0,
+      "t": "1 large onion, chopped",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "li",
+      "links": 0,
+      "t": "2 carrots, in small cubes",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "li",
+      "links": 0,
+      "t": "3 tablespoons olive oil",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "li",
+      "links": 0,
+      "t": "1 teaspoon ground cumin",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "li",
+      "links": 0,
+      "t": "1.5 litres water or light stock",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "li",
+      "links": 0,
+      "t": "Juice of 1 lemon, and salt",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "h",
+      "level": 2,
+      "links": 0,
+      "t": "Method",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "li",
+      "links": 0,
+      "t": "Warm the oil in a large pot and cook the onion and carrots on a low heat for 10 minutes, until soft.",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "li",
+      "links": 0,
+      "t": "Add the cumin and stir for one minute.",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "li",
+      "links": 0,
+      "t": "Add the lentils and the water. Bring to the boil, then cook gently for 35 to 40 minutes, until the lentils are soft.",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "li",
+      "links": 0,
+      "t": "Blend about a third of the soup and stir it back in, so the soup is thick but not smooth.",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "li",
+      "links": 0,
+      "t": "Add the lemon juice and salt just before you serve.",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "Can I freeze it?",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0.79,
+      "t": "Print recipe · Pin it · Share",
+      "zone": "main"
+    }
+  ],
+  "browser": "com.google.Chrome",
+  "complete": true,
+  "elements": 81,
+  "ms": 9.3,
+  "sensitive": "",
+  "url": "file:///d06.html"
+}

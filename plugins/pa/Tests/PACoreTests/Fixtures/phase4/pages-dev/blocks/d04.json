@@ -1,0 +1,265 @@
+{
+  "blocks": [
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0,
+      "t": "Brightwell Home",
+      "zone": "banner"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 1,
+      "t": "Kitchen Laundry Heating Offers Basket (0)",
+      "zone": "nav"
+    },
+    {
+      "inMain": true,
+      "k": "h",
+      "level": 1,
+      "links": 0,
+      "t": "Orla 2 cordless kettle, 1.5 litres",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "The Orla 2 boils one cup of water in 45 seconds and a full kettle in under three minutes. A window on each side shows the water level, and the lid opens with one button, so you do not touch the hot steel.",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "The kettle switches off when the water boils, when you lift it from the base, and when it is empty. The filter in the spout catches scale and comes out for cleaning.",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "h",
+      "level": 2,
+      "links": 0,
+      "t": "Specifications",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "Capacity",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "1.5 litres",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "Power",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "3,000 watts",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "Minimum fill",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "250 ml, one cup",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "Weight",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "1.1 kg",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "Guarantee",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "3 years, with registration within 28 days",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "Capacity",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "Power",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "Minimum fill",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "Weight",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "Guarantee",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "1.5 litres",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "3,000 watts",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "250 ml, one cup",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "1.1 kg",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "3 years, with registration within 28 days",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "h",
+      "level": 2,
+      "links": 0,
+      "t": "Reviews (2)",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "★★★★★ Quick and quiet. The lid button is great. – Sana, Bristol",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "★★★☆☆ Good kettle but the base cable is short. – Tom",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "£39.99",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "In stock. Free delivery over £30.",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0.88,
+      "t": "Compare · Save for later",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "You may also like",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 1,
+      "t": "Orla 2 toaster",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 1,
+      "t": "Descaler, 2 pack",
+      "zone": "main"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0.5,
+      "t": "Delivery Returns Contact © Brightwell Home Ltd",
+      "zone": "footer"
+    }
+  ],
+  "browser": "com.google.Chrome",
+  "complete": true,
+  "elements": 105,
+  "ms": 10.3,
+  "sensitive": "",
+  "url": "file:///d04.html"
+}

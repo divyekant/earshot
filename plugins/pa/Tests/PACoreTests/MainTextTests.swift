@@ -37,6 +37,15 @@ final class MainTextTests: XCTestCase {
                        ["Title of the page", "Ok then", "Kept part"])
     }
 
+    func testStep3DropsCopies() {
+        let blocks = [PageBlock("Rules", kind: .h, level: 1), para(60, "rule"), PageBlock("Rules", kind: .h, level: 1),
+                      para(60, "rule")]
+        let r = MainText.select(blocks, variant: .full)
+        XCTAssertEqual(r.blocks.filter { $0.text.hasPrefix("rule") }.count, 1)
+        // The second heading has no kept text below it, so it goes too.
+        XCTAssertEqual(r.blocks.filter { $0.text == "Rules" }.count, 1)
+    }
+
     func testStep4EndWords() {
         let blocks = [PageBlock("Story", kind: .h, level: 1), para(60), PageBlock("Comments (3)", kind: .h, level: 2),
                       para(20, "comment"), para(20, "comment"), PageBlock("Next part", kind: .h, level: 2), para(10, "more")]

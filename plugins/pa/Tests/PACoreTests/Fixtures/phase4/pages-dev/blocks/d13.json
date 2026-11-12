@@ -1,0 +1,200 @@
+{
+  "blocks": [
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0.81,
+      "t": "Puddleby Tool Library | Catalogue | Membership | Terms | Contact"
+    },
+    {
+      "inMain": false,
+      "k": "h",
+      "level": 1,
+      "links": 0,
+      "t": "Terms of hire"
+    },
+    {
+      "inMain": false,
+      "k": "cell",
+      "links": 0,
+      "t": "These terms apply from 1 September."
+    },
+    {
+      "inMain": false,
+      "k": "h",
+      "level": 2,
+      "links": 0,
+      "t": "1. Membership"
+    },
+    {
+      "inMain": false,
+      "k": "cell",
+      "links": 0,
+      "t": "1.1 You must be a member to borrow tools. Membership costs £25 a year, or £10 a year for people on a low income."
+    },
+    {
+      "inMain": false,
+      "k": "cell",
+      "links": 0,
+      "t": "1.2 Members must be 18 or older and live or work in the parish of Puddleby."
+    },
+    {
+      "inMain": false,
+      "k": "h",
+      "level": 2,
+      "links": 0,
+      "t": "2. Borrowing"
+    },
+    {
+      "inMain": false,
+      "k": "cell",
+      "links": 0,
+      "t": "2.1 You can borrow up to three tools at a time, for up to seven days. You can extend a loan once by seven days if no other member has reserved the tool."
+    },
+    {
+      "inMain": false,
+      "k": "cell",
+      "links": 0,
+      "t": "2.2 Power tools need a deposit of £20, which we return when the tool comes back clean and working."
+    },
+    {
+      "inMain": false,
+      "k": "h",
+      "level": 2,
+      "links": 0,
+      "t": "3. Late returns and damage"
+    },
+    {
+      "inMain": false,
+      "k": "cell",
+      "links": 0,
+      "t": "3.1 A late return costs £1 for each day, up to the value of the tool."
+    },
+    {
+      "inMain": false,
+      "k": "cell",
+      "links": 0,
+      "t": "3.2 Tell us at once if a tool breaks. We do not charge for normal wear. If a tool is damaged by misuse, we may ask you to pay for the repair."
+    },
+    {
+      "inMain": false,
+      "k": "h",
+      "level": 2,
+      "links": 0,
+      "t": "4. Safety"
+    },
+    {
+      "inMain": false,
+      "k": "cell",
+      "links": 0,
+      "t": "4.1 You use the tools at your own risk. Read the safety card in each tool bag before use, and wear the protection it names."
+    },
+    {
+      "inMain": false,
+      "k": "cell",
+      "links": 0.23,
+      "t": "Opening hours Wed 17:00–19:00 Sat 10:00–13:00 Donate a tool"
+    },
+    {
+      "inMain": false,
+      "k": "h",
+      "level": 1,
+      "links": 0,
+      "t": "Terms of hire"
+    },
+    {
+      "inMain": false,
+      "k": "cell",
+      "links": 0,
+      "t": "These terms apply from 1 September."
+    },
+    {
+      "inMain": false,
+      "k": "h",
+      "level": 2,
+      "links": 0,
+      "t": "1. Membership"
+    },
+    {
+      "inMain": false,
+      "k": "cell",
+      "links": 0,
+      "t": "1.1 You must be a member to borrow tools. Membership costs £25 a year, or £10 a year for people on a low income."
+    },
+    {
+      "inMain": false,
+      "k": "cell",
+      "links": 0,
+      "t": "1.2 Members must be 18 or older and live or work in the parish of Puddleby."
+    },
+    {
+      "inMain": false,
+      "k": "h",
+      "level": 2,
+      "links": 0,
+      "t": "2. Borrowing"
+    },
+    {
+      "inMain": false,
+      "k": "cell",
+      "links": 0,
+      "t": "2.1 You can borrow up to three tools at a time, for up to seven days. You can extend a loan once by seven days if no other member has reserved the tool."
+    },
+    {
+      "inMain": false,
+      "k": "cell",
+      "links": 0,
+      "t": "2.2 Power tools need a deposit of £20, which we return when the tool comes back clean and working."
+    },
+    {
+      "inMain": false,
+      "k": "h",
+      "level": 2,
+      "links": 0,
+      "t": "3. Late returns and damage"
+    },
+    {
+      "inMain": false,
+      "k": "cell",
+      "links": 0,
+      "t": "3.1 A late return costs £1 for each day, up to the value of the tool."
+    },
+    {
+      "inMain": false,
+      "k": "cell",
+      "links": 0,
+      "t": "3.2 Tell us at once if a tool breaks. We do not charge for normal wear. If a tool is damaged by misuse, we may ask you to pay for the repair."
+    },
+    {
+      "inMain": false,
+      "k": "h",
+      "level": 2,
+      "links": 0,
+      "t": "4. Safety"
+    },
+    {
+      "inMain": false,
+      "k": "cell",
+      "links": 0,
+      "t": "4.1 You use the tools at your own risk. Read the safety card in each tool bag before use, and wear the protection it names."
+    },
+    {
+      "inMain": false,
+      "k": "cell",
+      "links": 0.23,
+      "t": "Opening hours Wed 17:00–19:00 Sat 10:00–13:00 Donate a tool"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0,
+      "t": "Puddleby Tool Library is run by volunteers."
+    }
+  ],
+  "browser": "com.google.Chrome",
+  "complete": true,
+  "elements": 90,
+  "ms": 9.2,
+  "sensitive": "",
+  "url": "file:///d13.html"
+}
