@@ -411,28 +411,12 @@ settingsWatch?.resume()
 
 // Read stdin on its own thread. Each line goes to the engine queue. At the end of stdin, stop.
 let reader = Thread {
-    let input = FileHandle.standardInput
-    var buffer = Data()
-    let maxLine = 1_048_576
-    while true {
-        // Phase 5 (X1): this loop never returns, so its autorelease pool never drained. Each read of stdin left one
-        // block of about 16 KB (one for each message). Each read now has its own pool.
-        let chunk = autoreleasepool { input.availableData }
-        if chunk.isEmpty { break }
-        buffer.append(chunk)
-        while let nl = buffer.firstIndex(of: 0x0A) {
-            let line = buffer.subdata(in: buffer.startIndex..<nl)
-            buffer.removeSubrange(buffer.startIndex...nl)
-            if line.isEmpty { continue }
-            queue.async {
-                work { engine.receive(line) }
-                scheduleCheck()
-            }
+    LineReader.run(FileHandle.standardInput) { line in
+        queue.async {
+            work { engine.receive(line) }
+            scheduleCheck()
         }
-        // A line with no end that is too long: drop it.
-        if buffer.count > maxLine { buffer.removeAll() }
     }
-    if !buffer.isEmpty { let line = buffer; queue.async { engine.receive(line) } }
     queue.sync { engine.stop() }
     exit(0)
 }
