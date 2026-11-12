@@ -160,6 +160,29 @@ public final class EventBench {
         }
     }
 
+    /// Spec 8.7: the arrival flags for a project on a mailbox fixture. The project rule version 2 as it is, on the
+    /// subject and the first 500 characters of each mail that passes the bulk filter. It prints the count and the
+    /// fixture id with the project, so that a person can check each one. Use `--events <mailbox jsonl> --mail-arrivals`.
+    public func mailArrivals(_ file: URL, owner: Set<String> = ["maya.rao@example.com"]) throws {
+        let mails = try FixtureMail.read(file).filter { BulkFilter.reason($0, owner: owner) == nil }
+        var records: [ProjectRuleV2.Record] = []
+        for d in fx.docs { for p in TextCut.passages(d.text) { records.append(.init(project: d.project, vector: [], text: p.text)) } }
+        for it in fx.items { records.append(.init(project: it.project, vector: [], text: it.title)) }
+        let vecs = try embed(records.map(\.text), .passage)
+        for i in records.indices { records[i].vector = vecs[i] }
+        let floor = try searchFloor(records)
+        let texts = mails.map(Engine.arrivalText)
+        let mv = try embed(texts, .passage)
+        let rule = ProjectRuleV2()
+        var n = 0
+        for (i, m) in mails.enumerated() {
+            guard let p = rule.propose(title: texts[i], vector: mv[i], records: records, projects: fx.projects, floor: floor) else { continue }
+            n += 1
+            out("  \(m.id) -> \(p.project)")
+        }
+        out("Mail arrivals: \(n) flags for \(mails.count) messages that pass the filter")
+    }
+
     /// The one run on the holdout, with the go mark: 90% or more of the alerts correct, 2 or fewer wrong, and 8 or
     /// more of the 25 events with an alert.
     public func final(_ file: URL, lines: EventLinker.Lines) throws {

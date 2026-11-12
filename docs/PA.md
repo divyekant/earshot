@@ -132,6 +132,8 @@ The settings file is `~/Library/Application Support/earshot/plugin-data/pa/setti
 | `proposeByName` | `false` | If `true`, the PA also proposes a project whose name is in the capture. Off by default: a name in another sense ("the soup kitchen", "his Lisbon trip") gives a wrong proposal. Say "for <project>" to name a project for sure. |
 | `nearEventMinutes` | `15` | The near-event alert comes this count of minutes before the start of an event. |
 | `linkEvents` | `true` | If `true`, a rule links open items and documents to a calendar event, shown with "?". If `false`, only your own links ("before the dentist") stay. |
+| `sources` | `{"calendar": true, "mail": true, "notes": true}` | The sources that the PA reads. If you set one to `false`, the PA deletes what it kept from that source. |
+| `mail` | `{"everyMinutes": 5, "firstDays": 3, "maxPerRead": 50, "batch": 10}` | The mail read: the time between two reads, the days of the first read, the most messages to look back, and the ids in one step. |
 | `searchModel` | `"gemma"` | The search model: `"gemma"`, `"gemma2"`, `"qwen3"` or `"none"` (keywords only). The PA reads it at its start. Run `PA_MODEL=<name> scripts/install-pa.sh` to download another model. |
 
 If the file has an error, the PA uses the default values and shows one note.

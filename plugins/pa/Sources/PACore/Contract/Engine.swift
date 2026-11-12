@@ -54,6 +54,12 @@ public final class Engine {
     var lastCalendarRead: Date?
     /// The title of each event at its last link by a rule. A new or a changed title gets new links.
     var ruleLinkTitles: [Int64: String] = [:]
+    /// Phase 3, S4: the mail source, and the state of the mail read.
+    public var mailSource: MailSource?
+    let mailReader = SourceReader(name: "mail")
+    var lastMailRead: Date?
+    var mailFrontSince: Date?
+    var mailReading = false
     let log: PALog
     /// A note for the next answer, for example after a new store started.
     var pendingNotice: String?
