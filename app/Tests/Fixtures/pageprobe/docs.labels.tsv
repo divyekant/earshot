@@ -1,0 +1,32 @@
+noise	Quillmark docs Guide Reference Changelog
+noise	Start
+noise	Install
+noise	First project
+noise	Configure
+noise	The config file
+noise	The cache
+noise	Themes
+noise	Commands
+noise	build
+noise	serve
+noise	clean
+main	Configure the cache
+main	Quillmark keeps the result of each page build in a cache folder. With a warm cache, a build of a site with 2,000 pages takes about 4 seconds instead of 50 seconds. This page tells how to move the cache, limit its size and clear it.
+main	Where the cache is
+main	By default the cache is in the folder .quillmark/cache next to the config file. To move it, set the key cache.path in quillmark.toml:
+main	[cache] path = "/tmp/qm-cache" max_size_mb = 500
+main	A relative path is relative to the folder of the config file. The folder must be writable. If Quillmark cannot write to it, the build stops with the error E041 cache not writable.
+main	Limit the size
+main	The key max_size_mb sets the largest size of the cache in megabytes. The default is 1,000. When the cache is full, Quillmark removes the entries that it used least recently until the cache is at 80 percent of the limit.
+main	Clear the cache
+main	Clear the cache after you change a theme file that the cache does not track, for example a font. Use this command:
+main	quillmark clean --cache
+main	The command removes the cache folder and nothing else. The next build is a cold build.
+main	Cache keys
+main	Input Part of the key
+main	Page source Yes
+main	Templates Yes
+main	Fonts and images No
+neutral	Last updated 9 June
+noise	Previous: The config file · Next: Themes
+noise	Quillmark is free software. Source · Licence
