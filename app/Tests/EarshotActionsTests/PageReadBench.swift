@@ -59,6 +59,59 @@ final class PageReadBench: XCTestCase {
         }
     }
 
+    /// Reads each page of a folder in the browser with method A and writes its blocks as `<name>.json`. For the
+    /// development pages (fixtures for CI) and for the sealed holdout (one run for each browser). It prints only the
+    /// name, the time and the counts, never a text of a page.
+    /// - `EARSHOT_PAGE_DUMP`: the folder of `.html` files. `EARSHOT_PAGE_DUMP_OUT`: the folder for the JSON files.
+    /// - `EARSHOT_PAGE_BROWSERS`: one bundle id (default: the default browser).
+    func testDumpBlocks() async throws {
+        let env = ProcessInfo.processInfo.environment
+        guard env["EARSHOT_LIVE_PAGES"] == "1", let src = env["EARSHOT_PAGE_DUMP"], let dst = env["EARSHOT_PAGE_DUMP_OUT"] else {
+            throw XCTSkip("live dump: set EARSHOT_LIVE_PAGES=1, EARSHOT_PAGE_DUMP and EARSHOT_PAGE_DUMP_OUT")
+        }
+        guard AXIsProcessTrusted() else { throw XCTSkip("this process has no Accessibility permission") }
+        let browser = env["EARSHOT_PAGE_BROWSERS"]?.split(separator: ",").first.map(String.init) ?? Self.defaultBrowser() ?? "com.apple.Safari"
+        let out = URL(fileURLWithPath: dst)
+        try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
+        let files = try FileManager.default.contentsOfDirectory(at: URL(fileURLWithPath: src), includingPropertiesForKeys: nil)
+            .filter { $0.pathExtension == "html" }.sorted { $0.lastPathComponent < $1.lastPathComponent }
+        for file in files {
+            let name = file.deletingPathExtension().lastPathComponent
+            let t0 = Clock.nowNs()
+            guard let tab = try await open(file, browser: browser, marker: "") else {
+                print("PAGEDUMP \(name) error=did-not-open"); continue
+            }
+            // The read waits for a stable tree: read again every 500 ms, 3 s at most, until the count of elements stays.
+            await sleepMs(500)
+            var read = PageProbeReader.readA(area: tab.area, url: tab.url)
+            var waited = 0
+            while waited < 3000 {
+                await sleepMs(500); waited += 500
+                let again = PageProbeReader.readA(area: tab.area, url: tab.url)
+                let stable = again.elements == read.elements
+                read = again
+                if stable { break }
+            }
+            let total = Clock.ms(since: t0)
+            let doc: [String: Any] = [
+                "browser": browser, "complete": read.complete, "ms": (read.ms * 10).rounded() / 10, "elements": read.elements,
+                "sensitive": read.sensitive ?? "", "url": "file:///" + file.lastPathComponent,
+                "blocks": read.blocks.map { b -> [String: Any] in
+                    var o: [String: Any] = ["t": b.t, "k": b.k]
+                    if let v = b.level { o["level"] = v }
+                    if let v = b.zone { o["zone"] = v }
+                    if let v = b.inMain { o["inMain"] = v }
+                    if let v = b.links { o["links"] = v }
+                    return o
+                },
+            ]
+            let data = try JSONSerialization.data(withJSONObject: doc, options: [.sortedKeys, .prettyPrinted])
+            try data.write(to: out.appendingPathComponent("\(name).json"))
+            print("PAGEDUMP \(name) readMs=\(Int(read.ms)) totalMs=\(Int(total)) elements=\(read.elements) blocks=\(read.blocks.count) complete=\(read.complete)")
+            await close(tab)
+        }
+    }
+
     // MARK: - P1 The read
 
     func probe1(_ browser: String, _ dir: URL) async throws {
@@ -253,6 +306,15 @@ final class PageReadBench: XCTestCase {
         let url: String?
         let marker: String
         let titleMs: Double
+        var file: URL?
+    }
+
+    /// True if the window shows the probe page: its title has the marker, or (with an empty marker) the address of
+    /// its web area ends with the file name. The empty marker is for pages that the bench must not open as text.
+    static func shows(_ w: AXUIElement, marker: String, file: URL?) -> Bool {
+        if !marker.isEmpty { return (AX.string(w, "AXTitle") ?? "").contains(marker) }
+        guard let file, let area = ScreenReader.visibleWebArea(w), let url = ScreenReader.address(area) else { return false }
+        return url.hasSuffix("/" + file.lastPathComponent)
     }
 
     static func defaultBrowser() -> String? {
@@ -272,7 +334,7 @@ final class PageReadBench: XCTestCase {
         let app = AX.appElement(pid)
         var window: AXUIElement?
         while Clock.ms(since: t0) < 8000 {
-            if let w = AX.window(app), (AX.string(w, "AXTitle") ?? "").contains(marker) { window = w; break }
+            if let w = AX.window(app), Self.shows(w, marker: marker, file: file) { window = w; break }
             await sleepMs(50)
         }
         let titleMs = Clock.ms(since: t0)
@@ -285,17 +347,17 @@ final class PageReadBench: XCTestCase {
         }
         guard let area = area ?? ScreenReader.findWebArea(in: window)?.0 else {
             log("open", ["browser": browser, "marker": marker, "error": "no web area"])
-            await close(Tab(pid: pid, window: window, area: window, url: nil, marker: marker, titleMs: titleMs))
+            await close(Tab(pid: pid, window: window, area: window, url: nil, marker: marker, titleMs: titleMs, file: file))
             return nil
         }
-        return Tab(pid: pid, window: window, area: area, url: ScreenReader.address(area), marker: marker, titleMs: titleMs)
+        return Tab(pid: pid, window: window, area: area, url: ScreenReader.address(area), marker: marker, titleMs: titleMs, file: file)
     }
 
     /// Closes the tab of the probe page with Command-W, only if the browser is in front and its front window shows
     /// the title of the probe page.
     func close(_ tab: Tab) async {
         let app = AX.appElement(tab.pid)
-        guard AX.frontPid() == tab.pid, let w = AX.window(app), (AX.string(w, "AXTitle") ?? "").contains(tab.marker),
+        guard AX.frontPid() == tab.pid, let w = AX.window(app), Self.shows(w, marker: tab.marker, file: tab.file),
               let cmdW = Keys.parse("cmd+w") else {
             log("close", ["marker": tab.marker, "closed": false])
             return
