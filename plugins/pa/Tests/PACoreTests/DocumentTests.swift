@@ -27,10 +27,10 @@ final class DocumentTests: XCTestCase {
 
     static let quote = "Quote from Harbour Ceramics for the floor tiles. The porcelain tiles cost 42 pounds per square metre. Delivery takes ten working days."
 
-    func testStoreIsVersion2WithNewColumns() throws {
+    func testStoreHasPhase2Columns() throws {
         let (e, _, _) = engine()
         let db = e.store!.db
-        XCTAssertEqual(try db.query("PRAGMA user_version").first?.first?.int, 2)
+        XCTAssertEqual(try db.query("PRAGMA user_version").first?.first?.int, Int64(Store.schemaVersion))
         let docCols = try db.query("PRAGMA table_info(doc)").compactMap { $0[1].text }
         for c in ["path", "kind", "size", "modified_at", "text_state", "passages", "parent_doc_id"] { XCTAssertTrue(docCols.contains(c), c) }
         let itemCols = try db.query("PRAGMA table_info(item)").compactMap { $0[1].text }
@@ -38,7 +38,7 @@ final class DocumentTests: XCTestCase {
         // The migration can run again with no error.
         try db.exec("PRAGMA user_version = 1")
         try e.store!.migrate()
-        XCTAssertEqual(try db.query("PRAGMA user_version").first?.first?.int, 2)
+        XCTAssertEqual(try db.query("PRAGMA user_version").first?.first?.int, Int64(Store.schemaVersion))
         XCTAssertTrue(FileManager.default.fileExists(atPath: e.indexURL.path))
     }
 

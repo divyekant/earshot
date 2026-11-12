@@ -46,9 +46,34 @@ public final class IndexStore {
           data BLOB NOT NULL,
           PRIMARY KEY (owner_kind, owner_id)
         );
+        CREATE TABLE IF NOT EXISTS flag_example (
+          id INTEGER PRIMARY KEY,
+          flag_id INTEGER,
+          features BLOB NOT NULL,
+          vector BLOB,
+          answer TEXT NOT NULL,
+          created_at REAL NOT NULL
+        );
         PRAGMA user_version = 1;
         """)
         keywords = try KeywordIndex(db: db, table: "passage_fts")
+    }
+
+    // MARK: - Flag examples (phase 3, spec 8.8). Numbers and the answer only, no text.
+
+    /// One answer of the owner to a request flag: the feature values, the numbers of its sentence, and "kept" or
+    /// "dropped".
+    public func addFlagExample(flag: Int64, features: [Float], vector: [Float]?, answer: String, at: Date) throws {
+        try db.run("INSERT INTO flag_example(flag_id, features, vector, answer, created_at) VALUES (?, ?, ?, ?, ?)",
+                   [.int(flag), .blob(IndexStore.blob(features)), vector.map { .blob(IndexStore.blob($0)) } ?? .null,
+                    .text(answer), .real(at.timeIntervalSince1970)])
+    }
+
+    /// The answers, oldest first.
+    public func flagExamples() -> [(features: [Float], vector: [Float]?, answer: String)] {
+        ((try? db.query("SELECT features, vector, answer FROM flag_example ORDER BY id")) ?? []).map {
+            (IndexStore.floats($0[0].blob ?? Data()), $0[1].blob.map(IndexStore.floats), $0[2].text ?? "")
+        }
     }
 
     /// Replaces all passages of a document, in one transaction. Their numbers go too.

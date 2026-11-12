@@ -8,6 +8,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Added
 
+- PA, phase 3 frame: the plugin version is 0.3.0, with the new leads "keep", "what is new" and "what new". "what is new" lists the open flags. "keep 2" makes a to-do from flag 2, with a link to the mail. "drop 2" drops it. "keep" with other words saves a note. New settings: `sources`, `nearEventMinutes`, `mail`, `notes`, `rules.request`, `flagsLearn` and `owner`. If a source goes off, the PA deletes what it kept from it (R-PA-4, R-PA-5).
 - PA: the search model runs in a separate worker process. When the worker stops, its memory goes back to the Mac. If the worker fails, the PA still answers each command (R-PA-8).
 - PA: project proposals are on by default. A new rule proposes a project only if the nearest records and the keyword results agree. The setting `proposeByName` (off by default) also proposes a project whose name is in the capture. "main points" gives points to sentences with an amount, a date, a request or a result (R-PA-4).
 - PA: `pa.log` has the line `index-done texts=N ms=M` at the end of each run of index jobs, so that a speed test can see when the background index ends (R-PA-8).

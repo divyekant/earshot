@@ -124,7 +124,7 @@ public struct PlannedAlert: Equatable, Sendable {
 
 /// The kind of record in a list, the search index, the event table and the mirror.
 public enum RecordKind: String, Sendable {
-    case item, project, doc, alert, list, settings, mirror, store
+    case item, project, doc, alert, list, settings, mirror, store, flag, calEvent = "cal_event"
 }
 
 /// One pair of the copy in Apple Reminders.

@@ -79,6 +79,9 @@ public enum TimeText {
         "\(weekdays[d.weekday(cal) - 1]) \(d.day) \(months[d.month - 1]) \(d.year)"
     }
 
+    /// "20 Nov": the proposed day of a flag (phase 3, spec 8.6).
+    public static func shortDay(_ d: Day) -> String { "\(d.day) \(months[d.month - 1])" }
+
     public static func day(_ d: Day, now: Date, _ cal: Calendar) -> String {
         let today = Day(now, cal)
         if d == today { return "today" }
