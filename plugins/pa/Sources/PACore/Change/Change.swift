@@ -5,6 +5,8 @@ extension Engine {
     enum Pick {
         case item(Item)
         case doc(Doc)
+        /// A flag of the last list (phase 3).
+        case flag(Flag)
         /// The answer to send: no item, or a list of choices.
         case answer(Outgoing)
     }
@@ -33,6 +35,7 @@ extension Engine {
             guard let (kind, rid) = store.lastList(n) else { return .answer(.note(id, "No item \(n) in the last list.")) }
             if kind == .item, let it = store.item(rid) { return .item(it) }
             if kind == .doc, let d = store.doc(rid) { return .doc(d) }
+            if kind == .flag, let f = store.flag(rid), f.state == .new { return .flag(f) }
             return .answer(.note(id, "No item \(n) in the last list."))
         }
         let lower = t.lowercased()
@@ -77,6 +80,7 @@ extension Engine {
         switch pick(.done, id, Engine.clean(text)) {
         case .answer(let a): return a
         case .doc(let d): return .note(id, "\(d.title) is a document. Say \"drop\" to remove it.")
+        case .flag: return .note(id, Engine.flagOnly)
         case .item(var it):
             let old = it
             it.state = .done
@@ -90,6 +94,7 @@ extension Engine {
     func drop(id: String, text: String) -> Outgoing {
         switch pick(.drop, id, Engine.clean(text)) {
         case .answer(let a): return a
+        case .flag(let f): return dropFlag(id: id, f)
         case .doc(var d):
             d.droppedAt = clock.now
             do { try store?.updateDoc(d, event: "drop", at: clock.now) } catch { return .note(id, "The store had an error. Nothing changed.") }
@@ -155,6 +160,7 @@ extension Engine {
         switch pick(.snooze, id, target) {
         case .answer(let a): return a
         case .doc(let d): return .note(id, "\(d.title) is a document. It has no time.")
+        case .flag: return .note(id, Engine.flagOnly)
         case .item(var it):
             let old = it
             it.remindAt = at
@@ -183,6 +189,7 @@ extension Engine {
         }
         switch pick(.move, id, target) {
         case .answer(let a): return a
+        case .flag: return .note(id, Engine.flagOnly)
         case .doc(var d):
             d.projectID = project?.id
             do { try store.updateDoc(d, event: "move", at: clock.now) } catch { return .note(id, "The store had an error. Nothing changed.") }

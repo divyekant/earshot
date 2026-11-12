@@ -16,7 +16,7 @@ public final class Store {
     public private(set) var recoveredFrom: URL?
 
     /// The schema version. Each change is one numbered migration.
-    public static let schemaVersion = 2
+    public static let schemaVersion = 3
 
     public init(url: URL, now: Date = Date()) throws {
         self.url = url
@@ -60,6 +60,7 @@ public final class Store {
         let version = try db.query("PRAGMA user_version").first?.first?.int ?? 0
         if version < 1 { try migration1() }
         if version < 2 { try migration2() }
+        if version < 3 { try migration3() }
     }
 
     /// Phase 2 (build spec 7.2): kept files, proposals of the search, closed projects.

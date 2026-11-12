@@ -135,6 +135,10 @@ public final class Engine {
             _ = try? store?.db.run("DELETE FROM mirror")
             syncAll()
         }
+        // Phase 3 (spec 7.2): a source that goes off loses what the PA kept from it, at once.
+        if old.sources.calendar && !settings.sources.calendar { try? store?.forgetSource(.calendar) }
+        if old.sources.mail && !settings.sources.mail { try? store?.forgetSource(.mail) }
+        if old.sources.notes && !settings.sources.notes { try? store?.forgetSource(.note) }
         markPagesDirty()
     }
 
@@ -228,6 +232,8 @@ public final class Engine {
         case .whatProjects: return whatProjects(id: id)
         case .finishProject: return finishProject(id: id, text: text)
         case .mainPoints: return mainPoints(id: id, text: text, context: context)
+        case .keep: return keepFlag(id: id, text: text, context: context)
+        case .whatIsNew: return whatIsNew(id: id)
         }
     }
 
