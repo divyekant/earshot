@@ -192,7 +192,8 @@ public enum RequestFeatures {
 
     /// The prepared message with its candidate sentences, after gates 2 and 3 (v2 spec, section 4). The greeting and
     /// the sign-off are not candidates. `ownerAddresses` has the owner's addresses in lower case.
-    public static func prepared(_ m: MailMessage, owner: Set<String>, ownerAddresses: Set<String> = [],
+    /// A note (`note` true) is the owner's own text: it has no sender gate and no To rule.
+    public static func prepared(_ m: MailMessage, owner: Set<String>, ownerAddresses: Set<String> = [], note: Bool = false,
                                 time: (String) -> Bool = { _ in false }) -> Prepared {
         let lines = prepare(m.text)
         var greeting: String?
@@ -200,9 +201,9 @@ public enum RequestFeatures {
         var sents: [Sentence] = []
         var length = 0
         var gate: String?
-        if ownerAddresses.contains(m.fromAddress.lowercased()) { gate = "from owner" } else if m.replied { gate = "replied" }
+        if !note, ownerAddresses.contains(m.fromAddress.lowercased()) { gate = "from owner" } else if m.replied { gate = "replied" }
         let to = m.to.map { $0.lowercased() }
-        let ownerInTo = ownerAddresses.isEmpty || to.contains(where: ownerAddresses.contains)
+        let ownerInTo = note || ownerAddresses.isEmpty || to.contains(where: ownerAddresses.contains)
         let fewTo = ownerInTo && to.count <= 3
         var paragraphName: String?
         var seen = 0
@@ -244,7 +245,7 @@ public enum RequestFeatures {
                 named.append((s, forOwner))
             }
         }
-        let org = isOrganization(m)
+        let org = note ? false : isOrganization(m)
         var kept = named.filter(\.forOwner).map(\.text)
         if kept.isEmpty, gate == nil {
             gate = greetNames.map { $0 != ["*"] && !$0.contains(where: owner.contains) } == true ? "greets another" : "not for owner"

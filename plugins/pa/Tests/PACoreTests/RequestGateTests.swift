@@ -74,3 +74,34 @@ final class RequestGateTests: XCTestCase {
         XCTAssertFalse(lines.contains { $0.contains("form") })
     }
 }
+
+/// The envelope from raw headers (made-up headers).
+final class MailHeadersTests: XCTestCase {
+    func testEnvelopeFromHeaders() {
+        let raw = """
+        Return-Path: <bounce@example.net>
+        From: =?UTF-8?Q?Sam_L=C3=A9e?= <sam.lee@example.net>
+        To: "Rao, Maya" <maya.rao@example.com>,
+         paul.ng@example.com
+        Cc: Lena Fox <lena.fox@example.org>
+        Subject: =?UTF-8?B?Q2Fmw6k=?= plan
+        Date: Tue, 3 Nov 2026 08:12:00 +0000 (UTC)
+        Message-ID: <abc123@example.net>
+        List-Unsubscribe: <mailto:x@example.net>
+        Precedence: Bulk
+        Auto-Submitted: no
+        """
+        let m = MailHeaders.envelope(id: "42", raw: raw, replied: true, junk: false)
+        XCTAssertEqual(m.fromName, "Sam Lée")
+        XCTAssertEqual(m.fromAddress, "sam.lee@example.net")
+        XCTAssertEqual(m.to, ["maya.rao@example.com", "paul.ng@example.com"])
+        XCTAssertEqual(m.cc, ["lena.fox@example.org"])
+        XCTAssertEqual(m.subject, "Café plan")
+        XCTAssertEqual(m.messageID, "abc123@example.net")
+        XCTAssertEqual(m.date.timeIntervalSince1970, 1_793_693_520)
+        XCTAssertTrue(m.listHeader)
+        XCTAssertEqual(m.precedence, "bulk")
+        XCTAssertFalse(m.autoSubmitted)
+        XCTAssertTrue(m.replied)
+    }
+}

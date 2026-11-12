@@ -44,10 +44,15 @@ public final class FlagBench {
         public var sentences: Set<String>
         /// The sender wrote before in this set (an earlier date) and that mail passed gate 1.
         public var known = true
+        /// A note of the owner, not a mail: no bulk filter and no sender gate.
+        public var note = false
     }
 
     public static let owner: Set<String> = ["maya", "rao"]
     public static let ownerAddresses: Set<String> = ["maya.rao@example.com"]
+    /// The owner of the data: the made-up owner by default. `--items` can set another.
+    public var owner = FlagBench.owner
+    public var ownerAddresses = FlagBench.ownerAddresses
     let folder: URL
     let embedder: Embedder?
     public var out: (String) -> Void = { print($0) }
@@ -68,7 +73,7 @@ public final class FlagBench {
             labels[r[0]] = r
         }
         var firstPass: [String: Date] = [:]
-        for m in mails where BulkFilter.reason(m, owner: Self.ownerAddresses) == nil {
+        for m in mails where BulkFilter.reason(m, owner: ownerAddresses) == nil {
             let a = m.fromAddress.lowercased()
             if firstPass[a].map({ m.date < $0 }) ?? true { firstPass[a] = m.date }
         }
@@ -77,6 +82,7 @@ public final class FlagBench {
             let s = Set([r.count > 3 ? r[3] : "", r.count > 4 ? r[4] : ""].filter { !$0.isEmpty })
             var l = Labeled(m: m, request: r.count > 1 && r[1] == "1", sentences: s)
             l.known = firstPass[m.fromAddress.lowercased()].map { $0 < m.date } ?? false
+            l.note = r.count > 2 && r[2] == "note"
             return l
         }
     }
@@ -87,14 +93,14 @@ public final class FlagBench {
     }
 
     func prepared(_ l: Labeled) -> RequestFeatures.Prepared {
-        RequestFeatures.prepared(l.m, owner: Self.owner, ownerAddresses: Self.ownerAddresses) { [self] in timeFound($0, l.m.date) }
+        RequestFeatures.prepared(l.m, owner: owner, ownerAddresses: ownerAddresses, note: l.note) { [self] in timeFound($0, l.m.date) }
     }
 
     /// Gate 1 (the bulk filter), then gates 2 and 3.
     func passes(_ l: Labeled) -> Bool { gateReason(l) == nil }
 
     func gateReason(_ l: Labeled) -> String? {
-        BulkFilter.reason(l.m, owner: Self.ownerAddresses) ?? prepared(l).gate
+        (l.note ? nil : BulkFilter.reason(l.m, owner: ownerAddresses)) ?? prepared(l).gate
     }
 
     /// Fits the sentence score and the message score of variant B on the rows.
@@ -113,8 +119,8 @@ public final class FlagBench {
         for (l, p) in zip(kept, preps) {
             let s = p.sentences.map { sentence.p($0.f) }
             let b = s.indices.max(by: { s[$0] < s[$1] })
-            var x = RequestFeatures.messageFeatures(l.m, p, best: b, sentenceScores: s, owner: Self.owner,
-                                                    ownerAddresses: Self.ownerAddresses, middle: 0.5, known: l.known)
+            var x = RequestFeatures.messageFeatures(l.m, p, best: b, sentenceScores: s, owner: owner,
+                                                    ownerAddresses: ownerAddresses, middle: 0.5, known: l.known)
             x.removeLast()
             mx.append(x)
             my.append(l.request ? 1 : 0)
@@ -155,7 +161,7 @@ public final class FlagBench {
         let b = fitB(train)
         var out: [String: [Scored]] = [:]
         func bestB(_ l: Labeled, _ p: RequestFeatures.Prepared) -> (Int?, Double) {
-            let r = b.score(l.m, p, owner: Self.owner, ownerAddresses: Self.ownerAddresses, known: l.known)
+            let r = b.score(l.m, p, owner: owner, ownerAddresses: ownerAddresses, known: l.known)
             return (r.best, r.score)
         }
         let tp = test.map(prepared)
@@ -163,7 +169,7 @@ public final class FlagBench {
         var a = RequestModel(variant: "A", threshold: 0, sentence: b.sentence, message: b.message, middle: 0.5)
         a.variant = "A"
         out["A"] = zip(test, tp).map { l, p in
-            let r = a.score(l.m, p, owner: Self.owner, ownerAddresses: Self.ownerAddresses, known: l.known)
+            let r = a.score(l.m, p, owner: owner, ownerAddresses: ownerAddresses, known: l.known)
             return Scored(request: l.request, passed: passes(l), score: r.score,
                           sentenceOK: r.best.map { l.sentences.contains(p.sentences[$0].text) } ?? false)
         }
@@ -196,8 +202,8 @@ public final class FlagBench {
         func dx(_ l: Labeled, _ p: RequestFeatures.Prepared, _ cScore: Double) -> [Double] {
             let s = p.sentences.map { b.sentence.p($0.f) }
             let best = s.indices.max(by: { s[$0] < s[$1] })
-            var x = RequestFeatures.messageFeatures(l.m, p, best: best, sentenceScores: s, owner: Self.owner,
-                                                    ownerAddresses: Self.ownerAddresses, middle: 0.5, known: l.known)
+            var x = RequestFeatures.messageFeatures(l.m, p, best: best, sentenceScores: s, owner: owner,
+                                                    ownerAddresses: ownerAddresses, middle: 0.5, known: l.known)
             x.removeLast()
             return x + [cScore, 1]
         }
@@ -254,6 +260,30 @@ public final class FlagBench {
         out("Holdout 2, \(variant) at \(String(format: "%.2f", threshold)): flags \(c.flags), found \(c.found) of \(hold.filter(\.request).count), false \(c.falseFlags), sentence correct \(c.sentence)")
         let pass = c.found >= 16 && c.falseFlags <= 5 && c.sentence >= 13
         out("Go mark: \(pass ? "PASS" : "FAIL")")
+    }
+
+    /// The run on dk's items (v2 spec, section 6), with the shipped model (`RequestWeights`). The labels file has the
+    /// columns id, request (1 for an item with a to-do), and kind (`mail` or `note`). It prints counts only.
+    public func items(_ name: String) throws {
+        guard let model = RequestModel.fitted else { out("No model."); return }
+        let rows = try load(name)
+        func line(_ title: String, _ rs: [Labeled]) {
+            var flags = 0, found = 0, wrong = 0
+            for l in rs {
+                let p = prepared(l)
+                let flag = passes(l) && model.score(l.m, p, owner: owner, ownerAddresses: ownerAddresses, known: l.known).score >= model.threshold
+                if flag { flags += 1; if l.request { found += 1 } else { wrong += 1 } }
+            }
+            let todo = rs.filter(\.request).count
+            let share = flags > 0 ? Double(wrong) / Double(flags) : 0
+            out("| \(title) | \(rs.count) | \(flags) | \(found) of \(todo) (\(String(format: "%.2f", todo > 0 ? Double(found) / Double(todo) : 0))) | \(wrong) of \(rs.count - todo) | \(String(format: "%.2f", share)) |")
+        }
+        out("Model: \(model.variant) at \(model.threshold)")
+        out("| Items | Count | Flags | Found | False | False share of flags |")
+        out("|---|---|---|---|---|---|")
+        line("all", rows)
+        line("mails", rows.filter { !$0.note })
+        line("notes", rows.filter(\.note))
     }
 
     /// The failure table of a seen set (v2 spec, section 3), for variant A at a threshold: by kind, then each missed
