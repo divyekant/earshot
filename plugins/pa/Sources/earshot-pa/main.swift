@@ -214,6 +214,22 @@ timer.setEventHandler {
 }
 queue.sync { scheduleCheck() }
 timer.resume()
+// The calendar (phase 3, 9.1). The PA asks for access only if the source is on.
+#if os(macOS)
+if PASettings.load(folder.appendingPathComponent("settings.json")).settings.sources.calendar {
+    let calendar = EventKitCalendar(ask: true) {
+        queue.async {
+            engine.readCalendar()
+            scheduleCheck()
+        }
+    }
+    queue.async {
+        engine.calendarSource = calendar
+        engine.readCalendar()
+        scheduleCheck()
+    }
+}
+#endif
 let systemEvents = SystemEvents { _ in
     queue.async {
         engine.tick()
