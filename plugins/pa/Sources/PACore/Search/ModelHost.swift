@@ -13,8 +13,15 @@ public final class ModelHost: @unchecked Sendable {
     let state = NSLock()
     var model: Embedder?
     var lastUse: Date?
-    /// The load failed one time. The PA does not try again until the next start, and uses keywords only.
+    /// The load failed `maxLoadFailures` times in a row. The PA does not try again until the next start, and uses
+    /// keywords only.
     var failed = false
+    var loadFailures = 0
+    public static let maxLoadFailures = 3
+    /// Called after each load, with the new model (for the log: the process id of a worker).
+    public var onLoad: ((Embedder) -> Void)?
+    /// Called when a call to a loaded model fails, before the model is dropped.
+    public var onFault: (() -> Void)?
     /// The values of the proposal and duplicate rules for this model (E10). Nil: no proposals and no notice.
     public var rules: ModelRules?
     /// The time of the last load, for the log.
@@ -47,9 +54,17 @@ public final class ModelHost: @unchecked Sendable {
         }
         defer { work.unlock() }
         guard let m = loadLocked(load) else { return nil }
-        let out = try? m.embed(texts, kind: kind)
         touch()
-        return out
+        do {
+            return try m.embed(texts, kind: kind)
+        } catch {
+            // A model in a worker process can stop. Drop it: the next call loads a new one.
+            state.lock()
+            model = nil
+            state.unlock()
+            onFault?()
+            return nil
+        }
     }
 
     /// Loads the model, if it is not loaded. For a load in the background before the next search.
@@ -101,11 +116,14 @@ public final class ModelHost: @unchecked Sendable {
             lastLoadTime = Date().timeIntervalSince(t)
             state.lock()
             model = e
+            loadFailures = 0
             state.unlock()
+            onLoad?(e)
             return e
         } catch {
             state.lock()
-            failed = true
+            loadFailures += 1
+            if loadFailures >= Self.maxLoadFailures { failed = true }
             state.unlock()
             return nil
         }

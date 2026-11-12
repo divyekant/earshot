@@ -78,6 +78,23 @@ if let i = args.firstIndex(of: "--embed-bench"), i + 1 < args.count {
     exit(runBench())
 }
 
+// The model worker (follow-up R3): earshot-pa --embed-worker <model> --data <data folder>. The PA starts it with
+// this program file. It reads only the model file, never a file of the owner. It stops when stdin closes, or
+// after 5 minutes with no request.
+if let i = args.firstIndex(of: "--embed-worker"), i + 1 < args.count {
+    signal(SIGPIPE, SIG_IGN)
+    let data = args.firstIndex(of: "--data").flatMap { $0 + 1 < args.count ? args[$0 + 1] : nil }
+    func runWorker() -> Int32 {
+        guard let embedder = makeWorkerEmbedder(args[i + 1], folder: URL(fileURLWithPath: data ?? ".", isDirectory: true)) else {
+            return 2
+        }
+        // The embedder is freed when this function returns, before the exit: a GPU model that is still loaded at
+        // exit stops the program in the Metal teardown of llama.cpp.
+        return EmbedWorker.run(embedder) {}
+    }
+    exit(runWorker())
+}
+
 // The bench of the phase 2 follow-up (R1, R2): earshot-pa --followup-bench <fixtures folder> --embedder <name>
 // [--model <file.gguf>] [--gpu] [--explain | --final <variant> [--needs n,k]] [--bakeoff <folder>] [--verbose] [--weights a,d,r,s,f,t,tmax,w,n,b].
 if let i = args.firstIndex(of: "--followup-bench"), i + 1 < args.count {
@@ -126,6 +143,9 @@ if let path = env["EARSHOT_PLUGIN_DATA"], !path.isEmpty {
     folder = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/Application Support/earshot/plugin-data/pa", isDirectory: true)
 }
+
+// A write to a worker that stopped must give an error, not stop the PA (follow-up R3).
+signal(SIGPIPE, SIG_IGN)
 
 /// One serial queue owns the engine and the store.
 let queue = DispatchQueue(label: "earshot.pa.engine")
