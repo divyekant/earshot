@@ -138,6 +138,35 @@ if let i = args.firstIndex(of: "--followup-bench"), i + 1 < args.count {
     exit(runFollowUp())
 }
 
+// The bench of the page text (phase 4, section 8, E12): earshot-pa --page-bench <pages folder> [--corpus <phase 2
+// fixtures folder>] [--embedder <name> [--model <file.gguf>] [--gpu]] [--final <a|b|c> [--heading] [--dev <folder>]].
+// It prints counts and shares only, never a text of a page.
+if let i = args.firstIndex(of: "--page-bench"), i + 1 < args.count {
+    func value(_ flag: String) -> String? {
+        args.firstIndex(of: flag).flatMap { $0 + 1 < args.count ? args[$0 + 1] : nil }
+    }
+    func runPages() -> Int32 {
+        do {
+            let embedder = try makeEmbedder(value("--embedder") ?? "hash", allowAssetRequest: false, modelFile: value("--model"),
+                                            gpu: args.contains("--gpu"))
+            let corpus = try value("--corpus").map { try BenchFixtures.load(URL(fileURLWithPath: $0, isDirectory: true)) }
+            let bench = PageBench(folder: URL(fileURLWithPath: args[i + 1], isDirectory: true), corpus: corpus, embedder: embedder)
+            if let v = value("--final") {
+                guard let variant = MainText.Variant(rawValue: v) else { print("Unknown variant \(v). Use a, b or c."); return 1 }
+                let dev = value("--dev").map { PageBench(folder: URL(fileURLWithPath: $0, isDirectory: true), corpus: nil, embedder: embedder) }
+                try bench.final(variant: variant, headingFront: args.contains("--heading"), devPages: dev)
+            } else {
+                try bench.development()
+            }
+            return 0
+        } catch {
+            print("Bench error: \(error)")
+            return 1
+        }
+    }
+    exit(runPages())
+}
+
 // The bench of the request flags (phase 3, 8.5, E11): earshot-pa --flags-bench <mail fixtures folder>
 // [--embedder <name> [--model <file.gguf>] [--gpu]] [--final <variant>:<threshold>]
 // [--write-weights <file> --variant <A|B> --threshold <t>] [--analyze <set> --threshold <t>]
