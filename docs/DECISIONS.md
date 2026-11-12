@@ -351,3 +351,22 @@ Rejected:
 | Qwen3-Embedding-0.6B (Apache 2.0) | Search 86 of 100, below the mark of 90. Twice the download and about 500 MB while loaded. |
 | Keywords only | Search 78 of 100. Questions in other words find less. |
 | EmbeddingGemma with 256 numbers | Search 90 of 100, at the mark with no margin. The full 768 numbers cost about 107 MB more while the model is loaded. |
+
+## D-17. The PA reads Mail and Notes through the apps, with Apple events
+
+Date: 2026-11-12. Status: accepted (PA phase 3 build spec, section 2). Requirements: R-PA-9, R-PA-11.
+
+Decision:
+
+- The PA reads Mail and Notes through the Mail app and the Notes app, with Apple events (macOS permission "Automation"). The owner clicks "Allow" one time for each app.
+- The PA reads only while the app runs. It never starts the app. It sends one small event at a time, with a pause of 200 ms between events, and a time limit of 20 s for one batch.
+- All scripts are fixed texts in one source file. A CI test fails if a script has a word of a change (`send`, `delete`, `move`, `set `, `make`, `save`, `reply`, `forward`, `redirect`, `duplicate`).
+- Probe numbers (2026-11-12, run 3): all headers of one message 0.5 s, the text of one message 1.5 s. During a text read, Mail answers other events up to 2.2 s late. So the PA does not read while Mail is the front app, and it reads few texts in one read.
+
+Rejected:
+
+| Option | Why it was rejected |
+|---|---|
+| Full Disk Access with the mail files and the Envelope Index | It needs manual steps in System Settings. It opens all private data of the Mac to the PA, not only mail. The file format is private and changes. |
+| A mailbox export (`.mbox`) | A manual step for each read. |
+| A mail interface with network code (IMAP or an API) | The PA has no network code (R-PA-2). It would need a sign-in and a password store. |
