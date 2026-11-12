@@ -232,6 +232,45 @@ public final class FlagBench {
         out("Go mark: \(pass ? "PASS" : "FAIL")")
     }
 
+    /// The failure table of a seen set (v2 spec, section 3), for variant A at a threshold: by kind, then each missed
+    /// request and each false flag with its features. Use it only on data that is no longer sealed.
+    public func analyze(_ name: String, threshold: Double) throws {
+        let rows = try load(name)
+        var kindOf: [String: String] = [:]
+        for r in try BenchFixtures.rows(folder.appendingPathComponent(name + "-labels.tsv")) where r.count >= 3 { kindOf[r[0]] = r[2] }
+        var table: [String: (n: Int, flags: Int, found: Int, wrong: Int, req: Int)] = [:]
+        var misses: [String] = [], falses: [String] = []
+        for l in rows {
+            let k = kindOf[l.m.id] ?? "?"
+            var t = table[k] ?? (0, 0, 0, 0, 0)
+            t.n += 1
+            if l.request { t.req += 1 }
+            let pass = passes(l)
+            let p = prepared(l)
+            let s = p.sentences.map { RequestFeatures.handScore($0.f) }
+            let b = s.indices.max(by: { s[$0] < s[$1] })
+            let score = b.map { s[$0] } ?? -99
+            let flag = pass && score >= threshold
+            if flag { t.flags += 1; if l.request { t.found += 1 } else { t.wrong += 1 } }
+            table[k] = t
+            func feats(_ i: Int) -> String {
+                zip(RequestFeatures.sentenceNames, p.sentences[i].f).filter { $0.1 > 0 }.map(\.0).joined(separator: ",")
+            }
+            if l.request && !flag {
+                let li = p.sentences.firstIndex { l.sentences.contains($0.text) }
+                misses.append("MISS \(l.m.id) \(k) filter=\(BulkFilter.reason(l.m, owner: Self.ownerAddresses) ?? "pass") best=\(score) [\(b.map { p.sentences[$0].text } ?? "-")] {\(b.map(feats) ?? "")} labeled=\(li.map { String(s[$0]) } ?? "not a candidate") {\(li.map(feats) ?? "")}")
+            }
+            if flag && !l.request {
+                falses.append("FALSE \(l.m.id) \(k) score=\(score) [\(b.map { p.sentences[$0].text } ?? "-")] {\(b.map(feats) ?? "")}")
+            }
+        }
+        out("| Kind | Messages | Requests | Flags | Found | False |")
+        out("|---|---|---|---|---|---|")
+        for (k, t) in table.sorted(by: { $0.key < $1.key }) { out("| \(k) | \(t.n) | \(t.req) | \(t.flags) | \(t.found) | \(t.wrong) |") }
+        misses.forEach(out)
+        falses.forEach(out)
+    }
+
     /// Writes `RequestWeights.swift` with the model of variant A or B fitted on train.
     public func writeWeights(_ file: URL, variant: String, threshold: Double) throws {
         var m = fitB(try load("train"))

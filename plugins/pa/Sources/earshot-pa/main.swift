@@ -151,7 +151,9 @@ if let i = args.firstIndex(of: "--flags-bench"), i + 1 < args.count {
                 try makeEmbedder($0, allowAssetRequest: false, modelFile: value("--model"), gpu: args.contains("--gpu"))
             }
             let bench = FlagBench(folder: URL(fileURLWithPath: args[i + 1], isDirectory: true), embedder: embedder)
-            if let w = value("--write-weights") {
+            if let a = value("--analyze") {
+                try bench.analyze(a, threshold: Double(value("--threshold") ?? "4") ?? 4)
+            } else if let w = value("--write-weights") {
                 try bench.writeWeights(URL(fileURLWithPath: w), variant: value("--variant") ?? "B",
                                        threshold: Double(value("--threshold") ?? "0.5") ?? 0.5)
             } else if let f = value("--final") {
