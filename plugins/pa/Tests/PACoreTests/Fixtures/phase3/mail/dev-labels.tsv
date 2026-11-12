@@ -1,0 +1,201 @@
+id	request	kind	sentence	sentence2
+dv001	0	list		
+dv002	0	receipt		
+dv003	0	news		
+dv004	1	org_council	You must renew your resident permit before 30 November.	
+dv005	0	news		
+dv006	0	polite		
+dv007	1	question	Are you free for a call on Thursday afternoon?	
+dv008	0	news		
+dv009	0	news		
+dv010	0	thanks		
+dv011	1	person_long	Will you be able to book a table for six on or before 3 December?	
+dv012	0	ad		
+dv013	1	reply_chain	Will you be able to reply to the recruiter by 28 November?	
+dv014	0	group		
+dv015	0	from_owner		
+dv016	0	thanks		
+dv017	0	news		
+dv018	0	junk		
+dv019	0	newsletter		
+dv020	0	list		
+dv021	0	polite		
+dv022	0	help_offer		
+dv023	0	from_owner		
+dv024	0	junk		
+dv025	0	news		
+dv026	0	third_person		
+dv027	0	receipt		
+dv028	0	newsletter		
+dv029	0	news		
+dv030	0	list		
+dv031	0	newsletter		
+dv032	0	news		
+dv033	0	notice		
+dv034	0	notice		
+dv035	1	org_tradesman	Please pay the deposit of 200 pounds before 30 November so I can order the parts.	
+dv036	1	person	Are you able to choose a date for the dinner by the end of the week?	What time should we meet at the station?
+dv037	0	news		
+dv038	0	list		
+dv039	0	auto_reply		
+dv040	0	newsletter		
+dv041	0	receipt		
+dv042	0	list		
+dv043	0	list		
+dv044	0	from_owner		
+dv045	0	newsletter		
+dv046	0	list		
+dv047	1	org_club	Please pay the annual fee of 120 pounds before 25 November.	
+dv048	0	news		
+dv049	0	from_owner		
+dv050	0	newsletter		
+dv051	0	news		
+dv052	0	done		
+dv053	0	news		
+dv054	0	receipt		
+dv055	0	news		
+dv056	0	polite		
+dv057	0	list		
+dv058	1	person	Are you able to reply to the recruiter before the meeting on Wednesday?	
+dv059	0	replied		
+dv060	0	receipt		
+dv061	0	help_offer		
+dv062	0	news		
+dv063	1	question	Which date works better for you, the 18th or the 25th?	
+dv064	0	third_person		
+dv065	0	news		
+dv066	0	list		
+dv067	0	newsletter		
+dv068	0	polite		
+dv069	0	third_person		
+dv070	1	work	I need you to fill in the volunteer sheet before Monday.	
+dv071	0	newsletter		
+dv072	0	newsletter		
+dv073	0	notice		
+dv074	0	newsletter		
+dv075	0	newsletter		
+dv076	0	newsletter		
+dv077	0	notice		
+dv078	0	auto_reply		
+dv079	0	group		
+dv080	0	replied		
+dv081	0	thanks		
+dv082	0	receipt		
+dv083	1	question	Let me know whether you can come on Saturday.	
+dv084	0	thanks		
+dv085	0	receipt		
+dv086	0	receipt		
+dv087	0	auto_reply		
+dv088	0	help_offer		
+dv089	0	quoted_only		
+dv090	0	newsletter		
+dv091	0	from_owner		
+dv092	0	thanks		
+dv093	0	quoted_only		
+dv094	0	newsletter		
+dv095	0	group		
+dv096	0	newsletter		
+dv097	0	from_owner		
+dv098	0	news		
+dv099	0	thanks		
+dv100	1	person_long	Will you be able to confirm the time for Thursday by 28 November?	Is the 3 pm slot still good for you?
+dv101	0	junk		
+dv102	0	receipt		
+dv103	1	org_insurer	Please send us a photo of the damage by Friday 21 November so we can close the claim.	
+dv104	0	receipt		
+dv105	0	done		
+dv106	0	thanks		
+dv107	0	quoted_only		
+dv108	0	junk		
+dv109	0	news		
+dv110	0	newsletter		
+dv111	0	news		
+dv112	0	third_person		
+dv113	0	auto_reply		
+dv114	0	receipt		
+dv115	0	junk		
+dv116	0	receipt		
+dv117	0	newsletter		
+dv118	0	newsletter		
+dv119	0	news		
+dv120	0	ad		
+dv121	0	from_owner		
+dv122	1	cc_named	Maya, could you print the tickets by Thursday morning?	
+dv123	0	third_person		
+dv124	0	news		
+dv125	0	thanks		
+dv126	0	receipt		
+dv127	0	news		
+dv128	0	newsletter		
+dv129	0	newsletter		
+dv130	0	newsletter		
+dv131	0	thanks		
+dv132	0	receipt		
+dv133	0	help_offer		
+dv134	0	receipt		
+dv135	1	person	Are you able to print the tickets by Thursday morning?	
+dv136	0	polite		
+dv137	0	replied		
+dv138	0	quoted_only		
+dv139	0	newsletter		
+dv140	0	ad		
+dv141	0	auto_reply		
+dv142	0	replied		
+dv143	0	list		
+dv144	0	receipt		
+dv145	1	org_council	Please pay the parking charge of 35 pounds by 25 November.	
+dv146	0	done		
+dv147	0	news		
+dv148	0	ad		
+dv149	0	auto_reply		
+dv150	1	org_school	Please sign and return the trip form by 25 November.	
+dv151	0	from_owner		
+dv152	0	replied		
+dv153	0	done		
+dv154	0	newsletter		
+dv155	0	replied		
+dv156	0	third_person		
+dv157	0	receipt		
+dv158	0	news		
+dv159	1	org_utility	Please send us a meter reading before the end of the month.	
+dv160	0	notice		
+dv161	0	newsletter		
+dv162	0	thanks		
+dv163	0	from_owner		
+dv164	0	done		
+dv165	0	receipt		
+dv166	0	group		
+dv167	0	from_owner		
+dv168	0	list		
+dv169	0	replied		
+dv170	1	org_booking	Please bring your insurance card to your visit on 3 December.	
+dv171	0	ad		
+dv172	0	newsletter		
+dv173	0	news		
+dv174	0	group		
+dv175	0	quoted_only		
+dv176	0	done		
+dv177	0	newsletter		
+dv178	0	newsletter		
+dv179	0	replied		
+dv180	0	news		
+dv181	0	list		
+dv182	1	org_school	Please sign and return the trip form by 30 November.	
+dv183	0	thanks		
+dv184	0	from_owner		
+dv185	0	thanks		
+dv186	0	newsletter		
+dv187	0	receipt		
+dv188	0	auto_reply		
+dv189	0	polite		
+dv190	0	receipt		
+dv191	0	newsletter		
+dv192	0	news		
+dv193	0	help_offer		
+dv194	0	newsletter		
+dv195	0	receipt		
+dv196	0	list		
+dv197	0	news		
+dv198	0	notice		
+dv199	0	ad		
+dv200	0	receipt		

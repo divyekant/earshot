@@ -60,6 +60,8 @@ public struct Project: Equatable, Sendable {
 /// The kind of a kept reference.
 public enum DocKind: String, Sendable {
     case file, page, folder
+    /// A note of the Notes app (phase 3, S6). It has no address that the PA can open.
+    case note
 }
 
 /// The state of the text of a kept file (phase 2 build spec, 7.3).
@@ -124,7 +126,7 @@ public struct PlannedAlert: Equatable, Sendable {
 
 /// The kind of record in a list, the search index, the event table and the mirror.
 public enum RecordKind: String, Sendable {
-    case item, project, doc, alert, list, settings, mirror, store
+    case item, project, doc, alert, list, settings, mirror, store, flag, calEvent = "cal_event"
 }
 
 /// One pair of the copy in Apple Reminders.

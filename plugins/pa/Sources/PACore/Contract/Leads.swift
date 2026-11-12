@@ -5,6 +5,7 @@ import Foundation
 public enum PACommand: String, CaseIterable, Sendable {
     case remindMe, todo, note, keepThis, newProject, whatIsDue, whatAbout, whereIs, done, snooze, drop, move, quiet
     case whatProjects, finishProject, mainPoints
+    case keep, whatIsNew
 
     /// The leads of plugin.json for each command. "what due" is the form with an apostrophe: earshot removes "'s"
     /// before it reads a lead, so "what's due" reaches the PA as the lead "what due". "where's" becomes "where",
@@ -16,6 +17,9 @@ public enum PACommand: String, CaseIterable, Sendable {
         "quiet": .quiet,
         "what projects": .whatProjects, "finish project": .finishProject,
         "main points": .mainPoints, "summarize": .mainPoints, "summarise": .mainPoints,
+        // Phase 3. "what's new" reaches the PA as "what new". "keep this" stays a lead of its own: the longest lead
+        // wins in earshot.
+        "keep": .keep, "what is new": .whatIsNew, "what new": .whatIsNew,
     ]
 
     /// The command for a lead that earshot sent. The match ignores case, spaces, hyphens and apostrophes,

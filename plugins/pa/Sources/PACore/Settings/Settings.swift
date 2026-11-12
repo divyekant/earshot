@@ -22,6 +22,10 @@ public struct RuleModes: Codable, Equatable, Sendable {
     public var nearEvent: RuleMode = .alert
     /// Rule 3 (phase 2 and 3).
     public var newArrival: RuleMode = .list
+    /// Phase 3: a request flag from a mail or a note (spec 8.6).
+    /// A list by default (the owner's choice, 2026-11-12). Version 2 found about half of the requests with very few
+    /// false flags; it failed the found mark of the sealed holdout (E11).
+    public var request: RuleMode = .list
 
     public init() {}
 
@@ -33,6 +37,7 @@ public struct RuleModes: Codable, Equatable, Sendable {
         silence = try c.decodeIfPresent(RuleMode.self, forKey: .silence) ?? d.silence
         nearEvent = try c.decodeIfPresent(RuleMode.self, forKey: .nearEvent) ?? d.nearEvent
         newArrival = try c.decodeIfPresent(RuleMode.self, forKey: .newArrival) ?? d.newArrival
+        request = try c.decodeIfPresent(RuleMode.self, forKey: .request) ?? d.request
     }
 }
 
@@ -44,6 +49,7 @@ public struct ProjectRules: Codable, Equatable, Sendable {
     public var silence: RuleMode?
     public var nearEvent: RuleMode?
     public var newArrival: RuleMode?
+    public var request: RuleMode?
 
     public init() {}
 }
@@ -104,6 +110,77 @@ public struct ReminderSettings: Codable, Equatable, Sendable {
     }
 }
 
+/// Phase 3: the sources that the PA reads. If a source is false, the PA does not read it and does not ask for its
+/// permission. If it changes to false, the PA deletes what it kept from that source.
+public struct SourceSwitches: Codable, Equatable, Sendable {
+    public var calendar = true
+    public var mail = true
+    public var notes = true
+
+    public init() {}
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = SourceSwitches()
+        calendar = try c.decodeIfPresent(Bool.self, forKey: .calendar) ?? d.calendar
+        mail = try c.decodeIfPresent(Bool.self, forKey: .mail) ?? d.mail
+        notes = try c.decodeIfPresent(Bool.self, forKey: .notes) ?? d.notes
+    }
+}
+
+/// Phase 3: the mail read (spec 6.1 and 7.2).
+public struct MailSettings: Codable, Equatable, Sendable {
+    /// The time between two reads while Mail runs.
+    public var everyMinutes = 5
+    /// At the first read, the PA looks at the mail of this count of days.
+    public var firstDays = 3
+    /// The most messages that the PA looks back at, at the first read or after a long pause.
+    public var maxPerRead = 50
+    /// The most messages in one read. The rest waits for the next read.
+    public var batch = 10
+
+    public init() {}
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = MailSettings()
+        everyMinutes = try c.decodeIfPresent(Int.self, forKey: .everyMinutes) ?? d.everyMinutes
+        firstDays = try c.decodeIfPresent(Int.self, forKey: .firstDays) ?? d.firstDays
+        maxPerRead = try c.decodeIfPresent(Int.self, forKey: .maxPerRead) ?? d.maxPerRead
+        batch = try c.decodeIfPresent(Int.self, forKey: .batch) ?? d.batch
+    }
+}
+
+/// Phase 3: the notes read.
+public struct NotesSettings: Codable, Equatable, Sendable {
+    /// The time between two reads while Notes runs.
+    public var everyMinutes = 15
+
+    public init() {}
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        everyMinutes = try c.decodeIfPresent(Int.self, forKey: .everyMinutes) ?? NotesSettings().everyMinutes
+    }
+}
+
+/// Phase 3: the names and the addresses of the owner. If both lists are empty, the PA reads them from the Mail
+/// accounts.
+public struct OwnerSettings: Codable, Equatable, Sendable {
+    public var names: [String] = []
+    public var addresses: [String] = []
+
+    public init() {}
+
+    public init(names: [String], addresses: [String]) { self.names = names; self.addresses = addresses }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        names = try c.decodeIfPresent([String].self, forKey: .names) ?? []
+        addresses = try c.decodeIfPresent([String].self, forKey: .addresses) ?? []
+    }
+}
+
 /// The settings file, settings.json in the data folder. The PA writes it with the defaults at the first start,
 /// so the PA works with no setup. A key that is not in the file gets its default. An unknown key has no effect.
 public struct PASettings: Codable, Equatable, Sendable {
@@ -140,6 +217,21 @@ public struct PASettings: Codable, Equatable, Sendable {
     public var proposeByName = false
     /// After "new project", the next captures go to it for this count of minutes (8.3). 0 switches it off.
     public var projectFocusMinutes = 5
+    /// Phase 3: the sources that the PA reads.
+    public var sources = SourceSwitches()
+    /// Phase 3: the near-event alert comes this count of minutes before the start of an event.
+    public var nearEventMinutes = 15
+    /// Phase 3: if false, the PA makes no link by a rule between an event and the records. Links by the owner stay.
+    public var linkEvents = true
+    public var mail = MailSettings()
+    public var notes = NotesSettings()
+    /// Phase 3: if false, the request flags use the base formula only (spec 8.8).
+    public var flagsLearn = true
+    /// Phase 3: sender addresses that get no more request flags. The PA adds an address after the owner drops 3
+    /// flags from it and keeps none. Delete the line to get flags from that sender again.
+    public var flagsMuted: [String] = []
+    /// Phase 3: the names and addresses of the owner.
+    public var owner = OwnerSettings()
 
     public init() {}
 
@@ -162,6 +254,14 @@ public struct PASettings: Codable, Equatable, Sendable {
         proposeProject = try c.decodeIfPresent(Bool.self, forKey: .proposeProject) ?? d.proposeProject
         proposeByName = try c.decodeIfPresent(Bool.self, forKey: .proposeByName) ?? d.proposeByName
         projectFocusMinutes = try c.decodeIfPresent(Int.self, forKey: .projectFocusMinutes) ?? d.projectFocusMinutes
+        sources = try c.decodeIfPresent(SourceSwitches.self, forKey: .sources) ?? d.sources
+        nearEventMinutes = try c.decodeIfPresent(Int.self, forKey: .nearEventMinutes) ?? d.nearEventMinutes
+        linkEvents = try c.decodeIfPresent(Bool.self, forKey: .linkEvents) ?? d.linkEvents
+        mail = try c.decodeIfPresent(MailSettings.self, forKey: .mail) ?? d.mail
+        notes = try c.decodeIfPresent(NotesSettings.self, forKey: .notes) ?? d.notes
+        flagsLearn = try c.decodeIfPresent(Bool.self, forKey: .flagsLearn) ?? d.flagsLearn
+        flagsMuted = try c.decodeIfPresent([String].self, forKey: .flagsMuted) ?? d.flagsMuted
+        owner = try c.decodeIfPresent(OwnerSettings.self, forKey: .owner) ?? d.owner
     }
 
     /// The rules for an item in a project: the value of the project if it has one, or the general value.
@@ -173,6 +273,7 @@ public struct PASettings: Codable, Equatable, Sendable {
         if let v = p.silence { r.silence = v }
         if let v = p.nearEvent { r.nearEvent = v }
         if let v = p.newArrival { r.newArrival = v }
+        if let v = p.request { r.request = v }
         return r
     }
 

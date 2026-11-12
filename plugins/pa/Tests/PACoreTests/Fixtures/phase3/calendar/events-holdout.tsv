@@ -1,0 +1,45 @@
+# Phase 3, S3: holdout for links by a rule (spec 9.2). Written and committed before the code of the rule. Run one time.
+# Made-up events on the phase 2 corpus (Fixtures/phase2/corpus). Now is Wed 11 Nov 2026 10:00 Europe/London.
+# id	title	people	start	kind	expected
+# kind: want (a person wants to see one or more records), none (no record), sense (none; a project word in another sense)
+# expected: project:item numbers, separated by a space; a doc as project/file. Any one shown record in the list is correct.
+h01	Kitchen fitter first day		2026-11-16T08:00	want	kitchen:3,4,12 kitchen/plumber-letter.txt
+h02	Call with Helen about the tax return	Helen Ward	2026-11-13T17:00	want	taxes:2,7,3
+h03	Tax year review		2026-11-20T19:00	want	taxes:1,3,4,9,11,12
+h04	Visit day at Oakfield school	Mia Rao	2026-11-18T09:30	want	school:3,1,2
+h05	Priya views the car	Priya Shah	2026-11-16T18:00	want	car:4,2,3,11
+h06	Physio	Dr Jones	2026-11-12T17:30	want	knee:5,6,8,11
+h07	Bike club AGM		2026-11-19T19:30	want	bike:1,2,9
+h08	Wedding venue tasting		2026-11-21T12:00	want	wedding:2,3,6,9
+h09	Removals booked	Swift Removals	2026-11-24T08:00	want	move:1,10,3
+h10	Garden shed delivery		2026-11-25T10:00	want	shed:6,10,11,7
+h11	Lisbon trip planning		2026-11-15T20:00	want	trip:1,3,4,9,10
+h12	Plasterer quote visit		2026-11-17T11:00	want	kitchen:6
+h13	Accountant meeting	Helen Ward	2026-11-23T15:00	want	taxes:2,7,8
+h14	Mr Daniels parent evening	Mr Daniels	2026-11-19T18:00	want	school:7,12
+h15	Photographer call		2026-11-14T11:00	want	wedding:4,5
+h16	Kitchen showroom: tile samples		2026-11-14T10:00	want	kitchen:7,1,2 kitchen/quote-tiles.txt
+h17	Car sale paperwork with Priya	Priya Shah	2026-11-20T12:00	want	car:9,10,7,8
+h18	Knee physio session		2026-11-19T17:30	want	knee:5,6,1
+h19	Hill climb marshal briefing		2026-11-22T09:00	want	bike:9
+h20	Flat move check-out	Brook Lettings	2026-11-26T11:00	want	move:3,4,5,10
+h21	Ravi checks the fuse board	Ravi Rao	2026-11-18T08:30	want	kitchen:9
+h22	Wedding band audition		2026-11-17T20:00	want	wedding:8,11
+h23	Mrs Avery about the shed gate	Mrs Avery	2026-11-13T18:30	want	shed:6
+h24	Flight to Lisbon		2026-11-24T06:40	want	trip:1,2,5,6
+h25	School uniform shop		2026-11-21T10:00	want	school:4,5,9
+h26	Dentist		2026-11-13T09:00	none	
+h27	Lunch with Ana	Ana Costa	2026-11-12T13:00	none	
+h28	Gym class		2026-11-16T07:00	none	
+h29	Haircut		2026-11-20T16:00	none	
+h30	Team stand-up	Paul Evans	2026-11-12T09:30	none	
+h31	Book club		2026-11-18T19:00	none	
+h32	Piano lesson		2026-11-17T16:00	none	
+h33	Coffee with Grace	Grace Kim	2026-11-14T15:00	none	
+h34	Vet for the cat		2026-11-23T12:00	none	
+h35	Quarterly review	Sofia Romero	2026-11-25T14:00	none	
+h36	Kitchen table quiz night		2026-11-21T19:00	sense	
+h37	Wedding anniversary dinner of Anna and Leo	Anna Berg	2026-11-28T19:00	sense	
+h38	Car boot sale in the park		2026-11-15T08:00	sense	
+h39	Move and stretch class		2026-11-18T07:30	sense	
+h40	School reunion drinks		2026-11-27T20:00	sense	

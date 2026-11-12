@@ -1,0 +1,33 @@
+# Phase 3, S3: 30 captures for links by the owner (spec 9.2), with owner-calendar.tsv. Pass: 27 or more correct,
+# 1 or fewer linked to a wrong event. The project "Kitchen" exists.
+# lead	words	event (- for none)
+remind me	before the dentist to bring the x-ray	c01
+todo	print the contract for the meeting with Sam	c02
+remind me	before the plumber visit to turn off the water	c03
+todo	show the budget at the team meeting	c07
+remind me	before the flight to Lisbon to check in online	c08
+remind me	before dinner with Priya to buy flowers	c09
+todo	bring the report for the board meeting	c10
+remind me	before the haircut to take the photo	c11
+remind me	before the school visit to copy the birth certificate	c12
+remind me	before physio to fill in the exercise log	-
+remind me	before the meeting to charge the laptop	-
+remind me	before the dentist tomorrow at 9 to bring the x-ray	-
+todo	print the tickets for the concert	-
+remind me	before the parents evening to ask about maths	c04
+todo	prepare questions for the parents evening	c04
+todo	buy wine for the dinner with Priya	c09
+todo	send the agenda for the team meeting	c07
+remind me	at the plumber visit to show the leak	c03
+todo	book the taxi for the flight to Lisbon	c08
+todo	call the bank before Friday	-
+note	the dentist is on the second floor	-
+todo	buy a cake for the party	-
+remind me	before the board meeting to read the minutes	c10
+todo	fix the bike for the club ride	-
+todo	pay the deposit for kitchen	-
+remind me	before the meeting with Sam to read his notes	c02
+todo	print the boarding pass for the flight	c08
+remind me	before the haircut on Friday to wash my hair	-
+todo	review the plan for the school visit	c12
+remind me	before the team meeting to update the board	c07

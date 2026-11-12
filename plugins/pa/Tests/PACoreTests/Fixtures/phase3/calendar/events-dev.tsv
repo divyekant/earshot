@@ -1,0 +1,42 @@
+# Phase 3, S3: development set for links by a rule (spec 9.2). Same format as events-holdout.tsv.
+# id	title	people	start	kind	expected
+d01	Plumber visit	Tom Hale	2026-11-12T08:00	want	kitchen:3,12 kitchen/plumber-letter.txt
+d02	Kitchen electrics check		2026-11-13T09:00	want	kitchen:9,6 kitchen/electrics-notes.txt
+d03	Cabinet delivery for the kitchen		2026-11-18T10:00	want	kitchen:8,4 kitchen/cabinet-order.txt
+d04	Helen: tax call	Helen Ward	2026-11-16T12:00	want	taxes:2,7
+d05	Tax year paperwork		2026-11-21T10:00	want	taxes:1,4,9,10
+d06	School office visit		2026-11-17T09:00	want	school:3,1,2
+d07	School change meeting at Hillcrest		2026-11-24T15:30	want	school:10,1
+d08	Priya test drive	Priya Shah	2026-11-14T18:00	want	car:4,3,11
+d09	Car sale: buyer collects		2026-11-28T10:00	want	car:9,10,7,8
+d10	Physio appointment		2026-11-12T17:30	want	knee:5,6
+d11	Knee physio follow-up		2026-11-26T17:30	want	knee:5,6,12
+d12	Bike club ride		2026-11-15T08:00	want	bike:11,4,8
+d13	Bike club committee		2026-11-25T19:00	want	bike:1,2,3,9
+d14	Wedding planning with the venue		2026-11-19T18:00	want	wedding:2,3,9
+d15	Wedding photographer meeting		2026-11-22T11:00	want	wedding:4,5
+d16	Flat move day	Swift Removals	2026-11-27T08:00	want	move:10,1,2
+d17	Brook Lettings inspection	Brook Lettings	2026-11-20T10:00	want	move:3,4,5
+d18	Garden shed base work		2026-11-14T09:00	want	shed:2,3,5,8
+d19	Greenleaf shed order call		2026-11-13T14:00	want	shed:1,7
+d20	Lisbon trip check-in		2026-11-23T08:00	want	trip:2,1
+d21	Fado show		2026-11-25T21:00	want	trip:3
+d22	Ring fitting	Mira Sen	2026-11-18T12:00	want	wedding:10,3
+d23	Grandpa Ivo visit	Grandpa Ivo	2026-11-15T15:00	want	wedding:6
+d24	Breakfast club start		2026-11-16T07:45	want	school:11
+d25	Bike service		2026-11-24T09:00	want	bike:6,4,5
+d26	Yoga		2026-11-13T07:00	none	
+d27	Lunch with Sam	Sam Lee	2026-11-12T12:30	none	
+d28	Optician		2026-11-17T11:00	none	
+d29	Team retro	Paul Evans	2026-11-13T15:00	none	
+d30	Cinema		2026-11-14T20:00	none	
+d31	Choir practice		2026-11-19T19:30	none	
+d32	Swim		2026-11-16T06:30	none	
+d33	Drinks with Liam	Liam Walsh	2026-11-20T18:30	none	
+d34	Budget review	Ken Ito	2026-11-24T10:00	none	
+d35	Parents call		2026-11-15T18:00	none	
+d36	Kitchen disco for the kids party		2026-11-21T15:00	sense	
+d37	Tax webinar for small charities		2026-11-18T13:00	sense	
+d38	Trip to the zoo with the class		2026-11-26T09:00	sense	
+d39	Car park meeting point for the hike		2026-11-22T08:30	sense	
+d40	School of rock concert		2026-11-28T19:00	sense	

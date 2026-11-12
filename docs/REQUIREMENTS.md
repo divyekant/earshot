@@ -112,13 +112,15 @@ Experimental, phase 1. The PA (personal assistant) is the first plugin of earsho
 | R-PA-1 | The PA is one local program with one store file. It needs no server software and no account. | Must |
 | R-PA-2 | No PA data leaves the Mac. Exception, chosen by the owner: the titles, times and project names of open to-dos and reminders go to Apple Reminders, which syncs through iCloud. A later exception for research is not in phase 1. | Must |
 | R-PA-3 | The PA changes only its own store, its own pages and its own list in Apple Reminders. It never sends, books, pays, or changes a file of the owner. | Must |
-| R-PA-4 | Rules decide what to do and when. Search finds. No model writes text. The PA shows the owner's words, words of the owner's kept documents, fixed labels, times and counts. One embedding model of 0.6B or less can compare text. | Must |
-| R-PA-5 | A to-do that the PA found in a source is a proposal until the owner confirms it. (Not used in phase 1.) | Must |
+| R-PA-4 | Rules decide what to do and when. Search finds. No model writes text. The PA shows the owner's words, words of the owner's kept documents, mail, notes and calendar events, fixed labels, times and counts. One embedding model of 0.6B or less can compare text. A formula with some thousand weights can score a sentence. | Must |
+| R-PA-5 | A to-do that the PA found in a source is a proposal until the owner confirms it. A flag is a proposal until the owner says "keep". | Must |
 | R-PA-6 | If the PA is not sure of a time, it saves the item with no time and says so. The PA never loses a capture. | Must |
 | R-PA-7 | The PA interrupts the owner only by a rule that is set to "alert". By default, only time interrupts. | Must |
 | R-PA-8 | The PA answers a capture or a change in 100 ms or less, and a search in 300 ms or less. A PA command does not slow earshot (R-PL-5). | Must |
-| R-PA-9 | The PA keeps the text of a document only if the owner kept the document or its folder. If the owner drops it, the PA deletes its text and its numbers at once. | Must |
+| R-PA-9 | The PA keeps the text of a document only if the owner kept the document or its folder. It keeps the text of the notes of the Notes app only while that source is on. From a mail, it keeps only the sender name, the subject and one sentence, and only for a flag. If the owner drops a document or switches a source off, the PA deletes the text and the numbers at once. | Must |
 | R-PA-10 | A project that the search set has a mark and shows with "?". The owner can correct it with one command. The PA counts the corrections and shows them. | Must |
+| R-PA-11 | The PA only reads the calendar, Mail and Notes. It changes nothing in them and starts none of them. Each source has a switch. | Must |
+| R-PA-12 | The formula for flags learns only from the owner's "keep" and "drop" answers, on this Mac. The PA uses new weights only if they are better on the owner's last answers. | Should |
 
 ### 3.10 Command line
 

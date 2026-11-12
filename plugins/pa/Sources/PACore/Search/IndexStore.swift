@@ -46,9 +46,47 @@ public final class IndexStore {
           data BLOB NOT NULL,
           PRIMARY KEY (owner_kind, owner_id)
         );
+        CREATE TABLE IF NOT EXISTS flag_example (
+          id INTEGER PRIMARY KEY,
+          flag_id INTEGER,
+          features BLOB NOT NULL,
+          vector BLOB,
+          answer TEXT NOT NULL,
+          created_at REAL NOT NULL
+        );
         PRAGMA user_version = 1;
         """)
         keywords = try KeywordIndex(db: db, table: "passage_fts")
+    }
+
+    // MARK: - Flag examples (phase 3, spec 8.8). Numbers and the answer only, no text.
+
+    /// One answer of the owner to a request flag: the feature values, the numbers of its sentence, and "kept" or
+    /// "dropped".
+    public func addFlagExample(flag: Int64, features: [Float], vector: [Float]?, answer: String, at: Date) throws {
+        try db.run("INSERT INTO flag_example(flag_id, features, vector, answer, created_at) VALUES (?, ?, ?, ?, ?)",
+                   [.int(flag), .blob(IndexStore.blob(features)), vector.map { .blob(IndexStore.blob($0)) } ?? .null,
+                    .text(answer), .real(at.timeIntervalSince1970)])
+    }
+
+    /// The example of an open request flag: its features, before the owner answers. A newer mail of the same
+    /// conversation replaces it.
+    public func setOpenFlagExample(flag: Int64, features: [Float], at: Date) throws {
+        try db.run("DELETE FROM flag_example WHERE flag_id = ? AND answer = 'open'", [.int(flag)])
+        try addFlagExample(flag: flag, features: features, vector: nil, answer: "open", at: at)
+    }
+
+    /// The owner answered the flag: "kept" or "dropped". Gives false if the flag had no open example.
+    @discardableResult
+    public func answerFlagExample(flag: Int64, answer: String) throws -> Bool {
+        try db.run("UPDATE flag_example SET answer = ? WHERE flag_id = ? AND answer = 'open'", [.text(answer), .int(flag)]) > 0
+    }
+
+    /// The answers, oldest first. Open examples are not answers.
+    public func flagExamples() -> [(features: [Float], vector: [Float]?, answer: String)] {
+        ((try? db.query("SELECT features, vector, answer FROM flag_example WHERE answer != 'open' ORDER BY id")) ?? []).map {
+            (IndexStore.floats($0[0].blob ?? Data()), $0[1].blob.map(IndexStore.floats), $0[2].text ?? "")
+        }
     }
 
     /// Replaces all passages of a document, in one transaction. Their numbers go too.

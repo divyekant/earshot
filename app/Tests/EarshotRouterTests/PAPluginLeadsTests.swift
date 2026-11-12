@@ -47,6 +47,12 @@ final class PAPluginLeadsTests: XCTestCase {
             ("What projects", "what projects", ""),
             ("Finish project kitchen", "finish project", "kitchen"),
             ("Note this for kitchen", "note", "this for kitchen"),
+            // Phase 3 (phase 3 build spec 7.1). The longest lead wins: "keep this" stays its own lead.
+            ("What's new?", "what new", ""),
+            ("What is new", "what is new", ""),
+            ("Keep 2 for kitchen", "keep", "2 for kitchen"),
+            ("Keep this folder", "keep this", "folder"),
+            ("keep 1 as call Maya about the quote", "keep", "1 as call Maya about the quote"),
         ]
         for (text, lead, rest) in cases {
             let m = PluginRouter.match(text, plugins: leads, apps: apps)

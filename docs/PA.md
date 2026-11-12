@@ -21,6 +21,17 @@ The model runs in a separate worker process (`earshot-pa --embed-worker`). The w
 4. Approve the plugin **PA**.
 5. If macOS asks for access to Reminders, click **Allow**.
 
+From phase 3, the PA also reads the calendar, Mail and Notes. Do these steps one time:
+
+1. Approve the plugin **PA** again in **Manage > Plugins**, because its manifest changed.
+2. If macOS asks for access to the calendar, click **Allow**.
+3. If macOS asks "earshot PA wants to control Mail", click **Allow**.
+4. If macOS asks "earshot PA wants to control Notes", click **Allow**.
+
+macOS asks these questions only when Mail or Notes runs, because the PA never starts them. A new build of the PA keeps the access. To stop the read of a source, set it to `false` in `sources` in the settings. Then the PA deletes what it kept from that source.
+
+What the PA keeps from a mail: the sender name, the subject and one sentence, only for a flag. 30 days after you answer a flag, the PA deletes its subject and its sentence. The tests used English mail and notes only. The PA does not read a locked note. It cannot open a note for you by voice.
+
 The script also downloads the search model to the data folder of the PA, with a SHA-256 check. The PA program itself has no network code. To use no model, run `PA_MODEL=none plugins/pa/scripts/install-pa.sh` and set `"searchModel": "none"`. Then the search uses keywords only.
 
 The first time that you keep a file in Documents, Desktop or Downloads, macOS can ask if the PA can open files in that folder. Click **Allow** if you want the PA to find words in the file. If you click **Don't Allow**, the PA keeps the reference and shows one note: "The PA cannot read this folder. The reference is kept."
@@ -75,6 +86,7 @@ More rules:
 - In quiet hours (22:00 to 08:00), the PA keeps the alerts for later. A reminder with a clock time that you said in quiet hours still gives an alert.
 - If earshot was not on at the time of an alert, the PA shows a list "Missed" at the next start.
 - If the copy in Apple Reminders is on, Reminders gives the alert of a reminder. The PA does not give a second alert.
+- Near-event alert: 15 minutes before a calendar event with links, the PA shows the event, its time and the linked items and documents. An event with no link gives no alert. If a rule made the link, the record shows with "?". To link an item yourself, say for example "remind me before the dentist to bring the x-ray". In the test, 22 of 24 alerts from the rule were correct. To stop the links by a rule, set `linkEvents` to `false`. Your own links stay.
 
 ## The copy in Apple Reminders
 
@@ -110,6 +122,44 @@ To open a page, say "open today", "open all open" or "open <project>". You can a
 
 The pages have no script and load nothing from the network. The PA writes the pages again after each change.
 
+## Mail
+
+While the Mail app runs, the PA reads new messages of the inbox each 5 minutes, in small steps. It does not read while Mail is the front app. The PA never starts Mail and never sends, moves, deletes, flags or marks a mail.
+
+The PA makes flags. A flag is one line in a list. It is a proposal: it makes no reminder and no to-do.
+
+- Request flag: `Request · Sam Lee · Could you send me the signed form before the 20th? · 20 Nov?`. The PA selected the sentence from the mail. It writes no words. The day with "?" is a proposed due day.
+- Arrival flag: `Arrived? · Sam Lee · Quote for the tiles` if the sender is named in an open "waiting for" item. `New in Kitchen? · mail · Sam Lee · Quote for the tiles` if the mail is like the records of a project.
+
+Limit: the PA finds about half of the requests. Do not use it as your only check of the inbox. When the PA shows a request flag, it is almost always correct. In the tests, 1 of 37 request flags was wrong.
+
+The PA gives a request flag only if all of these are true:
+
+- The mail is not bulk, list, automatic or junk mail, and you did not send it or reply to it.
+- The mail is for you: the greeting or the sentence names you, or you are in To with 3 addresses or fewer.
+- A person wrote it, or an organization asks you to do a thing with a time limit about a thing of yours (a bill, an appointment, an order). Sales and surveys get no flag.
+
+| You say | The PA does |
+|---|---|
+| "what is new" | Shows the open flags, newest first. |
+| "keep 2" | Makes a to-do from flag 2. The title is the sentence. The to-do has a link to the mail. "keep 2 as call Sam about the form" uses your words. "keep 2 for kitchen" sets the project. |
+| "drop 2" | Drops flag 2. |
+
+If you reply to the mail in Mail, the flag goes away at the next read. To stop request flags, set `rules.request` to `off`.
+
+Say "open flags" to see the open flags on a page. Each flag has a link that opens the mail in Mail.
+
+The PA learns from your answers:
+
+- Each "keep" and each "drop" on a request flag is an answer. After 50 answers with 10 or more of each kind, the PA changes its weights a little after each answer. The PA uses the new weights only if they agree better with your last 20 answers than the base weights do.
+- The PA makes few wrong flags, so the learning can start late, or never.
+- If you drop 3 flags from one sender and keep none, the PA makes no more request flags from that sender. The Today page shows the sender under "No more flags from". To get flags from that sender again, delete the address from `flagsMuted` in the settings.
+- To stop the learning, set `flagsLearn` to `false`.
+
+## Notes
+
+While the Notes app runs, the PA reads your notes each 15 minutes. It skips locked notes and the folder "Recently Deleted". "where is" then finds the words of a note. The result shows the note name and the passage. The PA cannot open a note for you: open it in Notes. If a note changes, the PA reads it again. If you delete a note, the PA deletes its passages at the next read. The PA never starts Notes and never changes a note.
+
 ## Settings
 
 The settings file is `~/Library/Application Support/earshot/plugin-data/pa/settings.json`. The PA writes the file with the default values at the first start. The PA reads the file again when it changes.
@@ -123,12 +173,18 @@ The settings file is `~/Library/Application Support/earshot/plugin-data/pa/setti
 | `defaultSnoozeMinutes` | `10` | The snooze time if you say no time. |
 | `bareHourWindow` | `{"from": "07:00", "to": "23:00"}` | "at 5" is the next 5 o'clock in this window. |
 | `dayParts` | morning 09:00, noon 12:00, afternoon 15:00, evening 18:00, tonight 20:00, endOfDay 17:00 | The times of these words. |
-| `rules` | time alert, due list, silence list, nearEvent alert, newArrival list | Each rule is `"alert"`, `"list"` or `"off"`. |
+| `rules` | time alert, due list, silence list, nearEvent alert, newArrival list, request list | Each rule is `"alert"`, `"list"` or `"off"`. |
 | `projects` | `{}` | Rules for one project. Example: `{"kitchen": {"due": "alert"}}`. |
 | `reminders` | `{"copy": true, "list": "earshot", "alertBy": "reminders"}` | The copy in Apple Reminders. If `alertBy` is `"pa"`, the PA gives the alerts. |
 | `projectFocusMinutes` | `5` | After "new project kitchen", your next captures go to Kitchen for this count of minutes. Each capture starts the minutes again. `0` switches it off. |
 | `proposeProject` | `true` | If `true`, the PA proposes a project for a capture with no project, with a "?" ("To-do · Kitchen? · call the tiler"). Set it to `false` to stop the proposals. |
 | `proposeByName` | `false` | If `true`, the PA also proposes a project whose name is in the capture. Off by default: a name in another sense ("the soup kitchen", "his Lisbon trip") gives a wrong proposal. Say "for <project>" to name a project for sure. |
+| `nearEventMinutes` | `15` | The near-event alert comes this count of minutes before the start of an event. |
+| `linkEvents` | `true` | If `true`, a rule links open items and documents to a calendar event, shown with "?". If `false`, only your own links ("before the dentist") stay. |
+| `sources` | `{"calendar": true, "mail": true, "notes": true}` | The sources that the PA reads. If you set one to `false`, the PA deletes what it kept from that source. |
+| `mail` | `{"everyMinutes": 5, "firstDays": 3, "maxPerRead": 50, "batch": 10}` | The mail read: the time between two reads, the days of the first read, the most messages to look back, and the ids in one step. |
+| `flagsLearn` | `true` | If `true`, the request flags learn from your "keep" and "drop" answers. If `false`, the PA uses the base weights. |
+| `flagsMuted` | `[]` | Sender addresses that get no more request flags. The PA adds an address after you drop 3 flags from it and keep none. Delete an address to get its flags again. |
 | `searchModel` | `"gemma"` | The search model: `"gemma"`, `"gemma2"`, `"qwen3"` or `"none"` (keywords only). The PA reads it at its start. Run `PA_MODEL=<name> scripts/install-pa.sh` to download another model. |
 
 If the file has an error, the PA uses the default values and shows one note.

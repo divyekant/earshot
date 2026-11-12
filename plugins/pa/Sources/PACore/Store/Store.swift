@@ -16,7 +16,7 @@ public final class Store {
     public private(set) var recoveredFrom: URL?
 
     /// The schema version. Each change is one numbered migration.
-    public static let schemaVersion = 2
+    public static let schemaVersion = 4
 
     public init(url: URL, now: Date = Date()) throws {
         self.url = url
@@ -60,6 +60,8 @@ public final class Store {
         let version = try db.query("PRAGMA user_version").first?.first?.int ?? 0
         if version < 1 { try migration1() }
         if version < 2 { try migration2() }
+        if version < 3 { try migration3() }
+        if version < 4 { try migration4() }
     }
 
     /// Phase 2 (build spec 7.2): kept files, proposals of the search, closed projects.
@@ -432,7 +434,7 @@ public final class Store {
         d.droppedAt == nil ? d.title + " " + (d.address ?? "") : nil
     }
 
-    public func insertDoc(_ d: Doc) throws -> Int64 {
+    public func insertDoc(_ d: Doc, event: String = "keep") throws -> Int64 {
         try db.transaction {
             try db.run("""
             INSERT INTO doc(address, title, app, project_id, created_at, dropped_at, path, kind, size, modified_at,
@@ -441,7 +443,7 @@ public final class Store {
             """, docParams(d))
             let id = db.lastInsertID
             try index(.doc, id, Store.docBody(d))
-            log("keep", .doc, id, at: d.createdAt)
+            log(event, .doc, id, at: d.createdAt)
             return id
         }
     }

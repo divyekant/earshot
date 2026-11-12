@@ -138,6 +138,78 @@ if let i = args.firstIndex(of: "--followup-bench"), i + 1 < args.count {
     exit(runFollowUp())
 }
 
+// The bench of the request flags (phase 3, 8.5, E11): earshot-pa --flags-bench <mail fixtures folder>
+// [--embedder <name> [--model <file.gguf>] [--gpu]] [--final <variant>:<threshold>]
+// [--write-weights <file> --variant <A|B> --threshold <t>] [--analyze <set> --threshold <t>]
+// [--items <set> --owner-names a,b --owner-addresses x@y] (dk's items: counts only).
+if let i = args.firstIndex(of: "--flags-bench"), i + 1 < args.count {
+    func value(_ flag: String) -> String? {
+        args.firstIndex(of: flag).flatMap { $0 + 1 < args.count ? args[$0 + 1] : nil }
+    }
+    func runFlags() -> Int32 {
+        do {
+            let embedder = try value("--embedder").map {
+                try makeEmbedder($0, allowAssetRequest: false, modelFile: value("--model"), gpu: args.contains("--gpu"))
+            }
+            let bench = FlagBench(folder: URL(fileURLWithPath: args[i + 1], isDirectory: true), embedder: embedder)
+            if let names = value("--owner-names") { bench.owner = Set(names.lowercased().split(separator: ",").map(String.init)) }
+            if let addrs = value("--owner-addresses") { bench.ownerAddresses = Set(addrs.lowercased().split(separator: ",").map(String.init)) }
+            if let it = value("--items") {
+                try bench.items(it)
+            } else if let a = value("--analyze") {
+                try bench.analyze(a, threshold: Double(value("--threshold") ?? "4") ?? 4)
+            } else if let w = value("--write-weights") {
+                try bench.writeWeights(URL(fileURLWithPath: w), variant: value("--variant") ?? "B",
+                                       threshold: Double(value("--threshold") ?? "0.5") ?? 0.5)
+            } else if let f = value("--final") {
+                let parts = f.split(separator: ":")
+                guard parts.count == 2, let t = Double(parts[1]) else { print("Use --final B:0.60."); return 1 }
+                try bench.final(variant: String(parts[0]), threshold: t)
+            } else {
+                try bench.development()
+            }
+            return 0
+        } catch {
+            print("Bench error: \(error)")
+            return 1
+        }
+    }
+    exit(runFlags())
+}
+
+// The bench of the links by a rule (phase 3, 9.2): earshot-pa --events-bench <phase 2 fixtures folder>
+// --events <events tsv> --embedder <name> [--model <file.gguf>] [--gpu] [--detail] [--final L1+L2].
+if let i = args.firstIndex(of: "--events-bench"), i + 1 < args.count {
+    func value(_ flag: String) -> String? {
+        args.firstIndex(of: flag).flatMap { $0 + 1 < args.count ? args[$0 + 1] : nil }
+    }
+    func runEvents() -> Int32 {
+        do {
+            guard let events = value("--events") else { print("Say the events file with --events."); return 1 }
+            let embedder = try makeEmbedder(value("--embedder") ?? "hash", allowAssetRequest: false, modelFile: value("--model"),
+                                            gpu: args.contains("--gpu"))
+            let bench = try EventBench(corpus: URL(fileURLWithPath: args[i + 1], isDirectory: true), embedder: embedder)
+            let file = URL(fileURLWithPath: events)
+            if args.contains("--mail-arrivals") {
+                try bench.mailArrivals(file)
+                return 0
+            }
+            if let f = value("--final") {
+                guard let lines = EventLinker.Lines(label: f) else { print("Unknown lines \(f). Use for example L1+L2."); return 1 }
+                try bench.final(file, lines: lines)
+            } else {
+                let show = (value("--show") ?? "").split(separator: " ").compactMap { EventLinker.Lines(label: String($0)) }
+                try bench.development(file, detail: args.contains("--detail"), show: show)
+            }
+            return 0
+        } catch {
+            print("Bench error: \(error)")
+            return 1
+        }
+    }
+    exit(runEvents())
+}
+
 let env = ProcessInfo.processInfo.environment
 let folder: URL
 if let path = env["EARSHOT_PLUGIN_DATA"], !path.isEmpty {
@@ -186,6 +258,32 @@ timer.setEventHandler {
 }
 queue.sync { scheduleCheck() }
 timer.resume()
+// The calendar (phase 3, 9.1). The PA asks for access only if the source is on.
+#if os(macOS)
+if PASettings.load(folder.appendingPathComponent("settings.json")).settings.sources.calendar {
+    let calendar = EventKitCalendar(ask: true) {
+        queue.async {
+            engine.readCalendar()
+            scheduleCheck()
+        }
+    }
+    queue.async {
+        engine.calendarSource = calendar
+        engine.readCalendar()
+        scheduleCheck()
+    }
+}
+// The mail (phase 3, 6.1). The PA reads only while Mail runs. It never starts Mail.
+if PASettings.load(folder.appendingPathComponent("settings.json")).settings.sources.mail {
+    let mail = AppleMail()
+    queue.async { engine.mailSource = mail }
+}
+// The notes (phase 3, S6). The PA reads only while Notes runs. It never starts Notes.
+if PASettings.load(folder.appendingPathComponent("settings.json")).settings.sources.notes {
+    let notes = AppleNotes()
+    queue.async { engine.notesSource = notes }
+}
+#endif
 let systemEvents = SystemEvents { _ in
     queue.async {
         engine.tick()
@@ -245,6 +343,12 @@ let reader = Thread {
     exit(0)
 }
 reader.start()
+
+// Phase 3, S1: the probes, if the owner's test put the file probe-request in the data folder. They run off the
+// command path. Apple events run on the main thread.
+#if os(macOS)
+DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 2) { SourceProbe.runIfRequested(folder: folder) }
+#endif
 
 // The main run loop delivers the notifications of EventKit and of the system (wake, clock change).
 RunLoop.main.run()

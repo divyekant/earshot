@@ -49,6 +49,22 @@ public final class Engine {
     /// Runs a block at background priority, off the engine queue (phase 2 build rule 6). Tests run it at once.
     public var background: (@escaping () -> Void) -> Void = { block in block() }
     public internal(set) var settings = PASettings()
+    /// Phase 3: the calendar (EventKit on the Mac, a fixture in tests). Nil: no calendar read.
+    public var calendarSource: CalendarSource?
+    var lastCalendarRead: Date?
+    /// The title of each event at its last link by a rule. A new or a changed title gets new links.
+    var ruleLinkTitles: [Int64: String] = [:]
+    /// Phase 3, S4: the mail source, and the state of the mail read.
+    public var mailSource: MailSource?
+    let mailReader = SourceReader(name: "mail")
+    var lastMailRead: Date?
+    var mailFrontSince: Date?
+    var mailReading = false
+    /// Phase 3, S6: the notes source, and the state of the notes read.
+    public var notesSource: NotesSource?
+    let notesReader = SourceReader(name: "notes")
+    var lastNotesRead: Date?
+    var notesReading = false
     let log: PALog
     /// A note for the next answer, for example after a new store started.
     var pendingNotice: String?
@@ -135,6 +151,14 @@ public final class Engine {
             _ = try? store?.db.run("DELETE FROM mirror")
             syncAll()
         }
+        // Phase 3 (spec 7.2): a source that goes off loses what the PA kept from it, at once.
+        if old.sources.calendar && !settings.sources.calendar { try? store?.forgetSource(.calendar) }
+        if old.linkEvents && !settings.linkEvents {
+            try? store?.db.run("DELETE FROM cal_event_link WHERE by = 'rule'")
+            ruleLinkTitles = [:]
+        }
+        if old.sources.mail && !settings.sources.mail { try? store?.forgetSource(.mail) }
+        if old.sources.notes && !settings.sources.notes { try? store?.forgetSource(.note); forgetNotes() }
         markPagesDirty()
     }
 
@@ -228,6 +252,8 @@ public final class Engine {
         case .whatProjects: return whatProjects(id: id)
         case .finishProject: return finishProject(id: id, text: text)
         case .mainPoints: return mainPoints(id: id, text: text, context: context)
+        case .keep: return keepFlag(id: id, text: text, context: context)
+        case .whatIsNew: return whatIsNew(id: id)
         }
     }
 
