@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">
+<title>Probe fields · Request a library card at Ashwell Library</title>
+<style>body { font: 16px system-ui, sans-serif; margin: 40px; max-width: 640px; } input, select, textarea { display: block; margin: 6px 0 14px; }</style>
+</head>
+<body>
+<form role="search"><label for="q">Search the catalogue</label><input id="q" type="search" value="PROBE-SEARCH-VALUE"></form>
+<h1>Request a library card</h1>
+<p>Anyone who lives, works or studies in the district of Ashwell can have a free library card. Fill in this form and collect the card at the front desk within fourteen days. Bring a letter or a bill that shows your address.</p>
+<form>
+  <label for="name">Full name</label>
+  <input id="name" type="text" value="PROBE-LINE-VALUE">
+  <label for="branch">Branch</label>
+  <select id="branch"><option>Ashwell Central</option><option>Ashwell North</option></select>
+  <label for="town">Town</label>
+  <input id="town" list="towns" value="PROBE-COMBO-VALUE"><datalist id="towns"><option value="Ashwell"></option></datalist>
+  <label for="notes">Anything we should know</label>
+  <textarea id="notes" rows="4">PROBE-AREA-LINE-ONE
+PROBE-AREA-LINE-TWO</textarea>
+  <button type="button">Send request</button>
+</form>
+<p>Children under twelve need a parent or carer to sign the form at the desk.</p>
+</body>
+</html>
