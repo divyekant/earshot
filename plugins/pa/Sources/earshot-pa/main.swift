@@ -246,5 +246,11 @@ let reader = Thread {
 }
 reader.start()
 
+// Phase 3, S1: the probes, if the owner's test put the file probe-request in the data folder. They run off the
+// command path. Apple events run on the main thread.
+#if os(macOS)
+DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 2) { SourceProbe.runIfRequested(folder: folder) }
+#endif
+
 // The main run loop delivers the notifications of EventKit and of the system (wake, clock change).
 RunLoop.main.run()

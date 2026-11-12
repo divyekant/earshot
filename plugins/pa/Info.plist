@@ -26,6 +26,12 @@
 	<string>The PA plugin of earshot reads the documents that you keep, so that you can find words in them. The text stays on this Mac.</string>
 	<key>NSDownloadsFolderUsageDescription</key>
 	<string>The PA plugin of earshot reads the documents that you keep, so that you can find words in them. The text stays on this Mac.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>The PA plugin of earshot reads your calendar, so that it can show your notes and documents before an event. It changes nothing.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>The PA plugin of earshot reads your calendar, so that it can show your notes and documents before an event. It changes nothing.</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>The PA plugin of earshot reads new mail and notes to find requests. It changes nothing and sends nothing.</string>
 	<key>NSRemindersFullAccessUsageDescription</key>
 	<string>The PA plugin of earshot copies your to-dos and reminders to one Reminders list, so that you see them on your iPhone.</string>
 	<key>NSRemindersUsageDescription</key>
