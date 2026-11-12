@@ -47,6 +47,8 @@ extension EarshotActionRunner {
             ?? sensitiveNow(app: AX.appElement(read.pid), pid: read.pid) {
             return none("no screenshot: this looks like a sign-in, code or payment page (\(why))")
         }
+        // A page that a plugin wrote holds the owner's private data. It never goes to Jev (R-MD-1, D-10).
+        if SafetyPolicy.pluginPage(url: read.snapshot.url) { return none("no screenshot: a plugin page") }
         if read.web, read.areaPath != "hit test" { return none("no screenshot: the page can be a hidden tab") }
         if overlay.shown { overlay.hide() }
 
