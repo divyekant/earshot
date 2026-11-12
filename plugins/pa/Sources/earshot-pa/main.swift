@@ -138,6 +138,34 @@ if let i = args.firstIndex(of: "--followup-bench"), i + 1 < args.count {
     exit(runFollowUp())
 }
 
+// The bench of the links by a rule (phase 3, 9.2): earshot-pa --events-bench <phase 2 fixtures folder>
+// --events <events tsv> --embedder <name> [--model <file.gguf>] [--gpu] [--detail] [--final L1+L2].
+if let i = args.firstIndex(of: "--events-bench"), i + 1 < args.count {
+    func value(_ flag: String) -> String? {
+        args.firstIndex(of: flag).flatMap { $0 + 1 < args.count ? args[$0 + 1] : nil }
+    }
+    func runEvents() -> Int32 {
+        do {
+            guard let events = value("--events") else { print("Say the events file with --events."); return 1 }
+            let embedder = try makeEmbedder(value("--embedder") ?? "hash", allowAssetRequest: false, modelFile: value("--model"),
+                                            gpu: args.contains("--gpu"))
+            let bench = try EventBench(corpus: URL(fileURLWithPath: args[i + 1], isDirectory: true), embedder: embedder)
+            let file = URL(fileURLWithPath: events)
+            if let f = value("--final") {
+                guard let lines = EventLinker.Lines(label: f) else { print("Unknown lines \(f). Use for example L1+L2."); return 1 }
+                try bench.final(file, lines: lines)
+            } else {
+                try bench.development(file, detail: args.contains("--detail"))
+            }
+            return 0
+        } catch {
+            print("Bench error: \(error)")
+            return 1
+        }
+    }
+    exit(runEvents())
+}
+
 let env = ProcessInfo.processInfo.environment
 let folder: URL
 if let path = env["EARSHOT_PLUGIN_DATA"], !path.isEmpty {

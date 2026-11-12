@@ -94,6 +94,24 @@ extension Engine {
         return parts.joined(separator: " · ")
     }
 
+    /// The event that the words name, with the event phrase cut (phase 3, 9.2). Only events of the next 14 days.
+    func eventInWords(_ words: String) -> (event: CalEvent, rest: String)? {
+        guard settings.sources.calendar, let store else { return nil }
+        let events = store.events(from: clock.now, to: clock.now.addingTimeInterval(14 * 86400))
+        guard !events.isEmpty, let m = OwnerEventLink.match(words, events: events), !m.rest.isEmpty else { return nil }
+        return m
+    }
+
+    /// "Reminder · before Dentist, Thu 10:00 · bring the x-ray".
+    func eventNote(_ it: Item, _ e: CalEvent) -> String {
+        var parts = [it.kind == .reminder ? "Reminder" : "To-do"]
+        let when = OwnerEventLink.when(e, now: clock.now, clock.calendar, locale: clock.locale)
+        parts.append("\(it.kind == .reminder ? "before" : "for") \(e.title), \(when)")
+        if let p = projectName(it.projectID) { parts.append(p) }
+        parts.append(it.title.isEmpty ? it.said : it.title)
+        return parts.joined(separator: " · ")
+    }
+
     /// The same lead and the same text two times in 60 s: the PA keeps one.
     func duplicateNote(_ lead: PACommand, _ text: String) -> String? {
         guard let last = lastCapture, last.lead == lead, last.text == text,
@@ -117,15 +135,18 @@ extension Engine {
         var it = Item(kind: kind, said: text, title: text, createdAt: now)
         it.contextApp = context["app"]
         var unsure = false
+        var linkedEvent: CalEvent?
         // A very long text: save all of it, and do not read it for a time or a project.
         if text.count > Engine.maxRead {
             it.title = String(text.prefix(Engine.maxTitle))
         } else {
             var rest = text
+            var timeFound = false
             if kind != .note {
                 let reader = TimeReader(calendar: clock.calendar, settings: settings)
                 let r = reader.read(rest, now: now, todo: kind == .todo)
                 unsure = r.unsure
+                timeFound = r.kind != .none
                 if r.kind != .none {
                     rest = r.rest
                     it.hasClock = r.hasClock
@@ -142,7 +163,20 @@ extension Engine {
             let (project, cut) = readProject(rest)
             if let project { it.projectID = project.id; it.projectBy = "owner"; rest = cut }
             // The project focus (8.3): a capture with no project in the words goes to the focus project.
-            else if let focus = focusProject() { it.projectID = focus.id; it.projectBy = "owner" }
+            else {
+                // Phase 3 (9.2): "before the dentist", "for the meeting with Sam". Only with no time and no project
+                // in the words: "for <project>" has priority over an event.
+                if kind != .note, !timeFound, let m = eventInWords(rest) {
+                    linkedEvent = m.event
+                    rest = m.rest
+                    if kind == .reminder {
+                        it.remindAt = m.event.startsAt.addingTimeInterval(-TimeInterval(settings.nearEventMinutes * 60))
+                        it.hasClock = true
+                        unsure = false
+                    }
+                }
+                if let focus = focusProject() { it.projectID = focus.id; it.projectBy = "owner" }
+            }
             // "remind me about this", "todo this": the document or page in front.
             if kind != .note, rest.lowercased() == "this" {
                 guard let doc = docFromContext(context, projectID: it.projectID) else {
@@ -160,10 +194,13 @@ extension Engine {
             spare(kind: kind, said: text, at: now)
             return .note(id, "The store had an error. Your words are kept in a spare file.")
         }
+        if let ev = linkedEvent {
+            try? store.addEventLink(EventLink(eventID: ev.id, itemID: it.id, by: "owner"), at: now)
+        }
         itemChanged(it, old: nil)
         renewFocus()
         afterCapture(it)
-        let note = captureNote(it, unsure: unsure)
+        let note = linkedEvent.map { eventNote(it, $0) } ?? captureNote(it, unsure: unsure)
         rememberCapture(cmd, text, note: note)
         return .note(id, note)
     }

@@ -49,6 +49,9 @@ public final class Engine {
     /// Runs a block at background priority, off the engine queue (phase 2 build rule 6). Tests run it at once.
     public var background: (@escaping () -> Void) -> Void = { block in block() }
     public internal(set) var settings = PASettings()
+    /// Phase 3: the calendar (EventKit on the Mac, a fixture in tests). Nil: no calendar read.
+    public var calendarSource: CalendarSource?
+    var lastCalendarRead: Date?
     let log: PALog
     /// A note for the next answer, for example after a new store started.
     var pendingNotice: String?

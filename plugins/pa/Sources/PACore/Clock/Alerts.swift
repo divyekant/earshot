@@ -58,6 +58,7 @@ extension Engine {
         if let q = quietUntil, q > now { times.append(q) }
         times.append(nextMorning(now))
         if pagesDirty, let w = pagesWrittenAt { times.append(w.addingTimeInterval(1)) }
+        if let t = nextEventAlert(now) { times.append(t) }
         return times.min()
     }
 
@@ -83,7 +84,9 @@ extension Engine {
             quietUntil = nil
             releaseHeld(title: "While quiet")
         }
+        readCalendarIfDue()
         fireAlerts(now)
+        nearEventAlerts(now)
         repeatAlerts(now)
         morningList(now)
         clockTicked()
@@ -263,8 +266,10 @@ extension Engine {
         let new = arrivals(since: now.addingTimeInterval(-86400))
             .filter { settings.rules(project: projectName($0.projectID)).newArrival == .list }
         store?.log("morning", .list, Int64(items.count + new.count), at: now)
-        guard !items.isEmpty || !new.isEmpty else { return }
-        output.send(listAnswer(nil, title: "Today", records: items.map { (.item, $0.id, line($0)) }
+        let events = eventsForMorning(now)
+        guard !items.isEmpty || !new.isEmpty || !events.isEmpty else { return }
+        output.send(listAnswer(nil, title: "Today", records: events.map { (.calEvent, $0.0, $0.1) }
+                               + items.map { (.item, $0.id, line($0)) }
                                + new.map { (.doc, $0.id, arrivalText($0)) }, max: 7))
     }
 
