@@ -252,6 +252,31 @@ if let path = env["EARSHOT_PLUGIN_DATA"], !path.isEmpty {
         .appendingPathComponent("Library/Application Support/earshot/plugin-data/pa", isDirectory: true)
 }
 
+// Phase 5 (X1): earshot-pa --memory-bench [--scale N]. A made-up store of the size of the owner's store (times N) in
+// a new temporary folder, 50 searches, then the footprint before and after the trim. No file of the owner.
+if args.contains("--memory-bench") {
+    let scale = args.firstIndex(of: "--scale").flatMap { $0 + 1 < args.count ? Int(args[$0 + 1]) : nil } ?? 1
+    final class NoOutput: Output { func send(_ message: Outgoing) {} }
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("pa-memory-bench-\(UUID().uuidString)")
+    try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    func mb(_ b: Int?) -> String { b.map { String(format: "%.1f MB", Double($0) / 1e6) } ?? "?" }
+    let start = memoryFootprint()
+    let e = Engine(folder: dir, clock: SystemClock(), output: NoOutput(), reminders: nil)
+    autoreleasepool { e.start() }
+    let rows = autoreleasepool { MemoryBench.fill(e, scale: scale) }
+    for i in 0..<50 {
+        autoreleasepool { e.handle(.command(id: "b\(i)", lead: "where is", text: "garden invoice \(i)", context: [:])) }
+    }
+    let before = memoryFootprint()
+    malloc_zone_pressure_relief(nil, 0)
+    let after = memoryFootprint()
+    print("items \(rows.items), docs \(rows.docs), passages \(rows.passages)")
+    print("footprint: at start \(mb(start)), after 50 searches \(mb(before)), after the trim \(mb(after))")
+    e.stop()
+    try? FileManager.default.removeItem(at: dir)
+    exit(0)
+}
+
 // Phase 5 (X5): earshot-pa --counts [<data folder>]. Prints the counts of real use as one JSON line, and stops.
 // Numbers only: no text of the store.
 if let i = args.firstIndex(of: "--counts") {
