@@ -60,6 +60,8 @@ public struct Project: Equatable, Sendable {
 /// The kind of a kept reference.
 public enum DocKind: String, Sendable {
     case file, page, folder
+    /// A note of the Notes app (phase 3, S6). It has no address that the PA can open.
+    case note
 }
 
 /// The state of the text of a kept file (phase 2 build spec, 7.3).

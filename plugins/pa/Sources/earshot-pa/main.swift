@@ -271,6 +271,11 @@ if PASettings.load(folder.appendingPathComponent("settings.json")).settings.sour
     let mail = AppleMail()
     queue.async { engine.mailSource = mail }
 }
+// The notes (phase 3, S6). The PA reads only while Notes runs. It never starts Notes.
+if PASettings.load(folder.appendingPathComponent("settings.json")).settings.sources.notes {
+    let notes = AppleNotes()
+    queue.async { engine.notesSource = notes }
+}
 #endif
 let systemEvents = SystemEvents { _ in
     queue.async {

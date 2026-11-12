@@ -433,7 +433,7 @@ public final class Store {
         d.droppedAt == nil ? d.title + " " + (d.address ?? "") : nil
     }
 
-    public func insertDoc(_ d: Doc) throws -> Int64 {
+    public func insertDoc(_ d: Doc, event: String = "keep") throws -> Int64 {
         try db.transaction {
             try db.run("""
             INSERT INTO doc(address, title, app, project_id, created_at, dropped_at, path, kind, size, modified_at,
@@ -442,7 +442,7 @@ public final class Store {
             """, docParams(d))
             let id = db.lastInsertID
             try index(.doc, id, Store.docBody(d))
-            log("keep", .doc, id, at: d.createdAt)
+            log(event, .doc, id, at: d.createdAt)
             return id
         }
     }

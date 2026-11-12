@@ -60,6 +60,11 @@ public final class Engine {
     var lastMailRead: Date?
     var mailFrontSince: Date?
     var mailReading = false
+    /// Phase 3, S6: the notes source, and the state of the notes read.
+    public var notesSource: NotesSource?
+    let notesReader = SourceReader(name: "notes")
+    var lastNotesRead: Date?
+    var notesReading = false
     let log: PALog
     /// A note for the next answer, for example after a new store started.
     var pendingNotice: String?
@@ -153,7 +158,7 @@ public final class Engine {
             ruleLinkTitles = [:]
         }
         if old.sources.mail && !settings.sources.mail { try? store?.forgetSource(.mail) }
-        if old.sources.notes && !settings.sources.notes { try? store?.forgetSource(.note) }
+        if old.sources.notes && !settings.sources.notes { try? store?.forgetSource(.note); forgetNotes() }
         markPagesDirty()
     }
 
