@@ -49,7 +49,7 @@ Hold the earshot key and say one of these commands.
 | "remind me to call the plumber at 5" | Saves a reminder at 17:00 and shows an alert at that time. |
 | "todo send the tax papers by Friday" | Saves a to-do that is due on Friday. "task" is the same. |
 | "note the landlord wants two months notice" | Saves a note. The PA does not read a time in a note. |
-| "keep this for kitchen" | Keeps the address and the title of the front page or document. For a file (PDF, text, Markdown, RTF, Word, HTML), the PA also reads its text in the background, so that "where is" can find words in it. |
+| "keep this for kitchen" | Keeps the address and the title of the front page or document. For a file (PDF, text, Markdown, RTF, Word, HTML), the PA also reads its text in the background, so that "where is" can find words in it. For a web page, the PA also keeps the main text of the page (see "Web pages"). |
 | "note this" | Saves the selected text as a note (2,000 characters or fewer), with a link to the document or page. With no selection, "note this" is a normal note. |
 | "new project kitchen" | Makes the project "Kitchen". For 5 minutes, your next captures go to Kitchen. |
 | "what is due" | Shows late items, the reminders of today, and the to-dos of today and tomorrow. "what's due" is the same. |
@@ -117,10 +117,48 @@ The PA writes HTML pages in this folder:
 - `project-<name>.html`: one page for each open project, with its documents, its kept folders and the new files of the last 7 days.
 - `search.html`: the 10 results of the last "where is", with more text and the file path. Say "open search".
 - `main-points.html`: the 5 sentences of the last "main points", each with its page. Say "open main points".
+- `kept.html`: the kept web pages, newest first, 200 or fewer. Say "open kept pages".
+- `kept/<number>.html`: the text copy of one kept web page.
 
 To open a page, say "open today", "open all open" or "open <project>". You can also open a page in your browser. If an app has the same name as a project, "open <name>" opens the app.
 
 The pages have no script and load nothing from the network. The PA writes the pages again after each change.
+
+## Web pages
+
+When you say "keep this" with a web page in front, the PA keeps the address and the title at once. Then the PA asks earshot for the text of the page. earshot shows "→ PA · reads this page".
+
+1. earshot reads the page in front with Accessibility. It does not click, scroll, select or type.
+2. The PA selects the main text: the article, not the menus, the links, the footer or the comments.
+3. The PA keeps the main text as passages, so that "where is" finds words in the page. A result line is `Page · <title> · <site> · <words of the page>`.
+4. The note shows "Text kept · <title> · 1,240 words".
+
+Other notes:
+
+| Note | Meaning |
+|---|---|
+| "Text kept in part · <title> · 800 words" | A limit stopped the read, or the page has more than 2,000 passages. The PA keeps what came. |
+| "Link kept. The PA has no text of this page." | No text came in 10 s, or the page has fewer than 50 words of main text. The address and the title stay. |
+| "Link kept. The PA has no text of this page. Say "keep this" again." | The page changed during the read. |
+| "Link kept. The page has a password field, so earshot did not read it." | earshot sends no text of a sign-in, code or payment page. |
+| "Kept again · <title> · text updated" | You kept the same page before. The PA keeps one reference and the text of the last read. |
+
+Two addresses are the same page if they are equal without the part after `#` and without the parameters `utm_*`, `fbclid` and `gclid`.
+
+"main points of this" with a web page in front shows 5 sentences of the main text. The PA does not keep the page or its text for this command. "main points of <name>" also finds kept pages.
+
+To delete the text of a page, say "drop" for the page, for example "where is ferry" and then "drop 1". The PA deletes the passages, the numbers and the text copy at once.
+
+Important:
+
+- The PA keeps what the page shows. This also applies to private data of a page behind a sign-in, for example a bank page or an account page. Do not say "keep this" on a page if you do not want its text in the PA.
+- The page must be in front and loaded. Text that the page did not load (for example text that shows after a scroll) is not kept.
+- A page that you kept before PA 0.4.0 has no text. Say "keep this" again on the page.
+- earshot reads web pages in Safari, Chrome and other browsers with a web area. A PDF in Chrome gives text. The PDF view of Safari gives no text. A Slack window or another app is not a web page.
+- The tests used English pages only.
+- PA 0.4.0 needs an earshot build that knows `pageText` (the first build after 0.5.0). An older earshot does not load the PA.
+
+The setting `pageText` switches the read off. Then "keep this" keeps the address and the title only. The texts that the PA kept stay until you drop them.
 
 ## Mail
 
@@ -185,6 +223,8 @@ The settings file is `~/Library/Application Support/earshot/plugin-data/pa/setti
 | `mail` | `{"everyMinutes": 5, "firstDays": 3, "maxPerRead": 50, "batch": 10}` | The mail read: the time between two reads, the days of the first read, the most messages to look back, and the ids in one step. |
 | `flagsLearn` | `true` | If `true`, the request flags learn from your "keep" and "drop" answers. If `false`, the PA uses the base weights. |
 | `flagsMuted` | `[]` | Sender addresses that get no more request flags. The PA adds an address after you drop 3 flags from it and keep none. Delete an address to get its flags again. |
+| `pageText` | `true` | If `true`, "keep this" on a web page also keeps the main text of the page. If `false`, the PA does not ask for page text. |
+| `pagePoints` | `true` | If `true`, "main points" works for web pages. If `false`, the answer is "Main points work for kept files only." |
 | `searchModel` | `"gemma"` | The search model: `"gemma"`, `"gemma2"`, `"qwen3"` or `"none"` (keywords only). The PA reads it at its start. Run `PA_MODEL=<name> scripts/install-pa.sh` to download another model. |
 
 If the file has an error, the PA uses the default values and shows one note.
@@ -194,7 +234,8 @@ If the file has an error, the PA uses the default values and shows one note.
 All data stays in `~/Library/Application Support/earshot/plugin-data/pa/`:
 
 - `pa.sqlite`: the store. It keeps the path of each kept file, not its text.
-- `index.sqlite`: the text of kept files and the numbers of the search model. The PA can make it again from the kept files. It has no daily copy. If you drop a document or a kept folder, the PA deletes its text and its numbers at once (R-PA-9).
+- `kept-text/`: the main text of each kept web page, for "main points". "drop" deletes it.
+- `index.sqlite`: the text of kept files and kept web pages, and the numbers of the search model. The PA can make it again from the kept files. It has no daily copy. If you drop a document or a kept folder, the PA deletes its text and its numbers at once (R-PA-9).
 - `models/`: the search model file.
 - `backups/`: one copy of the store each day. The PA keeps 7 copies.
 - `pa.log`: times, event types and record numbers. The log has no words of yours.

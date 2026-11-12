@@ -117,10 +117,11 @@ Experimental, phase 1. The PA (personal assistant) is the first plugin of earsho
 | R-PA-6 | If the PA is not sure of a time, it saves the item with no time and says so. The PA never loses a capture. | Must |
 | R-PA-7 | The PA interrupts the owner only by a rule that is set to "alert". By default, only time interrupts. | Must |
 | R-PA-8 | The PA answers a capture or a change in 100 ms or less, and a search in 300 ms or less. A PA command does not slow earshot (R-PL-5). | Must |
-| R-PA-9 | The PA keeps the text of a document only if the owner kept the document or its folder. It keeps the text of the notes of the Notes app only while that source is on. From a mail, it keeps only the sender name, the subject and one sentence, and only for a flag. If the owner drops a document or switches a source off, the PA deletes the text and the numbers at once. | Must |
+| R-PA-9 | The PA keeps the text of a document only if the owner kept the document or its folder. It keeps the text of the notes of the Notes app only while that source is on. From a mail, it keeps only the sender name, the subject and one sentence, and only for a flag. If the owner drops a document or switches a source off, the PA deletes the text and the numbers at once. The PA keeps the text of a web page only if the owner said "keep this" for that page. If the owner drops the page, the PA deletes the text, the numbers and the copy at once. | Must |
 | R-PA-10 | A project that the search set has a mark and shows with "?". The owner can correct it with one command. The PA counts the corrections and shows them. | Must |
 | R-PA-11 | The PA only reads the calendar, Mail and Notes. It changes nothing in them and starts none of them. Each source has a switch. | Must |
 | R-PA-12 | The formula for flags learns only from the owner's "keep" and "drop" answers, on this Mac. The PA uses new weights only if they are better on the owner's last answers. | Should |
+| R-PA-13 | The PA gets the text of a web page only from earshot, and only after a command of the owner for the page in front. The PA has no network code and no Accessibility permission. | Must |
 
 ### 3.10 Command line
 
