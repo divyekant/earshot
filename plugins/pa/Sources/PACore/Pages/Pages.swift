@@ -119,7 +119,7 @@ extension Engine {
         let quietIDs = Set(morningItems(now).map(\.id)).subtracting((late + todayItems + tomorrowItems).map(\.id))
         let quiet = tasks.filter { quietIDs.contains($0.id) }
         let counts = store.eventCounts(since: now.addingTimeInterval(-7 * 86400))
-        let rows: [(String, Int)] = [
+        var rows: [(String, Int)] = [
             ("Captures", counts["capture", default: 0] + counts["keep", default: 0]),
             ("Done", counts["done", default: 0]),
             ("Snoozed", counts["snooze", default: 0]),
@@ -129,6 +129,8 @@ extension Engine {
             ("Project proposals", counts["proposal", default: 0]),
             ("Project proposals corrected", counts["proposal-corrected", default: 0]),
         ]
+        let nearEvent = store.eventAlertAnswers(since: now.addingTimeInterval(-7 * 86400))
+        rows += [("Near-event alerts", nearEvent.shown), ("Near-event alerts with an answer", nearEvent.answered)]
         let table = "<h2>The last 7 days</h2><table>" + rows.map { "<tr><td>\($0.0)</td><td class=\"n\">\($0.1)</td></tr>" }.joined() + "</table>"
         // 8.1, step 6: the PA does not change the setting by itself.
         var warning = ""

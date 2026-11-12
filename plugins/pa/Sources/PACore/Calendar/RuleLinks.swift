@@ -17,7 +17,7 @@ extension Engine {
     /// does the model work in the background, and writes the links on the engine queue. With no model, only the
     /// lines that need no model can link (L1 with a shared word, and L2).
     func linkEventsByRule() {
-        guard settings.sources.calendar, let store else { return }
+        guard settings.sources.calendar, settings.linkEvents, let store else { return }
         let now = clock.now
         let stamp = ruleLinkStamp()
         let events = store.events(from: now, to: now.addingTimeInterval(Engine.calendarDays))

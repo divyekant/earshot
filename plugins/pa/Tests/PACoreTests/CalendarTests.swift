@@ -176,6 +176,22 @@ final class CalendarTests: XCTestCase {
         e.readCalendar()
         let ev = try XCTUnwrap(e.store?.events(from: clock.now, to: clock.now.addingTimeInterval(3600)).first)
         XCTAssertEqual(e.store?.eventLinks(ev.id).count, 1)
+        XCTAssertEqual(e.store?.eventAlertAnswers(since: wed(0)).shown, 1)
+        XCTAssertEqual(e.store?.eventAlertAnswers(since: wed(0)).answered, 0)
+        // A done on the linked to-do in the hour after the alert is an answer.
+        clock.now = Self.date("2026-11-14T18:50")
+        say(e, out, "done", "ask Priya about the wine")
+        XCTAssertEqual(e.store?.items(where: "state = 'done'").count, 1)
+        XCTAssertEqual(e.store?.eventAlertAnswers(since: wed(0)).answered, 1)
+        // linkEvents off: the rule links go, and no new ones come.
+        var s = e.settings
+        let old = s
+        s.linkEvents = false
+        e.settings = s
+        e.settingsChanged(from: old)
+        XCTAssertEqual(e.store?.eventLinks(ev.id).count, 0)
+        e.readCalendar()
+        XCTAssertEqual(e.store?.eventLinks(ev.id).count, 0)
     }
 
     func testNoAlertWithNoLinkOrAfterTheEnd() throws {

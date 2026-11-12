@@ -142,6 +142,10 @@ public final class Engine {
         }
         // Phase 3 (spec 7.2): a source that goes off loses what the PA kept from it, at once.
         if old.sources.calendar && !settings.sources.calendar { try? store?.forgetSource(.calendar) }
+        if old.linkEvents && !settings.linkEvents {
+            try? store?.db.run("DELETE FROM cal_event_link WHERE by = 'rule'")
+            ruleLinkTitles = [:]
+        }
         if old.sources.mail && !settings.sources.mail { try? store?.forgetSource(.mail) }
         if old.sources.notes && !settings.sources.notes { try? store?.forgetSource(.note) }
         markPagesDirty()
