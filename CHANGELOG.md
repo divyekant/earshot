@@ -6,6 +6,10 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-12
+
+This release adds the PA plugin, phases 1 to 3. The PA captures reminders, to-dos and notes by voice, shows alerts, copies open items to the Reminders list "earshot", and writes local pages. It keeps files and folders and finds their text with "where is". It reads Notes, Mail and Calendar while those apps run, and never changes them. It reads and searches the text on this Mac. earshot also gets a command line and two plugin context keys.
+
 ### Added
 
 - PA: notes. While the Notes app runs, the PA reads your notes, and "where is" finds their words. It skips locked notes and "Recently Deleted". It never starts Notes and never changes a note (R-PA-4).
@@ -29,6 +33,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - `docs/PA.md` tells how to install and use the PA plugin. Say "open today" or "open <project>" to open a PA page (R-PA-3).
 - The PA plugin, phase 2 start: "keep this" with a file in front keeps the file and reads its text on this Mac (PDF, text, Markdown, RTF, Word, HTML) into `index.sqlite`. "note this" saves the selected text. "what projects" lists the open projects, and "finish project <name>" closes one. If you drop a document, the PA deletes its text at once. The plugin file changes, so approve the PA again (R-PA-3, R-PA-9).
 - A command line in the app program: `earshot settings set <name> <value>`, `earshot plugins restart <id>`, `earshot run <words>`, `earshot status`. The running app uses a change at once. The command line cannot approve a plugin. `docs/CONTROL.md` gives the commands (R-CT-1 to R-CT-4).
+
 
 ### Fixed
 
@@ -167,7 +172,8 @@ The first public release. earshot is early software. Expect bugs and changes to 
 
 - earshot never presses Send, or does another action that cannot be undone, without an explicit command (R-NV-5, R-ON-5).
 
-[Unreleased]: https://github.com/divyekant/earshot/compare/v0.4.0...develop
+[Unreleased]: https://github.com/divyekant/earshot/compare/v0.5.0...develop
+[0.5.0]: https://github.com/divyekant/earshot/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/divyekant/earshot/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/divyekant/earshot/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/divyekant/earshot/compare/v0.1.0...v0.2.0
