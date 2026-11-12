@@ -75,6 +75,10 @@ public enum TextState: String, Sendable {
     case tooLarge = "too_large"
     case noAccess = "no_access"
     case gone
+    /// Phase 4: a web page whose read stopped at a limit, or a page with more than 2,000 passages.
+    case partial
+    /// Phase 4: the page changed during the read. The PA has no text of it.
+    case changed
 }
 
 /// A reference to a document or a web page. For a page, the PA keeps the address and the title. For a kept file,
@@ -97,6 +101,10 @@ public struct Doc: Equatable, Sendable {
     public var passages = 0
     /// The kept folder of a file (phase 2, Q6).
     public var parentDocID: Int64?
+    /// Phase 4: the time of the last read of the text of a web page.
+    public var textAt: Date?
+    /// Phase 4: the count of words of the kept text of a web page.
+    public var textWords: Int?
 
     public init(address: String?, title: String, app: String?, projectID: Int64?, createdAt: Date) {
         self.address = address; self.title = title; self.app = app; self.projectID = projectID; self.createdAt = createdAt

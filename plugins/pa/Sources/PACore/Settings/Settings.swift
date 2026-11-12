@@ -232,6 +232,11 @@ public struct PASettings: Codable, Equatable, Sendable {
     public var flagsMuted: [String] = []
     /// Phase 3: the names and addresses of the owner.
     public var owner = OwnerSettings()
+    /// Phase 4: if true, "keep this" and "main points" on a web page ask earshot for the text of the page in front.
+    /// With false, the PA keeps only the address and the title. Kept texts stay until the owner drops them.
+    public var pageText = true
+    /// Phase 4: "main points" for a web page. The default goes to false if the go mark of W5 fails.
+    public var pagePoints = true
 
     public init() {}
 
@@ -262,6 +267,8 @@ public struct PASettings: Codable, Equatable, Sendable {
         flagsLearn = try c.decodeIfPresent(Bool.self, forKey: .flagsLearn) ?? d.flagsLearn
         flagsMuted = try c.decodeIfPresent([String].self, forKey: .flagsMuted) ?? d.flagsMuted
         owner = try c.decodeIfPresent(OwnerSettings.self, forKey: .owner) ?? d.owner
+        pageText = try c.decodeIfPresent(Bool.self, forKey: .pageText) ?? d.pageText
+        pagePoints = try c.decodeIfPresent(Bool.self, forKey: .pagePoints) ?? d.pagePoints
     }
 
     /// The rules for an item in a project: the value of the project if it has one, or the general value.

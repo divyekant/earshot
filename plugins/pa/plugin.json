@@ -2,13 +2,13 @@
   "contract": 1,
   "id": "pa",
   "name": "PA",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "leads": ["remind me", "todo", "task", "note", "keep this", "new project",
             "what is due", "what due", "what about", "where is",
             "done", "snooze", "drop", "move", "quiet",
             "main points", "summarize", "summarise", "what projects", "finish project",
             "keep", "what is new", "what new"],
-  "context": ["app", "windowTitle", "url", "document", "selection"],
+  "context": ["app", "windowTitle", "url", "document", "selection", "pageText"],
   "run": ["./EarshotPA.app/Contents/MacOS/earshot-pa"],
   "network": []
 }

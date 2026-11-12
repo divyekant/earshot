@@ -195,6 +195,8 @@ public final class Engine {
             let ms = Int(Date().timeIntervalSince(start) * 1000)
             log.write(clock.now, "command", ["lead": PACommand.from(lead: lead)?.rawValue ?? "unknown",
                                              "words": String(text.split(separator: " ").count), "ms": String(ms)])
+        case .pageText(let m):
+            receivePageText(m)
         case .unknown(let type):
             log.write(clock.now, "unknown-type", ["chars": String(type.count)])
         }
