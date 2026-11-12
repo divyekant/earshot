@@ -96,7 +96,7 @@ if let i = args.firstIndex(of: "--embed-worker"), i + 1 < args.count {
 }
 
 // The bench of the phase 2 follow-up (R1, R2): earshot-pa --followup-bench <fixtures folder> --embedder <name>
-// [--model <file.gguf>] [--gpu] [--explain | --final <variant> [--needs n,k]] [--bakeoff <folder>] [--verbose] [--weights a,d,r,s,f,t,tmax,w,n,b].
+// [--model <file.gguf>] [--gpu] [--explain | --names | --final <variant> [--needs n,k]] [--bakeoff <folder>] [--verbose] [--weights a,d,r,s,f,t,tmax,w,n,b].
 if let i = args.firstIndex(of: "--followup-bench"), i + 1 < args.count {
     func value(_ flag: String) -> String? {
         args.firstIndex(of: flag).flatMap { $0 + 1 < args.count ? args[$0 + 1] : nil }
@@ -117,6 +117,8 @@ if let i = args.firstIndex(of: "--followup-bench"), i + 1 < args.count {
             }
             if args.contains("--explain") {
                 try bench.explain()
+            } else if args.contains("--names") {
+                try bench.names()
             } else if let v = value("--final") {
                 guard let variant = ProjectRuleV2.Variant.allCases.first(where: { "\($0)" == v }) else {
                     print("Unknown variant \(v). Use one of: \(ProjectRuleV2.Variant.allCases.map { "\($0)" })")

@@ -191,7 +191,7 @@ public final class FollowUpBench {
         for (s, t, w) in sig {
             if let p = rule.propose(s, variant: .fullWithH), p != t { out("wrong: \(w) | truth \(t) | proposal \(p) | \(s)") }
         }
-        if let bakeoff { try bakeoffProjects(bakeoff, rule: rule, v1: rule1) }
+        if let bakeoff { try bakeoffProjects(bakeoff, rule: rule, v1: rule1, floor: r.floor) }
 
         out("\n## Main points version 2 on the old documents")
         try mainPoints(fx.points, label: "old")
@@ -228,7 +228,7 @@ public final class FollowUpBench {
     }
 
     /// 3.4: dk's research items. The records of a project are its description and the other items with its label.
-    func bakeoffProjects(_ folder: URL, rule: ProjectRuleV2, v1: ProjectRule) throws {
+    func bakeoffProjects(_ folder: URL, rule: ProjectRuleV2, v1: ProjectRule, floor: Float) throws {
         let lines = try String(contentsOf: folder.appendingPathComponent("projects.txt"), encoding: .utf8)
             .split(separator: "\n").map(String.init).filter { $0.contains(":") }
         let projects = lines.map { (id: String($0.prefix { $0 != ":" }), name: String($0.prefix { $0 != ":" })) }
@@ -239,7 +239,9 @@ public final class FollowUpBench {
         let dv = try embed(lines, .passage)
         let truths = items.map { labels[$0[0]]! }
         let v1p = items.indices.map { i in v1.propose(projects.indices.map { (projects[$0].id, Vectors.dot(iv[i], dv[$0])) }) }
-        var v2p: [String?] = []
+        var v2p: [String?] = [], pap: [String?] = []
+        var detail: [String] = []
+        let index = Dictionary(uniqueKeysWithValues: projects.enumerated().map { ($1.id, "P\($0 + 1)") })
         for i in items.indices {
             var proj: [String] = [], vec: [[Float]] = [], text: [String] = []
             for (k, p) in projects.enumerated() { proj.append(p.id); vec.append(dv[k]); text.append(lines[k]) }
@@ -252,16 +254,62 @@ public final class FollowUpBench {
             let title = Self.captureTitle(items[i][1])
             let hits = kw.search(Self.keywordText(title), limit: 3).map { proj[Int($0) - 1] }
             let s = rule.signals(words: title, projects: projects, nearest: order.map { (proj[$0], scores[$0]) }, floor: -1, keywordHits: hits)
-            v2p.append(rule.propose(s))
+            let p2 = rule.propose(s)
+            v2p.append(p2)
+            // The same rule as in the PA: the search floor, and 3 or more records for a project.
+            let recs = proj.indices.map { ProjectRuleV2.Record(project: proj[$0], vector: vec[$0], text: text[$0]) }
+            let e = rule.evaluate(title: title, vector: iv[i], records: recs, projects: projects, floor: floor)
+            pap.append(e.proposal)
+            // One line for each proposal of the bench rule. Only numbers and labels P1..Pn: no item text.
+            if let p2 {
+                let line = s.name == p2 ? "name" : "neighbors and keywords"
+                let n = proj.filter { $0 == p2 }.count
+                detail.append(String(format: "| %d | %@ | %@ | %@ | %@ | %d | %d of 5 | %d of 3 | %.3f | %@ |", detail.count + 1, line,
+                                     index[p2] ?? "?", index[truths[i]] ?? "none", p2 == truths[i] ? "yes" : "no", n,
+                                     s.neighborsCount, s.keywordsCount, s.nearest, e.proposal == nil ? "none" : (index[e.proposal!] ?? "?")))
+            }
         }
         out("\n## dk's research items (\(items.count) labeled)")
         out("| Variant | Proposals | Correct | Wrong | Captures with a project that got a correct proposal |")
         out("|---|---|---|---|---|")
         out(Self.line("Version 1 (rule of the development set)", Self.count(truths, v1p)))
         out(Self.line("Version 2 (full rule)", Self.count(truths, v2p)))
+        out(Self.line(String(format: "Version 2 as in the PA (floor %.3f, 3 or more records)", floor), Self.count(truths, pap)))
+        out("\nEach proposal of version 2 (full rule). Records: the records of the proposed project (its description and the other labeled items).")
+        out("| # | Line | Proposed | Truth | Correct | Records | Neighbors | Keywords | Nearest | As in the PA |")
+        out("|---|---|---|---|---|---|---|---|---|---|")
+        detail.forEach(out)
     }
 
     // MARK: - The one final run (3.3, 4.4)
+
+    /// Follow-up ask 3: the name line. `capture-names.tsv` has 10 captures for a named project and 10 with the
+    /// name words in another sense. Run one time.
+    public func names() throws {
+        let r = try records()
+        var rule = ProjectRuleV2()
+        rule.neighborsNeed = needs.neighbors
+        rule.keywordsNeed = needs.keywords
+        let caps = try BenchFixtures.rows(folder.appendingPathComponent("capture-names.tsv")).filter { $0.count >= 2 }
+            .map { BenchFixtures.Capture(words: $0[0], project: $0[1]) }
+        let sig = try signals(caps, r, rule: rule)
+        let proposals = sig.map { rule.propose($0.signals) }
+        out("## Name line: capture-names.tsv (neighbors \(needs.neighbors) of 5, keywords \(needs.keywords) of 3)")
+        out("| Captures | Proposals | Correct | Wrong |")
+        out("|---|---|---|---|")
+        for (label, range) in [("For the named project (1-10)", 0..<10), ("Name words in another sense (11-20)", 10..<20)] {
+            let part = range.filter { $0 < sig.count }
+            let c = Self.count(part.map { sig[$0].truth }, part.map { proposals[$0] })
+            out("| \(label) | \(c.proposals) | \(c.correct) | \(c.wrong) |")
+        }
+        out("\n| # | Capture | Truth | Proposal | Line | Name | Neighbors | Keywords |")
+        out("|---|---|---|---|---|---|---|---|")
+        for (i, x) in sig.enumerated() {
+            let p = proposals[i]
+            let line = p == nil ? "-" : (x.signals.name == p ? "name" : "neighbors and keywords")
+            out("| \(i + 1) | \(x.words) | \(x.truth) | \(p ?? "-") | \(line) | \(x.signals.name ?? "-") | \(x.signals.neighbors ?? "-") \(x.signals.neighborsCount) | \(x.signals.keywords ?? "-") \(x.signals.keywordsCount) |")
+        }
+    }
 
     public func final(variant: ProjectRuleV2.Variant) throws {
         let r = try records()
