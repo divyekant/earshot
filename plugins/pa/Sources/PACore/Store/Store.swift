@@ -210,6 +210,23 @@ public final class Store {
         return out
     }
 
+    /// Phase 4: the web pages kept since a time and not dropped, with text and as a link only.
+    /// "Link only" counts a page with no text: no answer from earshot, no text, a sign-in page or the setting off.
+    public func keptPageCounts(since: Date) -> (text: Int, linkOnly: Int) {
+        let rows = (try? db.query("""
+            SELECT text_state IN ('read', 'partial'), COUNT(*) FROM doc
+            WHERE kind = 'page' AND dropped_at IS NULL AND created_at >= ?
+              AND (address LIKE 'http://%' OR address LIKE 'https://%' OR address LIKE 'file:%')
+            GROUP BY 1
+            """, [.real(since.timeIntervalSince1970)])) ?? []
+        var text = 0, link = 0
+        for r in rows {
+            let n = Int(r[1].int ?? 0)
+            if (r[0].int ?? 0) == 1 { text += n } else { link += n }
+        }
+        return (text, link)
+    }
+
     /// The last event of a type, with its record.
     public func lastEvent(_ types: [String]) -> (at: Date, kind: RecordKind?, id: Int64?)? {
         let marks = types.map { _ in "?" }.joined(separator: ",")
