@@ -21,6 +21,17 @@ The model runs in a separate worker process (`earshot-pa --embed-worker`). The w
 4. Approve the plugin **PA**.
 5. If macOS asks for access to Reminders, click **Allow**.
 
+From phase 3, the PA also reads the calendar, Mail and Notes. Do these steps one time:
+
+1. Approve the plugin **PA** again in **Manage > Plugins**, because its manifest changed.
+2. If macOS asks for access to the calendar, click **Allow**.
+3. If macOS asks "earshot PA wants to control Mail", click **Allow**.
+4. If macOS asks "earshot PA wants to control Notes", click **Allow**.
+
+macOS asks these questions only when Mail or Notes runs, because the PA never starts them. A new build of the PA keeps the access. To stop the read of a source, set it to `false` in `sources` in the settings. Then the PA deletes what it kept from that source.
+
+What the PA keeps from a mail: the sender name, the subject and one sentence, only for a flag. 30 days after you answer a flag, the PA deletes its subject and its sentence. The tests used English mail and notes only. The PA does not read a locked note. It cannot open a note for you by voice.
+
 The script also downloads the search model to the data folder of the PA, with a SHA-256 check. The PA program itself has no network code. To use no model, run `PA_MODEL=none plugins/pa/scripts/install-pa.sh` and set `"searchModel": "none"`. Then the search uses keywords only.
 
 The first time that you keep a file in Documents, Desktop or Downloads, macOS can ask if the PA can open files in that folder. Click **Allow** if you want the PA to find words in the file. If you click **Don't Allow**, the PA keeps the reference and shows one note: "The PA cannot read this folder. The reference is kept."
