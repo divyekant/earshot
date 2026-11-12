@@ -63,10 +63,13 @@ public struct MailReadPlan: Sendable {
         public var failed: [String] = []
         public var seconds: TimeInterval = 0
         public var events = 0
+        /// The owner addresses that the read used, in lower case (for gate 2 of the request flags).
+        public var owner: Set<String> = []
     }
 
     public func run(_ source: MailSource, clock: () -> Date = Date.init) -> Result {
         var r = Result()
+        r.owner = owner
         let start = clock()
         func spent() -> TimeInterval { clock().timeIntervalSince(start) }
         // 1. The cheap check.

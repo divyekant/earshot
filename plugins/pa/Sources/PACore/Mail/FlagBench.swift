@@ -1,7 +1,7 @@
 import Foundation
 
 /// The model of the request flags: the sentence score, the message score, the variant and the threshold.
-/// `RequestWeights.swift` holds the fitted copy, made from `train.jsonl` by `earshot-pa --flags-bench <mail folder>
+/// `RequestWeights.swift` holds the fitted copy, made from `build-a.jsonl` and `design-a.jsonl` by `earshot-pa --flags-bench <mail folder>
 /// --write-weights <file>`. It comes from made-up data only.
 public struct RequestModel: Codable, Equatable, Sendable {
     public var variant: String
@@ -16,17 +16,20 @@ public struct RequestModel: Codable, Equatable, Sendable {
     }
 
     /// The sentence scores, the best sentence and the message score. Variant A uses the points by hand.
-    public func score(_ m: MailMessage, _ p: RequestFeatures.Prepared, owner: Set<String>, ownerAddresses: Set<String>)
-        -> (best: Int?, score: Double) {
+    /// `known` is true if the sender wrote to the owner before and that mail passed gate 1.
+    public func score(_ m: MailMessage, _ p: RequestFeatures.Prepared, owner: Set<String>, ownerAddresses: Set<String>,
+                      known: Bool = true) -> (best: Int?, score: Double) {
+        if p.gate != nil { return (nil, -99) }
         if variant == "A" {
             let s = p.sentences.map { RequestFeatures.handScore($0.f) }
             guard let b = s.indices.max(by: { s[$0] < s[$1] }) else { return (nil, -99) }
-            return (b, s[b])
+            return (b, s[b] - (p.org && !known ? 1 : 0))
         }
         let s = p.sentences.map { sentence.p($0.f) }
         let b = s.indices.max(by: { s[$0] < s[$1] })
+        guard b != nil else { return (nil, -99) }
         let x = RequestFeatures.messageFeatures(m, p, best: b, sentenceScores: s, owner: owner, ownerAddresses: ownerAddresses,
-                                                middle: middle)
+                                                middle: middle, known: known)
         return (b, message.p(x))
     }
 }
@@ -39,6 +42,8 @@ public final class FlagBench {
         public var m: MailMessage
         public var request: Bool
         public var sentences: Set<String>
+        /// The sender wrote before in this set (an earlier date) and that mail passed gate 1.
+        public var known = true
     }
 
     public static let owner: Set<String> = ["maya", "rao"]
@@ -62,10 +67,17 @@ public final class FlagBench {
         for r in try BenchFixtures.rows(folder.appendingPathComponent(name + "-labels.tsv")) where r.count >= 2 && r[0] != "id" {
             labels[r[0]] = r
         }
+        var firstPass: [String: Date] = [:]
+        for m in mails where BulkFilter.reason(m, owner: Self.ownerAddresses) == nil {
+            let a = m.fromAddress.lowercased()
+            if firstPass[a].map({ m.date < $0 }) ?? true { firstPass[a] = m.date }
+        }
         return mails.map { m in
             let r = labels[m.id] ?? []
             let s = Set([r.count > 3 ? r[3] : "", r.count > 4 ? r[4] : ""].filter { !$0.isEmpty })
-            return Labeled(m: m, request: r.count > 1 && r[1] == "1", sentences: s)
+            var l = Labeled(m: m, request: r.count > 1 && r[1] == "1", sentences: s)
+            l.known = firstPass[m.fromAddress.lowercased()].map { $0 < m.date } ?? false
+            return l
         }
     }
 
@@ -75,10 +87,15 @@ public final class FlagBench {
     }
 
     func prepared(_ l: Labeled) -> RequestFeatures.Prepared {
-        RequestFeatures.prepared(l.m, owner: Self.owner) { [self] in timeFound($0, l.m.date) }
+        RequestFeatures.prepared(l.m, owner: Self.owner, ownerAddresses: Self.ownerAddresses) { [self] in timeFound($0, l.m.date) }
     }
 
-    func passes(_ l: Labeled) -> Bool { BulkFilter.reason(l.m, owner: Self.ownerAddresses) == nil }
+    /// Gate 1 (the bulk filter), then gates 2 and 3.
+    func passes(_ l: Labeled) -> Bool { gateReason(l) == nil }
+
+    func gateReason(_ l: Labeled) -> String? {
+        BulkFilter.reason(l.m, owner: Self.ownerAddresses) ?? prepared(l).gate
+    }
 
     /// Fits the sentence score and the message score of variant B on the rows.
     public func fitB(_ rows: [Labeled]) -> RequestModel {
@@ -97,7 +114,7 @@ public final class FlagBench {
             let s = p.sentences.map { sentence.p($0.f) }
             let b = s.indices.max(by: { s[$0] < s[$1] })
             var x = RequestFeatures.messageFeatures(l.m, p, best: b, sentenceScores: s, owner: Self.owner,
-                                                    ownerAddresses: Self.ownerAddresses, middle: 0.5)
+                                                    ownerAddresses: Self.ownerAddresses, middle: 0.5, known: l.known)
             x.removeLast()
             mx.append(x)
             my.append(l.request ? 1 : 0)
@@ -138,7 +155,7 @@ public final class FlagBench {
         let b = fitB(train)
         var out: [String: [Scored]] = [:]
         func bestB(_ l: Labeled, _ p: RequestFeatures.Prepared) -> (Int?, Double) {
-            let r = b.score(l.m, p, owner: Self.owner, ownerAddresses: Self.ownerAddresses)
+            let r = b.score(l.m, p, owner: Self.owner, ownerAddresses: Self.ownerAddresses, known: l.known)
             return (r.best, r.score)
         }
         let tp = test.map(prepared)
@@ -146,7 +163,7 @@ public final class FlagBench {
         var a = RequestModel(variant: "A", threshold: 0, sentence: b.sentence, message: b.message, middle: 0.5)
         a.variant = "A"
         out["A"] = zip(test, tp).map { l, p in
-            let r = a.score(l.m, p, owner: Self.owner, ownerAddresses: Self.ownerAddresses)
+            let r = a.score(l.m, p, owner: Self.owner, ownerAddresses: Self.ownerAddresses, known: l.known)
             return Scored(request: l.request, passed: passes(l), score: r.score,
                           sentenceOK: r.best.map { l.sentences.contains(p.sentences[$0].text) } ?? false)
         }
@@ -180,7 +197,7 @@ public final class FlagBench {
             let s = p.sentences.map { b.sentence.p($0.f) }
             let best = s.indices.max(by: { s[$0] < s[$1] })
             var x = RequestFeatures.messageFeatures(l.m, p, best: best, sentenceScores: s, owner: Self.owner,
-                                                    ownerAddresses: Self.ownerAddresses, middle: 0.5)
+                                                    ownerAddresses: Self.ownerAddresses, middle: 0.5, known: l.known)
             x.removeLast()
             return x + [cScore, 1]
         }
@@ -196,38 +213,45 @@ public final class FlagBench {
         v == "A" ? stride(from: -2.0, through: 10, by: 1).map { $0 } : stride(from: 0.05, through: 0.951, by: 0.05).map { $0 }
     }
 
-    /// The dev table and the selection (8.5): the most found at 4 or fewer false flags; on a tie the simpler variant;
-    /// then one step more strict.
+    /// The data sets of version 2 (v2 spec, section 5): written by hand by two writers.
+    static let setA = "build-a", setB = "design-a"
+
+    /// The two-way table and the selection (v2 spec, 5.4): fit on build-a and measure on design-a, then the reverse.
+    /// The best variant and threshold has the most found requests in the two directions together, where each
+    /// direction has a false share of 0.20 or less of its flags. On a tie, the simpler variant (A, B, C, D), and in the
+    /// same variant the threshold with fewer false flags.
     public func development() throws {
-        let train = try load("train"), dev = try load("dev")
-        let s = try scores(train: train, test: dev)
-        out("| Variant | Threshold | Flags | Found | False | Sentence correct |")
-        out("|---|---|---|---|---|---|")
-        var best: (v: String, i: Int, found: Int)?
+        let a = try load(Self.setA), b = try load(Self.setB)
+        let ab = try scores(train: a, test: b), ba = try scores(train: b, test: a)
+        out("| Variant | Threshold | Flags A→B | Found A→B (of \(b.filter(\.request).count)) | False A→B | Sentence A→B | Flags B→A | Found B→A (of \(a.filter(\.request).count)) | False B→A | Sentence B→A |")
+        out("|---|---|---|---|---|---|---|---|---|---|")
+        var best: (v: String, t: Double, found: Int, wrong: Int)?
         for v in ["A", "B", "C", "D"] {
-            guard let sc = s[v] else { continue }
-            let ts = Self.thresholds(v)
-            for (i, t) in ts.enumerated() {
-                let c = Self.count(sc, t)
-                out("| \(v) | \(String(format: "%.2f", t)) | \(c.flags) | \(c.found) | \(c.falseFlags) | \(c.sentence) |")
-                if c.falseFlags <= 4, c.found > (best?.found ?? -1) { best = (v, i, c.found) }
+            guard let s1 = ab[v], let s2 = ba[v] else { continue }
+            for t in Self.thresholds(v) {
+                let c1 = Self.count(s1, t), c2 = Self.count(s2, t)
+                out("| \(v) | \(String(format: "%.2f", t)) | \(c1.flags) | \(c1.found) | \(c1.falseFlags) | \(c1.sentence) | \(c2.flags) | \(c2.found) | \(c2.falseFlags) | \(c2.sentence) |")
+                func ok(_ c: (flags: Int, found: Int, falseFlags: Int, sentence: Int)) -> Bool {
+                    c.flags > 0 && Double(c.falseFlags) <= 0.20 * Double(c.flags)
+                }
+                let found = c1.found + c2.found, wrong = c1.falseFlags + c2.falseFlags
+                // Most found; on a tie the simpler variant (the first in the loop); in the same variant, fewer false flags.
+                if ok(c1), ok(c2), found > (best?.found ?? -1) || (found == best?.found && v == best?.v && wrong < best!.wrong) {
+                    best = (v, t, found, wrong)
+                }
             }
         }
         guard let best else { out("Selected: none"); return }
-        let ts = Self.thresholds(best.v)
-        let strict = ts[min(ts.count - 1, best.i + 1)]
-        let c = Self.count(s[best.v]!, strict)
-        out("Selected: \(best.v) at \(String(format: "%.2f", ts[best.i])), one step more strict: \(String(format: "%.2f", strict))"
-            + " (dev: \(c.flags) flags, \(c.found) found, \(c.falseFlags) false, \(c.sentence) sentences correct)")
+        out("Selected: \(best.v) at \(String(format: "%.2f", best.t)) (found in the two directions: \(best.found))")
     }
 
-    /// The one holdout run. It prints 4 counts only.
+    /// The one run on the second sealed holdout. The fit uses build-a and design-a together. It prints 4 counts only.
     public func final(variant: String, threshold: Double) throws {
-        let train = try load("train"), hold = try load("holdout")
+        let train = try load(Self.setA) + load(Self.setB), hold = try load("holdout2")
         let s = try scores(train: train, test: hold)
         guard let sc = s[variant] else { out("No variant \(variant)."); return }
         let c = Self.count(sc, threshold)
-        out("Holdout \(variant) at \(String(format: "%.2f", threshold)): flags \(c.flags), found \(c.found) of \(hold.filter(\.request).count), false \(c.falseFlags), sentence correct \(c.sentence)")
+        out("Holdout 2, \(variant) at \(String(format: "%.2f", threshold)): flags \(c.flags), found \(c.found) of \(hold.filter(\.request).count), false \(c.falseFlags), sentence correct \(c.sentence)")
         let pass = c.found >= 16 && c.falseFlags <= 5 && c.sentence >= 13
         out("Go mark: \(pass ? "PASS" : "FAIL")")
     }
@@ -245,11 +269,12 @@ public final class FlagBench {
             var t = table[k] ?? (0, 0, 0, 0, 0)
             t.n += 1
             if l.request { t.req += 1 }
-            let pass = passes(l)
+            let gate = gateReason(l)
+            let pass = gate == nil
             let p = prepared(l)
             let s = p.sentences.map { RequestFeatures.handScore($0.f) }
             let b = s.indices.max(by: { s[$0] < s[$1] })
-            let score = b.map { s[$0] } ?? -99
+            let score = (b.map { s[$0] } ?? -99) - (p.org && !l.known ? 1 : 0)
             let flag = pass && score >= threshold
             if flag { t.flags += 1; if l.request { t.found += 1 } else { t.wrong += 1 } }
             table[k] = t
@@ -258,10 +283,10 @@ public final class FlagBench {
             }
             if l.request && !flag {
                 let li = p.sentences.firstIndex { l.sentences.contains($0.text) }
-                misses.append("MISS \(l.m.id) \(k) filter=\(BulkFilter.reason(l.m, owner: Self.ownerAddresses) ?? "pass") best=\(score) [\(b.map { p.sentences[$0].text } ?? "-")] {\(b.map(feats) ?? "")} labeled=\(li.map { String(s[$0]) } ?? "not a candidate") {\(li.map(feats) ?? "")}")
+                misses.append("MISS \(l.m.id) \(k) gate=\(gate ?? "pass") org=\(p.org) best=\(score) [\(b.map { p.sentences[$0].text } ?? "-")] {\(b.map(feats) ?? "")} labeled=\(li.map { String(s[$0]) } ?? "not a candidate") {\(li.map(feats) ?? "")}")
             }
             if flag && !l.request {
-                falses.append("FALSE \(l.m.id) \(k) score=\(score) [\(b.map { p.sentences[$0].text } ?? "-")] {\(b.map(feats) ?? "")}")
+                falses.append("FALSE \(l.m.id) \(k) org=\(p.org) known=\(l.known) score=\(score) [\(b.map { p.sentences[$0].text } ?? "-")] {\(b.map(feats) ?? "")}")
             }
         }
         out("| Kind | Messages | Requests | Flags | Found | False |")
@@ -273,7 +298,7 @@ public final class FlagBench {
 
     /// Writes `RequestWeights.swift` with the model of variant A or B fitted on train.
     public func writeWeights(_ file: URL, variant: String, threshold: Double) throws {
-        var m = fitB(try load("train"))
+        var m = fitB(try load(Self.setA) + load(Self.setB))
         m.variant = variant
         m.threshold = threshold
         let enc = JSONEncoder()
@@ -281,7 +306,7 @@ public final class FlagBench {
         let json = String(decoding: try enc.encode(m), as: UTF8.self)
         let text = """
         // Made by `earshot-pa --flags-bench Tests/PACoreTests/Fixtures/phase3/mail --write-weights <this file> --variant \(variant) --threshold \(threshold)`.
-        // Fitted on the made-up train.jsonl only. Do not edit by hand.
+        // Fitted on the made-up build-a.jsonl and design-a.jsonl, both written by hand. Do not edit by hand.
         enum RequestWeights {
             static let json = #\"\"\"
         \(json)
