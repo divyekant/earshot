@@ -44,9 +44,11 @@ public struct NoteHeader: Equatable, Sendable {
     public var name: String
     public var modifiedAt: Date
     public var locked: Bool
+    /// The name of the folder of the note. The PA skips "Recently Deleted".
+    public var folder: String
 
-    public init(id: String, name: String, modifiedAt: Date, locked: Bool = false) {
-        self.id = id; self.name = name; self.modifiedAt = modifiedAt; self.locked = locked
+    public init(id: String, name: String, modifiedAt: Date, locked: Bool = false, folder: String = "Notes") {
+        self.id = id; self.name = name; self.modifiedAt = modifiedAt; self.locked = locked; self.folder = folder
     }
 }
 

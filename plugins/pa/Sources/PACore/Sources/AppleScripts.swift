@@ -71,11 +71,26 @@ public enum AppleScripts {
     /// The plain text of note number N.
     public static let notesPlainText = #"tell application "Notes" to return plaintext of note %N%"#
 
+    /// All notes in one small list each (S6): ids, names, change dates, the lock state and the folder names.
+    public static let notesAllIDs = #"tell application "Notes" to return id of every note"#
+    public static let notesAllNames = #"tell application "Notes" to return name of every note"#
+    public static let notesAllDates = #"tell application "Notes" to return modification date of every note"#
+    public static let notesAllLocked = #"tell application "Notes" to return password protected of every note"#
+    public static let notesAllFolders = #"tell application "Notes" to return name of container of every note"#
+    /// The plain text of the note with id `%I%`.
+    public static let notesTextByID = #"tell application "Notes" to return plaintext of note id "%I%""#
+
+    /// A script with a note id in place of `%I%`. A quote or a backslash in the id is removed.
+    public static func withID(_ script: String, _ id: String) -> String {
+        script.replacingOccurrences(of: "%I%", with: id.filter { $0 != "\"" && $0 != "\\" })
+    }
+
     /// All scripts, for the read-only test.
     public static let all = [mailInboxCount, mailInboxIDs, mailInboxDates, mailInboxHeaders, mailInboxContent,
                              mailNewestID, mailAccountCount, mailAccountNewestID, mailIDOne, mailDateOne, mailIDDateOne,
                              mailAllHeadersOne, mailHeaderFactsOne, mailEnvelopeOne, mailContentOne, mailPing, mailIDsRange, mailAccountAddresses,
-                             notesCount, notesLocked, notesNames, notesDates, notesPlainText]
+                             notesCount, notesLocked, notesNames, notesDates, notesPlainText, notesAllIDs, notesAllNames,
+                             notesAllDates, notesAllLocked, notesAllFolders, notesTextByID]
 
     /// The words that must never be in a script (rule 1).
     public static let forbidden = ["send", "delete", "move", "set ", "make", "save", "reply", "forward", "redirect", "duplicate"]

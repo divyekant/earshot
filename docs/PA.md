@@ -111,6 +111,10 @@ To open a page, say "open today", "open all open" or "open <project>". You can a
 
 The pages have no script and load nothing from the network. The PA writes the pages again after each change.
 
+## Notes
+
+While the Notes app runs, the PA reads your notes each 15 minutes. It skips locked notes and the folder "Recently Deleted". "where is" then finds the words of a note. The result shows the note name and the passage. The PA cannot open a note for you: open it in Notes. If a note changes, the PA reads it again. If you delete a note, the PA deletes its passages at the next read. The PA never starts Notes and never changes a note.
+
 ## Settings
 
 The settings file is `~/Library/Application Support/earshot/plugin-data/pa/settings.json`. The PA writes the file with the default values at the first start. The PA reads the file again when it changes.

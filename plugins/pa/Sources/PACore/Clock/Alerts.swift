@@ -86,6 +86,7 @@ extension Engine {
         }
         readCalendarIfDue()
         readMailIfDue()
+        readNotesIfDue()
         fireAlerts(now)
         nearEventAlerts(now)
         repeatAlerts(now)
