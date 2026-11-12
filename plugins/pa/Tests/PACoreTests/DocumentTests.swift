@@ -16,7 +16,8 @@ final class DocumentTests: XCTestCase {
     @discardableResult
     func say(_ e: Engine, _ out: MemoryOutput, _ lead: String, _ text: String = "", _ ctx: [String: String] = [:]) -> Outgoing {
         e.handle(.command(id: UUID().uuidString, lead: lead, text: text, context: ctx))
-        return out.take().last!
+        // Phase 4: the ask for page text comes after the answer.
+        return out.take().last { if case .askPageText = $0 { return false }; return true }!
     }
 
     func file(_ name: String, _ text: String) -> URL {

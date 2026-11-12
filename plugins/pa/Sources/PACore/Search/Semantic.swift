@@ -169,6 +169,8 @@ extension Engine {
         var passage: String?
         var path: String?
         var page: Int?
+        /// Phase 4: the text copy of a kept page.
+        var copy: String? = nil
     }
 
     /// The results of a search: the keyword list merged with the list by numbers (6.6). Shows `limit` results.
@@ -215,15 +217,20 @@ extension Engine {
                 var passage: IndexStore.Row?
                 if let pid = bestPassage[rid] { passage = index?.passage(pid) }
                 if let page = passage?.page { parts.append("p. \(page)") }
+                if d.kind == .page, Engine.isPageAddress(d.address) {
+                    // Phase 4: `Page · <title> · <site name> · <passage>`.
+                    parts.insert("Page", at: 0)
+                    if let site = Engine.siteName(d.address) { parts.append(site) }
+                }
                 if let text = passage?.text {
                     parts.append(Engine.cut(text, 80))
-                } else {
+                } else if parts.first != "Page" {
                     parts.append("document")
                     if let p = projectName(d.projectID) { parts.append(p) }
                 }
                 out.append(Found(hit: hit, record: (.doc, rid), line: parts.joined(separator: " · "),
                                  pageLine: d.title, passage: passage.map { Engine.cut($0.text, 400) },
-                                 path: d.path ?? d.address, page: passage?.page))
+                                 path: d.path ?? d.address, page: passage?.page, copy: keptCopyPath(d)))
             case .project(let rid):
                 guard let p = store.project(rid), p.state == "open" else { continue }
                 out.append(Found(hit: hit, record: (.project, rid), line: p.name + " · project", pageLine: p.name + " · project"))
@@ -262,6 +269,9 @@ extension Engine {
                 var text = ""
                 if let p = f.passage { text = "<br><span class=\"when\" style=\"white-space:normal\">\(Engine.escape(p))</span>" }
                 if let path = f.path, path.hasPrefix("/") { text += "<br><span class=\"when\">\(Engine.escape(path))</span>" }
+                if let copy = f.copy {
+                    text += "<br><a class=\"when\" href=\"\(Engine.escape(URL(fileURLWithPath: copy).absoluteString))\">Text copy</a>"
+                }
                 return "<li><span>\(head)\(text)</span></li>"
             }.joined()
             body = "<ul>\(lis)</ul>"

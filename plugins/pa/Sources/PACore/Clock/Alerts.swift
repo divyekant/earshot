@@ -93,6 +93,7 @@ extension Engine {
         morningList(now)
         clockTicked()
         checkFilesIfDue()
+        expirePageAsks()
         unloadModelIfIdle()
         indexIfNeeded()
         // The pages show "today" and "late": write them again when the day changes.
