@@ -34,6 +34,10 @@ Follow `docs/RELEASING.md`. The short form:
 - If a JS/TS tool is ever needed: use pnpm, not npm, and add `.npmrc` with `ignore-scripts=true`.
 - If Python is needed (for example, Phase 0 measurement scripts): use `uv`, and commit `uv.lock`.
 
+## Change settings without the window
+
+Use the command line (`docs/CONTROL.md`) to read or change settings, restart a plugin, or run a typed command. Do not ask the owner to click for these. Do not approve a plugin: the owner approves each plugin (R-PL-4). Use `--owner-ok` only when the owner said so.
+
 ## Writing style
 
 Write docs, comments and commit messages in Simplified Technical English:

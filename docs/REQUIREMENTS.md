@@ -103,6 +103,36 @@ Experimental until a second plugin exists. `docs/PLUGINS.md` gives the contract.
 | R-PL-4 | The owner approves each plugin. A changed manifest needs a new approval. A core command wins over a plugin lead. | Must |
 | R-PL-5 | A plugin cannot slow a command. earshot shows its note at once and does not wait for the plugin. | Must |
 
+### 3.9 PA plugin
+
+Experimental, phase 1. The PA (personal assistant) is the first plugin of earshot. It is a separate program in `plugins/pa/`. The design document and `/mnt/project-files/earshot-pa/phase1-build-spec.md` give the reasons.
+
+| ID | Requirement | Priority |
+|---|---|---|
+| R-PA-1 | The PA is one local program with one store file. It needs no server software and no account. | Must |
+| R-PA-2 | No PA data leaves the Mac. Exception, chosen by the owner: the titles, times and project names of open to-dos and reminders go to Apple Reminders, which syncs through iCloud. A later exception for research is not in phase 1. | Must |
+| R-PA-3 | The PA changes only its own store, its own pages and its own list in Apple Reminders. It never sends, books, pays, or changes a file of the owner. | Must |
+| R-PA-4 | Rules decide what to do and when. Search finds. No model writes text. The PA shows the owner's words, words of the owner's kept documents, mail, notes and calendar events, fixed labels, times and counts. One embedding model of 0.6B or less can compare text. A formula with some thousand weights can score a sentence. | Must |
+| R-PA-5 | A to-do that the PA found in a source is a proposal until the owner confirms it. A flag is a proposal until the owner says "keep". | Must |
+| R-PA-6 | If the PA is not sure of a time, it saves the item with no time and says so. The PA never loses a capture. | Must |
+| R-PA-7 | The PA interrupts the owner only by a rule that is set to "alert". By default, only time interrupts. | Must |
+| R-PA-8 | The PA answers a capture or a change in 100 ms or less, and a search in 300 ms or less. A PA command does not slow earshot (R-PL-5). | Must |
+| R-PA-9 | The PA keeps the text of a document only if the owner kept the document or its folder. It keeps the text of the notes of the Notes app only while that source is on. From a mail, it keeps only the sender name, the subject and one sentence, and only for a flag. If the owner drops a document or switches a source off, the PA deletes the text and the numbers at once. | Must |
+| R-PA-10 | A project that the search set has a mark and shows with "?". The owner can correct it with one command. The PA counts the corrections and shows them. | Must |
+| R-PA-11 | The PA only reads the calendar, Mail and Notes. It changes nothing in them and starts none of them. Each source has a switch. | Must |
+| R-PA-12 | The formula for flags learns only from the owner's "keep" and "drop" answers, on this Mac. The PA uses new weights only if they are better on the owner's last answers. | Should |
+
+### 3.10 Command line
+
+`docs/CONTROL.md` gives the commands. D-15 gives the decision.
+
+| ID | Requirement | Priority |
+|---|---|---|
+| R-CT-1 | The owner, or an agent of the owner, can read and change each setting with a command, without the window. A value that the settings cannot take gives an error. The cloud settings turn on only with an explicit owner flag. | Must |
+| R-CT-2 | The command line talks to the running app only through a socket file in the store folder. It opens no network port. Only the same user can use it. | Must |
+| R-CT-3 | The command line never approves a plugin (R-PL-4). It never gives the Accessibility permission of earshot to a program that does not have that permission. | Must |
+| R-CT-4 | The command line can run one typed command as the Test tab does, and shows the route, the result and the plugin answers. Without an explicit flag, it is a dry run. | Must |
+
 ## 4. Out of scope
 
 - Multi-step tasks that need reasoning, for example "reply to the person who asked about the invoice". These tasks need a large model and are slow. They are not part of earshot.

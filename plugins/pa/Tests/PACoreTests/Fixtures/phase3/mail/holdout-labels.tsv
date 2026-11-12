@@ -1,0 +1,201 @@
+id	request	kind	sentence	sentence2
+h001	0	bulk		
+h002	0	bulk		
+h003	0	bulk		
+h004	0	transactional		
+h005	0	quoted		
+h006	0	survey		
+h007	1	duty	To stay insured, you must accept the renewal offer in your account or by phone before 30 November.	
+h008	1	person	It would help a lot if you could write a few lines for them this week.	
+h009	0	transactional		
+h010	0	hard-ad		
+h011	0	polite		
+h012	0	bulk		
+h013	0	bulk		
+h014	0	other-person		
+h015	0	bulk		
+h016	0	bulk		
+h017	0	bulk		
+h018	0	bulk		
+h019	0	bulk		
+h020	0	bulk		
+h021	1	person	can you pick up the cake from Bellini on saturday?	
+h022	0	transactional		
+h023	0	bulk		
+h024	0	personal		
+h025	0	bulk		
+h026	0	bulk		
+h027	0	transactional		
+h028	0	bulk		
+h029	1	person	The caretaker needs it for the inspection, so would you be able to drop it in my letterbox before the 16th?	
+h030	0	personal		
+h031	0	bulk		
+h032	0	personal		
+h033	0	hard-ad		
+h034	1	duty	Send us proof of the home office costs that you entered (line 44) within 21 days of the date of this message.	
+h035	0	personal		
+h036	0	offer		
+h037	0	bulk		
+h038	0	done		
+h039	0	hard-ad		
+h040	0	transactional		
+h041	0	bulk		
+h042	0	personal		
+h043	0	personal		
+h044	0	bulk		
+h045	0	other-person		
+h046	0	bulk		
+h047	0	bulk		
+h048	0	done		
+h049	0	hard-ad		
+h050	0	personal		
+h051	0	bulk		
+h052	0	bulk		
+h053	0	bulk		
+h054	0	bulk		
+h055	0	bulk		
+h056	0	personal		
+h057	0	transactional		
+h058	0	transactional		
+h059	0	personal		
+h060	0	replied		
+h061	0	hard-ad		
+h062	1	person	Maya, can you bring the spare bibs and the two size 4 balls from the shed?	
+h063	0	personal		
+h064	0	transactional		
+h065	0	bulk		
+h066	0	personal		
+h067	0	bulk		
+h068	0	transactional		
+h069	0	bulk		
+h070	0	bulk		
+h071	0	replied		
+h072	0	bulk		
+h073	0	transactional		
+h074	0	personal		
+h075	0	transactional		
+h076	0	survey		
+h077	0	personal		
+h078	1	person	Could you fix both and send me the final deck before the board call on Monday?	
+h079	0	transactional		
+h080	0	survey		
+h081	0	survey		
+h082	0	personal		
+h083	0	own		
+h084	0	other-person		
+h085	0	personal		
+h086	0	bulk		
+h087	0	other-person		
+h088	0	transactional		
+h089	0	bulk		
+h090	0	other-person		
+h091	0	transactional		
+h092	0	transactional		
+h093	0	personal		
+h094	0	hard-ad		
+h095	0	hard-ad		
+h096	1	duty	Please return it to the class teacher by Friday 20 November.	
+h097	0	bulk		
+h098	0	transactional		
+h099	0	done		
+h100	0	bulk		
+h101	0	offer		
+h102	0	personal		
+h103	0	quoted		
+h104	0	transactional		
+h105	0	personal		
+h106	0	bulk		
+h107	0	bulk		
+h108	0	done		
+h109	0	personal		
+h110	0	other-person		
+h111	1	person	Please let me know which morning of that week somebody will be at home.	
+h112	0	personal		
+h113	0	transactional		
+h114	0	hard-ad		
+h115	0	bulk		
+h116	1	duty	Please reply to this mail or call 555 0142 by 19 November to confirm your appointment.	
+h117	0	personal		
+h118	0	transactional		
+h119	1	list-person	Can you take three people from the station at 8:45?	Tell me by Thursday so I can plan the other cars.
+h120	0	own		
+h121	0	transactional		
+h122	0	bulk		
+h123	0	transactional		
+h124	0	other-person		
+h125	0	bulk		
+h126	0	personal		
+h127	0	personal		
+h128	0	bulk		
+h129	0	hard-ad		
+h130	0	other-person		
+h131	0	other-person		
+h132	0	transactional		
+h133	1	person	The only open thing is the offer for the Hansen account: it has to go out on Friday and it still needs your sign-off on the discount.	
+h134	0	personal		
+h135	0	personal		
+h136	0	bulk		
+h137	0	transactional		
+h138	1	person	Any chance I could borrow yours for the afternoon?	No stress if not, tell me either way so I can ask around.
+h139	0	done		
+h140	0	transactional		
+h141	0	hard-ad		
+h142	0	bulk		
+h143	0	other-person		
+h144	0	other-person		
+h145	0	bulk		
+h146	1	person	I need the signed copy of page 4 back from you by Thursday, otherwise they give the flat to the next couple.	
+h147	0	bulk		
+h148	0	bulk		
+h149	0	bulk		
+h150	0	bulk		
+h151	0	bulk		
+h152	0	done		
+h153	0	hard-ad		
+h154	1	person	Please make an appointment for February with the front desk, and have the blood test done one week before.	
+h155	0	other-person		
+h156	0	bulk		
+h157	1	duty	Collect your parcel by 21 November.	
+h158	0	personal		
+h159	0	bulk		
+h160	0	bulk		
+h161	0	personal		
+h162	1	duty	Return or renew them by that date.	
+h163	1	person	Send it over when you're out of your meeting?	I still don't have the list of people from your team, and catering want the number tomorrow noon.
+h164	0	bulk		
+h165	0	transactional		
+h166	0	transactional		
+h167	0	bulk		
+h168	0	bulk		
+h169	0	done		
+h170	0	bulk		
+h171	1	person	If you want me to order them I need your ok by Friday.	
+h172	0	quoted		
+h173	0	bulk		
+h174	0	bulk		
+h175	0	personal		
+h176	0	done		
+h177	0	hard-ad		
+h178	0	bulk		
+h179	0	bulk		
+h180	0	survey		
+h181	1	duty	Please pay the amount by the due date to avoid a late fee of 5.00.	Due date: 28 November 2026
+h182	0	personal		
+h183	0	transactional		
+h184	0	hard-ad		
+h185	0	bulk		
+h186	0	personal		
+h187	0	other-person		
+h188	0	hard-ad		
+h189	0	survey		
+h190	0	transactional		
+h191	0	transactional		
+h192	0	bulk		
+h193	0	bulk		
+h194	0	done		
+h195	0	bulk		
+h196	0	personal		
+h197	0	transactional		
+h198	0	bulk		
+h199	0	hard-ad		
+h200	0	bulk		

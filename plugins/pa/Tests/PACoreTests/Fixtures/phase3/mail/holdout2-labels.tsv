@@ -1,0 +1,201 @@
+id	request	kind	sentence	sentence2
+k001	0	personal		
+k002	0	personal		
+k003	0	bulk		
+k004	0	personal		
+k005	0	quoted		
+k006	0	transactional		
+k007	0	transactional		
+k008	0	personal		
+k009	0	hard-ad		
+k010	0	hard-ad		
+k011	0	transactional		
+k012	0	personal		
+k013	0	bulk		
+k014	0	bulk		
+k015	0	done		
+k016	0	hard-ad		
+k017	0	personal		
+k018	0	bulk		
+k019	0	bulk		
+k020	0	done		
+k021	0	personal		
+k022	0	bulk		
+k023	0	bulk		
+k024	0	transactional		
+k025	0	bulk		
+k026	0	hard-ad		
+k027	0	bulk		
+k028	0	transactional		
+k029	0	other-person		
+k030	0	bulk		
+k031	0	bulk		
+k032	0	bulk		
+k033	0	personal		
+k034	0	bulk		
+k035	0	other-person		
+k036	0	bulk		
+k037	0	done		
+k038	0	bulk		
+k039	1	person	Maya, please send the revised timeline to our team today if you can.	
+k040	0	bulk		
+k041	0	personal		
+k042	1	duty	Book your slot in the school portal by Thursday 19 November.	
+k043	0	other-person		
+k044	0	survey		
+k045	0	offer		
+k046	0	bulk		
+k047	0	bulk		
+k048	0	personal		
+k049	0	transactional		
+k050	0	other-person		
+k051	0	transactional		
+k052	0	own		
+k053	1	person	I want your comments on sections 2 and 5 by Wednesday evening.	
+k054	1	duty	Make an appointment at one of our stations in good time.	Our records show that your car WX-2041 is due for its inspection by 15 December 2026.
+k055	0	other-person		
+k056	0	personal		
+k057	0	bulk		
+k058	0	personal		
+k059	0	bulk		
+k060	1	person	Would you mind watering our plants while we are gone?	
+k061	0	bulk		
+k062	0	bulk		
+k063	0	done		
+k064	0	personal		
+k065	0	offer		
+k066	0	other-person		
+k067	1	person	I am still missing your bank statement for March.	Without it I cannot file before the deadline of 30 November.
+k068	0	replied		
+k069	1	person	Could you bring the folding chairs when you come on the 12th?	
+k070	0	other-person		
+k071	0	bulk		
+k072	0	transactional		
+k073	0	done		
+k074	0	personal		
+k075	0	bulk		
+k076	0	survey		
+k077	0	done		
+k078	0	survey		
+k079	0	hard-ad		
+k080	0	bulk		
+k081	0	other-person		
+k082	0	personal		
+k083	0	bulk		
+k084	0	bulk		
+k085	0	bulk		
+k086	0	survey		
+k087	0	transactional		
+k088	0	done		
+k089	0	done		
+k090	0	other-person		
+k091	0	personal		
+k092	0	bulk		
+k093	0	bulk		
+k094	0	bulk		
+k095	0	bulk		
+k096	0	transactional		
+k097	0	personal		
+k098	0	done		
+k099	0	bulk		
+k100	0	bulk		
+k101	0	transactional		
+k102	0	other-person		
+k103	0	personal		
+k104	0	bulk		
+k105	0	other-person		
+k106	0	personal		
+k107	0	own		
+k108	0	done		
+k109	0	personal		
+k110	0	transactional		
+k111	1	duty	Please call us on 555 0166 to make an appointment before 30 November, so that the protection does not lapse.	
+k112	0	transactional		
+k113	1	person	Maya - you are on snack duty this Saturday, 12 kids, no nuts.	
+k114	0	transactional		
+k115	0	bulk		
+k116	0	transactional		
+k117	0	hard-ad		
+k118	0	transactional		
+k119	0	hard-ad		
+k120	0	bulk		
+k121	0	polite		
+k122	0	bulk		
+k123	0	personal		
+k124	0	transactional		
+k125	0	bulk		
+k126	0	personal		
+k127	0	hard-ad		
+k128	0	hard-ad		
+k129	0	bulk		
+k130	0	bulk		
+k131	0	transactional		
+k132	0	bulk		
+k133	0	bulk		
+k134	0	bulk		
+k135	0	transactional		
+k136	0	bulk		
+k137	0	personal		
+k138	0	bulk		
+k139	0	transactional		
+k140	0	hard-ad		
+k141	1	list-person	Can you send me the title by the 1st?	Maya, it is your turn to choose the book for January.
+k142	0	bulk		
+k143	0	bulk		
+k144	0	bulk		
+k145	1	person	We fly on the 3rd and I'd need it back before then.	Do you still have my blue suitcase from the Lisbon trip?
+k146	1	person	send me your new address so I can post yours	
+k147	0	bulk		
+k148	0	bulk		
+k149	0	bulk		
+k150	0	transactional		
+k151	0	other-person		
+k152	0	transactional		
+k153	0	transactional		
+k154	0	transactional		
+k155	0	hard-ad		
+k156	0	personal		
+k157	0	hard-ad		
+k158	0	bulk		
+k159	0	transactional		
+k160	0	bulk		
+k161	0	personal		
+k162	0	survey		
+k163	0	transactional		
+k164	1	duty	Update your payment details or pay the bill in your account by 20 November, so that your service continues.	
+k165	0	bulk		
+k166	0	bulk		
+k167	0	bulk		
+k168	0	bulk		
+k169	0	quoted		
+k170	0	survey		
+k171	0	quoted		
+k172	0	bulk		
+k173	0	transactional		
+k174	0	hard-ad		
+k175	0	bulk		
+k176	0	personal		
+k177	0	personal		
+k178	0	personal		
+k179	1	person	Can you confirm that Tuesday works?	Somebody has to be in between 8 and 12, otherwise I cannot get to the stopcock in the cellar.
+k180	0	hard-ad		
+k181	0	bulk		
+k182	1	person	Are you in?	I have to buy the tickets by Friday or they are gone.
+k183	0	bulk		
+k184	0	done		
+k185	0	bulk		
+k186	0	other-person		
+k187	1	duty	You must activate the new card before 1 December.	
+k188	0	transactional		
+k189	1	duty	Submit your meter reading by 25 November in your online account or by phone.	
+k190	0	bulk		
+k191	0	replied		
+k192	0	hard-ad		
+k193	1	duty	Pick it up at counter 4 by 12 February 2027 and bring your old passport.	
+k194	0	transactional		
+k195	1	person	Is there any way you can cover my Thursday shift at the front desk?	
+k196	0	personal		
+k197	0	transactional		
+k198	0	bulk		
+k199	1	person	I need the entry fee of 48 and the signed form from you by then.	
+k200	0	bulk		

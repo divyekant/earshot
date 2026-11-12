@@ -14,7 +14,59 @@ public enum PluginContract {
     /// The owner's approvals: plugin id to the SHA-256 of the approved manifest.
     public static let approvalsFile = "plugins-approved.json"
     /// The context keys that a manifest can ask for. Nothing else goes to a plugin.
-    public static let contextKeys: Set<String> = ["app", "windowTitle", "url"]
+    public static let contextKeys: Set<String> = ["app", "windowTitle", "url", "document", "selection"]
+    /// The context keys that need an extra read of the front window. earshot reads them only for a plugin that names them.
+    public static let focusKeys: Set<String> = ["document", "selection"]
+    /// The longest selected text that a plugin gets, in characters.
+    public static let maxSelectionCharacters = 2000
+
+    /// What each context key gives the plugin, in words for the Plugins tab.
+    public static func contextText(_ key: String) -> String {
+        switch key {
+        case "app": return "the front app"
+        case "windowTitle": return "the title of the front window"
+        case "url": return "the address of the page in the front window"
+        case "document": return "the file path of the document in the front window"
+        case "selection": return "the text that you selected (the plugin gets the text and can keep it)"
+        default: return key
+        }
+    }
+
+    /// The file path in an AXDocument value: a "file:" address or a path. Nil for other values.
+    public static func documentPath(_ raw: String) -> String? {
+        let s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if s.hasPrefix("/") { return s }
+        guard let url = URL(string: s), url.isFileURL, !url.path.isEmpty else { return nil }
+        return url.path
+    }
+
+    /// The folder of a file window that gives no AXDocument (for example a Finder window). The window shows items
+    /// with file addresses (AXURL). The folder is a folder of these addresses, or the parent of an address, whose name
+    /// is the window title. If more than one matches, the deepest one wins. Nil if no folder matches the title.
+    public static func windowFolder(title: String, urls: [String]) -> String? {
+        let name = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return nil }
+        var best: String?
+        func consider(_ path: String) {
+            let p = path.count > 1 && path.hasSuffix("/") ? String(path.dropLast()) : path
+            guard p.hasPrefix("/"), p != "/" else { return }
+            let last = (p as NSString).lastPathComponent
+            guard last == name || p == name || (name.hasPrefix("~") && p.hasSuffix(String(name.dropFirst()))) else { return }
+            if best == nil || p.split(separator: "/").count > best!.split(separator: "/").count { best = p }
+        }
+        for raw in urls {
+            guard let url = URL(string: raw), url.isFileURL, !url.path.isEmpty else { continue }
+            if raw.hasSuffix("/") { consider(url.path) }
+            consider(url.deletingLastPathComponent().path)
+        }
+        return best
+    }
+
+    /// The selected text for a plugin: nil if empty, else cut at `maxSelectionCharacters`.
+    public static func selectionText(_ raw: String?) -> String? {
+        guard let raw, !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        return String(raw.prefix(maxSelectionCharacters))
+    }
     /// The most lead words in one lead.
     public static let maxLeadWords = 5
     /// The longest text of one answer on screen, in characters.
@@ -101,6 +153,62 @@ public struct PluginLead: Hashable, Sendable {
     public var lead: String
 
     public init(pluginID: String, lead: String) { self.pluginID = pluginID; self.lead = lead }
+}
+
+/// The extra context of the front window for a plugin: the document path and the selected text.
+public struct PluginFocus: Equatable, Sendable {
+    public var document: String?
+    public var selection: String?
+
+    public init(document: String? = nil, selection: String? = nil) { self.document = document; self.selection = selection }
+}
+
+/// One target of a running plugin, for the router: "open today" (docs/PLUGINS.md, section 5.2).
+public struct PluginTargetName: Hashable, Sendable {
+    public var pluginID: String
+    public var name: String
+    /// The file path or the web address that the plugin gave.
+    public var open: String
+
+    public init(pluginID: String, name: String, open: String) { self.pluginID = pluginID; self.name = name; self.open = open }
+}
+
+/// What "open <target>" can open (R-PL-3). earshot opens a web address (http or https), a document or a folder.
+/// It never opens a program, a script, an installer or a package: a plugin cannot make earshot run code.
+public enum PluginTargetOpen {
+    /// The file types that earshot opens. All other types are refused, also a file with no type.
+    public static let documentTypes: Set<String> = ["html", "htm", "pdf", "txt", "md", "markdown", "rtf", "csv",
+                                                     "png", "jpg", "jpeg", "gif", "heic", "webp"]
+
+    /// The address to open, or the reason not to open it.
+    /// - A web address must use http or https, and must have a host.
+    /// - A file path must be absolute ("/" or "~/"). earshot follows links before it checks the type.
+    /// - A file must have a type in `documentTypes`. A folder must not be a package (a folder with a type, such as an app).
+    public static func url(_ open: String, fileManager: FileManager = .default) -> (url: URL?, why: String?) {
+        let raw = open.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !raw.isEmpty else { return (nil, "the target has no address") }
+        if let u = URL(string: raw), let scheme = u.scheme?.lowercased(), !raw.hasPrefix("/") {
+            guard ["http", "https"].contains(scheme), let host = u.host, !host.isEmpty else {
+                return (nil, "earshot opens only http and https addresses")
+            }
+            return (u, nil)
+        }
+        var path = raw
+        if path.hasPrefix("~/") { path = fileManager.homeDirectoryForCurrentUser.path + String(path.dropFirst(1)) }
+        guard path.hasPrefix("/") else { return (nil, "not a file path or a web address") }
+        let file = URL(fileURLWithPath: path).standardizedFileURL.resolvingSymlinksInPath()
+        var folder: ObjCBool = false
+        guard fileManager.fileExists(atPath: file.path, isDirectory: &folder) else { return (nil, "the file is not there") }
+        if folder.boolValue {
+            guard file.pathExtension.isEmpty else { return (nil, "earshot does not open a package") }
+            return (file, nil)
+        }
+        let type = file.pathExtension.lowercased()
+        guard documentTypes.contains(type) else {
+            return (nil, type.isEmpty ? "earshot opens only documents" : "earshot does not open a .\(type) file")
+        }
+        return (file, nil)
+    }
 }
 
 /// Finds the plugins in the store folder and keeps the owner's approvals.

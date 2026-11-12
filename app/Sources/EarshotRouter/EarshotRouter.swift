@@ -270,6 +270,9 @@ public struct CommandRouter: Router {
             return RulesDecision(intent: .none, sure: true, exact: true, why: "\(phrase) with no target", options: [])
         }
 
+        // "open today": a target of a running plugin. An app name wins (R-PL-4). The plugin runs no action (R-PL-3).
+        if let d = PluginRouter.decideTarget(words, context: context) { return d }
+
         // A screen command for one app: "On Chrome, click Chat", "open notifications on Chrome", "Chrome, open settings".
         for hit in [appPrefix(text, apps: context.apps), appSuffix(text, apps: context.apps), appComma(text, apps: context.apps)] {
             if let hit, let d = screenFor(hit.0, hit.1, context: context) { return d }

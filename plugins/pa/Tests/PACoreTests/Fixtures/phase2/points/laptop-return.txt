@@ -1,0 +1,27 @@
+Email to the shop about the faulty laptop
+
+Subject: Return of a faulty laptop, order 88-14420
+
+Dear customer service team,
+
+I bought a laptop from your website on 2 September, order number 88-14420. It is the 14 inch model in silver with 16 GB of memory. It arrived on 5 September.
+
+The laptop has a fault: the screen goes black for a few seconds several times each day, and I cannot work when this happens. It started in the second week. At first it happened once a day. Now it happens five or six times a day. The laptop does not crash; the screen comes back after about five seconds, and my work is still there. The fault happens on battery and on mains power.
+
+I have tried the steps on your help page. I installed all system updates. I reset the display settings. I tested the laptop with an external screen, and the external screen does not go black, so the fault seems to be in the built-in screen or its cable. I also ran the built-in hardware test, which gave the code DSP-021.
+
+Because the laptop is less than 30 days old, I ask for a full refund under your returns policy, not a repair. I need a laptop for my work, and I cannot wait several weeks for a repair. Your policy on the website says that a faulty item can be returned within 30 days for a refund or a replacement, as the customer chooses.
+
+I still have the original box, the charger, the cable and the papers. The laptop is in very good condition, with no marks or scratches. I removed my data and reset it to the factory settings.
+
+Please send me a returns label and tell me how long the refund takes once you receive the laptop. I prefer to drop the parcel at a post office, but I can also be at home for a collection on a weekday after four o'clock.
+
+If you need more information, such as a video of the fault, I can send it. I attached a photo of the receipt and a photo of the screen with the error code.
+
+I would also like to know if I can order a different model at the same time, and if you can give me a discount on it for the trouble. This is a request and not a condition of the return.
+
+Thank you for your help. I look forward to your reply within five working days.
+
+Kind regards,
+Alex Moreau
+14 Harbour View, flat 3

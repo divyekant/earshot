@@ -1,0 +1,197 @@
+import Foundation
+import PACore
+#if canImport(NaturalLanguage)
+import NaturalLanguage
+
+/// Candidate 1 (phase 2 build spec, 6.2): the sentence embedding that macOS includes. No download.
+public final class NLSentenceEmbedder: Embedder {
+    public let id: String
+    public let dimension: Int
+    let model: NLEmbedding
+
+    public init?(language: NLLanguage = .english) {
+        guard let m = NLEmbedding.sentenceEmbedding(for: language) else { return nil }
+        model = m
+        dimension = m.dimension
+        id = "nl-sentence-\(language.rawValue)-r\(m.revision)"
+    }
+
+    public func embed(_ texts: [String], kind: EmbedKind) throws -> [[Float]] {
+        texts.map { t in
+            model.vector(for: t)?.map(Float.init) ?? [Float](repeating: 0, count: dimension)
+        }
+    }
+}
+
+
+/// Candidate 2 (6.2): the contextual embedding of macOS. macOS can download its data one time. The list of a text
+/// is the mean of the lists of its tokens.
+@available(macOS 14.0, *)
+public final class NLContextualEmbedder: Embedder {
+    public let id: String
+    public let dimension: Int
+    let model: NLContextualEmbedding
+    let language: NLLanguage
+
+    /// - Parameter allowAssetRequest: if true and the data is not on the Mac, ask macOS to get it, and wait.
+    public init(language: NLLanguage = .english, allowAssetRequest: Bool) throws {
+        guard let m = NLContextualEmbedding(language: language) else {
+            throw EmbedderError(description: "no contextual embedding for \(language.rawValue)")
+        }
+        if !m.hasAvailableAssets {
+            guard allowAssetRequest else { throw EmbedderError(description: "the data of the contextual embedding is not on this Mac") }
+            let sem = DispatchSemaphore(value: 0)
+            var outcome = "unknown"
+            m.requestAssets { result, error in
+                switch result {
+                case .available: outcome = "available"
+                case .notAvailable: outcome = "not available"
+                case .error: outcome = "error \(error.map { "\($0)" } ?? "")"
+                @unknown default: outcome = "unknown"
+                }
+                sem.signal()
+            }
+            _ = sem.wait(timeout: .now() + 600)
+            // The answer can come before the data is ready. The state of the data decides.
+            if !m.hasAvailableAssets {
+                throw EmbedderError(description: "the data of the contextual embedding: \(outcome)")
+            }
+        }
+        try m.load()
+        model = m
+        self.language = language
+        dimension = m.dimension
+        id = "nl-contextual-\(m.modelIdentifier)-r\(m.revision)"
+    }
+
+    public func embed(_ texts: [String], kind: EmbedKind) throws -> [[Float]] {
+        try texts.map { t in
+            var sum = [Double](repeating: 0, count: dimension)
+            var n = 0
+            guard !t.isEmpty else { return [Float](repeating: 0, count: dimension) }
+            let r = try model.embeddingResult(for: t, language: language)
+            r.enumerateTokenVectors(in: t.startIndex..<t.endIndex) { v, _ in
+                for i in 0..<min(v.count, sum.count) { sum[i] += v[i] }
+                n += 1
+                return true
+            }
+            return n == 0 ? sum.map(Float.init) : sum.map { Float($0 / Double(n)) }
+        }
+    }
+}
+#endif
+
+public struct EmbedderError: Error, CustomStringConvertible {
+    public var description: String
+    public init(description: String) { self.description = description }
+}
+
+/// The memory footprint of this program in bytes (the number that Activity Monitor shows), or nil.
+public func memoryFootprint() -> Int? {
+    #if os(macOS)
+    var info = task_vm_info_data_t()
+    var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<natural_t>.size)
+    let rc = withUnsafeMutablePointer(to: &info) {
+        $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+            task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
+        }
+    }
+    return rc == KERN_SUCCESS ? Int(info.phys_footprint) : nil
+    #else
+    return nil
+    #endif
+}
+
+/// The embedder for a name of the bench: "hash", "nl-sentence", "nl-contextual", "qwen3", "gemma".
+/// "qwen3" and "gemma" need `modelFile`, a GGUF file.
+public func makeEmbedder(_ name: String, allowAssetRequest: Bool = false, modelFile: String? = nil,
+                         gpu: Bool = false) throws -> Embedder {
+    switch name {
+    case "hash": return HashEmbedder()
+    #if canImport(llama)
+    case "qwen3", "gemma", "gemma2":
+        guard let modelFile else { throw EmbedderError(description: "\(name) needs --model <file.gguf>") }
+        let spec = name == "qwen3" ? LlamaEmbedder.qwen3 : (name == "gemma2" ? LlamaEmbedder.gemma2 : LlamaEmbedder.gemma)
+        return try LlamaEmbedder(path: modelFile, spec: spec, gpu: gpu)
+    #endif
+    #if canImport(NaturalLanguage)
+    case "nl-sentence":
+        guard let e = NLSentenceEmbedder() else { throw EmbedderError(description: "no sentence embedding on this Mac") }
+        return e
+    case "nl-contextual":
+        if #available(macOS 14.0, *) { return try NLContextualEmbedder(allowAssetRequest: allowAssetRequest) }
+        throw EmbedderError(description: "needs macOS 14")
+    #endif
+    default:
+        throw BenchNameError(name: name)
+    }
+}
+
+/// The model of the search by sense for the PA (phase 2, Q3), or nil for keywords only. The model file is in
+/// `<data folder>/models/`, where the install script puts it. The model runs in a worker process (follow-up R3):
+/// the same program file with `--embed-worker <name>`. It loads at the first use, on the GPU.
+/// "hash-worker" is a worker with the hash model, for tests only.
+public func makeSearchModel(_ name: String, folder: URL) -> ModelHost? {
+    let exe = Bundle.main.executableURL ?? URL(fileURLWithPath: CommandLine.arguments[0])
+    func worker(_ id: String, dimension: Int) -> ModelHost {
+        ModelHost(modelID: id) {
+            try WorkerEmbedder(executable: exe, arguments: ["--embed-worker", name, "--data", folder.path], id: id, dimension: dimension)
+        }
+    }
+    if name == "hash-worker" { return worker("hash-256-v1", dimension: 256) }
+    #if canImport(llama)
+    // The rule values come from the development files of the bench, with all numbers of the model (E10).
+    let host: ModelHost
+    switch name {
+    case "gemma":
+        host = worker(LlamaEmbedder.gemma.id, dimension: 768)
+        host.rules = ModelRules(projectA: 0.542, projectB: 0.025, duplicateC: 0.806, searchFloor: 0.411)
+    case "qwen3":
+        host = worker(LlamaEmbedder.qwen3.id, dimension: 1024)
+        host.rules = ModelRules(projectA: 0.632, projectB: 0.035, duplicateC: 0.800)
+    case "gemma2":
+        host = worker(LlamaEmbedder.gemma2.id, dimension: 768)
+        host.rules = ModelRules(projectA: 0.791, projectB: 0.0175, duplicateC: 0.842)
+    default: return nil
+    }
+    guard let file = modelFile(name), FileManager.default.fileExists(atPath: folder.appendingPathComponent("models").appendingPathComponent(file).path) else {
+        return nil
+    }
+    return host
+    #else
+    return nil
+    #endif
+}
+
+func modelFile(_ name: String) -> String? {
+    switch name {
+    case "gemma": return "embeddinggemma-300M-Q8_0.gguf"
+    case "qwen3": return "Qwen3-Embedding-0.6B-Q8_0.gguf"
+    case "gemma2": return "embeddinggemma-2-Q8_0.gguf"
+    default: return nil
+    }
+}
+
+/// The embedder inside the worker process: the model file of `name` in `<data folder>/models/`.
+public func makeWorkerEmbedder(_ name: String, folder: URL) -> Embedder? {
+    if name == "hash-worker" { return HashEmbedder() }
+    #if canImport(llama)
+    let spec: LlamaEmbedder.Spec
+    switch name {
+    case "gemma": spec = LlamaEmbedder.gemma
+    case "qwen3": spec = LlamaEmbedder.qwen3
+    case "gemma2": spec = LlamaEmbedder.gemma2
+    default: return nil
+    }
+    guard let file = modelFile(name) else { return nil }
+    let path = folder.appendingPathComponent("models").appendingPathComponent(file).path
+    return try? LlamaEmbedder(path: path, spec: spec, gpu: true)
+    #else
+    return nil
+    #endif
+}
+
+public struct BenchNameError: Error, CustomStringConvertible {
+    public var name: String
+    public var description: String { "unknown embedder \(name)" }
+}

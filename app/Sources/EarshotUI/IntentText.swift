@@ -30,6 +30,7 @@ public enum IntentText {
         // The typed text stays out of the note and the log: only its length.
         case .undoTyping(let text): return text.isEmpty ? "Undo the last typing" : "Undo the last typing (\(text.count) characters)"
         case .handOff(let id, let lead, _): return "→ plugin \(id) · \"\(lead)\""
+        case let .openTarget(id, name, _): return "Open \(name) (plugin \(id))"
         }
     }
 

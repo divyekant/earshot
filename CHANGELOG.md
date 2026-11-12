@@ -6,6 +6,42 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-12
+
+This release adds the PA plugin, phases 1 to 3. The PA captures reminders, to-dos and notes by voice, shows alerts, copies open items to the Reminders list "earshot", and writes local pages. It keeps files and folders and finds their text with "where is". It reads Notes, Mail and Calendar while those apps run, and never changes them. It reads and searches the text on this Mac. earshot also gets a command line and two plugin context keys.
+
+### Added
+
+- PA: notes. While the Notes app runs, the PA reads your notes, and "where is" finds their words. It skips locked notes and "Recently Deleted". It never starts Notes and never changes a note (R-PA-4).
+- PA: the mail read. While the Mail app runs, the PA reads new inbox messages each 5 minutes, in small steps. It does not read while Mail is the front app. It never starts Mail and never changes a mail. A mail from a person in a "waiting for" item gives the flag `Arrived? · Sam Lee · Quote for the tiles`. A mail for a project gives `New in Kitchen? · mail · ...`. The first read makes 5 flags or fewer. If you reply in Mail, the flag goes away (R-PA-4, R-PA-5). Request flags ("Request · Sam Lee · Could you send ...") are a list line by default. The PA finds about half of the requests. Do not use it as your only check of the inbox. In tests, version 2 (it checks who the mail is for and who writes) found 13 of 20 requests with 1 false flag on new made-up mail, and 23 of 53 with no false flag on the owner's research items. Set `rules.request` to `off` to stop them. "open flags" shows the open flags on a page, with a link to each mail. After 50 "keep" and "drop" answers, the flags learn from them (setting `flagsLearn`). After 3 dropped flags from one sender and no kept flag, the PA makes no more flags from that sender (setting `flagsMuted`). The mail read now gets each message with one header event, so it is faster (R-PA-4, R-PA-5).
+- PA: the calendar. The PA reads the events of the next 14 days. "remind me before the dentist to bring the x-ray" links the reminder to the event, and the reminder shows 15 minutes before it. A rule also links open items and documents to an event, shown with "?". The setting `linkEvents` stops the links by a rule. The Today page counts the near-event alerts and the answers to them. 15 minutes before an event with links, an alert lists them (R-PA-4, R-PA-7).
+- PA, phase 3 frame: the plugin version is 0.3.0, with the new leads "keep", "what is new" and "what new". "what is new" lists the open flags. "keep 2" makes a to-do from flag 2, with a link to the mail. "drop 2" drops it. "keep" with other words saves a note. New settings: `sources`, `nearEventMinutes`, `mail`, `notes`, `rules.request`, `flagsLearn` and `owner`. If a source goes off, the PA deletes what it kept from it (R-PA-4, R-PA-5).
+- PA: the search model runs in a separate worker process. When the worker stops, its memory goes back to the Mac. If the worker fails, the PA still answers each command (R-PA-8).
+- PA: project proposals are on by default. A new rule proposes a project only if the nearest records and the keyword results agree. The setting `proposeByName` (off by default) also proposes a project whose name is in the capture. "main points" gives points to sentences with an amount, a date, a request or a result (R-PA-4).
+- PA: `pa.log` has the line `index-done texts=N ms=M` at the end of each run of index jobs, so that a speed test can see when the background index ends (R-PA-8).
+- PA: "keep this folder" keeps a folder and reads its files. The PA watches the folder, reads new files and shows them as new arrivals (R-PA-3, R-PA-4).
+- PA: "main points of this" shows 5 sentences of a kept document that give its main points. The PA selects the sentences. It writes no new words (R-PA-4).
+- PA: after "new project kitchen", the next captures go to Kitchen for 5 minutes. A capture like an open item gets a second note: "To-do · like one that you have: order the paint". Project proposals with a "?" are available with the setting `proposeProject`, off by default (R-PA-4).
+- PA: "where is" finds the text of kept files, also in other words. The install script downloads a search model (EmbeddingGemma-300M, about 334 MB) with a SHA-256 check. The model loads at the first search and unloads after 5 minutes with no use. "open search" shows the full results (R-PA-4, R-PA-8).
+- Two plugin context keys: `document` (the file path of the front document) and `selection` (the selected text, up to 2,000 characters). A plugin gets them only if its manifest names them, never on a sign-in, code or payment page. The Plugins tab says that `selection` gives the plugin your selected text (R-PL-2).
+- The PA plugin, phase 1 start: a separate program in `plugins/pa/` with its plugin file, its store and the script `install-pa.sh`. Each command answers "Not built yet" for now. At its first start, the PA asks macOS for access to Reminders and shows the result (R-PA-1, R-PA-2, R-PL-1).
+- "open <target>" opens a target that a plugin gave, for example "open today". An app name wins. earshot opens only a web address, a document or a folder, never a program or a script (R-PL-3, R-PL-4).
+- The PA plugin can capture and list. Say "remind me ...", "todo ...", "note ...", "keep this" or "new project ...". The PA reads the time with fixed rules and shows it in the note. Say "what is due", "what about <project>" or "where is <words>" for a list, and "done 2", "snooze 2 to tomorrow", "drop that" or "move 2 to <project>" for a change. If the PA is not sure of a time, it saves the words with no time (R-PA-4, R-PA-6).
+- The PA plugin shows an alert at the time of a reminder, one more time after 10 minutes, and a morning list at 09:00. It shows 3 alerts or fewer in one hour, and none in quiet hours (22:00 to 08:00). "quiet for 2 hours" stops the alerts. Each rule has a setting in `settings.json` in the PA data folder: alert, list or off (R-PA-7).
+- The PA plugin writes local pages: today, all open items, and one page for each project. It sends these pages to earshot as targets (R-PA-3).
+- The PA plugin copies each open to-do and reminder to the Reminders list "earshot", so that you see them on your iPhone. A tick, a change, a delete or a new reminder in that list goes back to the PA (R-PA-2, R-PA-3).
+- `docs/PA.md` tells how to install and use the PA plugin. Say "open today" or "open <project>" to open a PA page (R-PA-3).
+- The PA plugin, phase 2 start: "keep this" with a file in front keeps the file and reads its text on this Mac (PDF, text, Markdown, RTF, Word, HTML) into `index.sqlite`. "note this" saves the selected text. "what projects" lists the open projects, and "finish project <name>" closes one. If you drop a document, the PA deletes its text at once. The plugin file changes, so approve the PA again (R-PA-3, R-PA-9).
+- A command line in the app program: `earshot settings set <name> <value>`, `earshot plugins restart <id>`, `earshot run <words>`, `earshot status`. The running app uses a change at once. The command line cannot approve a plugin. `docs/CONTROL.md` gives the commands (R-CT-1 to R-CT-4).
+
+
+### Fixed
+
+- The context key `document` now gives the folder of a Finder window. Before, it gave nothing, and "keep this folder" said "No folder here" (R-PL-2, R-PA-3).
+- "Read again" in the Plugins tab now starts a new build of a plugin program. Before, only a new approval or a restart of earshot did (R-PL-1).
+- The PA plugin reads a changed `settings.json` in about 1 s. Before, it waited for the next check, up to 60 s (R-PA-7).
+- The PA plugin stopped on a capture with "#" and a number above 31, for example "#43". Now the PA reads "#43" as words, not as a day (R-PA-6).
+
 ## [0.4.0] - 2026-11-11
 
 This release adds answers to a "not sure" note, with memory of your choices and of misheard names, spoken keys and "undo that", a menu bar state icon with pause, a turn recorder with no audio, a weekly report script, and experimental plugins. The microphone is open only while you hold the key in hold mode. "Slack <name>" works again, WhatsApp chats open, and room sound no longer matches the wake phrase.
@@ -136,7 +172,8 @@ The first public release. earshot is early software. Expect bugs and changes to 
 
 - earshot never presses Send, or does another action that cannot be undone, without an explicit command (R-NV-5, R-ON-5).
 
-[Unreleased]: https://github.com/divyekant/earshot/compare/v0.4.0...develop
+[Unreleased]: https://github.com/divyekant/earshot/compare/v0.5.0...develop
+[0.5.0]: https://github.com/divyekant/earshot/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/divyekant/earshot/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/divyekant/earshot/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/divyekant/earshot/compare/v0.1.0...v0.2.0

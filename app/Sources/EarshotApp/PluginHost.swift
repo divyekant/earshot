@@ -14,6 +14,10 @@ protocol PluginHandOff: AnyObject {
     /// Sends the words to the plugin, and returns at once (R-PL-5). Nil if the words went out, else a short reason.
     /// `available` is the context that earshot can give. The host sends only the keys that the manifest names.
     func handOff(pluginID: String, lead: String, text: String, available: [String: String]) -> String?
+    /// The context keys that the manifest of the plugin names.
+    func contextKeys(of pluginID: String) -> [String]
+    /// The targets with an `open` value of the approved plugins that run. The router uses them for "open <target>".
+    var targetNames: [PluginTargetName] { get }
 }
 
 final class PluginHost: PluginHandOff, @unchecked Sendable {
@@ -49,7 +53,9 @@ final class PluginHost: PluginHandOff, @unchecked Sendable {
         lock.lock()
         let wanted = found.filter { $0.approved && $0.problems.isEmpty }
         let keep = Set(wanted.map(\.hash))
-        let stop = processes.filter { !keep.contains($0.value.hash) }
+        // A plugin also stops if its program files changed since it started, so that "Read again" starts a new build.
+        // The approval stays on the plugin.json hash.
+        let stop = processes.filter { !keep.contains($0.value.hash) || $0.value.stamp != PluginProcess.stamp(of: $0.value.entry) }
         for id in stop.keys { processes[id] = nil; targetCache[id] = nil }
         entries = found
         starts = [:]
@@ -67,8 +73,18 @@ final class PluginHost: PluginHandOff, @unchecked Sendable {
 
     func name(of pluginID: String) -> String { all.first { $0.id == pluginID }?.manifest.name ?? pluginID }
 
-    /// The targets that the plugin gave last (contract part 3). Kept for the target sources of a later change.
+    func contextKeys(of pluginID: String) -> [String] { all.first { $0.id == pluginID }?.manifest.context ?? [] }
+
+    /// The targets that the plugin gave last (contract part 3).
     func targets(of pluginID: String) -> [PluginTarget] { lock.lock(); defer { lock.unlock() }; return targetCache[pluginID] ?? [] }
+
+    var targetNames: [PluginTargetName] {
+        let approved = Set(all.filter { $0.approved && $0.problems.isEmpty }.map(\.id))
+        lock.lock(); defer { lock.unlock() }
+        return targetCache.filter { approved.contains($0.key) }.flatMap { id, targets in
+            targets.compactMap { t in t.open.map { PluginTargetName(pluginID: id, name: t.name, open: $0) } }
+        }
+    }
 
     func handOff(pluginID: String, lead: String, text: String, available: [String: String]) -> String? {
         guard let entry = all.first(where: { $0.id == pluginID }), entry.approved, entry.problems.isEmpty else {
@@ -82,6 +98,32 @@ final class PluginHost: PluginHandOff, @unchecked Sendable {
         let context = available.filter { entry.manifest.context.contains($0.key) }
         process.send(.command(id: UUID().uuidString, lead: lead, text: text, context: context))
         return nil
+    }
+
+    /// Stops one plugin and starts it again, with a new start count (R-CT-2). It reads the plugins folder and the
+    /// approvals first, so a plugin that is not approved now does not start. Nil if it runs again, else a reason.
+    func restart(_ pluginID: String) -> String? {
+        reload()
+        guard let entry = all.first(where: { $0.id == pluginID }) else { return "there is no plugin \(pluginID)" }
+        guard entry.approved else { return "the plugin \(pluginID) is not approved" }
+        guard entry.problems.isEmpty else { return "the plugin \(pluginID) has problems: " + entry.problems.joined(separator: "; ") }
+        lock.lock()
+        let old = processes[pluginID]
+        processes[pluginID] = nil
+        targetCache[pluginID] = nil
+        starts[pluginID] = nil
+        lock.unlock()
+        old?.stop()
+        switch running(entry) {
+        case .success: return nil
+        case .failure(let why): return why.text
+        }
+    }
+
+    /// The ids of the plugins that run now.
+    var runningIDs: [String] {
+        lock.lock(); defer { lock.unlock() }
+        return processes.filter { $0.value.isRunning }.keys.sorted()
     }
 
     func stopAll() {
@@ -157,6 +199,8 @@ final class PluginHost: PluginHandOff, @unchecked Sendable {
 final class PluginProcess: @unchecked Sendable {
     let entry: PluginEntry
     var hash: String { entry.hash }
+    /// The program files when the process started. See `stamp(of:)`.
+    let stamp: String
     private let dataFolder: URL
     private let onMessage: (PluginMessage) -> Void
     private let onExit: (PluginProcess) -> Void
@@ -173,6 +217,25 @@ final class PluginProcess: @unchecked Sendable {
     init(entry: PluginEntry, dataFolder: URL, onMessage: @escaping (PluginMessage) -> Void,
          onExit: @escaping (PluginProcess) -> Void) {
         self.entry = entry; self.dataFolder = dataFolder; self.onMessage = onMessage; self.onExit = onExit
+        stamp = Self.stamp(of: entry)
+    }
+
+    /// The name, the size and the change date of the program and of each file directly in the plugin folder.
+    /// A new build of the plugin changes it, also when plugin.json stays the same. The read is not recursive,
+    /// so a large folder below the plugin folder does not slow it.
+    static func stamp(of entry: PluginEntry) -> String {
+        let fm = FileManager.default
+        let first = entry.manifest.run.first ?? ""
+        let program = first.hasPrefix("/") ? URL(fileURLWithPath: first) : entry.folder.appendingPathComponent(first)
+        let keys: [URLResourceKey] = [.contentModificationDateKey, .fileSizeKey, .isRegularFileKey]
+        let inFolder = (try? fm.contentsOfDirectory(at: entry.folder, includingPropertiesForKeys: keys)) ?? []
+        var lines: [String] = []
+        for file in [program.resolvingSymlinksInPath()] + inFolder.map({ $0.resolvingSymlinksInPath() }) {
+            guard let v = try? file.resourceValues(forKeys: Set(keys)), v.isRegularFile == true else { continue }
+            let date = v.contentModificationDate?.timeIntervalSince1970 ?? 0
+            lines.append("\(file.path) \(v.fileSize ?? 0) \(date)")
+        }
+        return Set(lines).sorted().joined(separator: "\n")
     }
 
     var isRunning: Bool { stateLock.lock(); defer { stateLock.unlock() }; return alive }

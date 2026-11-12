@@ -1,0 +1,101 @@
+# words	target	other
+where is the offer for the floor tiles	kitchen/quote-tiles	0
+the letter from the plumber	kitchen/plumber-letter	0
+what did the electrician say about the hob circuit	kitchen/electrics-notes	0
+the order for the kitchen units	kitchen/cabinet-order	0
+the price for the ceramics	kitchen/quote-tiles	1
+who moves the water pipes under the window	kitchen/plumber-letter	1
+the note about the wiring visit	kitchen/electrics-notes	1
+pick a colour for the grout	kitchen#1	0
+finish for the wooden worktop	kitchen#10	1
+the remaining money for the cupboards	kitchen#8	1
+the email from the accountant	taxes/accountant-email	0
+rent and costs for the flat	taxes/rental-income	0
+the pension statement	taxes/pension-letter	0
+notes about working from home	taxes/home-office	0
+what papers does Helen still need	taxes/accountant-email	1
+how much profit did the let property make	taxes/rental-income	1
+the retirement savings letter	taxes/pension-letter	1
+save cash for what I owe the revenue	taxes#12	1
+the bank interest statements	taxes#1	0
+the deadline for the return	taxes#3	1
+the letter from the admissions office	school/admissions-letter	0
+the school bus times	school/bus-timetable	0
+Mia's report from her old school	school/old-school-report	0
+the list of uniform and kit	school/uniform-list	0
+when does the coach leave in the morning	school/bus-timetable	1
+what clothes does she need for PE	school/uniform-list	1
+how did she do last year in maths	school/old-school-report	1
+the signed form for the place	school#1	0
+rubber boots for the outdoor lessons	school#9	1
+name tags in her clothes	school#5	1
+the valuation of the car	car/valuation	0
+the garage invoice	car/garage-invoice	0
+messages from the buyers	car/buyer-messages	0
+how to tell the agency about the sale	car/logbook-steps	0
+what is the hatchback worth	car/valuation	1
+the bill for the service and MOT	car/garage-invoice	1
+what did Priya offer	car/buyer-messages	1
+new tyres at the back	car#1	0
+the spare key	car#3	1
+stop the insurance once it is sold	car#8	1
+the flight booking	trip/flight-booking	0
+the apartment in Alfama	trip/apartment	0
+ideas for the days in Lisbon	trip/day-plans	0
+the packing list	trip/packing-list	0
+when do we fly out	trip/flight-booking	1
+the code for the key box	trip/apartment	1
+what to take for the holiday	trip/packing-list	1
+tickets for the palace in Sintra	trip#4	0
+plug converter	trip#6	1
+someone to look after the plants	trip#8	1
+the quote for the shed	shed/shed-quote	0
+how to build the base	shed/base-instructions	0
+do I need planning permission	shed/council-rules	0
+the note from Mrs Avery	shed/neighbour-note	0
+price of the timber garden building	shed/shed-quote	1
+how deep to dig for the foundation	shed/base-instructions	1
+the letter from next door about the tree	shed/neighbour-note	1
+the slabs and sand	shed#3	0
+borrow a level	shed#5	0
+wood treatment for the shed	shed#9	1
+the venue contract	wedding/venue-contract	0
+the guest list notes	wedding/guest-list-notes	0
+the email from the photographer	wedding/photographer-email	0
+the wedding budget	wedding/budget-sheet	0
+when must we pay the mill	wedding/venue-contract	1
+who has food allergies	wedding/guest-list-notes	1
+how much are we short for the big day	wedding/budget-sheet	1
+send out the invites	wedding#1	1
+the rings	wedding#10	0
+groups for the pictures	wedding#5	1
+the removal quote	move/removal-quote	0
+the letter about the end of the tenancy	move/tenancy-end	0
+the list of utilities to tell	move/utilities-list	0
+notes about the new house	move/new-house-notes	0
+how much do the movers cost	move/removal-quote	1
+when do I get my deposit back from the landlord	move/tenancy-end	1
+where is the fuse box in Orchard Close	move/new-house-notes	1
+forward my post	move#7	1
+parking for the van	move#2	0
+clean the cooker	move#4	1
+the physio treatment plan	knee/physio-plan	0
+the letter from the doctor	knee/gp-letter	0
+my exercise log	knee/exercise-log	0
+the half marathon entry	knee/race-entry	0
+which exercises for the sore knee	knee/physio-plan	1
+what did the GP write to the physio	knee/gp-letter	1
+when can I give away my race number	knee/race-entry	1
+cold packs	knee#3	1
+new running shoes	knee#10	0
+the remaining sessions	knee#6	0
+the club newsletter	bike/club-newsletter	0
+the bike service report	bike/bike-service	0
+the route of the sportive	bike/sportive-route	0
+the committee minutes	bike/committee-minutes	0
+how fast is the steady group	bike/club-newsletter	1
+what did the workshop replace on my road bike	bike/bike-service	1
+where are the feed stops on the long ride	bike/sportive-route	1
+the yearly club fee	bike#1	1
+handlebar wrap	bike#5	1
+help at the hill climb	bike#9	0

@@ -28,6 +28,8 @@ The plugins folder is `~/Library/Application Support/earshot/plugins/`. Each plu
 
 If the `plugin.json` file changes, the approval stops. Approve the plugin again.
 
+If you install a new build of the plugin program, click "Read again". earshot stops the old program and starts the new one. The approval stays. earshot sees a change in the program file and in each file directly in the plugin folder.
+
 ## 3. The manifest: plugin.json
 
 ```json
@@ -50,7 +52,7 @@ If the `plugin.json` file changes, the approval stops. Approve the plugin again.
 | `name` | No | The name on screen. The default is the id. |
 | `version` | No | The version of the plugin. |
 | `leads` | Yes | The words that start a command for the plugin. 1 to 5 words each. |
-| `context` | No | The context for each command: `app` (the bundle id of the front app), `windowTitle`, `url`. The default is none. |
+| `context` | No | The context for each command: `app` (the bundle id of the front app), `windowTitle`, `url`, `document`, `selection`. The default is none. See section 5.1. |
 | `run` | Yes | The program and its arguments. A relative path starts at the plugin folder. |
 | `network` | No | The network hosts that the plugin says it uses. The default is none. earshot shows it in the Plugins tab. earshot does not enforce it. |
 
@@ -91,7 +93,8 @@ earshot starts the program with posix_spawn. The program reads JSON lines from s
 
 - earshot makes macOS treat the program as a separate process for the privacy permissions. The program does not get the Microphone or the Accessibility permission of earshot.
   - Test on the Mac, 2026-11-11, builds 2e53860 and abc46df: a test plugin ran `AXIsProcessTrusted` through osascript. The result was `false` in the plugin, and `true` in a shell with the Accessibility permission. The plugin was a child process of earshot.
-  - A plugin that needs a permission, for example Reminders, must get its own permission from macOS. This is not tested yet. A command-line program can need an embedded Info.plist or a helper app before macOS shows the permission question.
+  - A plugin that needs a permission, for example Reminders, must get its own permission from macOS.
+  - Test on the Mac, 2026-11-11, PA plugin at commit e8e87cf: earshot started the PA (`EarshotPA.app/Contents/MacOS/earshot-pa`) as a plugin. The PA asked for full access to Reminders. macOS gave the access to the PA 3 s after its start. The program has an `Info.plist` in its app bundle and in the linker section `__TEXT,__info_plist`, and a stable code signature. Use the same layout for a plugin that needs a permission.
 - The program gets only these environment variables: `EARSHOT_PLUGIN_DATA` (a data folder for the plugin), `EARSHOT_CONTRACT` (`1`), `PATH`, `HOME`, `LANG` and `TMPDIR`.
 - The data folder is `~/Library/Application Support/earshot/plugin-data/<id>/`. An update of the plugin does not change this folder.
 - stderr goes to `/dev/null`.
@@ -115,6 +118,22 @@ earshot starts the program with posix_spawn. The program reads JSON lines from s
 ```
 
 The text can be empty, for example for a lead such as "what is due".
+
+The context keys:
+
+| Key | Value |
+|---|---|
+| `app` | The bundle id of the front app. |
+| `windowTitle` | The title of the front window. |
+| `url` | The address of the page in the front window. |
+| `document` | The file path of the document in the front window (the `AXDocument` attribute). A Finder window gives no `AXDocument`. For it, earshot reads the file addresses (`AXURL`) of the items in the window and gives the folder whose name is the window title. |
+| `selection` | The selected text of the focused element (`AXSelectedText`), cut at 2,000 characters. Never the text of a password field. |
+
+- earshot sends only the keys that the manifest names. A key with no value is absent.
+- earshot reads `document` and `selection` only for a plugin that names them. The read comes before the command goes to the plugin. The note does not wait for the plugin.
+- On a sign-in, code or payment page, earshot sends no context.
+- The Plugins tab shows each key in words. It shows `selection` in orange: the plugin gets the text that you selected, and can keep it.
+- The activity log keeps no context value.
 
 ### 5.2 From the plugin to earshot
 
@@ -143,9 +162,19 @@ The text can be empty, for example for a lead such as "what is due".
 {"type":"targets","targets":[{"id":"t1","name":"the lease","kind":"document","open":"/Users/me/Documents/lease.pdf"}]}
 ```
 
-Each `targets` message replaces the list from before. `open` is a file path or an http or https address.
+Each `targets` message replaces the list from before. `open` is an absolute file path or an http or https address. A target with no `open` value is kept, but "open" does not use it.
 
-Version 1 of earshot keeps the list only. A later change will let the core verb "open" open a target, for example "open the lease". The plugin will not run the action.
+#### 5.2.1 "open <target>"
+
+The core verb "open" opens a target, for example "open today" or "open the lease". The plugin does not run the action. earshot opens the target itself.
+
+- The words after "open", "go to" or "switch to" must be the whole name. The match ignores spaces and hyphens. earshot ignores a leading "the" or "my", and a trailing "page", "list" or "project".
+- An app name wins. If a plugin has a target "Notes", "open Notes" opens the app Notes.
+- A target comes before the names of chats and the labels on the screen.
+- If two plugins have a target with the same name, the plugin with the first id gets it.
+- earshot opens a web address in the browser, a document in its app, and a folder in Finder.
+- The document types are `html`, `htm`, `pdf`, `txt`, `md`, `markdown`, `rtf`, `csv`, `png`, `jpg`, `jpeg`, `gif`, `heic` and `webp`.
+- earshot never opens a program, a script, an installer or a package (a folder with a type, such as an app). It refuses other address types, such as `file:` and `ftp:`. It follows a link to its file before it checks the type.
 
 earshot drops a message of an unknown type. So a newer plugin can talk to an older earshot.
 
@@ -160,6 +189,4 @@ earshot drops a message of an unknown type. So a newer plugin can talk to an old
 
 ## 7. Not in version 1
 
-- "open <target>" for the targets of a plugin.
-- More context keys, for example the selected text or the file of the front window.
 - "undo that" for the last plugin answer.

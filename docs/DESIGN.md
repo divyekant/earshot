@@ -254,7 +254,7 @@ A plugin is a separate program with a manifest (`docs/PLUGINS.md`). The parts in
 - `EarshotApp/CommandPipeline+Plugins.swift`: the hand-off after the route. The log keeps the lead and a word count.
 - `EarshotUI/PluginsTab.swift`: the list of plugins and the approvals.
 
-The answers show as a note. An alert also goes to the Notification Center. A plugin also gives targets (names with ids). earshot keeps them for a later target source: "open <target>" with the core verb.
+The answers show as a note. An alert also goes to the Notification Center. A plugin also gives targets (names with ids). The targets are a target source for the core verb "open": "open today" opens the page that the plugin named. An app name wins. The action opens only a web address, a document or a folder (`PluginTargetOpen`).
 
 ### 3.9 Talk state (gap item 13, 2026-11-11)
 
@@ -280,6 +280,10 @@ The talk state also keeps the last typing that worked: the time, the front app, 
 A send and "undo that" clear the last typing. A wait does not change it.
 
 The menu bar icon (`ListenState`) shows "waits for text" as the text cursor. The other waits show as a note on screen. The wake rules and the end-of-turn rules (3.1) are in `WakeTrigger`, not in the talk state.
+
+### 3.10 Command line (R-CT-1 to R-CT-4, D-15)
+
+The app program is also the command line: `Earshot.app/Contents/MacOS/earshot settings set mode alwaysOn`. `EarshotCore/Control.swift` reads the words and edits `settings.json`. `EarshotApp/ControlSocket.swift` has the socket `<store>/control.sock` (mode 0600, same user id, one JSON line each way). The running app then reads the settings and the plugins again, as after a change in the window. `docs/CONTROL.md` gives each command.
 
 ## 4. Permissions
 

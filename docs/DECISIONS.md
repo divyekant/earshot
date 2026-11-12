@@ -306,3 +306,67 @@ Rules for dictation:
 
 - With the hold key and no "type", a sentence that starts with a lead goes to the plugin, not into the focused text box.
 - After a bare "type", the next turn is dictation (R-NV-4). A lead in it is text. The owner gave an explicit command to type.
+
+## D-15. A command line in the app program, with a socket file
+
+Date: 2026-11-11. Status: accepted. Requirements: R-CT-1 to R-CT-4. Commands: `docs/CONTROL.md`.
+
+The owner asked for a way to change settings without the window, so that agents can test and change earshot with no clicks.
+
+Decision: the app program is also the command line. When the first word is a control word, it runs one command and stops. The command line edits `settings.json` itself, then tells the running app through a Unix socket file in the store folder. The app reads the file again.
+
+Rejected:
+
+| Option | Why it was rejected |
+|---|---|
+| A local HTTP server | It opens a network port. Any local program, and a web page through the browser, can call a port. |
+| A separate command-line program | A second build product. The command line must be the same signed program for the peer check. |
+| Distributed notifications only | The app cannot know the sender, and the command line gets no answer. |
+| Plugin approval from the command line | The owner approves each plugin (R-PL-4). An agent must not approve its own plugin. |
+
+Limits:
+
+- `run --actions` asks two things: the program that starts the command line has the Accessibility permission, and the socket peer has the code signature of earshot. A program of the same user that can change the earshot files can still do much. The command line does not protect against such a program.
+
+
+## D-16. EmbeddingGemma-300M for the search by sense of the PA
+
+Date: 2026-11-11. Status: accepted by the owner. Requirements: R-PA-4, R-PA-8, R-MD-4. Numbers: `docs/experiments/E10-pa-embedding.md`.
+
+The PA selects the embedding model by numbers on a made-up holdout set (PA phase 2 build spec, section 6). Only EmbeddingGemma-300M passes the Search mark: 92 of 100 in the first 3, with 768 numbers. Keywords alone get 78. No candidate passes the Project mark.
+
+Decision:
+
+- The PA uses EmbeddingGemma-300M (Q8_0 GGUF) in llama.cpp on the Apple GPU, with 768 numbers. The setting `searchModel` is `"gemma"`.
+- The model has the Gemma terms, not an open-source license. R-MD-4 prefers an open-source license, so the owner made this choice on 2026-11-11.
+- The install script downloads the model at a fixed revision with a SHA-256 check. The PA program has no network code.
+- Project proposals stay off by default (`"proposeProject": false`), because no candidate passes the Project mark.
+
+Rejected:
+
+| Option | Why it was rejected |
+|---|---|
+| `NLEmbedding.sentenceEmbedding` (macOS) | Search 61 to 63 of 100. Worse than keywords alone. |
+| `NLContextualEmbedding` (macOS) | Search 65 of 100. Worse than keywords alone. |
+| Qwen3-Embedding-0.6B (Apache 2.0) | Search 86 of 100, below the mark of 90. Twice the download and about 500 MB while loaded. |
+| Keywords only | Search 78 of 100. Questions in other words find less. |
+| EmbeddingGemma with 256 numbers | Search 90 of 100, at the mark with no margin. The full 768 numbers cost about 107 MB more while the model is loaded. |
+
+## D-17. The PA reads Mail and Notes through the apps, with Apple events
+
+Date: 2026-11-12. Status: accepted (PA phase 3 build spec, section 2). Requirements: R-PA-9, R-PA-11.
+
+Decision:
+
+- The PA reads Mail and Notes through the Mail app and the Notes app, with Apple events (macOS permission "Automation"). The owner clicks "Allow" one time for each app.
+- The PA reads only while the app runs. It never starts the app. It sends one small event at a time, with a pause of 200 ms between events, and a time limit of 20 s for one batch.
+- All scripts are fixed texts in one source file. A CI test fails if a script has a word of a change (`send`, `delete`, `move`, `set `, `make`, `save`, `reply`, `forward`, `redirect`, `duplicate`).
+- Probe numbers (2026-11-12, run 3): all headers of one message 0.5 s, the text of one message 1.5 s. During a text read, Mail answers other events up to 2.2 s late. So the PA does not read while Mail is the front app, and it reads few texts in one read.
+
+Rejected:
+
+| Option | Why it was rejected |
+|---|---|
+| Full Disk Access with the mail files and the Envelope Index | It needs manual steps in System Settings. It opens all private data of the Mac to the PA, not only mail. The file format is private and changes. |
+| A mailbox export (`.mbox`) | A manual step for each read. |
+| A mail interface with network code (IMAP or an API) | The PA has no network code (R-PA-2). It would need a sign-in and a password store. |

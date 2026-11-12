@@ -7,12 +7,34 @@ import XCTest
 /// A fake hand-off: it keeps each call.
 final class FakePlugins: PluginHandOff {
     var leads: [PluginLead] = [PluginLead(pluginID: "pa", lead: "remind me to")]
+    var targetNames: [PluginTargetName] = []
+    var keys = ["app"]
+    func contextKeys(of pluginID: String) -> [String] { keys }
     var calls: [(String, String, String, [String: String])] = []
     var reason: String?
     func name(of pluginID: String) -> String { "Helper" }
     func handOff(pluginID: String, lead: String, text: String, available: [String: String]) -> String? {
         calls.append((pluginID, lead, text, available))
         return reason
+    }
+}
+
+/// A front window with a document and a selection. It counts the reads of the two keys.
+final class FocusRunner: CommandActions {
+    var reads: [(Bool, Bool)] = []
+    var signIn = false
+    func screen() async -> ScreenSnapshot? {
+        ScreenSnapshot(bundleID: "com.apple.Preview", windowTitle: signIn ? "Sign in" : "lease.pdf",
+                       url: signIn ? "https://accounts.example.com/signin" : nil,
+                       elements: signIn ? [ScreenElement(id: "e1", role: "AXTextField", subrole: "AXSecureTextField",
+                                                         label: "Password", risky: false)] : [])
+    }
+    func run(_ intent: Intent, context: RouteContext, command: CommandInfo) async -> ActionOutcome {
+        ActionOutcome(ok: true, note: "", stages: [:])
+    }
+    func pluginFocus(document: Bool, selection: Bool) async -> PluginFocus {
+        reads.append((document, selection))
+        return PluginFocus(document: document ? "/Users/me/lease.pdf" : nil, selection: selection ? "the blue fox" : nil)
     }
 }
 
@@ -41,6 +63,52 @@ final class PluginHandOffTests: XCTestCase {
         XCTAssertFalse(r.note.contains("plants"), r.note)
         XCTAssertNotNil(r.stages["plugin.handoff"])
         XCTAssertEqual(fake.calls.first?.3["app"], "com.anthropic.claudefordesktop")
+    }
+
+    /// "open today" runs the core open action with the target of the plugin. The plugin gets no command (R-PL-3).
+    func testOpenTargetIsTheCoreOpen() async {
+        let fake = FakePlugins()
+        fake.targetNames = [PluginTargetName(pluginID: "pa", name: "today", open: "/tmp/pa/today.html")]
+        let runner = FieldRunner()
+        let (p, e) = pipeline(fake, runner: runner)
+        e.text = "Open today."
+        let r = await p.finish(mode: .hold)
+        XCTAssertTrue(r.ok, r.note)
+        XCTAssertEqual(runner.runs.first?.0, .openTarget(pluginID: "pa", name: "today", open: "/tmp/pa/today.html"))
+        XCTAssertTrue(fake.calls.isEmpty)
+    }
+
+    /// "document" and "selection" go to a plugin that names them, and the log keeps no value (docs/PLUGINS.md 5.1).
+    func testDocumentAndSelection() async {
+        let fake = FakePlugins()
+        fake.keys = ["app", "document", "selection"]
+        let runner = FocusRunner()
+        let engine = TextEngine()
+        let p = CommandPipeline(engine: engine, router: CommandRouter(), actions: runner, names: FakeNames(),
+                                apps: { Fixture.apps }, allNames: { Fixture.names }, frontBundleID: { "com.apple.Preview" })
+        p.plugins = fake
+        engine.text = "remind me to read this"
+        let r = await p.finish(mode: .hold)
+        XCTAssertTrue(r.ok, r.note)
+        XCTAssertEqual(fake.calls.first?.3["document"], "/Users/me/lease.pdf")
+        XCTAssertEqual(fake.calls.first?.3["selection"], "the blue fox")
+        XCTAssertNotNil(r.stages["plugin.context"])
+        XCTAssertFalse(r.note.contains("blue fox") || r.heard.contains("blue fox") || r.note.contains("lease"), "no value in the log")
+
+        // A plugin that does not name the keys: no read.
+        fake.keys = ["app"]
+        runner.reads = []
+        engine.text = "remind me to read this"
+        _ = await p.finish(mode: .hold)
+        XCTAssertTrue(runner.reads.isEmpty)
+
+        // A sign-in page: no read and no context.
+        fake.keys = ["app", "document", "selection"]
+        runner.signIn = true
+        engine.text = "remind me to read this"
+        _ = await p.finish(mode: .hold)
+        XCTAssertTrue(runner.reads.isEmpty)
+        XCTAssertEqual(fake.calls.last?.3, [:])
     }
 
     func testFailedHandOffShowsTheReason() async {
@@ -167,6 +235,29 @@ final class PluginHandOffTests: XCTestCase {
             Thread.sleep(forTimeInterval: 0.2)
         }
         XCTAssertTrue(last?.contains("it is off") == true, last ?? "nil")
+    }
+
+    /// A new build of the program, with the same plugin.json: "Read again" (reload) starts the new program.
+    /// The approval stays.
+    func testNewProgramStartsOnReload() throws {
+        let host = try install("echo", run: ["./plugin.sh"], script: echo)
+        defer { host.stopAll() }
+        func answer() -> String? {
+            let answered = expectation(description: "answer")
+            var got: String?
+            host.onAnswer = { message, _ in got = message.shownText; answered.fulfill() }
+            XCTAssertNil(host.handOff(pluginID: "echo", lead: "note", text: "x", available: [:]))
+            wait(for: [answered], timeout: 5)
+            host.onAnswer = nil
+            return got
+        }
+        XCTAssertEqual(answer(), "kept")
+        let file = folder.appendingPathComponent("plugins/echo/plugin.sh")
+        try Data(echo.replacingOccurrences(of: "kept", with: "new build").utf8).write(to: file)
+        try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(10)], ofItemAtPath: file.path)
+        host.reload()
+        XCTAssertEqual(host.leads, [PluginLead(pluginID: "echo", lead: "note")], "the approval stays")
+        XCTAssertEqual(answer(), "new build")
     }
 
     /// A changed manifest stops the plugin and needs a new approval.

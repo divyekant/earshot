@@ -52,7 +52,8 @@ struct PluginsTab: View {
             Text("Network: " + (p.manifest.network.isEmpty ? "none" : p.manifest.network.joined(separator: ", "))
                  + " (the plugin says so; earshot does not check it)").foregroundStyle(.secondary)
             if !p.manifest.context.isEmpty {
-                Text("Gets: the words after the lead, and " + p.manifest.context.joined(separator: ", ")).foregroundStyle(.secondary)
+                Text("Gets: the words after the lead, and " + p.manifest.context.map(PluginContract.contextText).joined(separator: ", "))
+                    .foregroundStyle(p.manifest.context.contains("selection") ? .orange : .secondary)
             }
             ForEach(p.problems, id: \.self) { Text("Problem: \($0)").foregroundStyle(.red) }
         }
