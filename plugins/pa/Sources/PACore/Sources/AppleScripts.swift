@@ -19,6 +19,43 @@ public enum AppleScripts {
     /// The plain text of the first N messages.
     public static let mailInboxContent = #"tell application "Mail" to return content of messages 1 thru %N% of inbox"#
 
+    // Probe run 2 (spec 6.1): one small event for each message.
+
+    /// The id of the newest message of the unified inbox (the cheap check).
+    public static let mailNewestID = #"tell application "Mail" to return id of message 1 of inbox"#
+    /// The count of accounts.
+    public static let mailAccountCount = #"tell application "Mail" to return count of accounts"#
+    /// The id of the newest message of the inbox of account K. `%K%` is a fixed number.
+    public static let mailAccountNewestID = #"tell application "Mail" to return id of message 1 of mailbox "INBOX" of account %K%"#
+    /// The id of message N of the unified inbox.
+    public static let mailIDOne = #"tell application "Mail" to return id of message %N% of inbox"#
+    /// The receive date of message N.
+    public static let mailDateOne = #"tell application "Mail" to return date received of message %N% of inbox"#
+    /// The id and the receive date of message N in one event.
+    public static let mailIDDateOne = #"tell application "Mail" to tell message %N% of inbox to return {id, date received}"#
+    /// All headers of message N.
+    public static let mailAllHeadersOne = #"tell application "Mail" to return all headers of message %N% of inbox"#
+    /// The header facts of the bulk filter for message N: the header names, and the values of two headers.
+    public static let mailHeaderFactsOne = #"""
+        tell application "Mail"
+            tell message %N% of inbox
+                return {name of headers, content of (headers whose name is "Precedence"), content of (headers whose name is "Auto-Submitted")}
+            end tell
+        end tell
+        """#
+    /// All that the reader needs of message N except the text (spec 7.4). The From line comes from the headers.
+    public static let mailEnvelopeOne = #"""
+        tell application "Mail"
+            tell message %N% of inbox
+                return {id, message id, subject, date received, was replied to, junk mail status, address of to recipients, address of cc recipients, content of (headers whose name is "From"), name of headers, content of (headers whose name is "Precedence"), content of (headers whose name is "Auto-Submitted")}
+            end tell
+        end tell
+        """#
+    /// The plain text of message N.
+    public static let mailContentOne = #"tell application "Mail" to return content of message %N% of inbox"#
+    /// The front app test of another process: a small event that Mail must answer.
+    public static let mailPing = #"tell application "Mail" to return count of accounts"#
+
     /// The count of notes.
     public static let notesCount = #"tell application "Notes" to return count of notes"#
     /// For the first N notes: locked or not.
@@ -32,13 +69,16 @@ public enum AppleScripts {
 
     /// All scripts, for the read-only test.
     public static let all = [mailInboxCount, mailInboxIDs, mailInboxDates, mailInboxHeaders, mailInboxContent,
+                             mailNewestID, mailAccountCount, mailAccountNewestID, mailIDOne, mailDateOne, mailIDDateOne,
+                             mailAllHeadersOne, mailHeaderFactsOne, mailEnvelopeOne, mailContentOne, mailPing,
                              notesCount, notesLocked, notesNames, notesDates, notesPlainText]
 
     /// The words that must never be in a script (rule 1).
     public static let forbidden = ["send", "delete", "move", "set ", "make", "save", "reply", "forward", "redirect", "duplicate"]
 
     /// A script with a fixed number in place of `%N%`.
-    public static func limited(_ script: String, _ n: Int) -> String {
+    public static func limited(_ script: String, _ n: Int, account k: Int = 1) -> String {
         script.replacingOccurrences(of: "%N%", with: String(max(1, n)))
+            .replacingOccurrences(of: "%K%", with: String(max(1, k)))
     }
 }
