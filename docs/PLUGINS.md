@@ -128,12 +128,12 @@ The context keys:
 | `url` | The address of the page in the front window. |
 | `document` | The file path of the document in the front window (the `AXDocument` attribute). A Finder window gives no `AXDocument`. For it, earshot reads the file addresses (`AXURL`) of the items in the window and gives the folder whose name is the window title. |
 | `selection` | The selected text of the focused element (`AXSelectedText`), cut at 2,000 characters. Never the text of a password field. |
-| `pageText` | The text of the web page in the front window. It does not come with the command. The plugin asks for it after the command. This version accepts the key but does not send page text yet: the plugin gets no answer to its ask. |
+| `pageText` | The text of the web page in the front window. It does not come with the command. The plugin asks for it after the command. See section 5.3. |
 
 - earshot sends only the keys that the manifest names. A key with no value is absent.
 - earshot reads `document` and `selection` only for a plugin that names them. The read comes before the command goes to the plugin. The note does not wait for the plugin.
 - On a sign-in, code or payment page, earshot sends no context.
-- The Plugins tab shows each key in words. It shows `selection` in orange: the plugin gets the text that you selected, and can keep it.
+- The Plugins tab shows each key in words. It shows `selection` and `pageText` in orange: the plugin gets the text that you selected or the text of the page, and can keep it.
 - The activity log keeps no context value.
 
 ### 5.2 From the plugin to earshot
@@ -178,6 +178,65 @@ The core verb "open" opens a target, for example "open today" or "open the lease
 - earshot never opens a program, a script, an installer or a package (a folder with a type, such as an app). It refuses other address types, such as `file:` and `ftp:`. It follows a link to its file before it checks the type.
 
 earshot drops a message of an unknown type. So a newer plugin can talk to an older earshot.
+
+### 5.3 Page text
+
+A plugin whose manifest names `pageText` can ask for the text of the web page in the front window, once for each command. The read is not on the command path: the command note does not wait for it (R-PL-5).
+
+1. earshot sends the `command`.
+2. The plugin sends the ask, with the id of the command, in 10 s or less:
+
+   ```json
+   {"type":"pageText","re":"8C1F…"}
+   ```
+
+3. earshot shows the note "→ <plugin name> · reads this page". The note shows for each read, also when the notes are off.
+4. earshot reads the page and sends one or more lines:
+
+   ```json
+   {"type":"pageText","re":"8C1F…","part":1,"of":2,"complete":true,"url":"https://fox.example/a","title":"Fox facts","blocks":[{"t":"Fox facts","k":"h","level":1,"zone":"main","inMain":true,"links":0}]}
+   {"type":"pageText","re":"8C1F…","part":2,"of":2,"complete":true,"blocks":[{"t":"The fox is red.","k":"p","zone":"main","inMain":true,"links":0}]}
+   ```
+
+   If earshot does not send text, it sends one line with the reason:
+
+   ```json
+   {"type":"pageText","re":"8C1F…","error":"not a web page"}
+   ```
+
+The keys of a line:
+
+| Key | Meaning |
+|---|---|
+| `part`, `of` | The number of this line, and the number of lines. Each line is smaller than 60 KB. |
+| `complete` | False if a limit stopped the read. The limits are 5 s, 20,000 elements and 200,000 characters. |
+| `url`, `title` | The page address and the window title at the time of the read. Only on part 1. |
+| `blocks` | The blocks of the page, in the order of the page. |
+| `error` | Why there is no text. |
+
+The keys of a block (a key is absent if earshot does not know its value):
+
+| Key | Meaning |
+|---|---|
+| `t` | The text. A block longer than 8,000 characters becomes more blocks of the same kind. |
+| `k` | The kind: `h` (heading), `p` (paragraph), `li` (list item), `cell` (table cell), `pre` (code) or `q` (quote). |
+| `level` | The level of a heading, 1 to 6. |
+| `zone` | The nearest landmark that holds the block: `main`, `article`, `nav`, `banner`, `footer`, `aside`, `search`, `form` or `dialog`. |
+| `inMain` | True if a `main` or `article` landmark holds the block at some level. |
+| `links` | The share of link text in the block, 0 to 1. |
+
+The rules of the read:
+
+- earshot reads the page through Accessibility. It only copies values. It does not press, scroll, select or type, and it does not change the focus.
+- earshot never sends the value of a one-line field, a search field, a combo box or a password field. A text area gives its lines.
+- earshot sends no text on a sign-in, code or payment page.
+- The page in front must be the page of the command. earshot compares the page address at the time of the command, before the read and after the read. It also compares the front app and the front window before and after the read. If one is different, the reason is "the page changed".
+- If earshot had no page address at the time of the command, it sends no text.
+- A second ask for the same command, an ask after 10 s, and an ask with an unknown id get an error line.
+- A plugin whose manifest does not name `pageText` gets no answer to its ask.
+- The page text goes only to the plugin. It never goes to the activity log or to Jev.
+
+The reasons for no text: "no Accessibility permission", "no front app", "no front window", "not a web page", "no web page at the time of the command", "the page changed", "sign-in, code or payment page", "no command with this id", "one ask for each command", "too late".
 
 ## 6. The example plugin
 
