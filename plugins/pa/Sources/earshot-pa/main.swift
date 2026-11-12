@@ -415,7 +415,9 @@ let reader = Thread {
     var buffer = Data()
     let maxLine = 1_048_576
     while true {
-        let chunk = input.availableData
+        // Phase 5 (X1): this loop never returns, so its autorelease pool never drained. Each read of stdin left one
+        // block of about 16 KB (one for each message). Each read now has its own pool.
+        let chunk = autoreleasepool { input.availableData }
         if chunk.isEmpty { break }
         buffer.append(chunk)
         while let nl = buffer.firstIndex(of: 0x0A) {
