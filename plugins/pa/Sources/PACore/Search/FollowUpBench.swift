@@ -239,7 +239,7 @@ public final class FollowUpBench {
         let dv = try embed(lines, .passage)
         let truths = items.map { labels[$0[0]]! }
         let v1p = items.indices.map { i in v1.propose(projects.indices.map { (projects[$0].id, Vectors.dot(iv[i], dv[$0])) }) }
-        var v2p: [String?] = [], pap: [String?] = []
+        var v2p: [String?] = [], pap: [String?] = [], v2n: [String?] = []
         var detail: [String] = []
         let index = Dictionary(uniqueKeysWithValues: projects.enumerated().map { ($1.id, "P\($0 + 1)") })
         for i in items.indices {
@@ -256,13 +256,16 @@ public final class FollowUpBench {
             let s = rule.signals(words: title, projects: projects, nearest: order.map { (proj[$0], scores[$0]) }, floor: -1, keywordHits: hits)
             let p2 = rule.propose(s)
             v2p.append(p2)
+            var shipped = rule
+            shipped.high = nil
+            v2n.append(shipped.propose(s))
             // The same rule as in the PA: the search floor, and 3 or more records for a project.
             let recs = proj.indices.map { ProjectRuleV2.Record(project: proj[$0], vector: vec[$0], text: text[$0]) }
-            let e = rule.evaluate(title: title, vector: iv[i], records: recs, projects: projects, floor: floor)
+            let e = shipped.evaluate(title: title, vector: iv[i], records: recs, projects: projects, floor: floor)
             pap.append(e.proposal)
             // One line for each proposal of the bench rule. Only numbers and labels P1..Pn: no item text.
             if let p2 {
-                let line = s.name == p2 ? "name" : "neighbors and keywords"
+                let line = s.name == p2 ? "name" : (s.keywordsCount >= rule.keywordsNeed ? "neighbors and keywords" : "line 3")
                 let n = proj.filter { $0 == p2 }.count
                 detail.append(String(format: "| %d | %@ | %@ | %@ | %@ | %d | %d of 5 | %d of 3 | %.3f | %@ |", detail.count + 1, line,
                                      index[p2] ?? "?", index[truths[i]] ?? "none", p2 == truths[i] ? "yes" : "no", n,
@@ -273,7 +276,8 @@ public final class FollowUpBench {
         out("| Variant | Proposals | Correct | Wrong | Captures with a project that got a correct proposal |")
         out("|---|---|---|---|---|")
         out(Self.line("Version 1 (rule of the development set)", Self.count(truths, v1p)))
-        out(Self.line("Version 2 (full rule)", Self.count(truths, v2p)))
+        out(Self.line(rule.high == nil ? "Version 2 (full rule)" : "Version 2 (full rule with line 3)", Self.count(truths, v2p)))
+        out(Self.line("Version 2 without line 3 (the rule in the PA)", Self.count(truths, v2n)))
         out(Self.line(String(format: "Version 2 as in the PA (floor %.3f, 3 or more records)", floor), Self.count(truths, pap)))
         out("\nEach proposal of version 2 (full rule). Records: the records of the proposed project (its description and the other labeled items).")
         out("| # | Line | Proposed | Truth | Correct | Records | Neighbors | Keywords | Nearest | As in the PA |")
