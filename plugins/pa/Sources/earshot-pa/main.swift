@@ -257,6 +257,32 @@ signal(SIGPIPE, SIG_IGN)
 
 /// One serial queue owns the engine and the store.
 let queue = DispatchQueue(label: "earshot.pa.engine")
+
+// The memory trim (phase 5, memory mark: less than 15 MB with no worker). A mail read, a notes read or a search
+// allocates many small blocks for a short time. The allocator keeps the free pages after the work, so the PA stayed
+// at about 25 MB (RSS) with about 5 MB in use. After each piece of work, the PA drains the autorelease pool. When
+// no work came for 2 s, it gives the free pages back to the system.
+var trimPending = false
+let trimLock = NSLock()
+func scheduleTrim() {
+    trimLock.lock()
+    defer { trimLock.unlock() }
+    guard !trimPending else { return }
+    trimPending = true
+    queue.asyncAfter(deadline: .now() + 2) {
+        trimLock.lock()
+        trimPending = false
+        trimLock.unlock()
+        #if canImport(Darwin)
+        malloc_zone_pressure_relief(nil, 0)
+        #endif
+    }
+}
+/// Runs one piece of work in its own autorelease pool, then asks for a trim.
+func work(_ block: () -> Void) {
+    autoreleasepool { block() }
+    scheduleTrim()
+}
 let output = StdoutOutput()
 let engine = Engine(folder: folder, clock: SystemClock(), output: output, reminders: reminderStore(),
                     detector: SystemDateDetector(), textReader: makeTextReader())
@@ -271,8 +297,8 @@ engine.folderWatcher = FSEventsWatcher()
 engine.models = makeSearchModel(PASettings.load(folder.appendingPathComponent("settings.json")).settings.searchModel,
                                 folder: folder)
 queue.sync {
-    engine.runLater = { delay, block in queue.asyncAfter(deadline: .now() + delay, execute: block) }
-    engine.background = { block in backgroundQueue.async(execute: block) }
+    engine.runLater = { delay, block in queue.asyncAfter(deadline: .now() + delay) { work(block) } }
+    engine.background = { block in backgroundQueue.async { work(block) } }
     engine.start()
 }
 
@@ -286,7 +312,7 @@ func scheduleCheck() {
     timer.schedule(wallDeadline: .now() + delay, leeway: .milliseconds(100))
 }
 timer.setEventHandler {
-    engine.tick()
+    work { engine.tick() }
     scheduleCheck()
 }
 queue.sync { scheduleCheck() }
@@ -296,13 +322,13 @@ timer.resume()
 if PASettings.load(folder.appendingPathComponent("settings.json")).settings.sources.calendar {
     let calendar = EventKitCalendar(ask: true) {
         queue.async {
-            engine.readCalendar()
+            work { engine.readCalendar() }
             scheduleCheck()
         }
     }
     queue.async {
         engine.calendarSource = calendar
-        engine.readCalendar()
+        work { engine.readCalendar() }
         scheduleCheck()
     }
 }
@@ -319,7 +345,7 @@ if PASettings.load(folder.appendingPathComponent("settings.json")).settings.sour
 #endif
 let systemEvents = SystemEvents { _ in
     queue.async {
-        engine.tick()
+        work { engine.tick() }
         scheduleCheck()
     }
 }
@@ -364,7 +390,7 @@ let reader = Thread {
             buffer.removeSubrange(buffer.startIndex...nl)
             if line.isEmpty { continue }
             queue.async {
-                engine.receive(line)
+                work { engine.receive(line) }
                 scheduleCheck()
             }
         }

@@ -103,9 +103,12 @@ public enum SourceProbe {
         var code: Int?
         let t0 = Date()
         let work = {
-            var err: NSDictionary?
-            out = NSAppleScript(source: source)?.executeAndReturnError(&err)
-            if let e = err?[NSAppleScript.errorNumber] as? Int { code = e }
+            // Each event has its own autorelease pool, so that the script objects go at once (phase 5, memory).
+            autoreleasepool {
+                var err: NSDictionary?
+                out = NSAppleScript(source: source)?.executeAndReturnError(&err)
+                if let e = err?[NSAppleScript.errorNumber] as? Int { code = e }
+            }
         }
         if Thread.isMainThread { work() } else { DispatchQueue.main.sync(execute: work) }
         return (out, ms(t0), code)
