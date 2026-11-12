@@ -172,12 +172,17 @@ final class PageReadBench: XCTestCase {
         try proc.run()
         defer {
             proc.terminate()
+            // Chrome writes to the profile while it stops. Wait for the exit, then remove the folder.
+            proc.waitUntilExit()
             try? FileManager.default.removeItem(at: profile)
         }
         let app = AX.appElement(proc.processIdentifier)
         var area: AXUIElement?
         var window: AXUIElement?
         while Clock.ms(since: t0) < 15_000 {
+            // A new Chrome builds its page tree only for an assistive client that asks for it. earshot sets the
+            // same value (the only set-value call of the page read).
+            AX.set(app, "AXManualAccessibility", kCFBooleanTrue)
             for w in AX.elements(app, "AXWindows") where (AX.string(w, "AXTitle") ?? "").contains("Probe news") {
                 window = w
                 area = ScreenReader.findWebArea(in: w)?.0

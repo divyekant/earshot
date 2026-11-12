@@ -1,0 +1,161 @@
+{
+  "blocks": [
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0.73,
+      "t": "Notewing Product Pricing Blog Log in Try free"
+    },
+    {
+      "inMain": false,
+      "k": "h",
+      "level": 1,
+      "links": 0,
+      "t": "Simple prices for every team"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0,
+      "t": "All plans include unlimited notes and apps for Mac, Windows, iPhone and Android."
+    },
+    {
+      "inMain": false,
+      "k": "h",
+      "level": 2,
+      "links": 0,
+      "t": "Solo"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0,
+      "t": "Free"
+    },
+    {
+      "inMain": false,
+      "k": "li",
+      "links": 0,
+      "t": "1 person"
+    },
+    {
+      "inMain": false,
+      "k": "li",
+      "links": 0,
+      "t": "2 GB of files"
+    },
+    {
+      "inMain": false,
+      "k": "li",
+      "links": 0,
+      "t": "Sync on 2 devices"
+    },
+    {
+      "inMain": false,
+      "k": "h",
+      "level": 2,
+      "links": 0,
+      "t": "Team"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0,
+      "t": "$6 per person per month, billed yearly"
+    },
+    {
+      "inMain": false,
+      "k": "li",
+      "links": 0,
+      "t": "Up to 50 people"
+    },
+    {
+      "inMain": false,
+      "k": "li",
+      "links": 0,
+      "t": "100 GB of files per person"
+    },
+    {
+      "inMain": false,
+      "k": "li",
+      "links": 0,
+      "t": "Shared folders and comments"
+    },
+    {
+      "inMain": false,
+      "k": "h",
+      "level": 2,
+      "links": 0,
+      "t": "Business"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0,
+      "t": "$14 per person per month, billed yearly"
+    },
+    {
+      "inMain": false,
+      "k": "li",
+      "links": 0,
+      "t": "No limit on people"
+    },
+    {
+      "inMain": false,
+      "k": "li",
+      "links": 0,
+      "t": "Single sign-on and audit log"
+    },
+    {
+      "inMain": false,
+      "k": "li",
+      "links": 0,
+      "t": "Support by phone within 4 hours"
+    },
+    {
+      "inMain": false,
+      "k": "h",
+      "level": 2,
+      "links": 0,
+      "t": "Questions"
+    },
+    {
+      "inMain": false,
+      "k": "h",
+      "level": 3,
+      "links": 0,
+      "t": "Can I pay monthly?"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0,
+      "t": "Yes. A monthly plan costs 20 percent more than the yearly price."
+    },
+    {
+      "inMain": false,
+      "k": "h",
+      "level": 3,
+      "links": 0,
+      "t": "What happens at the end of the trial?"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0,
+      "t": "The trial lasts 14 days. After that, your team moves to Solo unless you add a card. No notes are deleted."
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0.34,
+      "t": "© Notewing Inc. · Terms · Status"
+    }
+  ],
+  "browser": "com.google.Chrome",
+  "complete": true,
+  "elements": 82,
+  "ms": 8.9,
+  "sensitive": "",
+  "url": "file:///d09.html"
+}

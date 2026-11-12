@@ -1,0 +1,86 @@
+{
+  "blocks": [
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0.56,
+      "t": "Marlow Vale Recycling · Collection days · Report a missed bin"
+    },
+    {
+      "inMain": false,
+      "k": "h",
+      "level": 1,
+      "links": 0,
+      "t": "Questions about the green bin collection"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0,
+      "t": "From 1 April the green bin is for garden waste only, and the service needs a yearly permit. These are the answers to the questions that people ask most often."
+    },
+    {
+      "inMain": false,
+      "k": "h",
+      "level": 3,
+      "links": 0,
+      "t": "How much does the permit cost?"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0,
+      "t": "The permit costs £48 for one bin for twelve months. A second bin at the same address costs £30."
+    },
+    {
+      "inMain": false,
+      "k": "h",
+      "level": 3,
+      "links": 0,
+      "t": "What can go in the green bin?"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0,
+      "t": "Grass, leaves, hedge cuttings, small branches and flowers. Do not put food, soil, stones or plastic bags in it."
+    },
+    {
+      "inMain": false,
+      "k": "h",
+      "level": 3,
+      "links": 0,
+      "t": "How often is it collected?"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0,
+      "t": "Every two weeks from March to November, and once a month from December to February."
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0,
+      "t": "Can I share a bin with my neighbour?"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0,
+      "t": "What if I move house?"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0.3,
+      "t": "Still have a question? Contact us"
+    }
+  ],
+  "browser": "com.google.Chrome",
+  "complete": true,
+  "elements": 34,
+  "ms": 4.9,
+  "sensitive": "",
+  "url": "file:///d17.html"
+}

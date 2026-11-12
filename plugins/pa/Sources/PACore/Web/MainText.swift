@@ -22,6 +22,8 @@ public enum MainText {
         "read next", "related stories", "related articles", "more opinion", "most read", "popular posts",
         "similar threads", "also on", "other jobs", "leave a comment", "join the newsletter",
     ]
+    /// Step 3: a block with this many words or more is dropped if an earlier kept block has the same words.
+    public static let minCopyWords = 4
     /// A short line for step 4 has this many words or fewer.
     public static let endLineWords = 6
 
@@ -72,6 +74,14 @@ public enum MainText {
             let next = firstPass.indices.suffix(from: i + 1).first { firstPass[$0] != .short }
             let ok = [prev, next].allSatisfy { j in j.map { firstPass[$0] == .keep && blocks[$0].kind != .h } ?? false }
             marks[i] = ok ? .keep : .drop
+        }
+        // A block with the same text as an earlier kept block is a copy (a hidden layout copy, or the cells of a table
+        // that the read gives two times). Only the first one stays.
+        var seen = Set<String>()
+        for i in marks.indices where marks[i] == .keep && blocks[i].kind != .h {
+            let key = WebPageText.words(blocks[i].text).joined(separator: " ")
+            guard key.split(separator: " ").count >= minCopyWords else { continue }
+            if !seen.insert(key).inserted { marks[i] = .drop }
         }
         // A heading stays only if a kept block that is not a heading follows before the next heading of the same
         // or a higher level.

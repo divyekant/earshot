@@ -1,0 +1,132 @@
+{
+  "blocks": [
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0.14,
+      "t": "Ridgeway Learning · Map Skills for Walkers · My courses · Progress 40%"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0,
+      "t": "Lessons",
+      "zone": "nav"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 1,
+      "t": "1 Grid references",
+      "zone": "nav"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 1,
+      "t": "2 Scale and distance",
+      "zone": "nav"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0,
+      "t": "3 Reading a contour map",
+      "zone": "nav"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 1,
+      "t": "4 Using a compass",
+      "zone": "nav"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 1,
+      "t": "5 Planning a route",
+      "zone": "nav"
+    },
+    {
+      "inMain": true,
+      "k": "h",
+      "level": 1,
+      "links": 0,
+      "t": "Lesson 3: Reading a contour map",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "A contour line joins points of the same height above sea level. On most walking maps of 1:25,000, the lines are 5 metres apart in height on low ground and 10 metres apart in mountains. The map key tells you which one your map uses.",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "h",
+      "level": 2,
+      "links": 0,
+      "t": "Steep or gentle?",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "When contour lines are close together, the ground is steep. When they are far apart, the ground is gentle. Where lines almost touch, expect a cliff or a very steep bank.",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "h",
+      "level": 2,
+      "links": 0,
+      "t": "Up or down?",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "The height numbers on the lines face uphill: the top of the number points up the slope. Rivers and streams always run downhill, so a stream on the map tells you which way the ground falls.",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "h",
+      "level": 2,
+      "links": 0,
+      "t": "Valleys and spurs",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "Contour lines make a V or a U shape where they cross a valley or a spur. In a valley, the point of the V faces uphill. On a spur, the point faces downhill.",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "Check yourself Question 1 of 3: The lines are close together. Is the slope steep or gentle?",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0.93,
+      "t": "Previous lesson · Mark as done and go on",
+      "zone": "main"
+    }
+  ],
+  "browser": "com.google.Chrome",
+  "complete": true,
+  "elements": 51,
+  "ms": 6.4,
+  "sensitive": "",
+  "url": "file:///d28.html"
+}

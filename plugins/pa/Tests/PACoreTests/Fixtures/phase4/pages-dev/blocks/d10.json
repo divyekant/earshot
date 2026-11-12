@@ -1,0 +1,126 @@
+{
+  "blocks": [
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0,
+      "t": "Cogwheel Cooperative ·",
+      "zone": "banner"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0.88,
+      "t": "Shop Repairs Jobs",
+      "zone": "nav"
+    },
+    {
+      "inMain": true,
+      "k": "h",
+      "level": 1,
+      "links": 0,
+      "t": "Workshop technician (bicycles), full time",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "Posted 6 February · Reference CW-24-07",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "Cogwheel is a worker cooperative that repairs and sells bicycles in Eastgate. We are looking for a technician to join our workshop team of five.",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "h",
+      "level": 2,
+      "links": 0,
+      "t": "What you will do",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "li",
+      "links": 0,
+      "t": "Service and repair all kinds of bicycles, including electric bikes and cargo bikes",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "li",
+      "links": 0,
+      "t": "Build wheels and fit new parts",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "li",
+      "links": 0,
+      "t": "Explain repairs to customers and give honest quotes",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "li",
+      "links": 0,
+      "t": "Teach one evening class each month for our members",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "h",
+      "level": 2,
+      "links": 0,
+      "t": "What we offer",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "The salary is £27,500 a year for 37.5 hours a week, the same rate for every member of the cooperative. After six months you can become a member with a vote. You get 30 days of holiday including public holidays, and a budget of £300 a year for tools.",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "h",
+      "level": 2,
+      "links": 0,
+      "t": "How to apply",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "Send a short letter and your work history to the hiring group by 1 March. Tell us about one repair that you are proud of. Interviews include a practical test of one hour in the workshop.",
+      "zone": "main"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0.74,
+      "t": "Other jobs Shop assistant, part time Volunteer mechanic Follow us Newsletter",
+      "zone": "aside"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0.12,
+      "t": "Cogwheel Cooperative Ltd, 14 Fenn Street, Eastgate · Privacy",
+      "zone": "footer"
+    }
+  ],
+  "browser": "com.google.Chrome",
+  "complete": true,
+  "elements": 56,
+  "ms": 6.3,
+  "sensitive": "",
+  "url": "file:///d10.html"
+}
