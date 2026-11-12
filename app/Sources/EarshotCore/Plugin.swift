@@ -173,7 +173,8 @@ public struct PluginTargetName: Hashable, Sendable {
     public init(pluginID: String, name: String, open: String) { self.pluginID = pluginID; self.name = name; self.open = open }
 }
 
-/// What "open <target>" can open (R-PL-3). earshot opens a web address (http or https), a document or a folder.
+/// What "open <target>" can open (R-PL-3). earshot opens a web address (http or https), a mail address (message:),
+/// a document or a folder.
 /// It never opens a program, a script, an installer or a package: a plugin cannot make earshot run code.
 public enum PluginTargetOpen {
     /// The file types that earshot opens. All other types are refused, also a file with no type.
@@ -188,8 +189,15 @@ public enum PluginTargetOpen {
         let raw = open.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !raw.isEmpty else { return (nil, "the target has no address") }
         if let u = URL(string: raw), let scheme = u.scheme?.lowercased(), !raw.hasPrefix("/") {
+            // A "message:" address shows one mail in Mail. It sends nothing (phase 3 of the PA).
+            if scheme == "message" {
+                guard raw.lowercased().hasPrefix("message://"), raw.count > "message://".count else {
+                    return (nil, "not a mail address")
+                }
+                return (u, nil)
+            }
             guard ["http", "https"].contains(scheme), let host = u.host, !host.isEmpty else {
-                return (nil, "earshot opens only http and https addresses")
+                return (nil, "earshot opens only http, https and message addresses")
             }
             return (u, nil)
         }
