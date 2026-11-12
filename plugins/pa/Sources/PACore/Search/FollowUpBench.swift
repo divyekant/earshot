@@ -13,6 +13,8 @@ public final class FollowUpBench {
     public var verbose = false
     /// The needs of the project rule for the final run: neighbors of 5, keywords of 3.
     public var needs = (neighbors: 4, keywords: 3)
+    /// The name line in `names()`: off by default, as in the PA (setting proposeByName).
+    public var byName = false
     public var out: (String) -> Void = { print($0) }
 
     public init(folder: URL, embedder: Embedder) throws {
@@ -239,7 +241,7 @@ public final class FollowUpBench {
         let dv = try embed(lines, .passage)
         let truths = items.map { labels[$0[0]]! }
         let v1p = items.indices.map { i in v1.propose(projects.indices.map { (projects[$0].id, Vectors.dot(iv[i], dv[$0])) }) }
-        var v2p: [String?] = [], pap: [String?] = [], v2n: [String?] = []
+        var v2p: [String?] = [], pap: [String?] = [], v2n: [String?] = [], v2b: [String?] = []
         var detail: [String] = []
         let index = Dictionary(uniqueKeysWithValues: projects.enumerated().map { ($1.id, "P\($0 + 1)") })
         for i in items.indices {
@@ -259,13 +261,16 @@ public final class FollowUpBench {
             var shipped = rule
             shipped.high = nil
             v2n.append(shipped.propose(s))
+            var named = shipped
+            named.byName = true
+            v2b.append(named.propose(s))
             // The same rule as in the PA: the search floor, and 3 or more records for a project.
             let recs = proj.indices.map { ProjectRuleV2.Record(project: proj[$0], vector: vec[$0], text: text[$0]) }
             let e = shipped.evaluate(title: title, vector: iv[i], records: recs, projects: projects, floor: floor)
             pap.append(e.proposal)
             // One line for each proposal of the bench rule. Only numbers and labels P1..Pn: no item text.
             if let p2 {
-                let line = s.name == p2 ? "name" : (s.keywordsCount >= rule.keywordsNeed ? "neighbors and keywords" : "line 3")
+                let line = rule.byName && s.name == p2 ? "name" : (s.keywordsCount >= rule.keywordsNeed ? "neighbors and keywords" : "line 3")
                 let n = proj.filter { $0 == p2 }.count
                 detail.append(String(format: "| %d | %@ | %@ | %@ | %@ | %d | %d of 5 | %d of 3 | %.3f | %@ |", detail.count + 1, line,
                                      index[p2] ?? "?", index[truths[i]] ?? "none", p2 == truths[i] ? "yes" : "no", n,
@@ -276,8 +281,9 @@ public final class FollowUpBench {
         out("| Variant | Proposals | Correct | Wrong | Captures with a project that got a correct proposal |")
         out("|---|---|---|---|---|")
         out(Self.line("Version 1 (rule of the development set)", Self.count(truths, v1p)))
-        out(Self.line(rule.high == nil ? "Version 2 (full rule)" : "Version 2 (full rule with line 3)", Self.count(truths, v2p)))
-        out(Self.line("Version 2 without line 3 (the rule in the PA)", Self.count(truths, v2n)))
+        out(Self.line((rule.high == nil ? "Version 2 (full rule" : "Version 2 (full rule with line 3") + (rule.byName ? ")" : ", name line off)"), Self.count(truths, v2p)))
+        out(Self.line("Version 2 without line 3, name line on (proposeByName true)", Self.count(truths, v2b)))
+        out(Self.line("Version 2 without line 3, name line off (the default in the PA)", Self.count(truths, v2n)))
         out(Self.line(String(format: "Version 2 as in the PA (floor %.3f, 3 or more records)", floor), Self.count(truths, pap)))
         out("\nEach proposal of version 2 (full rule). Records: the records of the proposed project (its description and the other labeled items).")
         out("| # | Line | Proposed | Truth | Correct | Records | Neighbors | Keywords | Nearest | As in the PA |")
@@ -294,11 +300,12 @@ public final class FollowUpBench {
         var rule = ProjectRuleV2()
         rule.neighborsNeed = needs.neighbors
         rule.keywordsNeed = needs.keywords
+        rule.byName = byName
         let caps = try BenchFixtures.rows(folder.appendingPathComponent("capture-names.tsv")).filter { $0.count >= 2 }
             .map { BenchFixtures.Capture(words: $0[0], project: $0[1]) }
         let sig = try signals(caps, r, rule: rule)
         let proposals = sig.map { rule.propose($0.signals) }
-        out("## Name line: capture-names.tsv (neighbors \(needs.neighbors) of 5, keywords \(needs.keywords) of 3)")
+        out("## Name line: capture-names.tsv (neighbors \(needs.neighbors) of 5, keywords \(needs.keywords) of 3, name line \(rule.byName ? "on" : "off"))")
         out("| Captures | Proposals | Correct | Wrong |")
         out("|---|---|---|---|")
         for (label, range) in [("For the named project (1-10)", 0..<10), ("Name words in another sense (11-20)", 10..<20)] {

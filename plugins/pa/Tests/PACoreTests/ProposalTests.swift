@@ -92,6 +92,7 @@ final class ProposalTests: XCTestCase {
         let (e, out, clock) = engine()
         e.settings.projectFocusMinutes = 0
         e.settings.proposeProject = true
+        e.settings.proposeByName = true
         say(e, out, "new project", "kitchen")
         say(e, out, "new project", "garden")
         for t in ["tiles floor", "tiles wall", "tiles grout"] { say(e, out, "todo", "kitchen " + t + " for kitchen") }
@@ -124,6 +125,18 @@ final class ProposalTests: XCTestCase {
         XCTAssertNil(e.store!.openItems().last!.projectID)
     }
 
+    /// The name line is off by default: a project name in the capture alone gives no proposal.
+    func testNoProposalByNameByDefault() {
+        let (e, out, _) = engine()
+        e.settings.projectFocusMinutes = 0
+        XCTAssertFalse(e.settings.proposeByName)
+        say(e, out, "new project", "kitchen")
+        for t in ["tiles floor", "tiles wall", "tiles grout"] { say(e, out, "todo", "kitchen " + t + " for kitchen") }
+        let r = say(e, out, "todo", "volunteer at the soup kitchen")
+        XCTAssertEqual(r.later, [])
+        XCTAssertNil(e.store!.openItems().last!.projectID)
+    }
+
     /// Without the name: the 5 nearest records and the first 3 keyword results must agree.
     func testProposalFromNeighborsAndKeywords() {
         var rule = ProjectRuleV2()
@@ -145,6 +158,7 @@ final class ProposalTests: XCTestCase {
         let (e, out, clock) = engine()
         e.settings.projectFocusMinutes = 0
         e.settings.proposeProject = true
+        e.settings.proposeByName = true
         say(e, out, "new project", "kitchen")
         say(e, out, "new project", "garden")
         for t in ["tiles floor", "tiles wall", "tiles grout"] { say(e, out, "todo", "kitchen " + t + " for kitchen") }

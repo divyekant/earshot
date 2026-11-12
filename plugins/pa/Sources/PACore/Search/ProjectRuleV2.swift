@@ -23,6 +23,9 @@ public struct ProjectRuleV2: Equatable, Sendable {
     public var high: Float?
     /// A project needs this many owner records before the rule can propose it.
     public var minRecords = 3
+    /// The name line: propose the project whose name is in the capture. Off by default: it matches words, not
+    /// meaning (10 of 10 wrong for a name in another sense, capture-names.tsv).
+    public var byName = false
 
     public init(high: Float? = nil) { self.high = high }
 
@@ -91,7 +94,7 @@ public struct ProjectRuleV2: Equatable, Sendable {
         case .neighborsAndKeywords:
             return s.neighbors != nil && s.neighbors == s.keywords ? s.neighbors : nil
         case .fullNoH, .fullWithH:
-            if let n = s.name { return n }
+            if byName, let n = s.name { return n }
             if let n = s.neighbors, n == s.keywords { return n }
             if variant == .fullWithH, let h = high, let n = s.neighbors, s.neighborsCount == 5, s.nearest > h { return n }
             return nil

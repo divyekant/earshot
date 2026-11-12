@@ -135,6 +135,9 @@ public struct PASettings: Codable, Equatable, Sendable {
     /// Project proposals for a capture with no project (8.1). On by default since project rule version 2 passed
     /// its holdout (follow-up R1: 20 proposals, 19 correct, 1 wrong).
     public var proposeProject = true
+    /// Project proposals also from a project name in the capture. Off by default: a name in another sense
+    /// ("the soup kitchen") gives a wrong proposal. "for <project>" is the sure way to name a project.
+    public var proposeByName = false
     /// After "new project", the next captures go to it for this count of minutes (8.3). 0 switches it off.
     public var projectFocusMinutes = 5
 
@@ -157,6 +160,7 @@ public struct PASettings: Codable, Equatable, Sendable {
         reminders = try c.decodeIfPresent(ReminderSettings.self, forKey: .reminders) ?? d.reminders
         searchModel = try c.decodeIfPresent(String.self, forKey: .searchModel) ?? d.searchModel
         proposeProject = try c.decodeIfPresent(Bool.self, forKey: .proposeProject) ?? d.proposeProject
+        proposeByName = try c.decodeIfPresent(Bool.self, forKey: .proposeByName) ?? d.proposeByName
         projectFocusMinutes = try c.decodeIfPresent(Int.self, forKey: .projectFocusMinutes) ?? d.projectFocusMinutes
     }
 
