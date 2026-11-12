@@ -133,6 +133,9 @@ extension Engine {
         rows += [("Near-event alerts", nearEvent.shown), ("Near-event alerts with an answer", nearEvent.answered)]
         rows += [("Flags", counts["flag", default: 0]), ("Flags kept", counts["flag-keep", default: 0]),
                  ("Flags dropped", counts["flag-drop", default: 0])]
+        // Phase 4: real use shows if page reads fail, for example after a start of the browser.
+        let pages = store.keptPageCounts(since: now.addingTimeInterval(-7 * 86400))
+        rows += [("Pages kept with text", pages.text), ("Pages kept as a link only", pages.linkOnly)]
         let table = "<h2>The last 7 days</h2><table>" + rows.map { "<tr><td>\($0.0)</td><td class=\"n\">\($0.1)</td></tr>" }.joined() + "</table>"
         // 8.1, step 6: the PA does not change the setting by itself.
         var warning = ""

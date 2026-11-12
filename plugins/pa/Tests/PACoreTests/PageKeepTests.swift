@@ -138,6 +138,23 @@ final class PageKeepTests: XCTestCase {
         XCTAssertEqual(e.index!.passageCount(), 0)
     }
 
+    /// The Today page counts the pages kept with text and as a link only, for the last 7 days.
+    func testTodayCountsKeptPages() throws {
+        let (e, out, _) = engine()
+        let (id, _) = keep(e, out)
+        send(e, id, Self.story)
+        let (id2, _) = keep(e, out, ["app": "com.apple.Safari", "url": "https://varrow-news.example/harbour",
+                                     "windowTitle": "Harbour works"])
+        e.handle(.pageText(.error(re: id2, reason: "not a web page")))
+        out.take()
+        XCTAssertEqual(e.store!.keptPageCounts(since: e.clock.now.addingTimeInterval(-7 * 86400)).text, 1)
+        XCTAssertEqual(e.store!.keptPageCounts(since: e.clock.now.addingTimeInterval(-7 * 86400)).linkOnly, 1)
+        e.flushPages(force: true)
+        let today = try String(contentsOf: e.pagesFolder.appendingPathComponent("today.html"), encoding: .utf8)
+        XCTAssertTrue(today.contains("<tr><td>Pages kept with text</td><td class=\"n\">1</td></tr>"), today)
+        XCTAssertTrue(today.contains("<tr><td>Pages kept as a link only</td><td class=\"n\">1</td></tr>"), today)
+    }
+
     /// The old earshot drops the ask: after 10 s the PA shows one note. The reference stays. No error.
     func testOldEarshotNoAnswerIn10Seconds() {
         let (e, out, clock) = engine()

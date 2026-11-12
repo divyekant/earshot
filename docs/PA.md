@@ -112,7 +112,7 @@ The PA writes HTML pages in this folder:
 ~/Library/Application Support/earshot/plugin-data/pa/pages/
 ```
 
-- `today.html`: late items, today, tomorrow, the quiet items, and the counts of the last 7 days.
+- `today.html`: late items, today, tomorrow, the quiet items, and the counts of the last 7 days. The counts include the web pages kept with text and the web pages kept as a link only.
 - `all-open.html`: all open items, by project.
 - `project-<name>.html`: one page for each open project, with its documents, its kept folders and the new files of the last 7 days.
 - `search.html`: the 10 results of the last "where is", with more text and the file path. Say "open search".
