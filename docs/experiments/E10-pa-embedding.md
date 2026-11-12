@@ -141,8 +141,8 @@ The holdout data was committed before the rule code. Each holdout ran one time (
 The rule uses only the owner records: items that the owner put in a project, and the passages of documents with a project.
 A project needs 3 or more records. The rule proposes a project if:
 
-1. the capture has the name of exactly one project, or
-2. 4 or more of the 5 nearest records (above the search floor) are in the project, and 3 of the first 3 keyword results are in the same project.
+1. 4 or more of the 5 nearest records (above the search floor) are in the project, and 3 of the first 3 keyword results are in the same project, or
+2. only with the setting `proposeByName` (off by default): the capture has the name of exactly one project.
 
 Line 3 of the spec is 5 of 5 neighbors with the nearest score above H. No 5-of-5 case was wrong on the development data, so H is -1 and line 3 fires on any 5 of 5. With needs 4 and 3, line 3 adds 7 correct and 0 wrong on the development data (33 against 26). By the selection rule of the spec, the variant with line 3 is the better one. The selected rule has no line 3, because H gave no real limit. This was a selection error: the holdout ran without line 3, and the PA has no line 3.
 
@@ -165,13 +165,14 @@ The owner's 100 labeled research items (75 with a project), development run, not
 | Rule | Proposals | Correct | Wrong |
 |---|---|---|---|
 | Version 1 | 16 | 15 | 1 |
-| Version 2 with line 3 | 18 | 15 | 3 |
-| **Version 2 without line 3 (the rule in the PA)** | **13** | **11** | **2** |
-| Version 2 as in the PA (floor 0.411, 3 or more records) | 13 | 11 | 2 |
+| Version 2 with line 3, name line on | 18 | 15 | 3 |
+| Version 2 without line 3, name line on (`proposeByName` true) | 13 | 11 | 2 |
+| **Version 2 without line 3, name line off (the default in the PA)** | **9** | **8** | **1** |
+| Version 2 as in the PA (floor 0.411, 3 or more records, name line off) | 9 | 8 | 1 |
 
 The 4B model of the research session scored 0.90 on these items.
 
-Which line made each proposal (version 2 with line 3, 18 proposals):
+Which line made each proposal (version 2 with line 3 and the name line, 18 proposals):
 
 | Line | Proposals | Wrong |
 |---|---|---|
@@ -187,14 +188,14 @@ The 3 wrong proposals:
 
 Few records do not explain the wrong proposals. Two of the three are in the largest project (11 or 12 records). The project with 4 records got 1 correct proposal.
 
-Name line test (`capture-names.tsv`, 20 made-up captures, one run):
+Name line test (`capture-names.tsv`, 20 made-up captures, measured with the name line on and off):
 
-| Captures | Proposals | Correct | Wrong |
-|---|---|---|---|
-| For the named project (10) | 10 | 10 | 0 |
-| The name words in another sense (10) | 10 | 0 | 10 |
+| Captures | Name line on: proposals | Correct | Wrong | Name line off: proposals | Correct | Wrong |
+|---|---|---|---|---|---|---|
+| For the named project (10) | 10 | 10 | 0 | 7 | 7 | 0 |
+| The name words in another sense (10) | 10 | 0 | 10 | 1 | 0 | 1 |
 
-The name line matches words, not meaning. It proposes a project for "the soup kitchen" and for "his Lisbon trip". Without the name line, neighbors and keywords alone give 7 of the first 10 correct, and 1 wrong proposal in the second 10.
+The name line matches words, not meaning. It proposes a project for "the soup kitchen" and for "his Lisbon trip". So the name line is now behind the setting `proposeByName`, off by default. The sure way to name a project is "for <project>" at the end of the capture. No capture of `capture-holdout-2.tsv` has a project name, so the holdout result does not change.
 
 Causes:
 
@@ -202,7 +203,7 @@ Causes:
 - Version 2 needs two signals that agree. The nearest records see local likeness. The keyword results see rare words. A household capture seldom passes both.
 - The cost is coverage: 19 of 70 captures with a project got a proposal, against 41 of 70 for version 1 on the old holdout.
 - No capture of `capture-holdout-2.tsv` has the name of a project, so the name line gave 0 proposals in the holdout. The name line test shows that it is wrong for each capture that uses the name words in another sense.
-- On the owner's research items, the rule in the PA made 2 wrong of 13 (version 1: 1 wrong of 16). The wrong proposals are not from projects with few records. One came from the name line.
+- On the owner's research items, the rule in the PA (name line off) made 1 wrong of 9 (version 1: 1 wrong of 16). The wrong proposals are not from projects with few records.
 
 ### R2: main points version 2
 

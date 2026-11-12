@@ -317,7 +317,7 @@ public final class FollowUpBench {
         out("|---|---|---|---|---|---|---|---|")
         for (i, x) in sig.enumerated() {
             let p = proposals[i]
-            let line = p == nil ? "-" : (x.signals.name == p ? "name" : "neighbors and keywords")
+            let line = p == nil ? "-" : (rule.byName && x.signals.name == p ? "name" : "neighbors and keywords")
             out("| \(i + 1) | \(x.words) | \(x.truth) | \(p ?? "-") | \(line) | \(x.signals.name ?? "-") | \(x.signals.neighbors ?? "-") \(x.signals.neighborsCount) | \(x.signals.keywords ?? "-") \(x.signals.keywordsCount) |")
         }
     }
