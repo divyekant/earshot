@@ -80,6 +80,10 @@ extension Engine {
                     result = .flag
                 }
             }
+            if s.bulk == nil, s.hasText, result != .flag, made < budget, (try? requestFlag(s.message)) ?? nil != nil {
+                made += 1
+                result = .flag
+            }
             try? store.markSeen(.mail, s.message.id, result, at: now)
             if s.bulk == nil, s.hasText, result != .flag { forProject.append(s.message) }
         }
@@ -147,6 +151,37 @@ extension Engine {
         }
         log.write(now, "mail-arrivals", ["flags": String(made)])
         if made > 0 { markPagesDirty() }
+    }
+
+    /// The owner names in lower case: the setting, or the parts of the owner addresses ("maya.rao@" gives maya, rao).
+    func ownerNames() -> Set<String> {
+        let names = settings.owner.names.flatMap(EventLinker.words)
+        if !names.isEmpty { return Set(names) }
+        return Set(settings.owner.addresses.flatMap { a in
+            (a.split(separator: "@").first.map(String.init) ?? "").split(whereSeparator: { ".-_+".contains($0) })
+                .map { $0.lowercased() }.filter { $0.count >= 3 }
+        })
+    }
+
+    /// Spec 8.4 to 8.6: a request flag for a mail that passed the bulk filter, if its score reaches the threshold.
+    /// The flag keeps the sender name, the subject and the best sentence, as written. Gives the flag id or nil.
+    func requestFlag(_ m: MailMessage) throws -> Int64? {
+        guard let store, settings.rules.request != .off, let model = RequestModel.fitted else { return nil }
+        let reader = TimeReader(calendar: clock.calendar, settings: settings)
+        func time(_ s: String) -> Bool { let r = reader.read(s, now: m.date, todo: true); return r.kind != .none && !r.unsure }
+        let owner = ownerNames()
+        let p = RequestFeatures.prepared(m, owner: owner, time: time)
+        let addresses = Set(settings.owner.addresses.map { $0.lowercased() })
+        let r = model.score(m, p, owner: owner, ownerAddresses: addresses)
+        guard r.score >= model.threshold, let b = r.best else { return nil }
+        let sentence = p.sentences[b].text
+        var f = Flag(kind: .request, source: .mail, sourceID: m.id, sender: m.fromName.isEmpty ? m.fromAddress : m.fromName,
+                     subject: m.subject, sentence: sentence, sourceAt: m.date, createdAt: clock.now)
+        f.messageID = m.messageID
+        f.score = r.score
+        let due = reader.read(sentence, now: m.date, todo: true)
+        if due.kind != .none, !due.unsure { f.dueOn = due.day }
+        return try store.upsertFlag(f)
     }
 
     /// The open "waiting for" item that names the sender of the mail, if exactly one does.

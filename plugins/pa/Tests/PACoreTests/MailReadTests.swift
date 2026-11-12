@@ -211,4 +211,25 @@ final class MailSyncTests: XCTestCase {
         XCTAssertLessThanOrEqual(e.store?.openFlags().count ?? 99, 5)
         XCTAssertEqual(e.store?.meta("mail.firstDone"), "1")
     }
+
+    func testRequestFlagLine() {
+        var m = Self.msg("r1", at: wed(9))
+        m.subject = "Signed form"
+        m.text = "Hi Maya,\n\nCould you send me the signed form before 20 November?\n\nThanks,\nSam"
+        let box = FixtureMail(messages: [m, Self.msg("n1", at: wed(8), list: true)])
+        let (e, _, _) = engineWithMail(box)
+        // The default is off (the go mark failed). The owner can set the rule to "list".
+        XCTAssertEqual(e.settings.rules.request, .off)
+        e.settings.rules.request = .list
+        e.readMailIfDue()
+        let flags = e.store?.openFlags(kind: .request) ?? []
+        XCTAssertEqual(flags.count, 1)
+        XCTAssertEqual(flags.first.map(e.flagLine), "Request · Sam Lee · Could you send me the signed form before 20 November? · 19 Nov?")
+        // The time reader reads "before 20 November" as due on 19 November.
+        // rules.request off: no request flag.
+        let (e2, _, _) = engineWithMail(FixtureMail(messages: [m]))
+        e2.settings.rules.request = .off
+        e2.readMailIfDue()
+        XCTAssertTrue(e2.store?.openFlags().isEmpty ?? false)
+    }
 }
