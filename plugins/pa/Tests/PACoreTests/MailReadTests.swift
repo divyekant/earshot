@@ -218,6 +218,9 @@ final class MailSyncTests: XCTestCase {
         m.text = "Hi Maya,\n\nCould you send me the signed form before 20 November?\n\nThanks,\nSam"
         let box = FixtureMail(messages: [m, Self.msg("n1", at: wed(8), list: true)])
         let (e, _, _) = engineWithMail(box)
+        // The default is off (the go mark failed). The owner can set the rule to "list".
+        XCTAssertEqual(e.settings.rules.request, .off)
+        e.settings.rules.request = .list
         e.readMailIfDue()
         let flags = e.store?.openFlags(kind: .request) ?? []
         XCTAssertEqual(flags.count, 1)

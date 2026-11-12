@@ -124,7 +124,7 @@ The settings file is `~/Library/Application Support/earshot/plugin-data/pa/setti
 | `defaultSnoozeMinutes` | `10` | The snooze time if you say no time. |
 | `bareHourWindow` | `{"from": "07:00", "to": "23:00"}` | "at 5" is the next 5 o'clock in this window. |
 | `dayParts` | morning 09:00, noon 12:00, afternoon 15:00, evening 18:00, tonight 20:00, endOfDay 17:00 | The times of these words. |
-| `rules` | time alert, due list, silence list, nearEvent alert, newArrival list | Each rule is `"alert"`, `"list"` or `"off"`. |
+| `rules` | time alert, due list, silence list, nearEvent alert, newArrival list, request off | Each rule is `"alert"`, `"list"` or `"off"`. |
 | `projects` | `{}` | Rules for one project. Example: `{"kitchen": {"due": "alert"}}`. |
 | `reminders` | `{"copy": true, "list": "earshot", "alertBy": "reminders"}` | The copy in Apple Reminders. If `alertBy` is `"pa"`, the PA gives the alerts. |
 | `projectFocusMinutes` | `5` | After "new project kitchen", your next captures go to Kitchen for this count of minutes. Each capture starts the minutes again. `0` switches it off. |
