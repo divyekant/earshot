@@ -193,6 +193,8 @@ public final class Engine {
             hello()
         case .command(let id, let lead, let text, let context):
             let start = Date()
+            // Phase 5 (X5): one event for each command, for the counts of real use. A type and a time, no text.
+            if let cmd = PACommand.from(lead: lead) { store?.log("command-" + cmd.rawValue, at: clock.now) }
             let answer = command(id: id, lead: lead, text: text, context: context)
             output.send(answer)
             sendPageAsks()

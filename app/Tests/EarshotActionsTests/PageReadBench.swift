@@ -51,6 +51,10 @@ final class PageReadBench: XCTestCase {
         }
         if probes.contains(6), let electron = env["EARSHOT_PAGE_ELECTRON"] { probe6Electron(electron) }
         if probes.contains(7) { try await probe2Fresh(dir) }
+        if probes.contains(8) {
+            try await probe7Clean(dir, arm: 1)
+            try await probe7Clean(dir, arm: 2)
+        }
         if let out = env["EARSHOT_PAGE_OUT"] {
             let lines = rows.compactMap { row -> String? in
                 guard let d = try? JSONSerialization.data(withJSONObject: row, options: [.sortedKeys]) else { return nil }
@@ -211,6 +215,68 @@ final class PageReadBench: XCTestCase {
         await sleepMs(5000)
         row["after5sA"] = Self.found(PageProbeReader.readA(area: area, url: url).text, labels.main)
         log("P2fresh", row)
+    }
+
+    /// The clean probe 7 (PA phase 5 spec, section 6.1): `EARSHOT_PAGE_PROBES=8`. A second Chrome with an empty
+    /// profile in a temporary folder, brought to the front. Arm 1: no flag. Arm 2 (the control):
+    /// `--force-renderer-accessibility`, for the probe process only. The probe sets no attribute: it only reads.
+    /// It records the screen lock flag, the front app, the count of elements and the web area at 1, 3 and 15 s, and
+    /// `AXEnhancedUserInterface` before and after. If the screen is locked, it does not run.
+    func probe7Clean(_ dir: URL, arm: Int) async throws {
+        let session = CGSessionCopyCurrentDictionary() as? [String: Any] ?? [:]
+        let locked = (session["CGSSessionScreenIsLocked"] as? Bool) ?? false
+        guard !locked else { log("P7clean", ["arm": arm, "result": "not run, the screen was locked"]); return }
+        let chrome = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+        guard FileManager.default.isExecutableFile(atPath: chrome) else { log("P7clean", ["arm": arm, "error": "no Chrome"]); return }
+        let profile = FileManager.default.temporaryDirectory.appendingPathComponent("earshot-probe-chrome-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: profile, withIntermediateDirectories: true)
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: chrome)
+        var arguments = ["--user-data-dir=\(profile.path)", "--no-first-run", "--no-default-browser-check"]
+        if arm == 2 { arguments.append("--force-renderer-accessibility") }
+        proc.arguments = arguments + [dir.appendingPathComponent("news.html").absoluteString]
+        let t0 = Clock.nowNs()
+        try proc.run()
+        defer {
+            proc.terminate()
+            proc.waitUntilExit()
+            try? FileManager.default.removeItem(at: profile)
+        }
+        var row: [String: Any] = ["arm": arm, "locked": locked]
+        let app = AX.appElement(proc.processIdentifier)
+        func enhanced() -> String {
+            guard let v = AX.copy(app, "AXEnhancedUserInterface") else { return "none" }
+            return CFGetTypeID(v) == CFBooleanGetTypeID() ? String(CFBooleanGetValue((v as! CFBoolean))) : "other"
+        }
+        func count(_ el: AXUIElement, _ limit: Int = 20_000) -> Int {
+            var n = 0
+            var stack = [el]
+            while let e = stack.popLast(), n < limit {
+                n += 1
+                stack.append(contentsOf: AX.elements(e, "AXChildren"))
+            }
+            return n
+        }
+        // Wait for the window of the probe page (10 s at most), then bring the probe app to the front.
+        var window: AXUIElement?
+        while Clock.ms(since: t0) < 10_000, window == nil {
+            window = AX.elements(app, "AXWindows").first { (AX.string($0, "AXTitle") ?? "").contains("Probe news") }
+            if window == nil { await sleepMs(100) }
+        }
+        row["enhancedBefore"] = enhanced()
+        row["role"] = AX.string(app, "AXRole") ?? "none"
+        guard let window else { log("P7clean", row.merging(["error": "no probe window in 10 s"]) { a, _ in a }); return }
+        NSRunningApplication(processIdentifier: proc.processIdentifier)?.activate()
+        let tWindow = Clock.nowNs()
+        for mark in [1, 3, 15] {
+            let wait = Double(mark * 1000) - Clock.ms(since: tWindow)
+            if wait > 0 { await sleepMs(Int(wait)) }
+            row["front\(mark)s"] = NSWorkspace.shared.frontmostApplication?.processIdentifier == proc.processIdentifier
+            row["elements\(mark)s"] = count(window)
+            row["webArea\(mark)s"] = ScreenReader.findWebArea(in: window) != nil
+        }
+        row["enhancedAfter"] = enhanced()
+        log("P7clean", row)
     }
 
     // MARK: - P3 No change

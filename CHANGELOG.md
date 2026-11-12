@@ -13,9 +13,11 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 - PA: "main points" for a web page, off by default (setting `pagePoints`). In the sealed test it found 2 or more of 3 key sentences on 6 of 10 pages, below the pass mark of 8. With the setting off, the answer is "Main points work for kept files only." (R-PA-4).
 - PA: the Today page counts the web pages kept with text and the web pages kept as a link only, for the last 7 days (R-PA-9).
 - PA: "drop" for a kept web page deletes its text, its search numbers and its text copy at once (R-PA-9, R-PA-13).
+- PA: `earshot-pa --counts` prints the counts of use as one JSON line: numbers only, no text of the store (R-PA-1).
 
 ### Changed
 
+- PA: the PA gives free memory back to macOS after each mail read, notes read and command. Each message from earshot no longer leaves 16 KB in the PA (R-PA-8).
 - If a page that a plugin wrote, or a sign-in, code or payment page, is in front, no label of the page goes to Jev, and "Jev sees the screen" takes no picture (R-MD-1, D-10).
 
 ## [0.5.0] - 2026-11-12

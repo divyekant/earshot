@@ -39,7 +39,9 @@ Share of the label words that the read found:
 - P5, protected pages: no blocks for the sign-in page, and no one-line field value, in the two browsers. Pass with method A.
 - P6, other content: a PDF in Chrome reads with A (1.000). A PDF in Safari has no web area. A frame reads with A in the two browsers. An Electron app (Slack) gave 112 blocks in 91 ms with A.
 
-A second fix came from the development read: Chrome sometimes builds its tree late. earshot sets `AXManualAccessibility` and reads again if a read gives fewer than 50 words (#172).
+A second fix came from the development read: Chrome sometimes builds its tree late. earshot reads again (after 1 s, for 3 s at most) if a read gives fewer than 50 words (#172). The page text reader (`PageTextReader`, through `ScreenReader.visibleWebArea`) writes no attribute.
+
+Correction of 2026-11-12 (PA phase 5): an earlier version of this paragraph said that earshot sets `AXManualAccessibility` for the page read. That was wrong. Chrome 157.0.8103.52 does not support `AXManualAccessibility`: a read and a set give -25205. The clean probe 7 of phase 5 (a new Chrome with an empty profile, in front, screen not locked) gave a web area after 1 s, with no flag and with `--force-renderer-accessibility`. The first run of probe 7 had no web area because its window was not in front and the screen was probably locked. A try to set `AXEnhancedUserInterface` on the probe Chrome in that first run was refused (-25208). earshot does not set `AXEnhancedUserInterface`.
 
 ## The main text rule
 
@@ -102,7 +104,7 @@ Main points for each marked page (marked sentences in the 5 selected, the same i
 - Two browsers (Chrome and Safari) on one Mac. Firefox and other browsers are not tested.
 - The page must be in front and loaded. Text that the page did not load is not kept. A page that loads for a long time can give `complete: false`.
 - A cold start of the browser was not tested.
-- A read right after a fresh Chrome start is not proven. Probe 7 starts a second Chrome with an empty profile. It failed 3 times with "no web area within 15 s" (last on 5998e2d). The window and its title were there, but the web area did not come within 15 s, also with `AXManualAccessibility` set each 50 ms. In that case earshot sends an error, and the PA keeps the link with no text.
+- The page must be in the front window, and the screen must not be locked. Probe 7 failed 3 times with "no web area within 15 s" (last on 5998e2d): its window was not in front, and the screen was probably locked. The clean probe of phase 5 (probe 8, 2026-11-12) brought a new Chrome with an empty profile to the front with the screen not locked: the web area was there after 1 s, with no flag and with `--force-renderer-accessibility`. If earshot cannot read the page, it sends an error, and the PA keeps the link with no text.
 
 ## Final check on the Mac (2026-11-12, 07:04 to 07:16 UTC)
 

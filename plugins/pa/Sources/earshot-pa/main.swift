@@ -252,11 +252,70 @@ if let path = env["EARSHOT_PLUGIN_DATA"], !path.isEmpty {
         .appendingPathComponent("Library/Application Support/earshot/plugin-data/pa", isDirectory: true)
 }
 
+// Phase 5 (X1): earshot-pa --memory-bench [--scale N]. A made-up store of the size of the owner's store (times N) in
+// a new temporary folder, 50 searches, then the footprint before and after the trim. No file of the owner.
+if args.contains("--memory-bench") {
+    let scale = args.firstIndex(of: "--scale").flatMap { $0 + 1 < args.count ? Int(args[$0 + 1]) : nil } ?? 1
+    final class NoOutput: Output { func send(_ message: Outgoing) {} }
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("pa-memory-bench-\(UUID().uuidString)")
+    try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    func mb(_ b: Int?) -> String { b.map { String(format: "%.1f MB", Double($0) / 1e6) } ?? "?" }
+    let start = memoryFootprint()
+    let e = Engine(folder: dir, clock: SystemClock(), output: NoOutput(), reminders: nil)
+    autoreleasepool { e.start() }
+    let rows = autoreleasepool { MemoryBench.fill(e, scale: scale) }
+    for i in 0..<50 {
+        autoreleasepool { e.handle(.command(id: "b\(i)", lead: "where is", text: "garden invoice \(i)", context: [:])) }
+    }
+    let before = memoryFootprint()
+    malloc_zone_pressure_relief(nil, 0)
+    let after = memoryFootprint()
+    print("items \(rows.items), docs \(rows.docs), passages \(rows.passages)")
+    print("footprint: at start \(mb(start)), after 50 searches \(mb(before)), after the trim \(mb(after))")
+    e.stop()
+    try? FileManager.default.removeItem(at: dir)
+    exit(0)
+}
+
+// Phase 5 (X5): earshot-pa --counts [<data folder>]. Prints the counts of real use as one JSON line, and stops.
+// Numbers only: no text of the store.
+if let i = args.firstIndex(of: "--counts") {
+    let dir = i + 1 < args.count ? URL(fileURLWithPath: args[i + 1], isDirectory: true) : folder
+    print(Counts.json(folder: dir))
+    exit(0)
+}
+
 // A write to a worker that stopped must give an error, not stop the PA (follow-up R3).
 signal(SIGPIPE, SIG_IGN)
 
 /// One serial queue owns the engine and the store.
 let queue = DispatchQueue(label: "earshot.pa.engine")
+
+// The memory trim (phase 5, memory mark: less than 15 MB with no worker). A mail read, a notes read or a search
+// allocates many small blocks for a short time. The allocator keeps the free pages after the work, so the PA stayed
+// at about 25 MB (RSS) with about 5 MB in use. After each piece of work, the PA drains the autorelease pool. When
+// no work came for 2 s, it gives the free pages back to the system.
+var trimPending = false
+let trimLock = NSLock()
+func scheduleTrim() {
+    trimLock.lock()
+    defer { trimLock.unlock() }
+    guard !trimPending else { return }
+    trimPending = true
+    queue.asyncAfter(deadline: .now() + 2) {
+        trimLock.lock()
+        trimPending = false
+        trimLock.unlock()
+        #if canImport(Darwin)
+        malloc_zone_pressure_relief(nil, 0)
+        #endif
+    }
+}
+/// Runs one piece of work in its own autorelease pool, then asks for a trim.
+func work(_ block: () -> Void) {
+    autoreleasepool { block() }
+    scheduleTrim()
+}
 let output = StdoutOutput()
 let engine = Engine(folder: folder, clock: SystemClock(), output: output, reminders: reminderStore(),
                     detector: SystemDateDetector(), textReader: makeTextReader())
@@ -271,8 +330,8 @@ engine.folderWatcher = FSEventsWatcher()
 engine.models = makeSearchModel(PASettings.load(folder.appendingPathComponent("settings.json")).settings.searchModel,
                                 folder: folder)
 queue.sync {
-    engine.runLater = { delay, block in queue.asyncAfter(deadline: .now() + delay, execute: block) }
-    engine.background = { block in backgroundQueue.async(execute: block) }
+    engine.runLater = { delay, block in queue.asyncAfter(deadline: .now() + delay) { work(block) } }
+    engine.background = { block in backgroundQueue.async { work(block) } }
     engine.start()
 }
 
@@ -286,7 +345,7 @@ func scheduleCheck() {
     timer.schedule(wallDeadline: .now() + delay, leeway: .milliseconds(100))
 }
 timer.setEventHandler {
-    engine.tick()
+    work { engine.tick() }
     scheduleCheck()
 }
 queue.sync { scheduleCheck() }
@@ -296,13 +355,13 @@ timer.resume()
 if PASettings.load(folder.appendingPathComponent("settings.json")).settings.sources.calendar {
     let calendar = EventKitCalendar(ask: true) {
         queue.async {
-            engine.readCalendar()
+            work { engine.readCalendar() }
             scheduleCheck()
         }
     }
     queue.async {
         engine.calendarSource = calendar
-        engine.readCalendar()
+        work { engine.readCalendar() }
         scheduleCheck()
     }
 }
@@ -319,7 +378,7 @@ if PASettings.load(folder.appendingPathComponent("settings.json")).settings.sour
 #endif
 let systemEvents = SystemEvents { _ in
     queue.async {
-        engine.tick()
+        work { engine.tick() }
         scheduleCheck()
     }
 }
@@ -352,26 +411,12 @@ settingsWatch?.resume()
 
 // Read stdin on its own thread. Each line goes to the engine queue. At the end of stdin, stop.
 let reader = Thread {
-    let input = FileHandle.standardInput
-    var buffer = Data()
-    let maxLine = 1_048_576
-    while true {
-        let chunk = input.availableData
-        if chunk.isEmpty { break }
-        buffer.append(chunk)
-        while let nl = buffer.firstIndex(of: 0x0A) {
-            let line = buffer.subdata(in: buffer.startIndex..<nl)
-            buffer.removeSubrange(buffer.startIndex...nl)
-            if line.isEmpty { continue }
-            queue.async {
-                engine.receive(line)
-                scheduleCheck()
-            }
+    LineReader.run(FileHandle.standardInput) { line in
+        queue.async {
+            work { engine.receive(line) }
+            scheduleCheck()
         }
-        // A line with no end that is too long: drop it.
-        if buffer.count > maxLine { buffer.removeAll() }
     }
-    if !buffer.isEmpty { let line = buffer; queue.async { engine.receive(line) } }
     queue.sync { engine.stop() }
     exit(0)
 }

@@ -11,6 +11,9 @@ struct PendingPage {
     var again: Bool
     var askedAt: Date
     var parts = PageTextAssembler()
+    /// Phase 5 (X2): the wall time of the ask, for the time to the note "Text kept". Tests use a fixed clock, so
+    /// this is not `askedAt`.
+    var wallStart = Date()
 }
 
 /// Phase 4, W4: the text of a kept web page. The PA selects the main text and keeps it as passages. It never writes
@@ -193,7 +196,9 @@ extension Engine {
         guard p.purpose == .keep else { pointsPage(p, page); return }
         guard let store, let id = p.docID, var d = store.doc(id), d.droppedAt == nil else { return }
         let now = clock.now
+        let t0 = Date()
         let sel = MainText.select(page.blocks, variant: Engine.pageVariant)
+        let ruleDone = Date()
         if sel.noText {
             // A page kept before keeps its old text.
             if d.textState == .none || d.textState == .queued {
@@ -225,8 +230,11 @@ extension Engine {
         try? store.updateDoc(d, event: "page-read", at: now)
         writeKeptCopy(d, sel.blocks)
         writeKeptText(d.id, sel.blocks)
-        log.write(now, "page-read", ["doc": String(id), "state": d.textState.rawValue, "passages": String(d.passages),
-                                     "words": String(sel.words)])
+        // Phase 5 (X2): the parts of the time, in ms. wait: from the ask to the last part of earshot (the read of
+        // earshot and its wait for a stable page). rule: the main text rule. index: the passages, the copy and the
+        // pages. total: from the ask to the note.
+        func ms(_ a: Date, _ b: Date) -> String { String(Int((b.timeIntervalSince(a) * 1000).rounded())) }
+        let indexDone = Date()
         docsChanged()
         vectorCache = nil
         indexIfNeeded()
@@ -240,6 +248,10 @@ extension Engine {
             note = "Text kept · \(d.title) · \(words)"
         }
         output.send(.note(nil, note))
+        let sent = Date()
+        log.write(now, "page-read", ["doc": String(id), "state": d.textState.rawValue, "passages": String(d.passages),
+                                     "words": String(sel.words), "wait": ms(p.wallStart, t0), "rule": ms(t0, ruleDone),
+                                     "index": ms(ruleDone, indexDone), "total": ms(p.wallStart, sent)])
     }
 
     // MARK: - The text copy and the list (9.3)

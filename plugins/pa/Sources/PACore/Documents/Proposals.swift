@@ -177,9 +177,8 @@ extension Engine {
     /// A move to the same project confirms the proposal and is not wrong.
     func countCorrection(old: Item, new: Item) {
         guard old.projectBy == "search", let store else { return }
-        if old.projectID != new.projectID, let last = store.lastEvent(["proposal"]), last.id == old.id,
-           clock.now.timeIntervalSince(last.at) <= 600 {
-            store.log("proposal-corrected", .item, old.id, at: clock.now)
-        }
+        guard let last = store.lastEvent(["proposal"]), last.id == old.id, clock.now.timeIntervalSince(last.at) <= 600 else { return }
+        // Phase 5 (X5): a move to the same project confirms the proposal.
+        store.log(old.projectID != new.projectID ? "proposal-corrected" : "proposal-confirmed", .item, old.id, at: clock.now)
     }
 }

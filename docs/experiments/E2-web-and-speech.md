@@ -44,6 +44,8 @@ The probe obeys these rules:
 
 `earshot-probe e2-page` opens each site in Chrome as a new tab and reads it. It does not bring Chrome to the front unless `--front` is given. It sets `AXManualAccessibility` on Chrome, because Chrome builds its web tree only when an assistive app asks.
 
+Note of 2026-11-12 (PA phase 5): Chrome 157.0.8103.52 does not support `AXManualAccessibility` (a read and a set give -25205), so the set has no effect in that version. A new Chrome with an empty profile, in front, gave its web area after 1 s with no flag. The set is correct for Electron apps. The E2 results do not change.
+
 The probe asks Chrome for the visible elements with one call: `AXUIElementsForSearchPredicate` with the link and control search keys and "visible only". VoiceOver uses this call. If the call gives nothing, the probe walks the tree of the page and skips parts outside the window. It logs the time of each method.
 
 For each element, the probe keeps the role, the label, the link address, the position, and if the link is in a heading. The label is the title, else the description, else the text inside the element. A field gives its placeholder. Elements with no label are counted, not kept. The snapshot stays on the Mac in `probe/logs/e2-page-<site>.json`. Git ignores it.
