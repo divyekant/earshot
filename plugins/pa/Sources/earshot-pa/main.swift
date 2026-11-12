@@ -138,6 +138,38 @@ if let i = args.firstIndex(of: "--followup-bench"), i + 1 < args.count {
     exit(runFollowUp())
 }
 
+// The bench of the request flags (phase 3, 8.5, E11): earshot-pa --flags-bench <mail fixtures folder>
+// [--embedder <name> [--model <file.gguf>] [--gpu]] [--final <variant>:<threshold>]
+// [--write-weights <file> --variant <A|B> --threshold <t>].
+if let i = args.firstIndex(of: "--flags-bench"), i + 1 < args.count {
+    func value(_ flag: String) -> String? {
+        args.firstIndex(of: flag).flatMap { $0 + 1 < args.count ? args[$0 + 1] : nil }
+    }
+    func runFlags() -> Int32 {
+        do {
+            let embedder = try value("--embedder").map {
+                try makeEmbedder($0, allowAssetRequest: false, modelFile: value("--model"), gpu: args.contains("--gpu"))
+            }
+            let bench = FlagBench(folder: URL(fileURLWithPath: args[i + 1], isDirectory: true), embedder: embedder)
+            if let w = value("--write-weights") {
+                try bench.writeWeights(URL(fileURLWithPath: w), variant: value("--variant") ?? "B",
+                                       threshold: Double(value("--threshold") ?? "0.5") ?? 0.5)
+            } else if let f = value("--final") {
+                let parts = f.split(separator: ":")
+                guard parts.count == 2, let t = Double(parts[1]) else { print("Use --final B:0.60."); return 1 }
+                try bench.final(variant: String(parts[0]), threshold: t)
+            } else {
+                try bench.development()
+            }
+            return 0
+        } catch {
+            print("Bench error: \(error)")
+            return 1
+        }
+    }
+    exit(runFlags())
+}
+
 // The bench of the links by a rule (phase 3, 9.2): earshot-pa --events-bench <phase 2 fixtures folder>
 // --events <events tsv> --embedder <name> [--model <file.gguf>] [--gpu] [--detail] [--final L1+L2].
 if let i = args.firstIndex(of: "--events-bench"), i + 1 < args.count {
