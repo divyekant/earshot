@@ -241,3 +241,18 @@ All data stays in `~/Library/Application Support/earshot/plugin-data/pa/`:
 - `pa.log`: times, event types and record numbers. The log has no words of yours.
 
 The PA removes dropped items after 30 days.
+
+## Counts of use
+
+To see how you use the PA, run this command in Terminal:
+
+```
+"$HOME/Library/Application Support/earshot/plugins/pa/EarshotPA.app/Contents/MacOS/earshot-pa" --counts
+```
+
+The command prints one JSON line and stops. It gives counts for the last 7 days (`last7Days`) and in total (`total`): captures by kind, commands by lead, project proposals, request flags, arrival flags, near-event alerts, reminders, searches, "main points" and the state of the flag learning. It reads the store and writes nothing. The output has only numbers, the date of the run and the version of the form. It has no title, sender, address or sentence.
+
+Limits:
+
+- The command counts and `proposal-confirmed` start with the build of 2026-11-12 (phase 5). Earlier commands are not counted. `commandCountsFrom` gives the time of the first command count.
+- `openAfterSearch` is always `null`. earshot opens a target itself, so the PA does not know about "open 2" after a search.
