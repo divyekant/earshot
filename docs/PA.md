@@ -145,7 +145,7 @@ Other notes:
 
 Two addresses are the same page if they are equal without the part after `#` and without the parameters `utm_*`, `fbclid` and `gclid`.
 
-"main points of this" with a web page in front shows 5 sentences of the main text. The PA does not keep the page or its text for this command. "main points of <name>" also finds kept pages.
+Main points of web pages are off by default (setting `pagePoints`). In the sealed test (experiment E12), 2 or more of the 3 marked key sentences were in the 5 for 6 of 10 web pages. The pass mark was 8 of 10. If you set `pagePoints` to `true`, "main points of this" with a web page in front shows 5 sentences of the main text. The PA does not keep the page or its text for this command. "main points of <name>" also finds kept pages.
 
 To delete the text of a page, say "drop" for the page, for example "where is ferry" and then "drop 1". The PA deletes the passages, the numbers and the text copy at once.
 
@@ -224,7 +224,7 @@ The settings file is `~/Library/Application Support/earshot/plugin-data/pa/setti
 | `flagsLearn` | `true` | If `true`, the request flags learn from your "keep" and "drop" answers. If `false`, the PA uses the base weights. |
 | `flagsMuted` | `[]` | Sender addresses that get no more request flags. The PA adds an address after you drop 3 flags from it and keep none. Delete an address to get its flags again. |
 | `pageText` | `true` | If `true`, "keep this" on a web page also keeps the main text of the page. If `false`, the PA does not ask for page text. |
-| `pagePoints` | `true` | If `true`, "main points" works for web pages. If `false`, the answer is "Main points work for kept files only." |
+| `pagePoints` | `false` | If `true`, "main points" works for web pages. If `false`, the answer is "Main points work for kept files only." The default is `false`: the sealed test of E12 found 2 or more of 3 marked sentences on 6 of 10 pages, and the pass mark is 8 of 10. |
 | `searchModel` | `"gemma"` | The search model: `"gemma"`, `"gemma2"`, `"qwen3"` or `"none"` (keywords only). The PA reads it at its start. Run `PA_MODEL=<name> scripts/install-pa.sh` to download another model. |
 
 If the file has an error, the PA uses the default values and shows one note.
