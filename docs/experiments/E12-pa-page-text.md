@@ -1,6 +1,6 @@
 # E12: the text of kept web pages for the PA plugin
 
-Status: closed on 2026-11-12. The page read and the main text rule pass each go mark on the sealed holdout, in Chrome and in Safari. Main points of a web page fail their mark (6 of 10 against 8 of 10). The setting `pagePoints` is `false` by default.
+Status: closed on 2026-11-12. The page read and the main text rule pass each go mark on the sealed holdout, in Chrome and in Safari. Main points of a web page fail their mark (6 of 10 against 8 of 10). The setting `pagePoints` is `false` by default. On the Mac, the memory of the PA (24.9 MB) failed its mark of 15 MB.
 
 Source: the PA phase 4 build spec, sections 6 to 11 (`/mnt/project-files/earshot-pa/phase4-build-spec.md` in the project folder). Requirements: R-PA-4, R-PA-9, R-PA-13, R-PL-2, R-PL-5. Decision: D-18.
 
@@ -102,5 +102,19 @@ Main points for each marked page (marked sentences in the 5 selected, the same i
 - Two browsers (Chrome and Safari) on one Mac. Firefox and other browsers are not tested.
 - The page must be in front and loaded. Text that the page did not load is not kept. A page that loads for a long time can give `complete: false`.
 - A cold start of the browser was not tested.
-- Probe 7 (a test of the full keep through earshot) failed its first run with "no web area within 15 s". The cause was the test. The test is fixed, but it did not run again.
-- The full keep on the Mac with the network off, the time to the note "Text kept", and the earshot speed during a read are not measured yet. They need a develop build of earshot on the Mac.
+- A read right after a fresh Chrome start is not proven. Probe 7 starts a second Chrome with an empty profile. It failed 3 times with "no web area within 15 s" (last on 5998e2d). The window and its title were there, but the web area did not come within 15 s, also with `AXManualAccessibility` set each 50 ms. In that case earshot sends an error, and the PA keeps the link with no text.
+
+## Final check on the Mac (2026-11-12, 07:04 to 07:16 UTC)
+
+earshot 0.5.0 (5998e2d), PA 0.4.0, the owner's real store. Made-up `file:` pages in a new Chrome window. The network of the Mac stayed on, because the remote session needs it. In its place, the check counted the network connections of the PA and of its worker during each keep and search.
+
+| Mark | Number | Result |
+|---|---|---|
+| Keep a made-up page | "Kept"; 2 passages; read and index in 62 ms or less; `keepThis` 4 to 9 ms | Pass |
+| No network | 0 connections of the PA and the worker during each keep and search | Pass |
+| Find it in other words | Position 1 for 4 of 5 questions. "the money for a vegetable bed" did not find it (the page says "renewal fee" and "plot") | Pass (4 of 5) |
+| earshot speed ("open safari", 20 runs) | Route median 7.9 ms with no read; 5.8 ms (slowest 7.6) with 20 page reads during the runs | Pass |
+| Memory, PA with no worker | 24.9 MB (23.2 MB before the keep). The worker uses 330 to 420 MB while it runs and stops 5 minutes after the last search | **Fail** (mark: less than 15 MB) |
+| Drop | 42 test pages dropped; 0 left; their passages deleted | Pass |
+
+The memory mark failed on the owner's real store. The bench store gave 6.3 MB. A keep added about 1 MB. The time to the note "Text kept" is short (the read and the index took less than 0.1 s after the read of earshot), but the check did not record it from the command to the note.
