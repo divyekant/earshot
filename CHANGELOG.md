@@ -17,10 +17,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Changed
 
-- PA: the PA gives free memory back to macOS after each mail read, notes read and command (R-PA-8).
-
-### Changed
-
+- PA: the PA gives free memory back to macOS after each mail read, notes read and command. Each message from earshot no longer leaves 16 KB in the PA (R-PA-8).
 - If a page that a plugin wrote, or a sign-in, code or payment page, is in front, no label of the page goes to Jev, and "Jev sees the screen" takes no picture (R-MD-1, D-10).
 
 ## [0.5.0] - 2026-11-12
