@@ -240,7 +240,9 @@ enum ScreenReader {
     static func read(pid: pid_t, maxElements: Int) -> ScreenRead? {
         let t0 = Clock.nowNs()
         let app = AX.appElement(pid)
-        // Chromium and Electron build their tree only when an assistive app asks. Other apps ignore the attribute.
+        // Electron apps build their tree only when an assistive app asks, and this attribute turns it on. Other apps
+        // ignore it. Chrome 157 does not support it (-25205, PA phase 5, 2026-11-12), and a new Chrome in front gave
+        // its web area after 1 s without it.
         AX.set(app, "AXManualAccessibility", kCFBooleanTrue)
         guard let window = AX.window(app), let wf = AX.frame(window) else { return nil }
         let bundleID = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier ?? ""
