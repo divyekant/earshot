@@ -136,6 +136,15 @@ The PA gives a request flag only if all of these are true:
 
 If you reply to the mail in Mail, the flag goes away at the next read. To stop request flags, set `rules.request` to `off`.
 
+Say "open flags" to see the open flags on a page. Each flag has a link that opens the mail in Mail.
+
+The PA learns from your answers:
+
+- Each "keep" and each "drop" on a request flag is an answer. After 50 answers with 10 or more of each kind, the PA changes its weights a little after each answer. The PA uses the new weights only if they agree better with your last 20 answers than the base weights do.
+- The PA makes few wrong flags, so the learning can start late, or never.
+- If you drop 3 flags from one sender and keep none, the PA makes no more request flags from that sender. The Today page shows the sender under "No more flags from". To get flags from that sender again, delete the address from `flagsMuted` in the settings.
+- To stop the learning, set `flagsLearn` to `false`.
+
 ## Notes
 
 While the Notes app runs, the PA reads your notes each 15 minutes. It skips locked notes and the folder "Recently Deleted". "where is" then finds the words of a note. The result shows the note name and the passage. The PA cannot open a note for you: open it in Notes. If a note changes, the PA reads it again. If you delete a note, the PA deletes its passages at the next read. The PA never starts Notes and never changes a note.
@@ -163,6 +172,8 @@ The settings file is `~/Library/Application Support/earshot/plugin-data/pa/setti
 | `linkEvents` | `true` | If `true`, a rule links open items and documents to a calendar event, shown with "?". If `false`, only your own links ("before the dentist") stay. |
 | `sources` | `{"calendar": true, "mail": true, "notes": true}` | The sources that the PA reads. If you set one to `false`, the PA deletes what it kept from that source. |
 | `mail` | `{"everyMinutes": 5, "firstDays": 3, "maxPerRead": 50, "batch": 10}` | The mail read: the time between two reads, the days of the first read, the most messages to look back, and the ids in one step. |
+| `flagsLearn` | `true` | If `true`, the request flags learn from your "keep" and "drop" answers. If `false`, the PA uses the base weights. |
+| `flagsMuted` | `[]` | Sender addresses that get no more request flags. The PA adds an address after you drop 3 flags from it and keep none. Delete an address to get its flags again. |
 | `searchModel` | `"gemma"` | The search model: `"gemma"`, `"gemma2"`, `"qwen3"` or `"none"` (keywords only). The PA reads it at its start. Run `PA_MODEL=<name> scripts/install-pa.sh` to download another model. |
 
 If the file has an error, the PA uses the default values and shows one note.

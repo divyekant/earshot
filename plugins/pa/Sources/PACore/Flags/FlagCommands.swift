@@ -103,6 +103,56 @@ extension Engine {
         return .note(id, "Dropped · " + Engine.cut(f.sentence.isEmpty ? f.subject : f.sentence, Engine.flagSentenceMax))
     }
 
-    /// The learning (spec 8.8) adds its example here. Package S5.
-    func flagAnswered(_ f: Flag, kept: Bool) {}
+    /// The learning (spec 8.8): the answer goes to the example of the flag, and the PA fits the weights again in the
+    /// background. A sender with 3 dropped flags and no kept flag gets no more flags (`flagsMuted`).
+    func flagAnswered(_ f: Flag, kept: Bool) {
+        guard f.kind == .request, let store else { return }
+        if (try? index?.answerFlagExample(flag: f.id, answer: kept ? "kept" : "dropped")) == true { learnFlags() }
+        if !kept, let address = store.flagSender(f.id) {
+            let a = store.senderAnswers(address)
+            if a.kept == 0, a.dropped >= Engine.muteAfterDrops { muteSender(address, flag: f.id) }
+        }
+    }
+
+    static let muteAfterDrops = 3
+
+    /// The learned weights in the meta table, or nil for the base weights.
+    func learnedWeights() -> FlagWeights? {
+        guard let s = store?.meta("flags.weights") else { return nil }
+        return try? JSONDecoder().decode(FlagWeights.self, from: Data(s.utf8))
+    }
+
+    /// Fits the weights again off the command path, and keeps them only if the guard passes.
+    func learnFlags() {
+        guard settings.flagsLearn, let index, let model = RequestModel.fitted, model.variant == "A" else { return }
+        let answers = index.flagExamples().map { (x: $0.features.map(Double.init), kept: $0.answer == "kept") }
+        let base = FlagWeights.base(threshold: model.threshold)
+        background { [weak self] in
+            let start = Date()
+            let w = FlagLearning.learn(answers, base: base)
+            let ms = Int(Date().timeIntervalSince(start) * 1000)
+            self?.runLater(0) { [weak self] in
+                guard let self else { return }
+                let json = w.flatMap { try? JSONEncoder().encode($0) }.map { String(decoding: $0, as: UTF8.self) }
+                try? self.store?.setMeta("flags.weights", json)
+                self.log.write(self.clock.now, "flags-learn", ["answers": String(answers.count), "used": w == nil ? "0" : "1",
+                                                               "ms": String(ms)])
+            }
+        }
+    }
+
+    /// Adds the address to `flagsMuted` in the settings file. The other settings stay as they are.
+    func muteSender(_ address: String, flag: Int64) {
+        let a = address.lowercased()
+        guard !settings.flagsMuted.contains(where: { $0.lowercased() == a }) else { return }
+        settings.flagsMuted.append(a)
+        var obj = ((try? Data(contentsOf: settingsURL)).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }) ?? [:]
+        obj["flagsMuted"] = settings.flagsMuted
+        if let d = try? JSONSerialization.data(withJSONObject: obj, options: [.prettyPrinted, .sortedKeys]) {
+            try? d.write(to: settingsURL, options: .atomic)
+            settingsStamp = (try? FileManager.default.attributesOfItem(atPath: settingsURL.path))?[.modificationDate] as? Date
+        }
+        store?.log("flag-mute", .flag, flag, at: clock.now)
+        markPagesDirty()
+    }
 }

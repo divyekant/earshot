@@ -12,7 +12,7 @@ final class PagesTests: XCTestCase {
         let (e, out, clock) = makeEngine()
         e.handle(.hello(contract: 1))
         guard case .targets(let first) = out.take().first(where: { if case .targets = $0 { return true }; return false })! else { return XCTFail() }
-        XCTAssertEqual(first.map(\.name), ["today", "all open"])
+        XCTAssertEqual(first.map(\.name), ["today", "all open", "flags"])
         say(e, "new project", "kitchen")
         let msgs = out.take()
         let targets = msgs.compactMap { m -> [Target]? in if case .targets(let t) = m { return t }; return nil }.last!

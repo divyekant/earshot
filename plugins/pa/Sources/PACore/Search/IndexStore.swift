@@ -69,9 +69,22 @@ public final class IndexStore {
                     .text(answer), .real(at.timeIntervalSince1970)])
     }
 
-    /// The answers, oldest first.
+    /// The example of an open request flag: its features, before the owner answers. A newer mail of the same
+    /// conversation replaces it.
+    public func setOpenFlagExample(flag: Int64, features: [Float], at: Date) throws {
+        try db.run("DELETE FROM flag_example WHERE flag_id = ? AND answer = 'open'", [.int(flag)])
+        try addFlagExample(flag: flag, features: features, vector: nil, answer: "open", at: at)
+    }
+
+    /// The owner answered the flag: "kept" or "dropped". Gives false if the flag had no open example.
+    @discardableResult
+    public func answerFlagExample(flag: Int64, answer: String) throws -> Bool {
+        try db.run("UPDATE flag_example SET answer = ? WHERE flag_id = ? AND answer = 'open'", [.text(answer), .int(flag)]) > 0
+    }
+
+    /// The answers, oldest first. Open examples are not answers.
     public func flagExamples() -> [(features: [Float], vector: [Float]?, answer: String)] {
-        ((try? db.query("SELECT features, vector, answer FROM flag_example ORDER BY id")) ?? []).map {
+        ((try? db.query("SELECT features, vector, answer FROM flag_example WHERE answer != 'open' ORDER BY id")) ?? []).map {
             (IndexStore.floats($0[0].blob ?? Data()), $0[1].blob.map(IndexStore.floats), $0[2].text ?? "")
         }
     }

@@ -47,7 +47,7 @@ extension Engine {
         <title>\(Engine.escape(title)) · PA</title><style>\(Engine.pageStyle)</style></head>
         <body><main><h1>\(Engine.escape(title))</h1><p class="sub">\(Engine.escape(sub))</p>
         \(body)
-        <nav><a href="today.html">Today</a> · <a href="all-open.html">All open</a></nav>
+        <nav><a href="today.html">Today</a> · <a href="all-open.html">All open</a> · <a href="flags.html">Flags</a></nav>
         </main></body></html>
         """
     }
@@ -131,6 +131,8 @@ extension Engine {
         ]
         let nearEvent = store.eventAlertAnswers(since: now.addingTimeInterval(-7 * 86400))
         rows += [("Near-event alerts", nearEvent.shown), ("Near-event alerts with an answer", nearEvent.answered)]
+        rows += [("Flags", counts["flag", default: 0]), ("Flags kept", counts["flag-keep", default: 0]),
+                 ("Flags dropped", counts["flag-drop", default: 0])]
         let table = "<h2>The last 7 days</h2><table>" + rows.map { "<tr><td>\($0.0)</td><td class=\"n\">\($0.1)</td></tr>" }.joined() + "</table>"
         // 8.1, step 6: the PA does not change the setting by itself.
         var warning = ""
@@ -138,8 +140,15 @@ extension Engine {
         if made >= 10, Double(corrected) / Double(made) > 0.2 {
             warning = "<p class=\"empty\">Many project proposals were wrong. Set proposeProject to false in the settings to stop them.</p>"
         }
+        // The senders with no more request flags (8.8, "3 drops and no keep").
+        var muted = ""
+        if !settings.flagsMuted.isEmpty {
+            muted = "<h2>No more flags from</h2><ul>" + settings.flagsMuted.map { a in
+                "<li><span>\(Engine.escape(store.senderName(a) ?? a))</span></li>" }.joined()
+                + "</ul><p class=\"empty\">To get flags from a sender again, delete the line in flagsMuted in the settings.</p>"
+        }
         let todayBody = warning + section("Late", late, late: true) + section("Today", todayItems, empty: "Nothing for today.")
-            + section("Tomorrow", tomorrowItems) + section("Quiet", quiet) + table
+            + section("Tomorrow", tomorrowItems) + section("Quiet", quiet) + table + muted
         let dateLine = TimeText.fullDay(today, cal)
         write(page(title: "Today", sub: dateLine, body: todayBody), "today.html")
 
@@ -154,9 +163,22 @@ extension Engine {
                            empty: projects.isEmpty ? "Nothing open." : nil)
         write(page(title: "All open", sub: "\(tasks.count) open", body: allBody), "all-open.html")
 
+        // The open flags (8.6), with a link that opens the mail.
+        let flags = store.openFlags()
+        var flagsBody = flags.isEmpty ? "<p class=\"empty\">Nothing new.</p>" : "<ul>"
+        for f in flags {
+            let text = Engine.escape(flagLine(f))
+            let subject = f.subject.isEmpty ? "" : "<br><span class=\"when\">\(Engine.escape(f.subject))</span>"
+            let link = f.mailLink.map { "<a href=\"\(Engine.escape($0))\">Open</a>" } ?? ""
+            flagsBody += "<li><span>\(text)\(subject)</span><span class=\"when\">\(link)</span></li>"
+        }
+        if !flags.isEmpty { flagsBody += "</ul>" }
+        flagsBody += "<p class=\"empty\">The PA finds about half of the requests. Do not use it as your only check of the inbox.</p>"
+        write(page(title: "Flags", sub: "\(flags.count) open", body: flagsBody), "flags.html")
+
         // One page for each open project.
         let since = now.addingTimeInterval(-30 * 86400).timeIntervalSince1970
-        var keep: Set<String> = ["today.html", "all-open.html", "search.html", "main-points.html"]
+        var keep: Set<String> = ["today.html", "all-open.html", "search.html", "main-points.html", "flags.html"]
         // The page of a closed project stays in the folder (phase 2 build spec 7.5).
         for p in store.projects(openOnly: false) where p.state == "closed" { keep.insert("project-\(p.slug).html") }
         for p in projects {
@@ -191,6 +213,7 @@ extension Engine {
         var out = [
             Target(id: "page-today", name: "today", kind: "page", open: pagesFolder.appendingPathComponent("today.html").path),
             Target(id: "page-all-open", name: "all open", kind: "page", open: pagesFolder.appendingPathComponent("all-open.html").path),
+            Target(id: "page-flags", name: "flags", kind: "page", open: pagesFolder.appendingPathComponent("flags.html").path),
         ]
         // "open search" shows the full results of the last search (phase 2 build spec, 7.7).
         if FileManager.default.fileExists(atPath: searchPageURL.path) {

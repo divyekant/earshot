@@ -1,6 +1,6 @@
 # E11: request flags for the PA plugin
 
-Status: closed. Version 1 and version 2 failed the go mark on a sealed holdout. `rules.request` is `off` by default. The owner decides the next step.
+Status: closed. Version 1 and version 2 failed the found mark on a sealed holdout. On 2026-11-12 04:34 UTC, the owner chose to use version 2 as a list: `rules.request` is `list` by default, and the guide says that the PA finds about half of the requests.
 
 Source: the PA phase 3 build spec, section 8, and the flags v2 spec (`/mnt/project-files/earshot-pa/phase3-build-spec.md` and `phase3-flags-v2-spec.md` in the project folder). Requirements: R-PA-4, R-PA-5.
 
@@ -48,7 +48,23 @@ Can fixed rules and a small score find the mails and notes that ask the owner to
 
 ## Conclusion
 
-Version 2 is precise: 1 false flag of 37 flags on new data. It finds only about half of the requests. The design thread and this thread recommend version 2 as a list, with this limit in the guide. The owner decides (options: version 2 as a list, no request flags, flags only for mail from persons, or a test of one small model of 0.8B or less).
+Version 2 is precise: 1 false flag of 37 flags on new data. It finds only about half of the requests. The owner chose version 2 as a list, from 4 options (version 2 as a list, no request flags, flags only for mail from persons, a test of one small model of 0.8B or less).
+
+## The learning (spec 8.8)
+
+- Variant A is a linear formula. The hand points are the base weights. Minus the threshold is the base offset.
+- After 50 answers with 10 or more of each kind, a logistic fit starts at the base weights, with a penalty for the distance from them.
+- A guard fits without the last 20 answers and compares on them. The PA keeps the new weights only if they get more of those 20 answers correct than the base weights.
+- The gates do not learn.
+- A test with two made-up owners (`FlagLearningTests`). Each owner answered the 66 flags that the base weights show on build-a and design-a. Only 66 flags exist, not 80. The test counts on holdout 2 (now seen) and on `dev.jsonl`.
+
+| Made-up owner | False flags on holdout 2, before | After | Requests found on dev, before | After |
+|---|---|---|---|---|
+| Drops all flags of organizations | 5 of 14 | 2 of 10 | 14 | 13 |
+| Keeps only flags with a time limit | 4 of 14 | 0 of 10 | 14 | 14 |
+
+- Pass: fewer false flags for the two owners, and found requests on dev fall by 2 or fewer. Both pass.
+- A separate rule: after 3 dropped flags from one sender address and no kept flag, the PA makes no more flags from it (setting `flagsMuted`).
 
 ## How to run the bench
 

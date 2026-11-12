@@ -57,7 +57,7 @@ final class Phase3FrameTests: XCTestCase {
             try store.db.exec("DROP TABLE cal_event; DROP TABLE cal_event_link; DROP TABLE flag; DROP TABLE source_seen; PRAGMA user_version = 2;")
         }
         let store = try Store(url: url)
-        XCTAssertEqual(try store.db.query("PRAGMA user_version").first?.first?.int, 3)
+        XCTAssertEqual(try store.db.query("PRAGMA user_version").first?.first?.int, Int64(Store.schemaVersion))
         for t in ["cal_event", "cal_event_link", "flag", "source_seen"] {
             XCTAssertEqual(try store.db.query("SELECT count(*) FROM \(t)").first?.first?.int, 0, t)
         }

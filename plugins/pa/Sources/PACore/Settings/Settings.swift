@@ -227,6 +227,9 @@ public struct PASettings: Codable, Equatable, Sendable {
     public var notes = NotesSettings()
     /// Phase 3: if false, the request flags use the base formula only (spec 8.8).
     public var flagsLearn = true
+    /// Phase 3: sender addresses that get no more request flags. The PA adds an address after the owner drops 3
+    /// flags from it and keeps none. Delete the line to get flags from that sender again.
+    public var flagsMuted: [String] = []
     /// Phase 3: the names and addresses of the owner.
     public var owner = OwnerSettings()
 
@@ -257,6 +260,7 @@ public struct PASettings: Codable, Equatable, Sendable {
         mail = try c.decodeIfPresent(MailSettings.self, forKey: .mail) ?? d.mail
         notes = try c.decodeIfPresent(NotesSettings.self, forKey: .notes) ?? d.notes
         flagsLearn = try c.decodeIfPresent(Bool.self, forKey: .flagsLearn) ?? d.flagsLearn
+        flagsMuted = try c.decodeIfPresent([String].self, forKey: .flagsMuted) ?? d.flagsMuted
         owner = try c.decodeIfPresent(OwnerSettings.self, forKey: .owner) ?? d.owner
     }
 
