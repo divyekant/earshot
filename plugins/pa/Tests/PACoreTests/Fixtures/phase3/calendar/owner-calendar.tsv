@@ -1,0 +1,16 @@
+# Phase 3, S3: the made-up calendar for links by the owner (spec 9.2). Now is Wed 11 Nov 2026 10:00 Europe/London.
+# id	title	people	start	minutes
+c01	Dentist		2026-11-12T10:00	30
+c02	Meeting with Sam	Sam Lee	2026-11-13T14:00	60
+c03	Plumber visit	Tom Hale	2026-11-16T08:00	120
+c04	Parents evening		2026-11-18T18:00	90
+c05	Physio		2026-11-12T17:30	45
+c06	Physio		2026-11-19T17:30	45
+c07	Team meeting	Paul Evans	2026-11-17T10:00	60
+c08	Flight to Lisbon		2026-11-24T06:40	180
+c09	Dinner with Priya	Priya Shah	2026-11-14T19:00	120
+c10	Board meeting		2026-11-23T15:00	90
+c11	Haircut		2026-11-20T16:00	30
+c12	School visit		2026-11-18T09:30	60
+c13	Kitchen fitting		2026-11-19T08:00	480
+c14	Concert in the park		2026-12-05T19:00	120
