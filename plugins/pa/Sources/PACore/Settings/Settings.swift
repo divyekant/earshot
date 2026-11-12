@@ -23,8 +23,9 @@ public struct RuleModes: Codable, Equatable, Sendable {
     /// Rule 3 (phase 2 and 3).
     public var newArrival: RuleMode = .list
     /// Phase 3: a request flag from a mail or a note (spec 8.6).
-    /// Off by default: the request flags failed their go mark on the sealed holdout (E11, 2026-11-12).
-    public var request: RuleMode = .off
+    /// A list by default (the owner's choice, 2026-11-12). Version 2 found about half of the requests with very few
+    /// false flags; it failed the found mark of the sealed holdout (E11).
+    public var request: RuleMode = .list
 
     public init() {}
 

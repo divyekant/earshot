@@ -111,6 +111,31 @@ To open a page, say "open today", "open all open" or "open <project>". You can a
 
 The pages have no script and load nothing from the network. The PA writes the pages again after each change.
 
+## Mail
+
+While the Mail app runs, the PA reads new messages of the inbox each 5 minutes, in small steps. It does not read while Mail is the front app. The PA never starts Mail and never sends, moves, deletes, flags or marks a mail.
+
+The PA makes flags. A flag is one line in a list. It is a proposal: it makes no reminder and no to-do.
+
+- Request flag: `Request · Sam Lee · Could you send me the signed form before the 20th? · 20 Nov?`. The PA selected the sentence from the mail. It writes no words. The day with "?" is a proposed due day.
+- Arrival flag: `Arrived? · Sam Lee · Quote for the tiles` if the sender is named in an open "waiting for" item. `New in Kitchen? · mail · Sam Lee · Quote for the tiles` if the mail is like the records of a project.
+
+Limit: the PA finds about half of the requests. Do not use it as your only check of the inbox. When the PA shows a request flag, it is almost always correct. In the tests, 1 of 37 request flags was wrong.
+
+The PA gives a request flag only if all of these are true:
+
+- The mail is not bulk, list, automatic or junk mail, and you did not send it or reply to it.
+- The mail is for you: the greeting or the sentence names you, or you are in To with 3 addresses or fewer.
+- A person wrote it, or an organization asks you to do a thing with a time limit about a thing of yours (a bill, an appointment, an order). Sales and surveys get no flag.
+
+| You say | The PA does |
+|---|---|
+| "what is new" | Shows the open flags, newest first. |
+| "keep 2" | Makes a to-do from flag 2. The title is the sentence. The to-do has a link to the mail. "keep 2 as call Sam about the form" uses your words. "keep 2 for kitchen" sets the project. |
+| "drop 2" | Drops flag 2. |
+
+If you reply to the mail in Mail, the flag goes away at the next read. To stop request flags, set `rules.request` to `off`.
+
 ## Notes
 
 While the Notes app runs, the PA reads your notes each 15 minutes. It skips locked notes and the folder "Recently Deleted". "where is" then finds the words of a note. The result shows the note name and the passage. The PA cannot open a note for you: open it in Notes. If a note changes, the PA reads it again. If you delete a note, the PA deletes its passages at the next read. The PA never starts Notes and never changes a note.
@@ -128,7 +153,7 @@ The settings file is `~/Library/Application Support/earshot/plugin-data/pa/setti
 | `defaultSnoozeMinutes` | `10` | The snooze time if you say no time. |
 | `bareHourWindow` | `{"from": "07:00", "to": "23:00"}` | "at 5" is the next 5 o'clock in this window. |
 | `dayParts` | morning 09:00, noon 12:00, afternoon 15:00, evening 18:00, tonight 20:00, endOfDay 17:00 | The times of these words. |
-| `rules` | time alert, due list, silence list, nearEvent alert, newArrival list, request off | Each rule is `"alert"`, `"list"` or `"off"`. |
+| `rules` | time alert, due list, silence list, nearEvent alert, newArrival list, request list | Each rule is `"alert"`, `"list"` or `"off"`. |
 | `projects` | `{}` | Rules for one project. Example: `{"kitchen": {"due": "alert"}}`. |
 | `reminders` | `{"copy": true, "list": "earshot", "alertBy": "reminders"}` | The copy in Apple Reminders. If `alertBy` is `"pa"`, the PA gives the alerts. |
 | `projectFocusMinutes` | `5` | After "new project kitchen", your next captures go to Kitchen for this count of minutes. Each capture starts the minutes again. `0` switches it off. |

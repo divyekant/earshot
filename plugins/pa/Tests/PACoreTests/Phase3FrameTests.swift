@@ -27,8 +27,8 @@ final class Phase3FrameTests: XCTestCase {
         XCTAssertEqual(s.mail.maxPerRead, 50)
         XCTAssertEqual(s.mail.batch, 10)
         XCTAssertEqual(s.notes.everyMinutes, 15)
-        // Off: the request flags failed their go mark on the sealed holdout (E11).
-        XCTAssertEqual(s.rules.request, .off)
+        // A list: the owner's choice after E11 (version 2 finds about half of the requests).
+        XCTAssertEqual(s.rules.request, .list)
         XCTAssertTrue(s.flagsLearn)
         XCTAssertEqual(s.owner, OwnerSettings())
     }
