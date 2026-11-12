@@ -144,10 +144,15 @@ public struct EventLinker: Sendable {
         }
         var docs: [String] = []
         for p in linkedProjects {
+            // Items that share a content word with the title first (a change on the development set: the
+            // spec order alone showed 5 newest items that missed the event), then items with a due day up to the
+            // event day, then the newest.
             let its = records.filter { $0.project == p && !$0.isDoc }
-            let dueFirst = its.filter { ($0.due.map { $0 <= day }) ?? false }.sorted { $0.due! < $1.due! }
-            let rest = its.filter { !dueFirst.map(\.key).contains($0.key) }.sorted { $0.order > $1.order }
-            items += (dueFirst + rest).map(\.key)
+            func overlap(_ r: Record) -> Int { Self.content(r.title).intersection(tContent).count }
+            func dueRank(_ r: Record) -> Int { (r.due.map { $0 <= day } ?? false) ? 1 : 0 }
+            items += its.sorted {
+                (overlap($0), dueRank($0), $0.order) > (overlap($1), dueRank($1), $1.order)
+            }.map(\.key)
             docs += records.filter { $0.project == p && $0.isDoc }.sorted { $0.order > $1.order }.map(\.key)
         }
         var seen = Set<String>()

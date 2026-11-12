@@ -137,7 +137,7 @@ public final class EventBench {
     }
 
     /// The development table, and the selection: the set with the most correct alerts at 1 or fewer wrong alerts.
-    public func development(_ file: URL, detail: Bool = false) throws {
+    public func development(_ file: URL, detail: Bool = false, show: [EventLinker.Lines] = []) throws {
         let events = try Self.readEvents(file)
         let sig = try signals(events)
         out("| Lines | Alerts | Correct | Wrong | Want events with an alert |")
@@ -147,6 +147,10 @@ public final class EventBench {
             let c = count(events, sig, lines: set)
             out(Self.line(set.label, c))
             if c.wrong <= 1, c.correct > (best?.1.correct ?? -1) { best = (set, c) }
+        }
+        for set in show {
+            out("Detail of \(set.label):")
+            _ = count(events, sig, lines: set, detail: true)
         }
         if let best {
             out("Selected: \(best.0.label)")

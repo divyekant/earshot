@@ -155,7 +155,8 @@ if let i = args.firstIndex(of: "--events-bench"), i + 1 < args.count {
                 guard let lines = EventLinker.Lines(label: f) else { print("Unknown lines \(f). Use for example L1+L2."); return 1 }
                 try bench.final(file, lines: lines)
             } else {
-                try bench.development(file, detail: args.contains("--detail"))
+                let show = (value("--show") ?? "").split(separator: " ").compactMap { EventLinker.Lines(label: String($0)) }
+                try bench.development(file, detail: args.contains("--detail"), show: show)
             }
             return 0
         } catch {
