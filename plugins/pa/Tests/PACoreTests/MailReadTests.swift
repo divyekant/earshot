@@ -117,3 +117,98 @@ final class MailReadTests: XCTestCase {
         XCTAssertEqual(r.answered, ["m1"])
     }
 }
+
+/// Phase 3, S4: the new arrival on the engine (8.7) and the read loop (6.1). Made-up data only.
+final class MailSyncTests: XCTestCase {
+    func testWaitingForPairs() throws {
+        let url = try XCTUnwrap(Bundle.module.url(forResource: "waiting-pairs", withExtension: "tsv", subdirectory: "Fixtures/phase3/mail"))
+        let rows = try BenchFixtures.rows(url).filter { $0.count >= 3 }
+        XCTAssertEqual(rows.count, 30)
+        var found = 0, wrong = 0
+        var misses: [String] = []
+        for r in rows {
+            let hit = Engine.waitingMatch(sender: r[0], title: r[1])
+            if r[2] == "1" { if hit { found += 1 } else { misses.append("missed: \(r[1])") } }
+            else if hit { wrong += 1; misses.append("wrong: \(r[1])") }
+        }
+        print("waiting for: \(found) of 15 found, \(wrong) wrong")
+        XCTAssertGreaterThanOrEqual(found, 13, misses.joined(separator: "\n"))
+        XCTAssertLessThanOrEqual(wrong, 2, misses.joined(separator: "\n"))
+    }
+
+    func engineWithMail(_ box: FixtureMail) -> (Engine, MemoryOutput, FixedClock) {
+        let (e, out, clock) = makeEngine()
+        e.settings.owner.addresses = ["maya.rao@example.com"]
+        e.mailSource = box
+        return (e, out, clock)
+    }
+
+    static func msg(_ id: String, at: Date, from: String = "Sam Lee", list: Bool = false, replied: Bool = false) -> MailMessage {
+        MailMessage(id: id, messageID: "<\(id)@x.example>", fromName: from, fromAddress: "sam.lee@example.net",
+                    to: ["maya.rao@example.com"], cc: [], subject: "Quote for the tiles", date: at, listHeader: list,
+                    replied: replied, text: "Here is the quote.")
+    }
+
+    func testArrivalForWaitingFor() {
+        let box = FixtureMail(messages: [Self.msg("m1", at: wed(9))])
+        let (e, out, clock) = engineWithMail(box)
+        e.handle(.command(id: "1", lead: "todo", text: "waiting for Sam's quote", context: [:]))
+        _ = out.take()
+        e.readMailIfDue()
+        let flags = e.store?.openFlags() ?? []
+        XCTAssertEqual(flags.count, 1)
+        XCTAssertEqual(flags.first.map(e.flagLine), "Arrived? · Sam Lee · Quote for the tiles")
+        XCTAssertEqual(e.store?.seen(.mail, "m1")?.result, .flag)
+        // No new read before the interval. Then the cheap check only.
+        let calls = box.calls
+        e.readMailIfDue()
+        XCTAssertEqual(box.calls, calls)
+        clock.now = wed(10, 6)
+        e.readMailIfDue()
+        XCTAssertEqual(box.calls, calls + 2) // the newest id, and the open flag reply check
+        // The owner replies in Mail: the flag is answered at the next read.
+        box.setReplied("m1")
+        clock.now = wed(10, 12)
+        e.readMailIfDue()
+        XCTAssertTrue(e.store?.openFlags().isEmpty ?? false)
+    }
+
+    func testMailNotRunningOrInFront() {
+        let box = FixtureMail(messages: [Self.msg("m1", at: wed(9))])
+        let (e, _, clock) = engineWithMail(box)
+        box.isRunning = false
+        e.readMailIfDue()
+        XCTAssertEqual(box.calls, 0)
+        box.isRunning = true
+        box.isFront = true
+        e.readMailIfDue()
+        XCTAssertEqual(box.calls, 0)
+        clock.now = wed(10, 29)
+        e.readMailIfDue()
+        XCTAssertEqual(box.calls, 0)
+        // After 30 minutes in front: one small read.
+        clock.now = wed(10, 31)
+        e.readMailIfDue()
+        XCTAssertGreaterThan(box.calls, 0)
+    }
+
+    func testNoFloodAtFirstRead() {
+        // 500 old messages from senders that each match one "waiting for" item. The first read reads 3 days only,
+        // and makes 5 flags or fewer.
+        let names = ["Sam Lee", "Helen Ward", "Tom Hale", "Priya Shah", "Kofi Mensah", "Anna Novak", "Grace Kim", "Ravi Patel"]
+        var msgs: [MailMessage] = []
+        for i in 0..<500 {
+            msgs.append(Self.msg("o\(i)", at: wed(9).addingTimeInterval(-Double(i) * 1800), from: names[i % names.count]))
+        }
+        let box = FixtureMail(messages: msgs)
+        let (e, out, clock) = engineWithMail(box)
+        for n in names { e.handle(.command(id: n, lead: "todo", text: "waiting for \(n.split(separator: " ")[0])", context: [:])) }
+        _ = out.take()
+        for k in 0..<40 {
+            clock.now = wed(10).addingTimeInterval(Double(k) * 360)
+            e.readMailIfDue()
+        }
+        XCTAssertLessThanOrEqual(e.store?.openFlags().count ?? 99, 5)
+        XCTAssertEqual(e.store?.meta("mail.firstDone"), "1")
+    }
+}

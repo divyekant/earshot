@@ -151,6 +151,10 @@ if let i = args.firstIndex(of: "--events-bench"), i + 1 < args.count {
                                             gpu: args.contains("--gpu"))
             let bench = try EventBench(corpus: URL(fileURLWithPath: args[i + 1], isDirectory: true), embedder: embedder)
             let file = URL(fileURLWithPath: events)
+            if args.contains("--mail-arrivals") {
+                try bench.mailArrivals(file)
+                return 0
+            }
             if let f = value("--final") {
                 guard let lines = EventLinker.Lines(label: f) else { print("Unknown lines \(f). Use for example L1+L2."); return 1 }
                 try bench.final(file, lines: lines)
@@ -229,6 +233,11 @@ if PASettings.load(folder.appendingPathComponent("settings.json")).settings.sour
         engine.readCalendar()
         scheduleCheck()
     }
+}
+// The mail (phase 3, 6.1). The PA reads only while Mail runs. It never starts Mail.
+if PASettings.load(folder.appendingPathComponent("settings.json")).settings.sources.mail {
+    let mail = AppleMail()
+    queue.async { engine.mailSource = mail }
 }
 #endif
 let systemEvents = SystemEvents { _ in

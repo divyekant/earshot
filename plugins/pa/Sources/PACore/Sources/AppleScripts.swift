@@ -53,6 +53,10 @@ public enum AppleScripts {
         """#
     /// The plain text of message N.
     public static let mailContentOne = #"tell application "Mail" to return content of message %N% of inbox"#
+    /// The ids of the messages A to B of the inbox, in one small event (spec 6.1, step 3).
+    public static let mailIDsRange = #"tell application "Mail" to return id of messages %A% thru %B% of inbox"#
+    /// The addresses of all Mail accounts (for the setting `owner`).
+    public static let mailAccountAddresses = #"tell application "Mail" to return email addresses of every account"#
     /// The front app test of another process: a small event that Mail must answer.
     public static let mailPing = #"tell application "Mail" to return count of accounts"#
 
@@ -70,11 +74,16 @@ public enum AppleScripts {
     /// All scripts, for the read-only test.
     public static let all = [mailInboxCount, mailInboxIDs, mailInboxDates, mailInboxHeaders, mailInboxContent,
                              mailNewestID, mailAccountCount, mailAccountNewestID, mailIDOne, mailDateOne, mailIDDateOne,
-                             mailAllHeadersOne, mailHeaderFactsOne, mailEnvelopeOne, mailContentOne, mailPing,
+                             mailAllHeadersOne, mailHeaderFactsOne, mailEnvelopeOne, mailContentOne, mailPing, mailIDsRange, mailAccountAddresses,
                              notesCount, notesLocked, notesNames, notesDates, notesPlainText]
 
     /// The words that must never be in a script (rule 1).
     public static let forbidden = ["send", "delete", "move", "set ", "make", "save", "reply", "forward", "redirect", "duplicate"]
+
+    /// A script with fixed numbers in place of `%A%` and `%B%`.
+    public static func range(_ script: String, _ a: Int, _ b: Int) -> String {
+        script.replacingOccurrences(of: "%A%", with: String(max(1, a))).replacingOccurrences(of: "%B%", with: String(max(1, a, b)))
+    }
 
     /// A script with a fixed number in place of `%N%`.
     public static func limited(_ script: String, _ n: Int, account k: Int = 1) -> String {

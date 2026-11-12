@@ -21,7 +21,7 @@ extension Engine {
             if let d = f.dueOn { parts.append(TimeText.shortDay(d) + "?") }
             return parts.joined(separator: " · ")
         case .arrival:
-            if f.itemID != nil, f.projectID == nil {
+            if f.itemID != nil {
                 return ["Arrived?", f.sender, f.subject].filter { !$0.isEmpty }.joined(separator: " · ")
             }
             let head = projectName(f.projectID).map { "New in \($0)?" } ?? "New?"

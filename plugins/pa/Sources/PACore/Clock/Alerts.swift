@@ -85,6 +85,7 @@ extension Engine {
             releaseHeld(title: "While quiet")
         }
         readCalendarIfDue()
+        readMailIfDue()
         fireAlerts(now)
         nearEventAlerts(now)
         repeatAlerts(now)

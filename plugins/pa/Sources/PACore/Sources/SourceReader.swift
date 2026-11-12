@@ -137,6 +137,11 @@ public final class FixtureMail: MailSource {
     /// A new message arrives (newest).
     public func add(_ m: MailMessage) { messages.insert(m, at: 0) }
 
+    /// The owner replied to the message in Mail.
+    public func setReplied(_ id: String) {
+        if let i = messages.firstIndex(where: { $0.id == id }) { messages[i].replied = true }
+    }
+
     public func ids(from: Int, count: Int) throws -> [String] {
         calls += 1
         guard from < messages.count else { return [] }
