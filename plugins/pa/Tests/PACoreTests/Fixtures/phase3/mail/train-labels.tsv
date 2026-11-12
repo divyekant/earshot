@@ -1,0 +1,401 @@
+id	request	kind	sentence	sentence2
+tr001	0	junk		
+tr002	0	third_person		
+tr003	1	org_library	Please return the 2 overdue books by 25 November.	
+tr004	0	news		
+tr005	0	junk		
+tr006	1	org_landlord	Your tenancy ends on 31 December, so please sign the renewal by 30 November.	
+tr007	0	news		
+tr008	1	org_school	Please sign and return the trip form by the end of the month.	
+tr009	0	replied		
+tr010	0	junk		
+tr011	0	thanks		
+tr012	0	receipt		
+tr013	0	quoted_only		
+tr014	1	work	We need you to review the slides for the client call before the meeting on Wednesday.	Do you have the number of the electrician?
+tr015	0	newsletter		
+tr016	0	notice		
+tr017	0	newsletter		
+tr018	0	receipt		
+tr019	0	polite		
+tr020	0	receipt		
+tr021	0	newsletter		
+tr022	0	ad		
+tr023	0	thanks		
+tr024	0	list		
+tr025	0	thanks		
+tr026	0	ad		
+tr027	0	news		
+tr028	0	ad		
+tr029	0	junk		
+tr030	0	group		
+tr031	0	newsletter		
+tr032	0	news		
+tr033	0	thanks		
+tr034	0	news		
+tr035	0	news		
+tr036	0	ad		
+tr037	1	person	We need you to forward me the contract by 5 pm tomorrow.	
+tr038	0	thanks		
+tr039	1	work	Can you update the guest list before the meeting on Wednesday?	Which of the two offers do you prefer?
+tr040	0	junk		
+tr041	0	from_owner		
+tr042	1	reply_chain	Please approve the leave request by the end of the week.	
+tr043	0	receipt		
+tr044	1	cc_named	Maya, could you choose a date for the dinner as soon as possible?	
+tr045	0	newsletter		
+tr046	0	help_offer		
+tr047	1	org_insurer	Please send us a photo of the damage by 3 December so we can close the claim.	
+tr048	0	help_offer		
+tr049	0	thanks		
+tr050	1	person	Do not forget to look at the quote from the builder on or before 3 December.	Is the 3 pm slot still good for you?
+tr051	0	thanks		
+tr052	0	newsletter		
+tr053	1	person	Could you test the new login page by the end of the week?	
+tr054	0	newsletter		
+tr055	1	person	Maya, could you check the flight times by noon on Tuesday?	
+tr056	0	thanks		
+tr057	0	list		
+tr058	0	done		
+tr059	0	list		
+tr060	0	from_owner		
+tr061	1	person	When can you approve the leave request?	
+tr062	0	news		
+tr063	0	replied		
+tr064	0	help_offer		
+tr065	0	quoted_only		
+tr066	1	reply_chain	Will you be able to choose a date for the dinner by noon on Tuesday?	
+tr067	0	ad		
+tr068	0	thanks		
+tr069	0	from_owner		
+tr070	1	person	Do not forget to return the projector by 28 November.	
+tr071	0	newsletter		
+tr072	1	org_bank	You need to sign the updated account terms before 30 November.	
+tr073	0	news		
+tr074	0	ad		
+tr075	0	receipt		
+tr076	0	done		
+tr077	0	third_person		
+tr078	0	auto_reply		
+tr079	0	thanks		
+tr080	0	news		
+tr081	0	receipt		
+tr082	0	junk		
+tr083	0	newsletter		
+tr084	0	newsletter		
+tr085	0	thanks		
+tr086	0	help_offer		
+tr087	0	polite		
+tr088	1	work	Do not forget to send the invoice for October by Thursday morning.	
+tr089	1	person_long	Can you pick up the keys from the office as soon as possible?	
+tr090	0	notice		
+tr091	1	org_utility	Please send us a meter reading before 3 December.	
+tr092	1	person	Please update the guest list before the 20th.	
+tr093	1	org_council	You must renew your resident permit before the end of the month.	
+tr094	1	org_library	Please collect your reserved book before Friday 21 November.	
+tr095	0	auto_reply		
+tr096	0	junk		
+tr097	1	person	Maya, could you choose a date for the dinner on or before 3 December?	
+tr098	1	reply_chain	When can you test the new login page?	
+tr099	0	junk		
+tr100	0	junk		
+tr101	0	newsletter		
+tr102	0	done		
+tr103	0	receipt		
+tr104	0	news		
+tr105	0	receipt		
+tr106	0	receipt		
+tr107	0	from_owner		
+tr108	1	org_landlord	Please confirm a time for the gas safety check before the end of the month.	
+tr109	0	thanks		
+tr110	0	list		
+tr111	1	work	We need you to print the tickets by 5 pm tomorrow.	What time should we meet at the station?
+tr112	1	org_library	Please collect your reserved book before 30 November.	
+tr113	0	news		
+tr114	0	receipt		
+tr115	0	receipt		
+tr116	0	quoted_only		
+tr117	0	newsletter		
+tr118	0	from_owner		
+tr119	0	notice		
+tr120	0	thanks		
+tr121	0	auto_reply		
+tr122	0	news		
+tr123	0	newsletter		
+tr124	0	replied		
+tr125	0	receipt		
+tr126	0	auto_reply		
+tr127	0	newsletter		
+tr128	0	third_person		
+tr129	1	person_long	Please remember to add your notes to the shared document no later than 14 November.	
+tr130	0	replied		
+tr131	1	person	Will you be able to add your notes to the shared document as soon as possible?	Do you have the number of the electrician?
+tr132	0	newsletter		
+tr133	0	from_owner		
+tr134	0	newsletter		
+tr135	0	notice		
+tr136	0	newsletter		
+tr137	0	newsletter		
+tr138	0	newsletter		
+tr139	1	work	It would help a lot if you could choose a date for the dinner as soon as possible.	
+tr140	0	thanks		
+tr141	1	person	It would help a lot if you could confirm the time for Thursday on or before 3 December.	
+tr142	0	third_person		
+tr143	1	person_long	We need you to reply to the recruiter on or before 3 December.	
+tr144	0	receipt		
+tr145	0	news		
+tr146	0	notice		
+tr147	0	receipt		
+tr148	0	help_offer		
+tr149	0	newsletter		
+tr150	0	done		
+tr151	1	person	Do not forget to look at the quote from the builder on or before 3 December.	
+tr152	0	notice		
+tr153	0	from_owner		
+tr154	1	cc_named	Maya, could you sign the permission slip by Thursday morning?	
+tr155	1	work	We need you to share the photos from the trip as soon as possible.	
+tr156	0	from_owner		
+tr157	0	junk		
+tr158	0	news		
+tr159	0	newsletter		
+tr160	0	thanks		
+tr161	0	group		
+tr162	0	quoted_only		
+tr163	1	org_bank	You need to sign the updated account terms before 30 November.	
+tr164	1	person	Please fill in the volunteer sheet by 5 pm tomorrow.	
+tr165	0	thanks		
+tr166	0	receipt		
+tr167	0	receipt		
+tr168	1	reply_chain	Could you call the plumber about the leak when you have a moment?	
+tr169	0	done		
+tr170	0	list		
+tr171	1	person	Are you able to pick up the keys from the office no later than 14 November?	
+tr172	0	news		
+tr173	0	receipt		
+tr174	0	news		
+tr175	0	thanks		
+tr176	1	person	It would help a lot if you could send me the signed form by the end of the week.	
+tr177	1	person	We need you to add your notes to the shared document before Monday.	What time should we meet at the station?
+tr178	0	newsletter		
+tr179	0	news		
+tr180	0	newsletter		
+tr181	0	quoted_only		
+tr182	1	person	When can you book a table for six?	
+tr183	0	help_offer		
+tr184	0	list		
+tr185	0	news		
+tr186	0	receipt		
+tr187	1	work	Please add your notes to the shared document before the 20th.	
+tr188	0	thanks		
+tr189	1	org_club	Please renew your membership by 30 November to keep your court bookings.	
+tr190	0	newsletter		
+tr191	1	person	It would help a lot if you could fill in the volunteer sheet by Thursday morning.	Which date works better for you, the 18th or the 25th?
+tr192	0	news		
+tr193	1	work	Maya, could you fill in the volunteer sheet before the 20th?	Do you want the vegetarian menu or the standard one?
+tr194	0	from_owner		
+tr195	1	question	Let me know whether you can come on Saturday.	
+tr196	1	org_library	Please collect your reserved book before Friday 21 November.	
+tr197	0	news		
+tr198	0	list		
+tr199	0	news		
+tr200	0	newsletter		
+tr201	1	work	Would you fill in the volunteer sheet by Thursday morning?	
+tr202	0	auto_reply		
+tr203	0	list		
+tr204	0	news		
+tr205	0	receipt		
+tr206	0	news		
+tr207	0	quoted_only		
+tr208	0	auto_reply		
+tr209	0	junk		
+tr210	0	receipt		
+tr211	1	org_utility	Please send us a meter reading before 30 November.	
+tr212	0	receipt		
+tr213	0	list		
+tr214	0	news		
+tr215	0	thanks		
+tr216	0	third_person		
+tr217	1	work	We need you to sign the permission slip by noon on Tuesday.	
+tr218	0	newsletter		
+tr219	0	quoted_only		
+tr220	0	thanks		
+tr221	0	replied		
+tr222	0	news		
+tr223	0	news		
+tr224	0	third_person		
+tr225	0	notice		
+tr226	0	receipt		
+tr227	1	question	Can you tell me how many people are coming?	
+tr228	0	thanks		
+tr229	1	org_library	Please collect your reserved book before Friday 21 November.	
+tr230	0	third_person		
+tr231	0	done		
+tr232	0	newsletter		
+tr233	0	polite		
+tr234	0	auto_reply		
+tr235	0	newsletter		
+tr236	0	receipt		
+tr237	0	from_owner		
+tr238	0	thanks		
+tr239	0	group		
+tr240	0	newsletter		
+tr241	0	receipt		
+tr242	1	org_booking	Please confirm your appointment on 3 December or call us to change it.	
+tr243	1	org_library	Please return the 2 overdue books by 30 November.	
+tr244	0	newsletter		
+tr245	0	newsletter		
+tr246	0	thanks		
+tr247	1	org_utility	Please send us a meter reading before Friday 21 November.	
+tr248	0	replied		
+tr249	0	ad		
+tr250	0	junk		
+tr251	0	newsletter		
+tr252	0	polite		
+tr253	1	reply_chain	Would you confirm the time for Thursday by Friday?	
+tr254	0	receipt		
+tr255	0	news		
+tr256	0	newsletter		
+tr257	0	newsletter		
+tr258	0	polite		
+tr259	0	list		
+tr260	0	news		
+tr261	0	help_offer		
+tr262	1	work	When can you send the invoice for October?	Which of the two offers do you prefer?
+tr263	0	newsletter		
+tr264	0	newsletter		
+tr265	0	receipt		
+tr266	0	newsletter		
+tr267	0	thanks		
+tr268	0	newsletter		
+tr269	1	person	Could you choose a date for the dinner when you have a moment?	
+tr270	1	reply_chain	It would help a lot if you could check the draft budget before Monday.	
+tr271	1	person_long	Could you update the guest list when you have a moment?	
+tr272	0	group		
+tr273	0	notice		
+tr274	0	receipt		
+tr275	0	receipt		
+tr276	0	news		
+tr277	0	help_offer		
+tr278	0	done		
+tr279	1	org_council	Please pay the parking charge of 35 pounds by 30 November.	
+tr280	0	receipt		
+tr281	0	auto_reply		
+tr282	0	receipt		
+tr283	0	newsletter		
+tr284	0	list		
+tr285	0	polite		
+tr286	0	news		
+tr287	0	newsletter		
+tr288	0	done		
+tr289	0	newsletter		
+tr290	0	thanks		
+tr291	0	newsletter		
+tr292	0	receipt		
+tr293	1	person	Are you able to book a table for six as soon as possible?	
+tr294	1	org_booking	Please bring your insurance card to your visit on Friday 21 November.	
+tr295	0	quoted_only		
+tr296	0	polite		
+tr297	0	receipt		
+tr298	0	junk		
+tr299	0	from_owner		
+tr300	0	news		
+tr301	0	done		
+tr302	0	thanks		
+tr303	0	help_offer		
+tr304	1	reply_chain	Can you confirm the time for Thursday by noon on Tuesday?	
+tr305	1	question	Let me know whether you can come on Saturday.	
+tr306	0	group		
+tr307	1	question	Let me know by Friday if you want to join.	
+tr308	1	work	We need you to check the draft budget by Friday.	
+tr309	0	group		
+tr310	0	newsletter		
+tr311	0	news		
+tr312	0	ad		
+tr313	0	receipt		
+tr314	0	news		
+tr315	0	thanks		
+tr316	0	junk		
+tr317	0	replied		
+tr318	0	done		
+tr319	0	group		
+tr320	0	news		
+tr321	0	receipt		
+tr322	0	receipt		
+tr323	1	question	Let me know by Friday if you want to join.	
+tr324	0	replied		
+tr325	0	list		
+tr326	0	from_owner		
+tr327	0	receipt		
+tr328	0	news		
+tr329	0	newsletter		
+tr330	0	receipt		
+tr331	0	notice		
+tr332	0	receipt		
+tr333	0	quoted_only		
+tr334	0	receipt		
+tr335	0	receipt		
+tr336	0	newsletter		
+tr337	0	news		
+tr338	0	newsletter		
+tr339	1	person	We need you to send the invoice for October by noon on Tuesday.	Which date works better for you, the 18th or the 25th?
+tr340	0	replied		
+tr341	0	newsletter		
+tr342	0	news		
+tr343	0	ad		
+tr344	0	ad		
+tr345	0	news		
+tr346	0	receipt		
+tr347	0	news		
+tr348	0	auto_reply		
+tr349	1	person_long	Could you sign the permission slip when you have a moment?	
+tr350	0	newsletter		
+tr351	0	from_owner		
+tr352	0	newsletter		
+tr353	0	thanks		
+tr354	1	org_insurer	Your home policy ends on Friday 21 November, so please renew it before that date.	
+tr355	0	receipt		
+tr356	0	list		
+tr357	0	third_person		
+tr358	1	org_utility	Please send us a meter reading before 30 November.	
+tr359	0	group		
+tr360	1	org_council	Please pay the parking charge of 35 pounds by Friday 21 November.	
+tr361	0	newsletter		
+tr362	0	news		
+tr363	0	news		
+tr364	0	group		
+tr365	1	person	Would you return the projector by 28 November?	Do you want the vegetarian menu or the standard one?
+tr366	0	list		
+tr367	0	receipt		
+tr368	0	junk		
+tr369	0	third_person		
+tr370	1	org_council	Please pay the parking charge of 35 pounds by 30 November.	
+tr371	1	person	Do not forget to book a table for six before the meeting on Wednesday.	
+tr372	0	from_owner		
+tr373	1	question	Do you have the number of the electrician?	
+tr374	1	reply_chain	Maya, could you review the slides for the client call by Friday?	
+tr375	0	newsletter		
+tr376	0	thanks		
+tr377	0	notice		
+tr378	0	list		
+tr379	0	from_owner		
+tr380	0	receipt		
+tr381	0	polite		
+tr382	0	newsletter		
+tr383	0	help_offer		
+tr384	0	receipt		
+tr385	0	quoted_only		
+tr386	0	polite		
+tr387	1	person_long	Please pick up the keys from the office by the end of the week.	
+tr388	0	newsletter		
+tr389	0	receipt		
+tr390	0	group		
+tr391	0	news		
+tr392	0	receipt		
+tr393	0	polite		
+tr394	0	receipt		
+tr395	0	news		
+tr396	0	newsletter		
+tr397	0	newsletter		
+tr398	0	receipt		
+tr399	0	news		
+tr400	0	third_person		
