@@ -51,6 +51,9 @@ public enum AppleScripts {
             end tell
         end tell
         """#
+    /// The envelope of message N from its raw headers (probe run 3: about 0.5 s for all headers, 4.7 s for the
+    /// envelope event). Two facts that are not headers come in the same event.
+    public static let mailHeadEnvelopeOne = #"tell application "Mail" to tell message %N% of inbox to return {id, was replied to, junk mail status, all headers}"#
     /// The plain text of message N.
     public static let mailContentOne = #"tell application "Mail" to return content of message %N% of inbox"#
     /// The ids of the messages A to B of the inbox, in one small event (spec 6.1, step 3).
@@ -88,7 +91,7 @@ public enum AppleScripts {
     /// All scripts, for the read-only test.
     public static let all = [mailInboxCount, mailInboxIDs, mailInboxDates, mailInboxHeaders, mailInboxContent,
                              mailNewestID, mailAccountCount, mailAccountNewestID, mailIDOne, mailDateOne, mailIDDateOne,
-                             mailAllHeadersOne, mailHeaderFactsOne, mailEnvelopeOne, mailContentOne, mailPing, mailIDsRange, mailAccountAddresses,
+                             mailAllHeadersOne, mailHeaderFactsOne, mailEnvelopeOne, mailHeadEnvelopeOne, mailContentOne, mailPing, mailIDsRange, mailAccountAddresses,
                              notesCount, notesLocked, notesNames, notesDates, notesPlainText, notesAllIDs, notesAllNames,
                              notesAllDates, notesAllLocked, notesAllFolders, notesTextByID]
 

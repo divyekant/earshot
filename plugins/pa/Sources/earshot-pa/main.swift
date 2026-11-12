@@ -140,7 +140,8 @@ if let i = args.firstIndex(of: "--followup-bench"), i + 1 < args.count {
 
 // The bench of the request flags (phase 3, 8.5, E11): earshot-pa --flags-bench <mail fixtures folder>
 // [--embedder <name> [--model <file.gguf>] [--gpu]] [--final <variant>:<threshold>]
-// [--write-weights <file> --variant <A|B> --threshold <t>].
+// [--write-weights <file> --variant <A|B> --threshold <t>] [--analyze <set> --threshold <t>]
+// [--items <set> --owner-names a,b --owner-addresses x@y] (dk's items: counts only).
 if let i = args.firstIndex(of: "--flags-bench"), i + 1 < args.count {
     func value(_ flag: String) -> String? {
         args.firstIndex(of: flag).flatMap { $0 + 1 < args.count ? args[$0 + 1] : nil }
@@ -151,7 +152,11 @@ if let i = args.firstIndex(of: "--flags-bench"), i + 1 < args.count {
                 try makeEmbedder($0, allowAssetRequest: false, modelFile: value("--model"), gpu: args.contains("--gpu"))
             }
             let bench = FlagBench(folder: URL(fileURLWithPath: args[i + 1], isDirectory: true), embedder: embedder)
-            if let a = value("--analyze") {
+            if let names = value("--owner-names") { bench.owner = Set(names.lowercased().split(separator: ",").map(String.init)) }
+            if let addrs = value("--owner-addresses") { bench.ownerAddresses = Set(addrs.lowercased().split(separator: ",").map(String.init)) }
+            if let it = value("--items") {
+                try bench.items(it)
+            } else if let a = value("--analyze") {
                 try bench.analyze(a, threshold: Double(value("--threshold") ?? "4") ?? 4)
             } else if let w = value("--write-weights") {
                 try bench.writeWeights(URL(fileURLWithPath: w), variant: value("--variant") ?? "B",

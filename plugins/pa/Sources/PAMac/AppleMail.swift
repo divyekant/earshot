@@ -64,30 +64,14 @@ public final class AppleMail: MailSource {
         return p + i
     }
 
-    /// "Sam Lee <sam.lee@example.net>" gives the name and the address.
-    static func from(_ line: String) -> (String, String) {
-        guard let lt = line.lastIndex(of: "<"), let gt = line.lastIndex(of: ">"), lt < gt else {
-            return ("", line.trimmingCharacters(in: .whitespaces))
-        }
-        let name = line[..<lt].trimmingCharacters(in: CharacterSet(charactersIn: " \""))
-        return (name, String(line[line.index(after: lt)..<gt]))
-    }
-
+    /// One event with the id, two facts and all headers. The parse is in `MailHeaders` (probe run 3: the envelope
+    /// event took 4.7 s for each message, all headers 0.5 s).
     public func envelope(id: String) throws -> MailMessage {
         let p = try position(of: id)
-        let d = try event(AppleScripts.limited(AppleScripts.mailEnvelopeOne, p))
-        guard d.numberOfItems >= 12, d.atIndex(1)?.stringValue == id else { throw SourceError("message moved") }
-        let fromLine = Self.strings(d.atIndex(9)).first ?? ""
-        let (name, address) = Self.from(fromLine)
-        let headerNames = Set(Self.strings(d.atIndex(10)).map { $0.lowercased() })
-        let auto = (Self.strings(d.atIndex(12)).first ?? "no").lowercased()
-        return MailMessage(
-            id: id, messageID: d.atIndex(2)?.stringValue ?? "", fromName: name, fromAddress: address,
-            to: Self.strings(d.atIndex(7)), cc: Self.strings(d.atIndex(8)), subject: d.atIndex(3)?.stringValue ?? "",
-            date: d.atIndex(4)?.dateValue ?? Date(), listHeader: headerNames.contains("list-unsubscribe") || headerNames.contains("list-id"),
-            precedence: (Self.strings(d.atIndex(11)).first ?? "").lowercased(),
-            autoSubmitted: !(auto.trimmingCharacters(in: .whitespaces).isEmpty || auto.trimmingCharacters(in: .whitespaces).hasPrefix("no")), junk: d.atIndex(6)?.booleanValue ?? false,
-            replied: d.atIndex(5)?.booleanValue ?? false)
+        let d = try event(AppleScripts.limited(AppleScripts.mailHeadEnvelopeOne, p))
+        guard d.numberOfItems >= 4, d.atIndex(1)?.stringValue == id else { throw SourceError("message moved") }
+        return MailHeaders.envelope(id: id, raw: d.atIndex(4)?.stringValue ?? "", replied: d.atIndex(2)?.booleanValue ?? false,
+                                    junk: d.atIndex(3)?.booleanValue ?? false)
     }
 
     public func text(id: String) throws -> String {

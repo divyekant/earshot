@@ -35,7 +35,7 @@ extension Engine {
         var plan = MailReadPlan(known: known, lastNewest: store.meta("mail.newest"), owner: [])
         plan.batch = max(1, settings.mail.batch)
         plan.maxLookBack = max(plan.batch, settings.mail.maxPerRead)
-        if small { plan.maxMessages = 5; plan.maxTexts = 2 }
+        if small { plan.maxMessages = 5; plan.maxTexts = 1 }
         let first = store.meta("mail.firstDone") == nil
         if first { plan.since = now.addingTimeInterval(-TimeInterval(settings.mail.firstDays) * 86400) }
         plan.openFlagIDs = store.openFlags().filter { $0.source == .mail }.map(\.sourceID)
@@ -80,7 +80,9 @@ extension Engine {
                     result = .flag
                 }
             }
-            if s.bulk == nil, s.hasText, result != .flag, made < budget, (try? requestFlag(s.message)) ?? nil != nil {
+            let known = s.bulk == nil ? knownSender(s.message.fromAddress) : false
+            if s.bulk == nil, s.hasText, result != .flag, made < budget,
+               (try? requestFlag(s.message, ownerAddresses: r.owner, known: known)) ?? nil != nil {
                 made += 1
                 result = .flag
             }
@@ -95,6 +97,7 @@ extension Engine {
                 store.log("flag-answered", .flag, f.id, at: now)
             }
         }
+        rememberSenders(r.seen.filter { $0.bulk == nil }.map(\.message.fromAddress))
         if r.complete, let n = r.newest { try? store.setMeta("mail.newest", n) }
         if first {
             try? store.setMeta("mail.firstFlags", String((Int(store.meta("mail.firstFlags") ?? "0") ?? 0) + made))
@@ -165,14 +168,15 @@ extension Engine {
 
     /// Spec 8.4 to 8.6: a request flag for a mail that passed the bulk filter, if its score reaches the threshold.
     /// The flag keeps the sender name, the subject and the best sentence, as written. Gives the flag id or nil.
-    func requestFlag(_ m: MailMessage) throws -> Int64? {
+    func requestFlag(_ m: MailMessage, ownerAddresses: Set<String> = [], known: Bool = true) throws -> Int64? {
         guard let store, settings.rules.request != .off, let model = RequestModel.fitted else { return nil }
         let reader = TimeReader(calendar: clock.calendar, settings: settings)
         func time(_ s: String) -> Bool { let r = reader.read(s, now: m.date, todo: true); return r.kind != .none && !r.unsure }
         let owner = ownerNames()
-        let p = RequestFeatures.prepared(m, owner: owner, time: time)
-        let addresses = Set(settings.owner.addresses.map { $0.lowercased() })
-        let r = model.score(m, p, owner: owner, ownerAddresses: addresses)
+        let addresses = ownerAddresses.isEmpty ? Set(settings.owner.addresses.map { $0.lowercased() }) : ownerAddresses
+        let p = RequestFeatures.prepared(m, owner: owner, ownerAddresses: addresses, time: time)
+        guard p.gate == nil else { return nil }
+        let r = model.score(m, p, owner: owner, ownerAddresses: addresses, known: known)
         guard r.score >= model.threshold, let b = r.best else { return nil }
         let sentence = p.sentences[b].text
         var f = Flag(kind: .request, source: .mail, sourceID: m.id, sender: m.fromName.isEmpty ? m.fromAddress : m.fromName,
@@ -182,6 +186,33 @@ extension Engine {
         let due = reader.read(sentence, now: m.date, todo: true)
         if due.kind != .none, !due.unsure { f.dueOn = due.day }
         return try store.upsertFlag(f)
+    }
+
+    /// The senders that wrote before and passed gate 1, as hashes of the address (no text), in the meta table.
+    static let maxSenders = 5000
+
+    static func senderHash(_ address: String) -> String {
+        var h: UInt64 = 0xcbf29ce484222325
+        for b in address.lowercased().utf8 { h = (h ^ UInt64(b)) &* 0x100000001b3 }
+        return String(h, radix: 16)
+    }
+
+    func senderHashes() -> [String] {
+        guard let s = store?.meta("mail.senders"), let a = try? JSONSerialization.jsonObject(with: Data(s.utf8)) as? [String]
+        else { return [] }
+        return a
+    }
+
+    /// True if the sender wrote before and that mail passed gate 1 (v2 spec, the last score feature).
+    func knownSender(_ address: String) -> Bool { senderHashes().contains(Engine.senderHash(address)) }
+
+    func rememberSenders(_ addresses: [String]) {
+        guard !addresses.isEmpty else { return }
+        var list = senderHashes()
+        var set = Set(list)
+        for a in addresses where set.insert(Engine.senderHash(a)).inserted { list.append(Engine.senderHash(a)) }
+        if list.count > Engine.maxSenders { list = Array(list.suffix(Engine.maxSenders)) }
+        if let d = try? JSONSerialization.data(withJSONObject: list) { try? store?.setMeta("mail.senders", String(decoding: d, as: UTF8.self)) }
     }
 
     /// The open "waiting for" item that names the sender of the mail, if exactly one does.
