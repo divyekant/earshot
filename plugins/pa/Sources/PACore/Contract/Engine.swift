@@ -52,6 +52,8 @@ public final class Engine {
     /// Phase 3: the calendar (EventKit on the Mac, a fixture in tests). Nil: no calendar read.
     public var calendarSource: CalendarSource?
     var lastCalendarRead: Date?
+    /// The title of each event at its last link by a rule. A new or a changed title gets new links.
+    var ruleLinkTitles: [Int64: String] = [:]
     let log: PALog
     /// A note for the next answer, for example after a new store started.
     var pendingNotice: String?

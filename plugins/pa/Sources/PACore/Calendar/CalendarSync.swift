@@ -20,6 +20,7 @@ extension Engine {
             for e in events where !e.allDay { try store.upsertEvent(e) }
             try store.pruneEvents(now: now, keep: Set(events.map(\.sourceID)), readFrom: from)
             log.write(now, "calendar-read", ["events": String(events.count)])
+            linkEventsByRule()
         } catch {
             log.write(now, "calendar-error")
         }
@@ -82,8 +83,10 @@ extension Engine {
                 continue
             }
             let head = e.title + " · " + TimeText.clock(e.startsAt, clock.calendar, locale: clock.locale)
-            output.send(.answer(re: nil, kind: .alert, text: head,
-                                items: items.map { $0.title.isEmpty ? $0.said : $0.title } + docs.map(\.title)))
+            let owned = store.eventLinks(e.id).filter { $0.by == "owner" }
+            let lines = items.map { it in linkedLine(it.title.isEmpty ? it.said : it.title, byOwner: owned.contains { $0.itemID == it.id }) }
+                + docs.map { d in linkedLine(d.title, byOwner: owned.contains { $0.docID == d.id }) }
+            output.send(.answer(re: nil, kind: .alert, text: head, items: lines))
             store.log("alert-shown", .calEvent, e.id, at: now)
             log.write(now, "event-alert", ["items": String(items.count), "docs": String(docs.count)])
         }

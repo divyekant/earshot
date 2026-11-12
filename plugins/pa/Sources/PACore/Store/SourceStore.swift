@@ -372,6 +372,11 @@ extension Store {
                     .text(l.by), l.score.map { .real($0) } ?? .null, .real(at.timeIntervalSince1970)])
     }
 
+    /// Deletes the links by a rule of an event. The links by the owner stay.
+    public func deleteRuleLinks(_ eventID: Int64) throws {
+        try db.run("DELETE FROM cal_event_link WHERE event_id = ? AND by = 'rule'", [.int(eventID)])
+    }
+
     public func eventLinks(_ eventID: Int64) -> [EventLink] {
         ((try? db.query("SELECT event_id, item_id, doc_id, by, score FROM cal_event_link WHERE event_id = ? ORDER BY id",
                         [.int(eventID)])) ?? []).map {

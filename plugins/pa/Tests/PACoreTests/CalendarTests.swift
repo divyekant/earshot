@@ -161,6 +161,23 @@ final class CalendarTests: XCTestCase {
         XCTAssertTrue(out.take().filter { $0.kind == .alert }.isEmpty)
     }
 
+    func testRuleLinkShowsWithQuestionMark() throws {
+        let (e, out, clock, _) = try calendarEngine()
+        say(e, out, "todo", "ask Priya about the wine")
+        _ = out.take()
+        // The next read links the to-do to "Dinner with Priya" by L2 (a person of the event).
+        e.readCalendar()
+        clock.now = Self.date("2026-11-14T18:45")
+        e.tick()
+        let alerts = out.take().filter { $0.kind == .alert }
+        XCTAssertEqual(alerts.first?.text, "Dinner with Priya · 19:00")
+        XCTAssertEqual(alerts.first?.items, ["ask Priya about the wine?"])
+        // A second read with no change keeps one link.
+        e.readCalendar()
+        let ev = try XCTUnwrap(e.store?.events(from: clock.now, to: clock.now.addingTimeInterval(3600)).first)
+        XCTAssertEqual(e.store?.eventLinks(ev.id).count, 1)
+    }
+
     func testNoAlertWithNoLinkOrAfterTheEnd() throws {
         let (e, out, clock, _) = try calendarEngine()
         clock.now = Self.date("2026-11-12T09:50")
