@@ -218,9 +218,8 @@ final class MailSyncTests: XCTestCase {
         m.text = "Hi Maya,\n\nCould you send me the signed form before 20 November?\n\nThanks,\nSam"
         let box = FixtureMail(messages: [m, Self.msg("n1", at: wed(8), list: true)])
         let (e, _, _) = engineWithMail(box)
-        // The default is off (the go mark failed). The owner can set the rule to "list".
-        XCTAssertEqual(e.settings.rules.request, .off)
-        e.settings.rules.request = .list
+        // The default is "list" (the owner's choice after E11).
+        XCTAssertEqual(e.settings.rules.request, .list)
         e.readMailIfDue()
         let flags = e.store?.openFlags(kind: .request) ?? []
         XCTAssertEqual(flags.count, 1)
@@ -231,5 +230,56 @@ final class MailSyncTests: XCTestCase {
         e2.settings.rules.request = .off
         e2.readMailIfDue()
         XCTAssertTrue(e2.store?.openFlags().isEmpty ?? false)
+    }
+}
+
+/// 8.8: "3 drops and no keep" stops the flags from that sender; the flags page lists open flags. Made-up mail.
+extension MailSyncTests {
+    func requestMail(_ id: String, _ subject: String, at: Date) -> MailMessage {
+        var m = Self.msg(id, at: at)
+        m.subject = subject
+        m.text = "Hi Maya,\n\nCould you send me the signed form for \(subject) by Friday?\n\nThanks,\nSam"
+        return m
+    }
+
+    func testThreeDropsMuteTheSender() throws {
+        let (e, _, _) = engineWithMail(FixtureMail(messages: []))
+        for (i, s) in ["tiles", "roof", "garden"].enumerated() {
+            let id = try XCTUnwrap(try e.requestFlag(requestMail("d\(i)", s, at: wed(9 + i))))
+            _ = e.dropFlag(id: "c\(i)", try XCTUnwrap(e.store?.flag(id)))
+        }
+        XCTAssertEqual(e.settings.flagsMuted, ["sam.lee@example.net"])
+        // The settings file has the line; the other settings stay.
+        let (s, problem) = PASettings.load(e.settingsURL)
+        XCTAssertNil(problem)
+        XCTAssertEqual(s.flagsMuted, ["sam.lee@example.net"])
+        XCTAssertNil(try e.requestFlag(requestMail("d9", "fence", at: wed(15))))
+        e.flushPages(force: true)
+        let today = try String(contentsOf: e.pagesFolder.appendingPathComponent("today.html"), encoding: .utf8)
+        XCTAssertTrue(today.contains("No more flags from") && today.contains("Sam Lee"))
+    }
+
+    func testAKeepStopsTheMute() throws {
+        let (e, _, _) = engineWithMail(FixtureMail(messages: []))
+        let k = try XCTUnwrap(try e.requestFlag(requestMail("k0", "tiles", at: wed(8))))
+        e.handle(.command(id: "w", lead: "what is new", text: "", context: [:]))
+        _ = e.keepFlag(id: "k", text: "1", context: [:])
+        XCTAssertEqual(e.store?.flag(k)?.state, .kept)
+        for (i, s) in ["roof", "garden", "fence"].enumerated() {
+            let id = try XCTUnwrap(try e.requestFlag(requestMail("d\(i)", s, at: wed(9 + i))))
+            _ = e.dropFlag(id: "c\(i)", try XCTUnwrap(e.store?.flag(id)))
+        }
+        XCTAssertEqual(e.settings.flagsMuted, [])
+    }
+
+    func testFlagsPageListsOpenFlags() throws {
+        let (e, _, _) = engineWithMail(FixtureMail(messages: []))
+        _ = try e.requestFlag(requestMail("p0", "tiles", at: wed(9)))
+        e.flushPages(force: true)
+        let html = try String(contentsOf: e.pagesFolder.appendingPathComponent("flags.html"), encoding: .utf8)
+        XCTAssertTrue(html.contains("Request · Sam Lee · Could you send me the signed form for tiles by Friday?"))
+        XCTAssertTrue(html.contains("message://%3Cp0@x.example%3E"))
+        XCTAssertTrue(html.contains("about half of the requests"))
+        XCTAssertFalse(html.contains("<script"))
     }
 }

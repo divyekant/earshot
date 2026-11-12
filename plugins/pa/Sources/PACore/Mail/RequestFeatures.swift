@@ -270,10 +270,9 @@ public enum RequestFeatures {
     // MARK: - Variant A: points by hand
 
     /// Points by hand for one sentence (variant A).
-    public static func handScore(_ f: [Double]) -> Double {
-        let w: [Double] = [3, 1, 2, 3, 1, 1, -3, -4, -4, -3, 1, 1, 3, -4, -3]
-        return zip(w, f).map(*).reduce(0, +)
-    }
+    public static let handWeights: [Double] = [3, 1, 2, 3, 1, 1, -3, -4, -4, -3, 1, 1, 3, -4, -3]
+
+    public static func handScore(_ f: [Double]) -> Double { zip(handWeights, f).map(*).reduce(0, +) }
 
     /// The message features (8.4) for variant B: the features of the best sentence, then the message facts.
     public static func messageFeatures(_ m: MailMessage, _ p: Prepared, best: Int?, sentenceScores: [Double],

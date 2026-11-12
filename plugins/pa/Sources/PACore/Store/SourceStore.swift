@@ -182,6 +182,47 @@ extension Store {
         }
     }
 
+    /// Phase 3, the learning (8.8): the sender address of a request flag, for the rule "3 drops and no keep".
+    func migration4() throws {
+        try db.transaction {
+            try db.exec("""
+            CREATE TABLE IF NOT EXISTS flag_sender (
+              flag_id INTEGER PRIMARY KEY,
+              address TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS flag_sender_address ON flag_sender(address);
+            PRAGMA user_version = 4;
+            """)
+        }
+    }
+
+    public func setFlagSender(_ flag: Int64, address: String) throws {
+        try db.run("INSERT OR REPLACE INTO flag_sender(flag_id, address) VALUES (?, ?)", [.int(flag), .text(address.lowercased())])
+    }
+
+    public func flagSender(_ flag: Int64) -> String? {
+        (try? db.query("SELECT address FROM flag_sender WHERE flag_id = ?", [.int(flag)]))?.first?.first?.text
+    }
+
+    /// The kept and dropped request flags from one sender address.
+    public func senderAnswers(_ address: String) -> (kept: Int, dropped: Int) {
+        let rows = (try? db.query("""
+            SELECT f.state, COUNT(*) FROM flag f JOIN flag_sender s ON s.flag_id = f.id
+            WHERE s.address = ? AND f.kind = 'request' AND f.state IN ('kept', 'dropped') GROUP BY f.state
+            """, [.text(address.lowercased())])) ?? []
+        var k = 0, d = 0
+        for r in rows { if r[0].text == "kept" { k = Int(r[1].int ?? 0) } else { d = Int(r[1].int ?? 0) } }
+        return (k, d)
+    }
+
+    /// The newest sender name for an address, for the Today page.
+    public func senderName(_ address: String) -> String? {
+        (try? db.query("""
+            SELECT f.sender FROM flag f JOIN flag_sender s ON s.flag_id = f.id WHERE s.address = ? AND f.sender != ''
+            ORDER BY f.id DESC LIMIT 1
+            """, [.text(address.lowercased())]))?.first?.first?.text
+    }
+
     // MARK: - Flags
 
     static let flagColumns = """
@@ -313,6 +354,8 @@ extension Store {
                 try db.run("DELETE FROM flag WHERE source = ? AND state = 'new'", [.text(source.rawValue)])
                 // An answered flag keeps its row for the counts, with no text.
                 try db.run("UPDATE flag SET subject = '', sentence = '', sender = '' WHERE source = ?", [.text(source.rawValue)])
+                try db.run("DELETE FROM flag_sender WHERE flag_id NOT IN (SELECT id FROM flag) OR flag_id IN (SELECT id FROM flag WHERE source = ?)",
+                           [.text(source.rawValue)])
             }
             try db.run("DELETE FROM source_seen WHERE source = ?", [.text(source.rawValue)])
         }

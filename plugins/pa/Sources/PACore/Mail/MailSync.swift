@@ -170,22 +170,39 @@ extension Engine {
     /// The flag keeps the sender name, the subject and the best sentence, as written. Gives the flag id or nil.
     func requestFlag(_ m: MailMessage, ownerAddresses: Set<String> = [], known: Bool = true) throws -> Int64? {
         guard let store, settings.rules.request != .off, let model = RequestModel.fitted else { return nil }
+        if settings.flagsMuted.contains(where: { $0.lowercased() == m.fromAddress.lowercased() }) { return nil }
         let reader = TimeReader(calendar: clock.calendar, settings: settings)
         func time(_ s: String) -> Bool { let r = reader.read(s, now: m.date, todo: true); return r.kind != .none && !r.unsure }
         let owner = ownerNames()
         let addresses = ownerAddresses.isEmpty ? Set(settings.owner.addresses.map { $0.lowercased() }) : ownerAddresses
         let p = RequestFeatures.prepared(m, owner: owner, ownerAddresses: addresses, time: time)
         guard p.gate == nil else { return nil }
-        let r = model.score(m, p, owner: owner, ownerAddresses: addresses, known: known)
-        guard r.score >= model.threshold, let b = r.best else { return nil }
-        let sentence = p.sentences[b].text
+        let sentence: String
+        let score: Double
+        var example: [Double]?
+        if model.variant == "A" {
+            // Variant A as a linear formula (8.8): the learned weights, or the hand points.
+            let w = (settings.flagsLearn ? learnedWeights() : nil) ?? FlagWeights.base(threshold: model.threshold)
+            guard let b = FlagLearning.best(p, known: known, weights: w), b.value >= 0 else { return nil }
+            sentence = p.sentences[b.index].text
+            score = b.value
+            example = b.x
+        } else {
+            let r = model.score(m, p, owner: owner, ownerAddresses: addresses, known: known)
+            guard r.score >= model.threshold, let b = r.best else { return nil }
+            sentence = p.sentences[b].text
+            score = r.score
+        }
         var f = Flag(kind: .request, source: .mail, sourceID: m.id, sender: m.fromName.isEmpty ? m.fromAddress : m.fromName,
                      subject: m.subject, sentence: sentence, sourceAt: m.date, createdAt: clock.now)
         f.messageID = m.messageID
-        f.score = r.score
+        f.score = score
         let due = reader.read(sentence, now: m.date, todo: true)
         if due.kind != .none, !due.unsure { f.dueOn = due.day }
-        return try store.upsertFlag(f)
+        let id = try store.upsertFlag(f)
+        try? store.setFlagSender(id, address: m.fromAddress)
+        if let example { try? index?.setOpenFlagExample(flag: id, features: example.map(Float.init), at: clock.now) }
+        return id
     }
 
     /// The senders that wrote before and passed gate 1, as hashes of the address (no text), in the meta table.

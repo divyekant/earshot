@@ -27,8 +27,8 @@ final class Phase3FrameTests: XCTestCase {
         XCTAssertEqual(s.mail.maxPerRead, 50)
         XCTAssertEqual(s.mail.batch, 10)
         XCTAssertEqual(s.notes.everyMinutes, 15)
-        // Off: the request flags failed their go mark on the sealed holdout (E11).
-        XCTAssertEqual(s.rules.request, .off)
+        // A list: the owner's choice after E11 (version 2 finds about half of the requests).
+        XCTAssertEqual(s.rules.request, .list)
         XCTAssertTrue(s.flagsLearn)
         XCTAssertEqual(s.owner, OwnerSettings())
     }
@@ -57,7 +57,7 @@ final class Phase3FrameTests: XCTestCase {
             try store.db.exec("DROP TABLE cal_event; DROP TABLE cal_event_link; DROP TABLE flag; DROP TABLE source_seen; PRAGMA user_version = 2;")
         }
         let store = try Store(url: url)
-        XCTAssertEqual(try store.db.query("PRAGMA user_version").first?.first?.int, 3)
+        XCTAssertEqual(try store.db.query("PRAGMA user_version").first?.first?.int, Int64(Store.schemaVersion))
         for t in ["cal_event", "cal_event_link", "flag", "source_seen"] {
             XCTAssertEqual(try store.db.query("SELECT count(*) FROM \(t)").first?.first?.int, 0, t)
         }

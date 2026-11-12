@@ -294,6 +294,7 @@ public final class FlagBench {
         for r in try BenchFixtures.rows(folder.appendingPathComponent(name + "-labels.tsv")) where r.count >= 3 { kindOf[r[0]] = r[2] }
         var table: [String: (n: Int, flags: Int, found: Int, wrong: Int, req: Int)] = [:]
         var misses: [String] = [], falses: [String] = []
+        var band = 0, bandRequests = 0
         for l in rows {
             let k = kindOf[l.m.id] ?? "?"
             var t = table[k] ?? (0, 0, 0, 0, 0)
@@ -306,6 +307,7 @@ public final class FlagBench {
             let b = s.indices.max(by: { s[$0] < s[$1] })
             let score = (b.map { s[$0] } ?? -99) - (p.org && !l.known ? 1 : 0)
             let flag = pass && score >= threshold
+            if pass, score >= threshold - 2, score < threshold { band += 1; if l.request { bandRequests += 1 } }
             if flag { t.flags += 1; if l.request { t.found += 1 } else { t.wrong += 1 } }
             table[k] = t
             func feats(_ i: Int) -> String {
@@ -322,6 +324,7 @@ public final class FlagBench {
         out("| Kind | Messages | Requests | Flags | Found | False |")
         out("|---|---|---|---|---|---|")
         for (k, t) in table.sorted(by: { $0.key < $1.key }) { out("| \(k) | \(t.n) | \(t.req) | \(t.flags) | \(t.found) | \(t.wrong) |") }
+        out("Band below the threshold (\(threshold - 2) to \(threshold - 1)), after the gates: \(band) messages, \(bandRequests) with a request")
         misses.forEach(out)
         falses.forEach(out)
     }

@@ -23,8 +23,9 @@ public struct RuleModes: Codable, Equatable, Sendable {
     /// Rule 3 (phase 2 and 3).
     public var newArrival: RuleMode = .list
     /// Phase 3: a request flag from a mail or a note (spec 8.6).
-    /// Off by default: the request flags failed their go mark on the sealed holdout (E11, 2026-11-12).
-    public var request: RuleMode = .off
+    /// A list by default (the owner's choice, 2026-11-12). Version 2 found about half of the requests with very few
+    /// false flags; it failed the found mark of the sealed holdout (E11).
+    public var request: RuleMode = .list
 
     public init() {}
 
@@ -226,6 +227,9 @@ public struct PASettings: Codable, Equatable, Sendable {
     public var notes = NotesSettings()
     /// Phase 3: if false, the request flags use the base formula only (spec 8.8).
     public var flagsLearn = true
+    /// Phase 3: sender addresses that get no more request flags. The PA adds an address after the owner drops 3
+    /// flags from it and keeps none. Delete the line to get flags from that sender again.
+    public var flagsMuted: [String] = []
     /// Phase 3: the names and addresses of the owner.
     public var owner = OwnerSettings()
 
@@ -256,6 +260,7 @@ public struct PASettings: Codable, Equatable, Sendable {
         mail = try c.decodeIfPresent(MailSettings.self, forKey: .mail) ?? d.mail
         notes = try c.decodeIfPresent(NotesSettings.self, forKey: .notes) ?? d.notes
         flagsLearn = try c.decodeIfPresent(Bool.self, forKey: .flagsLearn) ?? d.flagsLearn
+        flagsMuted = try c.decodeIfPresent([String].self, forKey: .flagsMuted) ?? d.flagsMuted
         owner = try c.decodeIfPresent(OwnerSettings.self, forKey: .owner) ?? d.owner
     }
 
