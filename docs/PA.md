@@ -152,7 +152,7 @@ To delete the text of a page, say "drop" for the page, for example "where is fer
 Important:
 
 - The PA keeps what the page shows. This also applies to private data of a page behind a sign-in, for example a bank page or an account page. Do not say "keep this" on a page if you do not want its text in the PA.
-- The page must be in front and loaded. Text that the page did not load (for example text that shows after a scroll) is not kept.
+- The page must be in the front window and loaded, and the screen must not be locked. Text that the page did not load (for example text that shows after a scroll) is not kept.
 - A page that you kept before PA 0.4.0 has no text. Say "keep this" again on the page.
 - earshot reads web pages in Safari, Chrome and other browsers with a web area. A PDF in Chrome gives text. The PDF view of Safari gives no text. A Slack window or another app is not a web page.
 - The tests used English pages only.

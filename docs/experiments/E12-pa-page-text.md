@@ -104,7 +104,7 @@ Main points for each marked page (marked sentences in the 5 selected, the same i
 - Two browsers (Chrome and Safari) on one Mac. Firefox and other browsers are not tested.
 - The page must be in front and loaded. Text that the page did not load is not kept. A page that loads for a long time can give `complete: false`.
 - A cold start of the browser was not tested.
-- A read right after a fresh Chrome start is not proven. Probe 7 starts a second Chrome with an empty profile. It failed 3 times with "no web area within 15 s" (last on 5998e2d). The window and its title were there, but the web area did not come within 15 s, also with `AXManualAccessibility` set each 50 ms. In that case earshot sends an error, and the PA keeps the link with no text.
+- The page must be in the front window, and the screen must not be locked. Probe 7 failed 3 times with "no web area within 15 s" (last on 5998e2d): its window was not in front, and the screen was probably locked. The clean probe of phase 5 (probe 8, 2026-11-12) brought a new Chrome with an empty profile to the front with the screen not locked: the web area was there after 1 s, with no flag and with `--force-renderer-accessibility`. If earshot cannot read the page, it sends an error, and the PA keeps the link with no text.
 
 ## Final check on the Mac (2026-11-12, 07:04 to 07:16 UTC)
 
