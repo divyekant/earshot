@@ -232,6 +232,10 @@ extension Engine {
         guard var doc = docFromContext(context, projectID: project?.id) else {
             return .note(id, "Nothing kept. No page or document here.")
         }
+        // Phase 4: a web page keeps one reference, and its text if earshot sends it.
+        if doc.kind == .page, Engine.isPageAddress(doc.address) {
+            return keepPage(id: id, doc, project: project, words: text, context: context)
+        }
         if let again = duplicateNote(.keepThis, text + "|" + (doc.address ?? doc.title)) { return .note(id, again) }
         do { doc.id = try store.insertDoc(doc) } catch { return .note(id, "The store had an error. Nothing kept.") }
         docsChanged()

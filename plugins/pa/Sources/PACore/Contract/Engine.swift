@@ -74,6 +74,10 @@ public final class Engine {
     var pagesDirty = true
     var pagesWrittenAt: Date?
     var lastPull: Date?
+    /// Phase 4: the asks for page text that wait for an answer of earshot, by command id.
+    var pagePending: [String: PendingPage] = [:]
+    /// Phase 4: the asks to send after the answer of the current command.
+    var pageAsksToSend: [String] = []
     /// Runs a block on the queue of the engine after some seconds. The program sets it to the engine queue.
     /// Tests run the block at once.
     public var runLater: (TimeInterval, @escaping () -> Void) -> Void = { _, block in block() }
@@ -191,6 +195,7 @@ public final class Engine {
             let start = Date()
             let answer = command(id: id, lead: lead, text: text, context: context)
             output.send(answer)
+            sendPageAsks()
             flushPages()
             let ms = Int(Date().timeIntervalSince(start) * 1000)
             log.write(clock.now, "command", ["lead": PACommand.from(lead: lead)?.rawValue ?? "unknown",

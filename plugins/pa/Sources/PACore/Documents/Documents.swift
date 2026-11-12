@@ -167,5 +167,6 @@ extension Engine {
     func forgetText(_ docID: Int64) {
         try? index?.deleteDoc(docID)
         vectorCache = nil
+        removeKeptCopy(docID)
     }
 }

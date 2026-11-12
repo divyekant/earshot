@@ -43,7 +43,7 @@ extension Engine {
     func page(title: String, sub: String, body: String) -> String {
         """
         <!doctype html>
-        <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+        <html lang="en"><head><meta charset="utf-8">\(Engine.pageCSP)<meta name="viewport" content="width=device-width, initial-scale=1">
         <title>\(Engine.escape(title)) · PA</title><style>\(Engine.pageStyle)</style></head>
         <body><main><h1>\(Engine.escape(title))</h1><p class="sub">\(Engine.escape(sub))</p>
         \(body)
@@ -178,7 +178,8 @@ extension Engine {
 
         // One page for each open project.
         let since = now.addingTimeInterval(-30 * 86400).timeIntervalSince1970
-        var keep: Set<String> = ["today.html", "all-open.html", "search.html", "main-points.html", "flags.html"]
+        var keep: Set<String> = ["today.html", "all-open.html", "search.html", "main-points.html", "flags.html", "kept.html"]
+        writeKeptList()
         // The page of a closed project stays in the folder (phase 2 build spec 7.5).
         for p in store.projects(openOnly: false) where p.state == "closed" { keep.insert("project-\(p.slug).html") }
         for p in projects {
@@ -214,6 +215,7 @@ extension Engine {
             Target(id: "page-today", name: "today", kind: "page", open: pagesFolder.appendingPathComponent("today.html").path),
             Target(id: "page-all-open", name: "all open", kind: "page", open: pagesFolder.appendingPathComponent("all-open.html").path),
             Target(id: "page-flags", name: "flags", kind: "page", open: pagesFolder.appendingPathComponent("flags.html").path),
+            Target(id: "page-kept", name: "kept pages", kind: "page", open: pagesFolder.appendingPathComponent("kept.html").path),
         ]
         // "open search" shows the full results of the last search (phase 2 build spec, 7.7).
         if FileManager.default.fileExists(atPath: searchPageURL.path) {
