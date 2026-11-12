@@ -252,6 +252,14 @@ if let path = env["EARSHOT_PLUGIN_DATA"], !path.isEmpty {
         .appendingPathComponent("Library/Application Support/earshot/plugin-data/pa", isDirectory: true)
 }
 
+// Phase 5 (X5): earshot-pa --counts [<data folder>]. Prints the counts of real use as one JSON line, and stops.
+// Numbers only: no text of the store.
+if let i = args.firstIndex(of: "--counts") {
+    let dir = i + 1 < args.count ? URL(fileURLWithPath: args[i + 1], isDirectory: true) : folder
+    print(Counts.json(folder: dir))
+    exit(0)
+}
+
 // A write to a worker that stopped must give an error, not stop the PA (follow-up R3).
 signal(SIGPIPE, SIG_IGN)
 
