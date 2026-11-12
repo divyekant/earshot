@@ -128,6 +128,7 @@ The context keys:
 | `url` | The address of the page in the front window. |
 | `document` | The file path of the document in the front window (the `AXDocument` attribute). A Finder window gives no `AXDocument`. For it, earshot reads the file addresses (`AXURL`) of the items in the window and gives the folder whose name is the window title. |
 | `selection` | The selected text of the focused element (`AXSelectedText`), cut at 2,000 characters. Never the text of a password field. |
+| `pageText` | The text of the web page in the front window. It does not come with the command. The plugin asks for it after the command. This version accepts the key but does not send page text yet: the plugin gets no answer to its ask. |
 
 - earshot sends only the keys that the manifest names. A key with no value is absent.
 - earshot reads `document` and `selection` only for a plugin that names them. The read comes before the command goes to the plugin. The note does not wait for the plugin.
