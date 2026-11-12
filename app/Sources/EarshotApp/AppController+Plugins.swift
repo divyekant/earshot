@@ -57,7 +57,9 @@ extension AppController {
             }
             let re = command.id
             Self.pageReads.async {
-                let result = PageTextReader.read(expectURL: command.url)
+                // A page that is still loading gives few words: read again, for 3 s at most.
+                let result = PageText.settled(read: { PageTextReader.read(expectURL: command.url) },
+                                              blocks: { $0.error == nil ? $0.blocks : nil })
                 if let error = result.error {
                     reply([PageText.errorLine(re: re, error)])
                 } else {
