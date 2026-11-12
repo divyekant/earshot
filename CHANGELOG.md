@@ -10,6 +10,8 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 - A plugin can ask for the text of the web page in front after a command (context key `pageText`). earshot shows "→ <plugin> · reads this page" for each read. It sends no text on a sign-in, code or payment page, and never the value of a one-line field (R-PL-2, R-PL-5).
 - PA 0.4.0: "keep this" on a web page keeps the main text of the page, if earshot sends it. The note "Text kept · <title> · <n> words" comes after the first answer. "where is" finds words in kept pages. The list `kept pages` and a text copy of each page are local pages with no script (R-PA-9).
+- PA: "main points" for a web page, off by default (setting `pagePoints`). In the sealed test it found 2 or more of 3 key sentences on 6 of 10 pages, below the pass mark of 8. With the setting off, the answer is "Main points work for kept files only." (R-PA-4).
+- PA: "drop" for a kept web page deletes its text, its search numbers and its text copy at once (R-PA-9, R-PA-13).
 
 ## [0.5.0] - 2026-11-12
 

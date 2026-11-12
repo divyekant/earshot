@@ -370,3 +370,22 @@ Rejected:
 | Full Disk Access with the mail files and the Envelope Index | It needs manual steps in System Settings. It opens all private data of the Mac to the PA, not only mail. The file format is private and changes. |
 | A mailbox export (`.mbox`) | A manual step for each read. |
 | A mail interface with network code (IMAP or an API) | The PA has no network code (R-PA-2). It would need a sign-in and a password store. |
+
+## D-18. The text of a web page comes from the page in front, through the Accessibility read of earshot
+
+Date: 2026-11-12. Status: accepted (PA phase 4 build spec, section 2). Requirements: R-PA-9, R-PA-13, R-PL-2.
+
+Decision:
+
+- The PA gets the text of a web page only from earshot (contract key `pageText`, `docs/PLUGINS.md`, section 5.3). earshot reads the page in front with Accessibility, after a command of the owner for that page.
+- The PA selects the main text with a fixed rule (experiment E12) and keeps it as passages. It writes no text.
+- The PA has no network code and no Accessibility permission.
+
+Rejected:
+
+| Option | Why it was rejected |
+|---|---|
+| A fetch of the address by the PA or by a helper program | It needs network code (R-PA-2). It gets no text of a page behind a sign-in. It needs an HTML parser. |
+| Apple event scripts for each browser | A script for each app (R-MT-1). Chrome needs a manual setting for scripts. |
+| The Accessibility permission for the PA | A manual step for the owner. It gives the PA control of each app. |
+

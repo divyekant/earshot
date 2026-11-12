@@ -19,6 +19,15 @@ final class FakePlugins: PluginHandOff {
     }
 }
 
+/// A tier 2 that keeps each question and its options. A plugin command must never reach it.
+final class RecordingTier2: Tier2Chooser {
+    var asked: [String] = []
+    func choose(_ text: String, options: [String], budgetMs: Int) async -> Int? {
+        asked.append(([text] + options).joined(separator: " | "))
+        return 0
+    }
+}
+
 /// A front window with a document and a selection. It counts the reads of the two keys.
 final class FocusRunner: CommandActions {
     var reads: [(Bool, Bool)] = []
@@ -259,6 +268,38 @@ final class PluginHandOffTests: XCTestCase {
         RunLoop.current.run(until: Date().addingTimeInterval(1))
         XCTAssertFalse(asked)
         XCTAssertEqual(answers, 0)
+    }
+
+    /// A plugin command with a page read never reaches tier 2 (Jev), also with tier 2 on (R-MD-1, D-9, PA phase 4
+    /// spec section 11, "Not to Jev"). The page text goes only to the plugin. Made-up page words only.
+    func testPageReadNeverReachesTier2() async throws {
+        let host = try install("asker", run: ["./plugin.sh"], script: asker, context: ["pageText"])
+        defer { host.stopAll() }
+        let spy = RecordingTier2()
+        let engine = TextEngine()
+        let runner = FieldRunner()
+        runner.url = "https://heron.example/weir"
+        let p = CommandPipeline(engine: engine, router: CommandRouter(tier2: spy), actions: runner, names: FakeNames(),
+                                apps: { Fixture.apps }, allNames: { Fixture.names }, frontBundleID: { "com.google.Chrome" })
+        p.plugins = host
+        let pageWords = "The amber heron crossed the quiet weir at dawn"
+        var asks = 0
+        host.onPageTextAsk = { command, _, reply in
+            asks += 1
+            reply(PageText.lines(re: command.id, url: command.url, title: "Heron", blocks: [PageBlock(t: pageWords)],
+                                 complete: true))
+        }
+        let answered = expectation(description: "answers")
+        answered.expectedFulfillmentCount = 2
+        host.onAnswer = { _, _ in answered.fulfill() }
+        engine.text = "Note keep this page."
+        let r = await p.finish(mode: .hold)
+        XCTAssertTrue(r.ok, r.note)
+        await fulfillment(of: [answered], timeout: 5)
+        XCTAssertEqual(asks, 1)
+        XCTAssertTrue(spy.asked.isEmpty, "tier 2 got: \(spy.asked)")
+        XCTAssertFalse(r.note.contains("heron"), r.note)
+        XCTAssertFalse(r.heard.contains("heron"), r.heard)
     }
 
     func testNotApprovedDoesNotStart() throws {

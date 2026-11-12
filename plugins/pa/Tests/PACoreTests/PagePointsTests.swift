@@ -7,6 +7,8 @@ final class PagePointsTests: XCTestCase {
     func engine() -> (Engine, MemoryOutput, FixedClock) {
         let (e, out, clock) = makeEngine()
         e.models = ModelHost(modelID: "hash-256-v1") { HashEmbedder() }
+        // Off by default (E12). These tests switch it on.
+        e.settings.pagePoints = true
         return (e, out, clock)
     }
 
@@ -49,6 +51,12 @@ final class PagePointsTests: XCTestCase {
         let msgs = out.take()
         XCTAssertEqual(notes(msgs), ["Main points work for kept files only."])
         XCTAssertFalse(msgs.contains(.askPageText(re: "m1")))
+    }
+
+    func testOffByDefault() {
+        let (e, out, _) = makeEngine()
+        e.handle(.command(id: "m1", lead: "main points", text: "of this", context: PageKeepTests.ctx))
+        XCTAssertEqual(notes(out.take()), ["Main points work for kept files only."])
     }
 
     func testNoTextOfThePage() {

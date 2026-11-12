@@ -235,8 +235,9 @@ public struct PASettings: Codable, Equatable, Sendable {
     /// Phase 4: if true, "keep this" and "main points" on a web page ask earshot for the text of the page in front.
     /// With false, the PA keeps only the address and the title. Kept texts stay until the owner drops them.
     public var pageText = true
-    /// Phase 4: "main points" for a web page. The default goes to false if the go mark of W5 fails.
-    public var pagePoints = true
+    /// Phase 4: "main points" for a web page. Off by default: the sealed test of E12 found 2 or more of 3 marked
+    /// sentences on 6 of 10 pages, and the pass mark is 8 of 10. With false, the answer is a fixed note.
+    public var pagePoints = false
 
     public init() {}
 

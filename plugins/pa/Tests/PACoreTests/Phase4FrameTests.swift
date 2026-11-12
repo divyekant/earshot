@@ -15,7 +15,7 @@ final class Phase4FrameTests: XCTestCase {
 
     func testSettingDefaults() throws {
         XCTAssertTrue(PASettings().pageText)
-        XCTAssertTrue(PASettings().pagePoints)
+        XCTAssertFalse(PASettings().pagePoints)
         let old = try JSONDecoder().decode(PASettings.self, from: Data(#"{"silenceDays": 5}"#.utf8))
         XCTAssertTrue(old.pageText, "a settings file of phase 3 gets the default")
         let off = try JSONDecoder().decode(PASettings.self, from: Data(#"{"pageText": false}"#.utf8))
