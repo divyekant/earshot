@@ -138,6 +138,35 @@ if let i = args.firstIndex(of: "--followup-bench"), i + 1 < args.count {
     exit(runFollowUp())
 }
 
+// The bench of the links by a rule (phase 3, 9.2): earshot-pa --events-bench <phase 2 fixtures folder>
+// --events <events tsv> --embedder <name> [--model <file.gguf>] [--gpu] [--detail] [--final L1+L2].
+if let i = args.firstIndex(of: "--events-bench"), i + 1 < args.count {
+    func value(_ flag: String) -> String? {
+        args.firstIndex(of: flag).flatMap { $0 + 1 < args.count ? args[$0 + 1] : nil }
+    }
+    func runEvents() -> Int32 {
+        do {
+            guard let events = value("--events") else { print("Say the events file with --events."); return 1 }
+            let embedder = try makeEmbedder(value("--embedder") ?? "hash", allowAssetRequest: false, modelFile: value("--model"),
+                                            gpu: args.contains("--gpu"))
+            let bench = try EventBench(corpus: URL(fileURLWithPath: args[i + 1], isDirectory: true), embedder: embedder)
+            let file = URL(fileURLWithPath: events)
+            if let f = value("--final") {
+                guard let lines = EventLinker.Lines(label: f) else { print("Unknown lines \(f). Use for example L1+L2."); return 1 }
+                try bench.final(file, lines: lines)
+            } else {
+                let show = (value("--show") ?? "").split(separator: " ").compactMap { EventLinker.Lines(label: String($0)) }
+                try bench.development(file, detail: args.contains("--detail"), show: show)
+            }
+            return 0
+        } catch {
+            print("Bench error: \(error)")
+            return 1
+        }
+    }
+    exit(runEvents())
+}
+
 let env = ProcessInfo.processInfo.environment
 let folder: URL
 if let path = env["EARSHOT_PLUGIN_DATA"], !path.isEmpty {
@@ -186,6 +215,22 @@ timer.setEventHandler {
 }
 queue.sync { scheduleCheck() }
 timer.resume()
+// The calendar (phase 3, 9.1). The PA asks for access only if the source is on.
+#if os(macOS)
+if PASettings.load(folder.appendingPathComponent("settings.json")).settings.sources.calendar {
+    let calendar = EventKitCalendar(ask: true) {
+        queue.async {
+            engine.readCalendar()
+            scheduleCheck()
+        }
+    }
+    queue.async {
+        engine.calendarSource = calendar
+        engine.readCalendar()
+        scheduleCheck()
+    }
+}
+#endif
 let systemEvents = SystemEvents { _ in
     queue.async {
         engine.tick()

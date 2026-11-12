@@ -219,6 +219,8 @@ public struct PASettings: Codable, Equatable, Sendable {
     public var sources = SourceSwitches()
     /// Phase 3: the near-event alert comes this count of minutes before the start of an event.
     public var nearEventMinutes = 15
+    /// Phase 3: if false, the PA makes no link by a rule between an event and the records. Links by the owner stay.
+    public var linkEvents = true
     public var mail = MailSettings()
     public var notes = NotesSettings()
     /// Phase 3: if false, the request flags use the base formula only (spec 8.8).
@@ -249,6 +251,7 @@ public struct PASettings: Codable, Equatable, Sendable {
         projectFocusMinutes = try c.decodeIfPresent(Int.self, forKey: .projectFocusMinutes) ?? d.projectFocusMinutes
         sources = try c.decodeIfPresent(SourceSwitches.self, forKey: .sources) ?? d.sources
         nearEventMinutes = try c.decodeIfPresent(Int.self, forKey: .nearEventMinutes) ?? d.nearEventMinutes
+        linkEvents = try c.decodeIfPresent(Bool.self, forKey: .linkEvents) ?? d.linkEvents
         mail = try c.decodeIfPresent(MailSettings.self, forKey: .mail) ?? d.mail
         notes = try c.decodeIfPresent(NotesSettings.self, forKey: .notes) ?? d.notes
         flagsLearn = try c.decodeIfPresent(Bool.self, forKey: .flagsLearn) ?? d.flagsLearn

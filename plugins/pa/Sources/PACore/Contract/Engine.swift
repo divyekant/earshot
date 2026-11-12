@@ -49,6 +49,11 @@ public final class Engine {
     /// Runs a block at background priority, off the engine queue (phase 2 build rule 6). Tests run it at once.
     public var background: (@escaping () -> Void) -> Void = { block in block() }
     public internal(set) var settings = PASettings()
+    /// Phase 3: the calendar (EventKit on the Mac, a fixture in tests). Nil: no calendar read.
+    public var calendarSource: CalendarSource?
+    var lastCalendarRead: Date?
+    /// The title of each event at its last link by a rule. A new or a changed title gets new links.
+    var ruleLinkTitles: [Int64: String] = [:]
     let log: PALog
     /// A note for the next answer, for example after a new store started.
     var pendingNotice: String?
@@ -137,6 +142,10 @@ public final class Engine {
         }
         // Phase 3 (spec 7.2): a source that goes off loses what the PA kept from it, at once.
         if old.sources.calendar && !settings.sources.calendar { try? store?.forgetSource(.calendar) }
+        if old.linkEvents && !settings.linkEvents {
+            try? store?.db.run("DELETE FROM cal_event_link WHERE by = 'rule'")
+            ruleLinkTitles = [:]
+        }
         if old.sources.mail && !settings.sources.mail { try? store?.forgetSource(.mail) }
         if old.sources.notes && !settings.sources.notes { try? store?.forgetSource(.note) }
         markPagesDirty()

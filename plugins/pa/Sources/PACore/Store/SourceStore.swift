@@ -372,6 +372,27 @@ extension Store {
                     .text(l.by), l.score.map { .real($0) } ?? .null, .real(at.timeIntervalSince1970)])
     }
 
+    /// The near-event alerts shown since the time, and how many of them got an answer: a change to a linked item in
+    /// the hour after the alert (done, snooze, drop, move or another change).
+    public func eventAlertAnswers(since: Date) -> (shown: Int, answered: Int) {
+        let s = since.timeIntervalSince1970
+        let shown = (try? db.query("SELECT COUNT(*) FROM event WHERE type = 'alert-shown' AND record_kind = 'cal_event' AND at >= ?",
+                                   [.real(s)]))?.first?.first?.int ?? 0
+        let answered = (try? db.query("""
+            SELECT COUNT(DISTINCT a.id) FROM event a
+            JOIN cal_event_link l ON l.event_id = a.record_id AND l.item_id IS NOT NULL
+            JOIN event b ON b.record_kind = 'item' AND b.record_id = l.item_id AND b.at >= a.at AND b.at <= a.at + 3600
+              AND b.type IN ('done', 'snooze', 'drop', 'move', 'change')
+            WHERE a.type = 'alert-shown' AND a.record_kind = 'cal_event' AND a.at >= ?
+            """, [.real(s)]))?.first?.first?.int ?? 0
+        return (Int(shown), Int(answered))
+    }
+
+    /// Deletes the links by a rule of an event. The links by the owner stay.
+    public func deleteRuleLinks(_ eventID: Int64) throws {
+        try db.run("DELETE FROM cal_event_link WHERE event_id = ? AND by = 'rule'", [.int(eventID)])
+    }
+
     public func eventLinks(_ eventID: Int64) -> [EventLink] {
         ((try? db.query("SELECT event_id, item_id, doc_id, by, score FROM cal_event_link WHERE event_id = ? ORDER BY id",
                         [.int(eventID)])) ?? []).map {
