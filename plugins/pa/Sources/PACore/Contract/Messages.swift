@@ -4,6 +4,8 @@ import Foundation
 public enum Incoming: Equatable, Sendable {
     case hello(contract: Int)
     case command(id: String, lead: String, text: String, context: [String: String])
+    /// Phase 4: a part of the text of a web page, or the reason why earshot gives none.
+    case pageText(PageTextMessage)
     /// A message of a type that the PA does not know. The PA ignores it.
     case unknown(type: String)
 
@@ -23,6 +25,9 @@ public enum Incoming: Equatable, Sendable {
                 for (k, v) in c { if let s = v as? String { ctx[k] = s } }
             }
             return .command(id: id, lead: lead, text: text, context: ctx)
+        case "pageText":
+            guard let m = PageTextMessage.from(obj) else { return nil }
+            return .pageText(m)
         default:
             return .unknown(type: type)
         }
@@ -38,6 +43,8 @@ public enum AnswerKind: String, Sendable {
 public enum Outgoing: Equatable, Sendable {
     case answer(re: String?, kind: AnswerKind, text: String, items: [String])
     case targets([Target])
+    /// Phase 4: the ask for the text of the web page of one command (`re` is the id of the command).
+    case askPageText(re: String)
 
     /// One line of JSON, with no line break in it.
     public func line() -> Data {
@@ -49,6 +56,9 @@ public enum Outgoing: Equatable, Sendable {
             obj["kind"] = kind.rawValue
             obj["text"] = text
             if kind == .list || !items.isEmpty { obj["items"] = items }
+        case .askPageText(let re):
+            obj["type"] = "pageText"
+            obj["re"] = re
         case .targets(let targets):
             obj["type"] = "targets"
             obj["targets"] = targets.map { t -> [String: Any] in

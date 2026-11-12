@@ -16,7 +16,7 @@ public final class Store {
     public private(set) var recoveredFrom: URL?
 
     /// The schema version. Each change is one numbered migration.
-    public static let schemaVersion = 4
+    public static let schemaVersion = 5
 
     public init(url: URL, now: Date = Date()) throws {
         self.url = url
@@ -62,6 +62,7 @@ public final class Store {
         if version < 2 { try migration2() }
         if version < 3 { try migration3() }
         if version < 4 { try migration4() }
+        if version < 5 { try migration5() }
     }
 
     /// Phase 2 (build spec 7.2): kept files, proposals of the search, closed projects.
@@ -420,13 +421,13 @@ public final class Store {
 
     // MARK: - Documents
 
-    static let docColumns = "id, address, title, app, project_id, created_at, dropped_at, path, kind, size, modified_at, text_state, passages, parent_doc_id"
+    static let docColumns = "id, address, title, app, project_id, created_at, dropped_at, path, kind, size, modified_at, text_state, passages, parent_doc_id, text_at, text_words"
 
     func docParams(_ d: Doc) -> [SQLValue] {
         [Store.value(d.address), .text(d.title), Store.value(d.app), Store.value(d.projectID),
          .real(d.createdAt.timeIntervalSince1970), Store.value(d.droppedAt), Store.value(d.path), .text(d.kind.rawValue),
          Store.value(d.size), Store.value(d.modifiedAt), .text(d.textState.rawValue), .int(Int64(d.passages)),
-         Store.value(d.parentDocID)]
+         Store.value(d.parentDocID), Store.value(d.textAt), Store.value(d.textWords.map(Int64.init))]
     }
 
     /// The words of a reference in the keyword index of pa.sqlite: the title and the address, not the path.
@@ -438,8 +439,8 @@ public final class Store {
         try db.transaction {
             try db.run("""
             INSERT INTO doc(address, title, app, project_id, created_at, dropped_at, path, kind, size, modified_at,
-                            text_state, passages, parent_doc_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            text_state, passages, parent_doc_id, text_at, text_words)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, docParams(d))
             let id = db.lastInsertID
             try index(.doc, id, Store.docBody(d))
@@ -461,6 +462,10 @@ public final class Store {
             d.textState = TextState(rawValue: r[11].text ?? "") ?? .none
             d.passages = Int(r[12].int ?? 0)
             d.parentDocID = r[13].int
+        }
+        if r.count > 15 {
+            d.textAt = date(r[14])
+            d.textWords = r[15].int.map(Int.init)
         }
         return d
     }
@@ -490,7 +495,8 @@ public final class Store {
             p.append(.int(d.id))
             try db.run("""
             UPDATE doc SET address = ?, title = ?, app = ?, project_id = ?, created_at = ?, dropped_at = ?, path = ?,
-              kind = ?, size = ?, modified_at = ?, text_state = ?, passages = ?, parent_doc_id = ?
+              kind = ?, size = ?, modified_at = ?, text_state = ?, passages = ?, parent_doc_id = ?,
+              text_at = ?, text_words = ?
             WHERE id = ?
             """, p)
             try index(.doc, d.id, Store.docBody(d))
