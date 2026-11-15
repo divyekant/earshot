@@ -114,7 +114,7 @@ uv run app/scripts/weekly-report.py --since 2026-11-03 --until 2026-11-10
    |---|---|
    | Accessibility | Read the screen, focus fields, type and click. |
    | Microphone | Hear commands. Audio stays on this Mac. |
-   | Speech recognition | Use the Apple speech engine on this Mac. |
+   | Speech recognition (optional on macOS 26) | Use the Apple speech engine on macOS 14 and 15. On macOS 26, the speech engines run without it. |
    | Input Monitoring | Read the hold key while another app is in front. |
    | Screen Recording (optional) | Read text that has no accessibility label, with on-device text recognition. |
    | Contacts (optional) | Find a chat by the name of a contact. This is off until you turn it on. |

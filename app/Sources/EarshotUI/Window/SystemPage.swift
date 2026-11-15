@@ -7,29 +7,35 @@ import SwiftUI
 
 /// The words of the System page, as pure functions for the tests.
 public enum SystemWords {
-    /// One short line about each permission. Speech recognition is for the Apple engine only.
-    public static func why(_ p: Permission, engine: EngineChoice = .auto) -> String {
+    /// True on macOS 26 and later. There the Apple engine is SpeechTranscriber, which runs without the Speech
+    /// recognition permission (dk's Mac, 2026-11-15: the permission was never asked, and the Apple engine typed).
+    /// On older macOS, the Apple engine is SFSpeechRecognizer, which needs it.
+    public static let speechNeedsNoPermission = ProcessInfo.processInfo.isOperatingSystemAtLeast(
+        OperatingSystemVersion(majorVersion: 26, minorVersion: 0, patchVersion: 0))
+
+    /// One short line about each permission.
+    public static func why(_ p: Permission, newSpeech: Bool = speechNeedsNoPermission) -> String {
         switch p {
         case .accessibility: return "Read the screen, type and click"
         case .microphone: return "Hear commands. Audio stays on this Mac."
-        case .speech: return engine == .parakeet ? "Optional. Only the Apple engine uses it." : "The Apple speech engine, on this Mac"
+        case .speech: return newSpeech ? "Optional. The speech engines of macOS 26 run without it." : "The Apple speech engine, on this Mac"
         case .inputMonitoring: return "Read the hold key in other apps"
         case .screenRecording: return "Optional. Read text in apps with poor labels."
         }
     }
 
-    /// True if earshot works without the permission: Screen Recording, and Speech recognition with Parakeet.
-    public static func optional(_ p: Permission, engine: EngineChoice = .auto) -> Bool {
-        p == .screenRecording || (p == .speech && engine == .parakeet)
+    /// True if earshot works without the permission: Screen Recording, and Speech recognition on macOS 26.
+    public static func optional(_ p: Permission, newSpeech: Bool = speechNeedsNoPermission) -> Bool {
+        p == .screenRecording || (p == .speech && newSpeech)
     }
 
     /// "4 of 5 allowed · the fifth is optional", "All 5 allowed", "3 of 5 allowed".
-    public static func accessLine(_ states: [Permission: PermissionState], engine: EngineChoice = .auto) -> String {
+    public static func accessLine(_ states: [Permission: PermissionState], newSpeech: Bool = speechNeedsNoPermission) -> String {
         let all = Permission.allCases
         let on = all.filter { states[$0] == .granted }
         if on.count == all.count { return "All \(all.count) allowed" }
         let missing = all.filter { states[$0] != .granted }
-        if missing.allSatisfy({ optional($0, engine: engine) }) {
+        if missing.allSatisfy({ optional($0, newSpeech: newSpeech) }) {
             return "\(on.count) of \(all.count) allowed · " + (missing.count == 1 ? "the fifth is optional" : "the others are optional")
         }
         return "\(on.count) of \(all.count) allowed"
@@ -110,7 +116,7 @@ struct SystemPage: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("Access").textStyle(.section, Palette.ink)
                 Spacer()
-                Text(SystemWords.accessLine(states, engine: speech)).textStyle(.small, Palette.ink3)
+                Text(SystemWords.accessLine(states)).textStyle(.small, Palette.ink3)
             }
             .padding(.top, 30).padding(.bottom, 4)
             ForEach(Array(Permission.allCases.enumerated()), id: \.element) { i, p in
@@ -143,7 +149,7 @@ struct SystemPage: View {
         let state = states[p] ?? .notAsked
         return HStack(spacing: 12) {
             Text(p.title).textStyle(.bodyStrong, Palette.ink)
-            Text(SystemWords.why(p, engine: speech)).textStyle(.detail, Palette.ink3).lineLimit(1)
+            Text(SystemWords.why(p)).textStyle(.detail, Palette.ink3).lineLimit(1)
             Spacer(minLength: 12)
             if state == .granted {
                 HStack(spacing: 6) {
@@ -155,7 +161,7 @@ struct SystemPage: View {
                     if state == .notAsked && Permissions.canAsk(p) { Permissions.ask(p) } else { NSWorkspace.shared.open(p.settingsURL) }
                     read()
                 }
-                .buttonStyle(KeyStyle(SystemWords.optional(p, engine: speech) ? .line : .ink, small: true))
+                .buttonStyle(KeyStyle(SystemWords.optional(p) ? .line : .ink, small: true))
                 .help(state == .notAsked ? "macOS asks you." : "Opens Privacy & Security in System Settings.")
             }
         }
