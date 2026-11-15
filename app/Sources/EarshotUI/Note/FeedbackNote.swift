@@ -130,9 +130,8 @@ public final class FeedbackNote: FeedbackSink {
 final class NoteModel: ObservableObject {
     /// The clear area of the panel. The note sits at its bottom center, so it can grow and move without a new frame.
     static let stage = CGSize(width: 720, height: 360)
-    /// The clear room around the note, inside the view that fades. SwiftUI draws a fading view into its own layer,
-    /// and that layer ends at the frame of the view. Without this room, the dark shadow showed as a black rectangle
-    /// behind the round note while it faded in or out (Mac check 2026-11-15).
+    /// The clear room for the shadow, inside the frame of the note. No part of the note draws outside its frame
+    /// (Mac check 2026-11-15: a SwiftUI shadow that went past the frame was cut to a dark box around the note).
     static let shadowRoom: CGFloat = 40
     /// The note starts 12 pt lower and rises.
     static let lift: CGFloat = 12
@@ -152,8 +151,7 @@ struct NoteStage: View {
             Spacer(minLength: 0)
             if model.visible {
                 NoteView(content: model.content, level: model.level, duration: model.duration, shownAt: model.shownAt)
-                    .padding(EdgeInsets(top: NoteModel.shadowRoom, leading: NoteModel.shadowRoom,
-                                        bottom: NoteModel.lift + 24, trailing: NoteModel.shadowRoom))
+                    .padding(.bottom, max(0, NoteModel.lift + 24 - NoteModel.shadowRoom))
                     .transition(.asymmetric(insertion: .opacity.combined(with: .offset(y: NoteModel.lift)), removal: .opacity))
                     .id(model.content.kindKey)
             }
@@ -239,8 +237,7 @@ struct NoteView: View {
         HStack(spacing: 10) { c() }
             .padding(.leading, 14).padding(.trailing, 16)
             .frame(height: 42)
-            .background(Capsule().fill(Palette.raise.opacity(0.96)).noteShadow())
-            .overlay(Capsule().strokeBorder(Palette.line, lineWidth: 1))
+            .noteSurface(Capsule())
             .fixedSize()
     }
 
@@ -264,18 +261,41 @@ struct NoteView: View {
                 }
             }
         }
-        // The clip cuts only the line of the time left. The shadow sits on the shape behind it, after the clip.
+        // The clip cuts only the line of the time left.
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Palette.raise.opacity(0.96)).noteShadow())
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Palette.line, lineWidth: 1))
+        .noteSurface(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }
 
-private extension View {
-    /// The shadow of the note, on its shape only. On the whole note, SwiftUI drew it into one layer with the text and
-    /// the moving bars. After some frames that layer showed the dark shadow as a box (Mac check 2026-11-15).
-    func noteShadow() -> some View {
-        self.shadow(color: .black.opacity(0.6), radius: 0.5)
-            .shadow(color: .black.opacity(0.85), radius: 20, y: 18)
+extension View {
+    /// Puts the note on its surface: the room for the shadow around it, and the shape, the shadow and the edge behind.
+    func noteSurface<S: Shape>(_ shape: S) -> some View {
+        padding(NoteModel.shadowRoom).background(NoteSurface(shape: shape, room: NoteModel.shadowRoom))
+    }
+}
+
+/// The shape of the note with its shadow and its edge, drawn in one Canvas. The Canvas fills the frame of the note
+/// with the room, so the shadow never goes past a frame. A SwiftUI shadow on the note went past the frame, and on the
+/// screen it was cut to a dark box around the note after some frames (Mac check 2026-11-15).
+struct NoteSurface<S: Shape>: View {
+    let shape: S
+    let room: CGFloat
+
+    var body: some View {
+        Canvas { context, size in
+            let rect = CGRect(origin: .zero, size: size).insetBy(dx: room, dy: room)
+            let path = shape.path(in: rect)
+            context.drawLayer { layer in
+                layer.addFilter(.shadow(color: .black.opacity(0.85), radius: 20, x: 0, y: 18))
+                layer.fill(path, with: .color(Palette.raise))
+            }
+            context.drawLayer { layer in
+                layer.addFilter(.shadow(color: .black.opacity(0.6), radius: 0.5))
+                layer.fill(path, with: .color(Palette.raise))
+            }
+            context.stroke(shape.path(in: rect.insetBy(dx: 0.5, dy: 0.5)), with: .color(Palette.line), lineWidth: 1)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
