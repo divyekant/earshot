@@ -239,10 +239,8 @@ struct NoteView: View {
         HStack(spacing: 10) { c() }
             .padding(.leading, 14).padding(.trailing, 16)
             .frame(height: 42)
-            .background(Capsule().fill(Palette.raise.opacity(0.96)))
+            .background(Capsule().fill(Palette.raise.opacity(0.96)).noteShadow())
             .overlay(Capsule().strokeBorder(Palette.line, lineWidth: 1))
-            .shadow(color: .black.opacity(0.6), radius: 0.5)
-            .shadow(color: .black.opacity(0.85), radius: 20, y: 18)
             .fixedSize()
     }
 
@@ -266,10 +264,18 @@ struct NoteView: View {
                 }
             }
         }
-        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Palette.raise.opacity(0.96)))
+        // The clip cuts only the line of the time left. The shadow sits on the shape behind it, after the clip.
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Palette.raise.opacity(0.96)).noteShadow())
         .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Palette.line, lineWidth: 1))
-        .shadow(color: .black.opacity(0.6), radius: 0.5)
-        .shadow(color: .black.opacity(0.85), radius: 20, y: 18)
+    }
+}
+
+private extension View {
+    /// The shadow of the note, on its shape only. On the whole note, SwiftUI drew it into one layer with the text and
+    /// the moving bars. After some frames that layer showed the dark shadow as a box (Mac check 2026-11-15).
+    func noteShadow() -> some View {
+        self.shadow(color: .black.opacity(0.6), radius: 0.5)
+            .shadow(color: .black.opacity(0.85), radius: 20, y: 18)
     }
 }
