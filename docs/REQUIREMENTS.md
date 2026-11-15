@@ -132,7 +132,7 @@ Experimental, phase 1. Footnote is the private personal assistant of the owner, 
 | R-CT-1 | The owner, or an agent of the owner, can read and change each setting with a command, without the window. A value that the settings cannot take gives an error. The cloud settings turn on only with an explicit owner flag. | Must |
 | R-CT-2 | The command line talks to the running app only through a socket file in the store folder. It opens no network port. Only the same user can use it. | Must |
 | R-CT-3 | The command line never approves a plugin (R-PL-4). It never gives the Accessibility permission of earshot to a program that does not have that permission. | Must |
-| R-CT-4 | The command line can run one typed command as the Test tab does, and shows the route, the result and the plugin answers. Without an explicit flag, it is a dry run. | Must |
+| R-CT-4 | The command line can run one typed command as System > Try a command does, and shows the route, the result and the plugin answers. Without an explicit flag, it is a dry run. | Must |
 
 ## 4. Out of scope
 

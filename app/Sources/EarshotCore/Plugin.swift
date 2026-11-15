@@ -13,6 +13,8 @@ public enum PluginContract {
     public static let manifestName = "plugin.json"
     /// The owner's approvals: plugin id to the SHA-256 of the approved manifest.
     public static let approvalsFile = "plugins-approved.json"
+    /// The ids of the approved plugins that the owner turned off. An off plugin keeps its approval but does not run.
+    public static let offFile = "plugins-off.json"
     /// The context keys that a manifest can ask for. Nothing else goes to a plugin.
     public static let contextKeys: Set<String> = ["app", "windowTitle", "url", "document", "selection", "pageText"]
     /// The context keys that need an extra read of the front window. earshot reads them only for a plugin that names them.
@@ -159,9 +161,27 @@ public struct PluginEntry: Hashable, Sendable, Identifiable {
     public var approved: Bool
     /// The problems of the manifest. A plugin with a problem does not start.
     public var problems: [String]
+    /// False if the owner turned the plugin off in the window. The approval stays.
+    public var on: Bool
 
-    public init(manifest: PluginManifest, folder: URL, hash: String, approved: Bool, problems: [String]) {
+    public init(manifest: PluginManifest, folder: URL, hash: String, approved: Bool, problems: [String], on: Bool = true) {
         self.manifest = manifest; self.folder = folder; self.hash = hash; self.approved = approved; self.problems = problems
+        self.on = on
+    }
+
+    /// True if earshot can start the plugin and give it commands: approved, on, and with no problem.
+    public var usable: Bool { approved && on && problems.isEmpty }
+}
+
+/// The state of one plugin process, for the Plugins page.
+public struct PluginRun: Equatable, Sendable {
+    public var running: Bool
+    /// The time the process started, if it runs.
+    public var since: Date?
+    /// Why earshot does not start it again, if it stopped too often.
+    public var stopped: String?
+    public init(running: Bool, since: Date? = nil, stopped: String? = nil) {
+        self.running = running; self.since = since; self.stopped = stopped
     }
 }
 
@@ -248,11 +268,22 @@ public struct PluginCatalog: Sendable {
     /// The plugin id to the approved manifest hash.
     public var approvals: [String: String] { store.load([String: String].self, PluginContract.approvalsFile) ?? [:] }
 
+    /// The ids of the plugins that the owner turned off.
+    public var off: Set<String> { Set(store.load([String].self, PluginContract.offFile) ?? []) }
+
+    /// Turns one plugin on or off. The approval does not change.
+    public func setOn(_ id: String, _ on: Bool) throws {
+        var all = off
+        if on { all.remove(id) } else { all.insert(id) }
+        try store.save(all.sorted(), PluginContract.offFile)
+    }
+
     /// The plugins in plugins/<id>/plugin.json, sorted by id. A folder with no readable manifest is left out.
     public func scan() -> [PluginEntry] {
         let fm = FileManager.default
         guard let dirs = try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.isDirectoryKey]) else { return [] }
         let approved = approvals
+        let offIDs = off
         var out: [PluginEntry] = []
         for dir in dirs where (try? dir.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
             guard let data = try? Data(contentsOf: dir.appendingPathComponent(PluginContract.manifestName)) else { continue }
@@ -265,7 +296,7 @@ public struct PluginCatalog: Sendable {
             var problems = manifest.problems
             if manifest.id != dir.lastPathComponent { problems.append("the id is not the folder name") }
             out.append(PluginEntry(manifest: manifest, folder: dir, hash: hash, approved: approved[manifest.id] == hash,
-                                   problems: problems))
+                                   problems: problems, on: !offIDs.contains(manifest.id)))
         }
         return out.sorted { $0.id < $1.id }
     }

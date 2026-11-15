@@ -182,6 +182,10 @@ extension Engine {
         flagsBody += "<p class=\"empty\">Footnote finds about half of the requests. Do not use it as your only check of the inbox.</p>"
         write(page(title: "Flags", sub: "\(flags.count) open", body: flagsBody), "flags.html")
 
+        // The same lists as data, for the window and the panel of earshot (earshot docs/PLUGINS.md 5.5).
+        writeBoard(late: late, today: todayItems, tomorrow: tomorrowItems, quiet: quiet, tasks: tasks, open: open,
+                   projects: projects, flags: flags, counts: counts, dayText: Engine.boardDay(today, cal))
+
         // One page for each open project.
         let since = now.addingTimeInterval(-30 * 86400).timeIntervalSince1970
         var keep: Set<String> = ["index.html", "today.html", "all-open.html", "search.html", "main-points.html", "flags.html", "kept.html"]

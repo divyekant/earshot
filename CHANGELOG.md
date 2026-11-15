@@ -6,6 +6,8 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+- A full redesign of the window, the menu bar panel, the note on screen and the menu bar icon, from the design canvas. The window has five pages (Activity, Settings, Apps, Plugins, System) and the pages of each plugin. The names of people and channels are on the page of each app. A plugin can write its lists as data (`board.json`), and earshot draws them with its own rows. A plugin can be turned off and keep its approval. Footnote writes its lists this way. (R-FB-1, R-MT-2, R-PL-3, R-PL-4)
+
 ## [0.6.0] - 2026-11-15
 
 This release gives the PA plugin the new name Footnote, and gives earshot a new look. A click on the menu bar icon opens a panel. The window has four text links in place of seven tabs, and shows the plugin pages. Footnote 0.4.0 keeps the text of web pages and finds their words with "where is".

@@ -51,6 +51,6 @@ final class PluginPagesTests: XCTestCase {
 
     func testPluginLinksComeBeforeTheFixedPages() {
         let p = PluginPages(id: "footnote", name: "Footnote", folder: root)
-        XCTAssertEqual(ManageLink.all(plugins: [p]).map(\.title), ["Footnote", "Settings", "Activity", "Plugins", "Advanced"])
+        XCTAssertEqual(ManageLink.all(plugins: [p]).map(\.title), ["Footnote", "Activity", "Settings", "Apps", "Plugins", "System"])
     }
 }

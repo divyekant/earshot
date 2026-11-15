@@ -43,6 +43,8 @@ final class PluginHost: PluginHandOff, @unchecked Sendable {
     private var processes: [String: PluginProcess] = [:]
     private var starts: [String: [Date]] = [:]
     private var targetCache: [String: [PluginTarget]] = [:]
+    /// The time each plugin process started last, for the Plugins page.
+    private var startedAt: [String: Date] = [:]
 
     init(store: Store) {
         catalog = PluginCatalog(store: store)
@@ -58,7 +60,7 @@ final class PluginHost: PluginHandOff, @unchecked Sendable {
         renamePlugins()
         let found = catalog.scan()
         lock.lock()
-        let wanted = found.filter { $0.approved && $0.problems.isEmpty }
+        let wanted = found.filter(\.usable)
         let keep = Set(wanted.map(\.hash))
         // A plugin also stops if its program files changed since it started, so that "Read again" starts a new build.
         // The approval stays on the plugin.json hash.
@@ -94,7 +96,7 @@ final class PluginHost: PluginHandOff, @unchecked Sendable {
     var all: [PluginEntry] { lock.lock(); defer { lock.unlock() }; return entries }
 
     var leads: [PluginLead] {
-        all.filter { $0.approved && $0.problems.isEmpty }
+        all.filter(\.usable)
             .flatMap { e in e.manifest.leads.map { PluginLead(pluginID: e.id, lead: $0) } }
     }
 
@@ -106,7 +108,7 @@ final class PluginHost: PluginHandOff, @unchecked Sendable {
     func targets(of pluginID: String) -> [PluginTarget] { lock.lock(); defer { lock.unlock() }; return targetCache[pluginID] ?? [] }
 
     var targetNames: [PluginTargetName] {
-        let approved = Set(all.filter { $0.approved && $0.problems.isEmpty }.map(\.id))
+        let approved = Set(all.filter(\.usable).map(\.id))
         lock.lock(); defer { lock.unlock() }
         return targetCache.filter { approved.contains($0.key) }.flatMap { id, targets in
             targets.compactMap { t in t.open.map { PluginTargetName(pluginID: id, name: t.name, open: $0) } }
@@ -117,6 +119,7 @@ final class PluginHost: PluginHandOff, @unchecked Sendable {
         guard let entry = all.first(where: { $0.id == pluginID }), entry.approved, entry.problems.isEmpty else {
             return "the plugin \(pluginID) is not approved"
         }
+        guard entry.on else { return "the plugin \(entry.manifest.name) is off" }
         let process: PluginProcess
         switch running(entry) {
         case .success(let p): process = p
@@ -137,6 +140,7 @@ final class PluginHost: PluginHandOff, @unchecked Sendable {
         reload()
         guard let entry = all.first(where: { $0.id == pluginID }) else { return "there is no plugin \(pluginID)" }
         guard entry.approved else { return "the plugin \(pluginID) is not approved" }
+        guard entry.on else { return "the plugin \(entry.manifest.name) is off" }
         guard entry.problems.isEmpty else { return "the plugin \(pluginID) has problems: " + entry.problems.joined(separator: "; ") }
         lock.lock()
         let old = processes[pluginID]
@@ -149,6 +153,20 @@ final class PluginHost: PluginHandOff, @unchecked Sendable {
         case .success: return nil
         case .failure(let why): return why.text
         }
+    }
+
+    /// The state of one plugin for the Plugins page: when it started, or why it does not run.
+    func status(of pluginID: String) -> PluginRun {
+        let entry = all.first { $0.id == pluginID }
+        lock.lock()
+        defer { lock.unlock() }
+        if let p = processes[pluginID], p.isRunning { return PluginRun(running: true, since: startedAt[pluginID]) }
+        guard let entry, entry.usable else { return PluginRun(running: false) }
+        let recent = (starts[pluginID] ?? []).filter { Date().timeIntervalSince($0) < Self.startWindow }
+        if recent.count >= Self.maxStarts {
+            return PluginRun(running: false, stopped: "It stopped \(recent.count) times in 1 minute, so earshot does not start it again.")
+        }
+        return PluginRun(running: false)
     }
 
     /// The ids of the plugins that run now.
@@ -191,6 +209,7 @@ final class PluginHost: PluginHandOff, @unchecked Sendable {
             return .failure(StartError(text: "the plugin \(manifest.name) did not start: \(error)"))
         }
         processes[entry.id] = p
+        startedAt[entry.id] = now
         return .success(p)
     }
 

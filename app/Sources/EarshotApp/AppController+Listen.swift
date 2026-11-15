@@ -87,10 +87,3 @@ extension AppController {
         refreshListen()
     }
 }
-
-/// The SF Symbol for the menu bar. A symbol that this macOS does not have shows the ear, so the icon never goes blank.
-enum ListenIcon {
-    static func symbol(_ state: ListenState) -> String {
-        NSImage(systemSymbolName: state.symbol, accessibilityDescription: nil) == nil ? ListenState.idle.symbol : state.symbol
-    }
-}

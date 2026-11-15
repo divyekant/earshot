@@ -44,6 +44,38 @@ final class PagesTests: XCTestCase {
         XCTAssertEqual(index, today)
     }
 
+    /// board.json holds the same lists as data for earshot (earshot docs/PLUGINS.md 5.5): tabs, rows and the panel.
+    func testBoardHoldsTheLists() throws {
+        let (e, _, clock) = makeEngine()
+        e.handle(.hello(contract: 1))
+        say(e, "new project", "kitchen")
+        say(e, "todo", "order the tiles for kitchen")
+        say(e, "remind me", "to call the plumber at 5")
+        clock.advance(minutes: 0.05)
+        e.tick()
+        let data = try Data(contentsOf: e.pagesFolder.appendingPathComponent("board.json"))
+        let board = try JSONDecoder().decode(BoardFile.self, from: data)
+        XCTAssertEqual(board.version, 1)
+        XCTAssertEqual(board.tabs.map(\.id), ["today", "all", "flags", "projects", "kept"])
+        XCTAssertEqual(board.settingsTab, "Rules")
+        let today = board.tabs[0]
+        let rows = today.sections.compactMap(\.rows).flatMap { $0 }
+        XCTAssertTrue(rows.contains { $0.text.contains("call the plumber") && $0.when?.contains("17:00") == true && $0.mark == "todo" })
+        XCTAssertEqual(today.sections.last?.title, "The last 7 days")
+        XCTAssertTrue(board.panel!.rows.contains { $0.text.contains("call the plumber") })
+        XCTAssertLessThanOrEqual(board.panel!.rows.count, BoardFile.panelRows)
+        let projects = board.tabs[3].sections[0].rows ?? []
+        XCTAssertEqual(projects.map(\.text), ["Kitchen"])
+        XCTAssertEqual(projects.first?.open, "project-kitchen.html")
+        let all = board.tabs[1].sections.map(\.title)
+        XCTAssertTrue(all.contains("Kitchen"))
+    }
+
+    func testTodayLine() {
+        XCTAssertEqual(Engine.todayLine(late: 1, today: 1, tomorrow: 2), "1 late, 1 for today, 2 for tomorrow")
+        XCTAssertEqual(Engine.todayLine(late: 0, today: 0, tomorrow: 0), "Nothing late and nothing for today")
+    }
+
     func testPagesAtMostOnceASecond() throws {
         let (e, _, clock) = makeEngine()
         e.handle(.hello(contract: 1))
