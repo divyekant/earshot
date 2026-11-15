@@ -696,6 +696,42 @@ public struct Tile: View {
     }
 }
 
+/// The icon of an app, from its bundle id. If macOS does not find the app, the first-letter tile shows.
+public struct AppIcon: View {
+    let bundleID: String
+    let name: String
+    var size: CGFloat
+    var dim: Bool
+    public init(bundleID: String, name: String, size: CGFloat = 28, dim: Bool = false) {
+        self.bundleID = bundleID; self.name = name; self.size = size; self.dim = dim
+    }
+    public var body: some View {
+        if let image = AppIcons.image(bundleID) {
+            // A Mac app icon keeps a margin in its square, so it shows a little larger than the tile.
+            Image(nsImage: image).resizable().interpolation(.high)
+                .frame(width: size * 1.18, height: size * 1.18)
+                .frame(width: size, height: size)
+                .saturation(dim ? 0 : 1)
+                .opacity(dim ? 0.45 : 1)
+                .accessibilityHidden(true)
+        } else {
+            Tile(name, size: size, dim: dim)
+        }
+    }
+}
+
+/// The app icons that the window shows. macOS reads each icon one time.
+@MainActor enum AppIcons {
+    private static var cache: [String: NSImage?] = [:]
+    static func image(_ bundleID: String) -> NSImage? {
+        if let hit = cache[bundleID] { return hit }
+        let url = bundleID.isEmpty ? nil : NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID)
+        let image = url.map { NSWorkspace.shared.icon(forFile: $0.path) }
+        cache[bundleID] = image
+        return image
+    }
+}
+
 /// A chip with a remove mark, for a name that the owner can take away.
 public struct RemovableChip: View {
     let text: String

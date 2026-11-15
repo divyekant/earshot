@@ -133,13 +133,19 @@ struct BoardRow: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            switch row.mark {
-            case "todo":
-                Circle().strokeBorder(late ? Palette.coral : Palette.ink3, lineWidth: 1.5).frame(width: 12, height: 12)
-            case "doc": Glyph(.window, size: 14).foregroundStyle(Palette.ink3)
-            case "flag": Glyph(.failed, size: 14).foregroundStyle(Palette.amber)
-            case "note": Glyph(.typed, size: 14).foregroundStyle(Palette.ink3)
-            default: EmptyView()
+            if row.mark != nil {
+                Group {
+                    switch row.mark {
+                    case "todo":
+                        Circle().strokeBorder(late ? Palette.coral : Palette.ink3, lineWidth: 1.5).frame(width: 12, height: 12)
+                    case "doc": Glyph(.window, size: 14).foregroundStyle(Palette.ink3)
+                    case "flag": Glyph(.failed, size: 14).foregroundStyle(Palette.amber)
+                    case "note": Glyph(.typed, size: 14).foregroundStyle(Palette.ink3)
+                    default: EmptyView()
+                    }
+                }
+                // One column for all marks, so that the texts start at one line.
+                .frame(width: 14)
             }
             (Text(row.text).foregroundColor(Palette.ink) + Text(row.detail.map { " · \($0)" } ?? "").foregroundColor(Palette.ink3))
                 .textStyle(TextStyle(14.5, 20))

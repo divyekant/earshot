@@ -94,6 +94,21 @@ final class LiveStateTests: XCTestCase {
         XCTAssertEqual(LiveState.holdWords("F5"), "F5")
     }
 
+    func testPanelTimeAndMarks() {
+        let now = Date()
+        XCTAssertTrue(MenuPanel.time(now, now: now).contains(":"))
+        let earlier = now.addingTimeInterval(-3 * 86_400)
+        XCTAssertEqual(MenuPanel.time(earlier, now: now), earlier.formatted(.dateTime.weekday(.abbreviated)))
+        let old = now.addingTimeInterval(-20 * 86_400)
+        XCTAssertEqual(MenuPanel.time(old, now: now), old.formatted(.dateTime.day().month(.abbreviated)))
+        guard case .todo(late: true) = MenuPanel.mark(Board.Row(text: "Pay", late: true, mark: "todo")) else {
+            return XCTFail("a late to-do is a coral circle")
+        }
+        guard case .glyph(.typed, _) = MenuPanel.mark(Board.Row(text: "Tiler", mark: "note")) else {
+            return XCTFail("a note has the note glyph")
+        }
+    }
+
     func testShortcutCaps() {
         XCTAssertEqual(ShortcutCaps.caps("cmd+k"), ["⌘", "K"])
         XCTAssertEqual(ShortcutCaps.caps("cmd+shift+k"), ["⇧", "⌘", "K"])

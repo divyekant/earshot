@@ -120,6 +120,8 @@ public struct ManageView: View {
     /// True if macOS turned off the microphone for earshot. The window reads it every 2 s.
     @State private var micOff = false
     @Namespace private var underline
+    /// The page to show first, for the snapshot run. The app asks for a page with WindowNav.
+    var first: WindowPage?
 
     public init(settings: Binding<EarshotSettings>, store: Store = Store(), hooks: ManageHooks = ManageHooks(),
                 live: LiveState = LiveState()) {
@@ -143,7 +145,7 @@ public struct ManageView: View {
         .background(WindowChrome().frame(width: 0, height: 0))
         .onAppear {
             findPlugins()
-            if let r = nav.request { go(r) }
+            if let first { show(first) } else if let r = nav.request { go(r) }
         }
         .onChange(of: nav.request) { _, r in if let r { go(r) } }
         .task {
@@ -247,6 +249,11 @@ public struct ManageView: View {
     }
 
     private func go(_ request: WindowPage) {
+        show(request)
+        nav.request = nil
+    }
+
+    private func show(_ request: WindowPage) {
         findPlugins()
         switch request {
         case .plugin(let id):
@@ -259,7 +266,6 @@ public struct ManageView: View {
         case .system: page = .page(.system)
         }
         opened += 1
-        nav.request = nil
     }
 
     /// Reads the plugins with pages again, for example after an approval in the Plugins page.

@@ -157,7 +157,7 @@ struct PluginsPage: View {
     }
 
     private func label(_ text: String) -> some View {
-        Text(text).textStyle(TextStyle(12, 16, 600, mono: true), Palette.ink2)
+        Text(text).textStyle(.label, Palette.ink3)
     }
 
     /// A plugin that waits for the owner: what it gets, its lead words, and the key to approve it.

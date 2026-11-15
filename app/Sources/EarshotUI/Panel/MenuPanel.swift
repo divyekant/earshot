@@ -144,7 +144,7 @@ public struct MenuPanel: View {
                 Text(empty).textStyle(.row, Palette.ink3).padding(.vertical, 8)
             }
             ForEach(Array(list.rows.enumerated()), id: \.offset) { _, row in
-                PanelRowView(mark: .todo(late: row.isLate), title: row.text, aside: row.detail, detail: nil,
+                PanelRowView(mark: Self.mark(row), title: row.text, aside: row.detail, detail: nil,
                              when: row.when ?? "", whenTone: row.isLate ? Palette.coral : Palette.ink3) {
                     if let open = row.open { BoardOpen.open(open, pages: pages) } else { go(.plugin(pages.id)) }
                 }
@@ -174,8 +174,21 @@ public struct MenuPanel: View {
         }
     }
 
-    static func time(_ d: Date) -> String {
-        d.formatted(.dateTime.hour(.defaultDigits(amPM: .omitted)).minute())
+    /// The mark of a board row, as on the plugin page: a circle for a to-do, a glyph for a document, a flag or a note.
+    static func mark(_ row: Board.Row) -> PanelRowView.Mark {
+        switch row.mark {
+        case "doc": return .glyph(.window, Palette.ink3)
+        case "flag": return .glyph(.failed, Palette.amber)
+        case "note": return .glyph(.typed, Palette.ink3)
+        default: return .todo(late: row.isLate)
+        }
+    }
+
+    /// The time of a command today, the day of the week in the last 6 days, else the date.
+    static func time(_ d: Date, now: Date = Date(), calendar: Calendar = .current) -> String {
+        if calendar.isDate(d, inSameDayAs: now) { return d.formatted(.dateTime.hour(.defaultDigits(amPM: .omitted)).minute()) }
+        if now.timeIntervalSince(d) < 6 * 86_400 { return d.formatted(.dateTime.weekday(.abbreviated)) }
+        return d.formatted(.dateTime.day().month(.abbreviated))
     }
 
     // MARK: Footer
@@ -257,10 +270,14 @@ struct PanelRowView: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            switch mark {
-            case let .glyph(kind, color): Glyph(kind).foregroundStyle(color).padding(.top, 2)
-            case let .todo(late): Circle().strokeBorder(late ? Palette.coral : Palette.ink3, lineWidth: 1.5).frame(width: 12, height: 12).padding(.top, 3.5)
+            Group {
+                switch mark {
+                case let .glyph(kind, color): Glyph(kind).foregroundStyle(color).padding(.top, 2)
+                case let .todo(late): Circle().strokeBorder(late ? Palette.coral : Palette.ink3, lineWidth: 1.5).frame(width: 12, height: 12).padding(.top, 3.5)
+                }
             }
+            // One column for all marks, so that the texts start at one line.
+            .frame(width: 16)
             VStack(alignment: .leading, spacing: 1) {
                 (Text(title).foregroundColor(Palette.ink) + Text(aside.map { " · \($0)" } ?? "").foregroundColor(Palette.ink3))
                     .textStyle(.row).lineLimit(1).truncationMode(.tail)

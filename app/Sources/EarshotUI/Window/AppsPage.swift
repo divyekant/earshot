@@ -278,7 +278,7 @@ struct ReadingApps: View {
                 }
                 .frame(width: 260, height: 3)
                 .padding(.top, 26)
-                Text("\(Int(t)) s").textStyle(.mono, Palette.ink3).padding(.top, 14)
+                Text("\(Int(t)) s").textStyle(.small, Palette.ink3).monospacedDigit().padding(.top, 14)
             }
             Spacer(minLength: 40)
         }
@@ -301,7 +301,7 @@ struct AppListRow<Trailing: View>: View {
     var body: some View {
         let off = app.approved && !app.enabled
         HStack(spacing: 14) {
-            Tile(app.name, dim: off)
+            AppIcon(bundleID: app.bundleID, name: app.name, dim: off)
             VStack(alignment: .leading, spacing: 1) {
                 Text(app.name).textStyle(.body, off ? Palette.ink3 : Palette.ink).lineLimit(1)
                 Text(detail).textStyle(.detail, Palette.ink3).lineLimit(1)
@@ -378,7 +378,7 @@ struct AppPage: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 16) {
-                Tile(app.name, size: 52, dim: app.approved && !app.enabled)
+                AppIcon(bundleID: app.bundleID, name: app.name, size: 52, dim: app.approved && !app.enabled)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(app.name).textStyle(.title, Palette.ink)
                     Text(app.bundleID).textStyle(.mono, Palette.ink3).textSelection(.enabled)

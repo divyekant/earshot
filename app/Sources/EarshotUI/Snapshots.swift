@@ -49,10 +49,11 @@ public enum UISnapshots {
             ("window-plugins", .plugins), ("window-system", .system),
         ]
         for (name, page) in pages {
-            WindowNav.shared.request = page
-            shot(name, window, ManageView(settings: .constant(settings), store: store, live: idle))
+            // Each window gets its first page directly: the windows of the earlier pictures still observe WindowNav.
+            var view = ManageView(settings: .constant(settings), store: store, live: idle)
+            view.first = page
+            shot(name, window, view)
         }
-        WindowNav.shared.request = nil
 
         // A plugin board from made-up rows. The page of a plugin that waits for approval does not show, so the
         // check of the board does not depend on the plugins of the owner.
@@ -83,19 +84,23 @@ public enum UISnapshots {
         let notes: [(String, NoteContent)] = [
             ("note-listening", .listening),
             ("note-done", NoteContent.parse("→ Notes", ok: true)),
-            ("note-typed", NoteContent.parse("typed · 12 words", ok: true)),
+            ("note-typed", NoteContent.parse("→ Type 12 words", ok: true)),
             ("note-failed", NoteContent.parse("✗ the search field did not show in 1200 ms", ok: false)),
             ("note-question", NoteContent.parse("not sure: two apps are close · 1: Notes · 2: Notion · say one or two", ok: false)),
-            ("note-answer", NoteContent.answer(from: "Plugin", text: "Due today · Call the plumber, 5 pm · Pay the rent, 6 pm")),
+            ("note-plugin", NoteContent.answer(from: "Planner", text: "Saved: call the shop, today 17:00")),
+            ("note-answer", NoteContent.answer(from: "Planner", text: "Due\n1. Pay the rent · Wed\n2. Call the plumber · 17:00\n3. Book the car service · Mon 09:00")),
         ]
         for (name, content) in notes {
-            shot(name, CGSize(width: 560, height: 220), VStack {
+            // The note is plain SwiftUI, so ImageRenderer draws it with its shadows as on the screen. The window
+            // render (cacheDisplay) draws the stroke of a capsule with stray edges.
+            let note = VStack {
                 Spacer()
                 NoteView(content: content, level: level, duration: content.kindKey == "pill" ? nil : 8)
                 Spacer()
             }
-            .frame(width: 560, height: 220)
-            .background(Palette.night))
+            .frame(width: 560, height: 260)
+            .background(Palette.night)
+            if renderPure(note, to: folder.appendingPathComponent(name + ".png")) { out.append(name) }
         }
 
         // The menu bar icon, black on white and white on black.
@@ -123,9 +128,9 @@ public enum UISnapshots {
 
     /// Made-up commands for the panel with a board.
     static let sampleRecords = [
-        ActivityRecord(heard: "todo call the shop", intent: "Planner · todo", tier: .rules, ok: true, note: "sent to Planner", stages: [:]),
-        ActivityRecord(heard: "open notes", intent: "→ Notes", tier: .rules, ok: true, note: "→ Notes · route: app name", stages: [:]),
-        ActivityRecord(heard: "(9 words)", intent: "Type \"(9 words)\"", tier: .rules, ok: true, note: "typed", stages: [:]),
+        ActivityRecord(heard: "todo call the shop", intent: "Planner · todo", tier: .rules, ok: true, note: "sent to Planner", stages: ["total": 40]),
+        ActivityRecord(heard: "open notes", intent: "→ Notes", tier: .rules, ok: true, note: "→ Notes · route: app name", stages: ["total": 300]),
+        ActivityRecord(heard: "(9 words)", intent: "Type 9 words", tier: .rules, ok: true, note: "typed", stages: ["total": 380]),
     ]
 
     /// Writes a board.json of made-up rows to `folder`/pages and returns its plugin pages. Nil if the write fails.
@@ -159,6 +164,16 @@ public enum UISnapshots {
                             settingsFile: folder.appendingPathComponent("settings.json"), hasIndex: false)
         guard let read = p.board else { return nil }
         return (p, read)
+    }
+
+    /// Draws a SwiftUI view with ImageRenderer, at 2x, and writes it as PNG. For views with no AppKit parts.
+    @MainActor static func renderPure<V: View>(_ view: V, to url: URL) -> Bool {
+        let renderer = ImageRenderer(content: view.environment(\.colorScheme, .dark))
+        renderer.scale = 2
+        guard let image = renderer.cgImage else { return false }
+        let rep = NSBitmapImageRep(cgImage: image)
+        guard let data = rep.representation(using: .png, properties: [:]) else { return false }
+        return (try? data.write(to: url)) != nil
     }
 
     /// Draws a view in a window off the screen and writes it as PNG. `size` nil uses the size that the view needs.
