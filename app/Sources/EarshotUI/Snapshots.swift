@@ -53,6 +53,18 @@ public enum UISnapshots {
             shot(name, window, ManageView(settings: .constant(settings), store: store, live: idle))
         }
         WindowNav.shared.request = nil
+
+        // A plugin board from made-up rows. The page of a plugin that waits for approval does not show, so the
+        // check of the board does not depend on the plugins of the owner.
+        if let sample = sampleBoard(in: store.folder.appendingPathComponent("snapshot-sample", isDirectory: true)) {
+            shot("window-board-sample", window, BoardPage(pages: sample.pages, reload: 0)
+                .frame(width: window.width, height: window.height).background(Palette.paper))
+            if let list = sample.board.panel {
+                let data = PanelData(records: sampleRecords, apps: [], boards: [(sample.pages, list)], notices: [])
+                shot("panel-board-sample", nil, MenuPanel(model: panelModel(idle, notices: [], level: level), store: store, fixed: data)
+                    .frame(width: 360).background(Palette.raise))
+            }
+        }
         let apps = store.apps
         if let chat = apps.first(where: { $0.isChat && $0.approved }) ?? apps.first {
             shot("window-app", window, AppPage(app: .constant(chat), names: .constant(store.names), hooks: ManageHooks(), back: {})
@@ -99,11 +111,54 @@ public enum UISnapshots {
     }
 
     @MainActor static func panelView(_ live: LiveState, notices: [Notice], level: VoiceLevel, store: Store) -> some View {
-        MenuPanel(model: PanelModel(live: live, mode: .constant(live.mode), startsAtLogin: .constant(true), level: level,
-                                    notices: { notices }, pause: {}, resume: {}, open: { _ in }, quit: {}),
-                  store: store)
+        MenuPanel(model: panelModel(live, notices: notices, level: level), store: store)
             .frame(width: 360)
             .background(Palette.raise)
+    }
+
+    @MainActor static func panelModel(_ live: LiveState, notices: [Notice], level: VoiceLevel) -> PanelModel {
+        PanelModel(live: live, mode: .constant(live.mode), startsAtLogin: .constant(true), level: level,
+                   notices: { notices }, pause: {}, resume: {}, open: { _ in }, quit: {})
+    }
+
+    /// Made-up commands for the panel with a board.
+    static let sampleRecords = [
+        ActivityRecord(heard: "todo call the shop", intent: "Planner · todo", tier: .rules, ok: true, note: "sent to Planner", stages: [:]),
+        ActivityRecord(heard: "open notes", intent: "→ Notes", tier: .rules, ok: true, note: "→ Notes · route: app name", stages: [:]),
+        ActivityRecord(heard: "(9 words)", intent: "Type \"(9 words)\"", tier: .rules, ok: true, note: "typed", stages: [:]),
+    ]
+
+    /// Writes a board.json of made-up rows to `folder`/pages and returns its plugin pages. Nil if the write fails.
+    static func sampleBoard(in folder: URL) -> (pages: PluginPages, board: Board)? {
+        typealias R = Board.Row
+        let late = [R(text: "Pay the rent", detail: "Home", when: "Wed", late: true, mark: "todo")]
+        let today = [R(text: "Call the shop about the lamp", detail: "Home", when: "5 pm", mark: "todo"),
+                     R(text: "Send the draft to the editor", detail: "Book", when: "6 pm", mark: "todo"),
+                     R(text: "The tiler can start on Monday", detail: "Kitchen", mark: "note")]
+        let tomorrow = [R(text: "Book the car service", when: "9 am", mark: "todo")]
+        let board = Board(
+            panel: Board.PanelList(title: "Today", rows: late + today, empty: "Nothing for today."),
+            tabs: [
+                Board.Tab(id: "today", title: "Today", sub: "1 late, 3 for today, 1 for tomorrow", date: "Sun 15 Nov", sections: [
+                    Board.Section(title: "Late", tone: "late", rows: late),
+                    Board.Section(title: "Today", rows: today),
+                    Board.Section(title: "Tomorrow", rows: tomorrow),
+                    Board.Section(title: "The last 7 days", numbers: [
+                        Board.Number(label: "captured", value: 23), Board.Number(label: "done", value: 17),
+                        Board.Number(label: "snoozed", value: 4), Board.Number(label: "dropped", value: 2),
+                    ]),
+                ], hint: "Say “done” or “snooze” with the words of a to-do."),
+                Board.Tab(id: "all", title: "All open", sub: "5 open", sections: [Board.Section(title: "Home", rows: late + today)]),
+            ])
+        let pages = folder.appendingPathComponent("pages", isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: pages, withIntermediateDirectories: true)
+            try JSONEncoder().encode(board).write(to: pages.appendingPathComponent(Board.fileName))
+        } catch { return nil }
+        let p = PluginPages(id: "sample", name: "Planner", folder: pages, settings: [],
+                            settingsFile: folder.appendingPathComponent("settings.json"), hasIndex: false)
+        guard let read = p.board else { return nil }
+        return (p, read)
     }
 
     /// Draws a view in a window off the screen and writes it as PNG. `size` nil uses the size that the view needs.
