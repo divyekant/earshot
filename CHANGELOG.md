@@ -6,7 +6,33 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
-- A full redesign of the window, the menu bar panel, the note on screen and the menu bar icon, from the design canvas. The window has five pages (Activity, Settings, Apps, Plugins, System) and the pages of each plugin. The names of people and channels are on the page of each app. A plugin can write its lists as data (`board.json`), and earshot draws them with its own rows. A plugin can be turned off and keep its approval. Footnote writes its lists this way. (R-FB-1, R-MT-2, R-PL-3, R-PL-4)
+## [0.7.0] - 2026-11-15
+
+This release redraws earshot from one design: the window, the menu bar panel, the note on screen and the menu bar icon. The v0.6.0 look only changed the colors of the default Mac controls. Now each screen uses the same type, spacing, controls and states.
+
+To update a Mac with Footnote:
+
+1. Install the new earshot.
+2. Run `plugins/footnote/scripts/install-footnote.sh`, so that Footnote writes its lists for the panel and its page.
+3. Click "Look for new plugins" in the Plugins page, or run `earshot plugins reload`. The plugin.json of Footnote did not change, so an approved Footnote stays approved.
+
+### Changed
+
+- The window has five pages at the top (Activity, Settings, Apps, Plugins, System) and the page of each plugin. "Advanced" is gone. The names of people and channels are on the page of each app, and each app shows its own macOS icon. The System page shows the permissions, "Try a command" and the version. Speech recognition is optional on macOS 26 (R-FB-1, R-MT-2).
+- The menu bar panel shows the state with the hold key, the notices that need you (microphone, Accessibility, a plugin that waits or stopped, the wake model download), the lists of a plugin, and each command in plain words ("Opened Notes", "Typed 14 words") with its time or day (R-FB-1).
+- The note on screen is a pill for a result, a card for a question, and a card with items for a plugin answer (R-FB-1).
+- The menu bar icon is the ear mark of the app, with sound bars while earshot hears and a mark when earshot needs you (R-FB-1).
+- The type of the window, the panel and the note is Schibsted Grotesk and JetBrains Mono (SIL OFL 1.1), the same as the web site (R-FB-1).
+
+### Added
+
+- A plugin can write its lists as data (`pages/board.json`, docs/PLUGINS.md 5.5). earshot draws them with its own rows, in the panel and on the page of the plugin. Footnote writes its Today and open lists this way (R-PL-3).
+- A plugin can be turned off in the Plugins page and keep its approval (`plugins-off.json`) (R-PL-4).
+- `earshot snapshot <folder>` writes a picture of each screen and state, from a copy of the settings. It starts no microphone, no key monitor and no plugin (R-CT-4).
+
+### Fixed
+
+- Fixes found on the Mac before this release: the title bar no longer covers the page links of the window; the panel reads its notices and lists each time it opens; the shadow of the note no longer turns into a dark box (R-FB-1).
 
 ## [0.6.0] - 2026-11-15
 
@@ -206,7 +232,8 @@ The first public release. earshot is early software. Expect bugs and changes to 
 
 - earshot never presses Send, or does another action that cannot be undone, without an explicit command (R-NV-5, R-ON-5).
 
-[Unreleased]: https://github.com/divyekant/earshot/compare/v0.6.0...develop
+[Unreleased]: https://github.com/divyekant/earshot/compare/v0.7.0...develop
+[0.7.0]: https://github.com/divyekant/earshot/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/divyekant/earshot/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/divyekant/earshot/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/divyekant/earshot/compare/v0.3.0...v0.4.0
