@@ -9,7 +9,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 ### Added
 
 - A plugin that writes `pages/index.html` in its data folder gets a link with its name in the window, and a part in the menu bar panel. Footnote shows its Today page there. Script is off in the page view (R-PL-3, R-FN-3).
-- A click on the menu bar icon opens a panel: the listen state, Pause, the mode, the last commands in plain words, and the cloud state. "Settings…" in the panel opens the window (R-FB-1, R-MD-1).
+- A click on the menu bar icon opens a panel: the listen state, Pause, the mode, the last commands in plain words, and the cloud state. Escape closes it. "Settings…" in the panel opens the window. A dictation shows as "Dictation · N words" (R-FB-1, R-MD-1).
 - A plugin can name its old id in the manifest key `formerID`. earshot then moves the data folder and the approval to the new id, but only if the approved old manifest has the same contract, leads, context and network (docs/PLUGINS.md 2.1, R-PL-4).
 - A plugin can ask for the text of the web page in front after a command (context key `pageText`). earshot shows "→ <plugin> · reads this page" for each read. It sends no text on a sign-in, code or payment page, and never the value of a one-line field (R-PL-2, R-PL-5).
 - Footnote 0.4.0: "keep this" on a web page keeps the main text of the page, if earshot sends it. The note "Text kept · <title> · <n> words" comes after the first answer. "where is" finds words in kept pages. The list `kept pages` and a text copy of each page are local pages with no script (R-FN-9).
