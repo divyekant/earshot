@@ -263,7 +263,10 @@ final class ActionRunnerTests: XCTestCase {
         print("EARSHOT_BENCH fake result wait: \(ms) ms (row at 45 ms)")
         XCTAssertTrue(shown)
         XCTAssertGreaterThanOrEqual(ms, 45)
-        XCTAssertLessThan(ms, 150)
+        // The wait polls every 15 ms, so on a quiet Mac it ends at about 60 ms. The bound is half of the 800 ms
+        // time-out: it still shows that the wait ends at the row, not at the time-out. A loaded CI runner took
+        // 151 ms once (release PR #195), which failed the old bound of 150 ms.
+        XCTAssertLessThan(ms, Double(SwitcherTiming.resultMs) / 2)
     }
 
     /// A fake app for the switcher field wait. The element type is a string.
