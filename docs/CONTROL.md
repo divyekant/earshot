@@ -24,10 +24,10 @@ EARSHOT=~/projects/earshot-t0/app/build/Earshot.app/Contents/MacOS/earshot
 | `settings set <name> <value>` | Changes one setting. The running app uses the change at once. |
 | `settings reset <name>` | Sets one setting back to its default. |
 | `plugins` | Lists the plugins, with the approval state and the problems. |
-| `plugins reload` | Reads the plugins folder and the approvals again. This is the same as "Read again" in the Plugins tab. |
+| `plugins reload` | Reads the plugins folder and the approvals again. This is the same as "Look for new plugins" on the Plugins page. |
 | `plugins restart <id>` | Stops one plugin and starts it again. |
-| `run <words>` | Routes the typed words as the Test tab does. It does no action. |
-| `run <words> --actions` | Routes the words and does the action, as "Run actions" in the Test tab. |
+| `run <words>` | Routes the typed words as System > Try a command does. It does no action. |
+| `run <words> --actions` | Routes the words and does the action, as "Also do it" in System > Try a command. |
 | `run <words> --actions --wait <s>` | Also waits up to `<s>` seconds for the plugin answers. The default is 3 s. The maximum is 20 s. |
 | `status` | Shows the version, the commit, the mode, the state and the running plugins. |
 | `reload` | Makes the running app read `settings.json` and the plugins folder again. |
@@ -55,7 +55,7 @@ If earshot does not run, `settings set` and `settings reset` still change `setti
 
 ## 4. Safety rules
 
-- The command line cannot approve a plugin or remove an approval. The owner does this in Settings… > Plugins (R-PL-4).
+- The command line cannot approve a plugin or remove an approval. The owner does this on the Plugins page of the window (R-PL-4).
 - `tier2` and `jevSeesScreen` send data to the cloud (R-MD-1). To turn one on, add `--owner-ok`. Use this flag only when the owner said so. To turn one off, no flag is necessary.
 - `run` without `--actions` is a dry run.
 - `run --actions` does the same actions as a spoken command, with the same rules. earshot never presses Send without the word "send" (R-NV-5).

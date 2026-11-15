@@ -112,7 +112,8 @@ Footnote writes HTML pages in this folder:
 ~/Library/Application Support/earshot/plugin-data/footnote/pages/
 ```
 
-- `index.html`: the same as `today.html`. earshot shows it under the link "Footnote" in its window, and in the "Footnote" part of the menu bar panel.
+- `board.json`: the lists as data (docs/PLUGINS.md 5.5): Today, All open, Flags, Projects and Kept, the "Today" list of the panel, and the counts of the last 7 days. earshot draws them on the "Footnote" page of its window and in the "Today" part of the menu bar panel, with its own rows and type. A click on a project, a flag or a kept page opens its project page, its mail or its web page.
+- `index.html`: the same as `today.html`. earshot shows it only if `board.json` is missing or not valid.
 - `today.html`: late items, today, tomorrow, the quiet items, and the counts of the last 7 days. The counts include the web pages kept with text and the web pages kept as a link only.
 - `all-open.html`: all open items, by project.
 - `project-<name>.html`: one page for each open project, with its documents, its kept folders and the new files of the last 7 days.
@@ -212,7 +213,7 @@ The settings file is `~/Library/Application Support/earshot/plugin-data/footnote
 | `defaultSnoozeMinutes` | `10` | The snooze time if you say no time. |
 | `bareHourWindow` | `{"from": "07:00", "to": "23:00"}` | "at 5" is the next 5 o'clock in this window. |
 | `dayParts` | morning 09:00, noon 12:00, afternoon 15:00, evening 18:00, tonight 20:00, endOfDay 17:00 | The times of these words. |
-| `rules` | time alert, due list, silence list, nearEvent alert, newArrival list, request list | Each rule is `"alert"`, `"list"` or `"off"`. You can also change them in earshot: Settings… > Footnote > Settings. |
+| `rules` | time alert, due list, silence list, nearEvent alert, newArrival list, request list | Each rule is `"alert"`, `"list"` or `"off"`. You can also change them in earshot: the Footnote page > Rules. |
 | `projects` | `{}` | Rules for one project. Example: `{"kitchen": {"due": "alert"}}`. |
 | `reminders` | `{"copy": true, "list": "earshot", "alertBy": "reminders"}` | The copy in Apple Reminders. If `alertBy` is `"footnote"` (or any value other than `"reminders"`), Footnote gives the alerts. |
 | `projectFocusMinutes` | `5` | After "new project kitchen", your next captures go to Kitchen for this count of minutes. Each capture starts the minutes again. `0` switches it off. |
