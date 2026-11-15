@@ -8,6 +8,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Added
 
+- A click on the menu bar icon opens a panel: the listen state, Pause, the mode, the last commands in plain words, and the cloud state. "Settings…" in the panel opens the window (R-FB-1, R-MD-1).
 - A plugin can name its old id in the manifest key `formerID`. earshot then moves the data folder and the approval to the new id, but only if the approved old manifest has the same contract, leads, context and network (docs/PLUGINS.md 2.1, R-PL-4).
 - A plugin can ask for the text of the web page in front after a command (context key `pageText`). earshot shows "→ <plugin> · reads this page" for each read. It sends no text on a sign-in, code or payment page, and never the value of a one-line field (R-PL-2, R-PL-5).
 - Footnote 0.4.0: "keep this" on a web page keeps the main text of the page, if earshot sends it. The note "Text kept · <title> · <n> words" comes after the first answer. "where is" finds words in kept pages. The list `kept pages` and a text copy of each page are local pages with no script (R-FN-9).
@@ -18,6 +19,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Changed
 
+- The window has a new look: white text on black, and four text links at the top (Settings, Activity, Plugins, Advanced) in place of seven tabs. Both Jev switches are in one Cloud group (R-MD-1).
 - The PA plugin has the new name Footnote, also inside: plugin id `footnote`, folder `plugins/footnote/`, program `footnote` in `Footnote.app`, app ID `com.divyekant.earshot.footnote`, data folder `plugin-data/footnote/`, store `footnote.sqlite`, script `install-footnote.sh`, guide `docs/FOOTNOTE.md`, requirement IDs R-FN-n (were R-PA-n). Older lines of this file use the new name. earshot moves the old data folder and the approval by itself. macOS asks again for Reminders, Calendar, Mail and Notes, because the app ID changed (R-PL-4).
 - Footnote gives free memory back to macOS after each mail read, notes read and command. Each message from earshot no longer leaves 16 KB in Footnote (R-FN-8).
 - If a page that a plugin wrote, or a sign-in, code or payment page, is in front, no label of the page goes to Jev, and "Jev sees the screen" takes no picture (R-MD-1, D-10).

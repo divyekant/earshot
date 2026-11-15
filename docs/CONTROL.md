@@ -55,7 +55,7 @@ If earshot does not run, `settings set` and `settings reset` still change `setti
 
 ## 4. Safety rules
 
-- The command line cannot approve a plugin or remove an approval. The owner does this in Manage > Plugins (R-PL-4).
+- The command line cannot approve a plugin or remove an approval. The owner does this in Settings… > Plugins (R-PL-4).
 - `tier2` and `jevSeesScreen` send data to the cloud (R-MD-1). To turn one on, add `--owner-ok`. Use this flag only when the owner said so. To turn one off, no flag is necessary.
 - `run` without `--actions` is a dry run.
 - `run --actions` does the same actions as a spoken command, with the same rules. earshot never presses Send without the word "send" (R-NV-5).

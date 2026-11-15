@@ -106,27 +106,3 @@ enum MarkShapes {
         return path
     }
 }
-
-/// The band at the top of the management window: the mark, the name, one line on what earshot does, and the version.
-struct BrandHeader: View {
-    var body: some View {
-        HStack(spacing: 12) {
-            EarshotMark().frame(width: 44, height: 44)
-                .shadow(color: Brand.tileBottom.opacity(0.35), radius: 4, y: 2)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("earshot").font(.system(size: 22, weight: .semibold))
-                Text("Voice control for this Mac. Audio stays on this Mac. earshot never presses Send unless you say \"send\".")
-                    .font(.caption).foregroundStyle(.secondary).lineLimit(2)
-            }
-            Spacer()
-            if let v = Brand.version {
-                Text("Version \(v)").font(.caption).foregroundStyle(.secondary)
-            }
-        }
-        .padding(.horizontal, 16).padding(.vertical, 12)
-        .background(
-            LinearGradient(colors: [Brand.accent.opacity(0.16), Brand.accent.opacity(0.02)],
-                           startPoint: .leading, endPoint: .trailing)
-        )
-    }
-}

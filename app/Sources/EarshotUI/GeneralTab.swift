@@ -2,6 +2,7 @@ import AppKit
 import EarshotCore
 import SwiftUI
 
+/// The Settings page: listening, speech, cloud, and the note and sounds.
 struct GeneralTab: View {
     @Binding var settings: EarshotSettings
     let hooks: ManageHooks
@@ -12,18 +13,18 @@ struct GeneralTab: View {
 
     var body: some View {
         Form {
-            Section("Input") {
+            Section("Listening") {
                 Picker("Mode", selection: $settings.mode) {
                     Text("Hold key").tag(InputMode.hold)
                     Text("Always on").tag(InputMode.alwaysOn)
                 }
                 .pickerStyle(.segmented)
                 if settings.mode == .alwaysOn {
-                    Text("Say the wake phrase, then the command, for example \"\(settings.wakePhrase), open Notes\". For 5 s after a command, your voice can give the next command with no phrase. earshot never presses Send or does a risky action from always-on mode. The hold key also stays available.")
+                    Text("Say \"\(settings.wakePhrase), open Notes\". For 5 s after a command, your voice can give the next one with no phrase. In this mode, earshot never presses Send or does a risky action. The hold key also works.")
                         .font(.caption).foregroundStyle(.secondary)
                     WakeSection(settings: $settings, voice: hooks.voice)
                     Toggle("Keep the numbers of each turn for 7 days", isOn: $settings.recordTurns)
-                    Text("For tests of the wake phrase and the voice check: sound levels, scores and the wake frames of each always-on turn. No audio. They stay on this Mac. Turn it off to delete them.")
+                    Text("Numbers only, no audio, for tests of the wake phrase and the voice check. Turn it off to delete them.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Picker("Hold key", selection: holdKeyBinding) {
@@ -51,8 +52,8 @@ struct GeneralTab: View {
                 }
                 TextField("Language", text: $settings.locale, prompt: Text("en_US"))
             }
-            Section("When the rules are unsure") {
-                Picker("Tier 2", selection: $settings.tier2) {
+            Section {
+                Picker("When the rules are unsure", selection: $settings.tier2) {
                     Text("Do nothing (all decisions on this Mac)").tag(Tier2.off)
                     Text("Ask Jev (cloud, text only)").tag(Tier2.jev)
                 }
@@ -75,8 +76,6 @@ struct GeneralTab: View {
                         .disabled(!jevKeySaved)
                     }
                 }
-            }
-            Section("When a click finds no target") {
                 // D-10: a separate switch. "Ask Jev" (text only) never turns it on.
                 Toggle("Jev sees the screen (cloud, sends a screenshot)", isOn: $settings.jevSeesScreen)
                 if settings.jevSeesScreen {
@@ -88,8 +87,12 @@ struct GeneralTab: View {
                             .font(.caption).foregroundStyle(.orange)
                     }
                 }
+            } header: {
+                Text("Cloud")
+            } footer: {
+                Text("Both are off by default. Audio never leaves this Mac.").font(.caption).foregroundStyle(Quiet.dim)
             }
-            Section("Behavior") {
+            Section("Typing, note and sounds") {
                 Toggle("Type dictated text into chats with other people", isOn: $settings.typeIntoOthers)
                 Toggle("Show the note on screen", isOn: $settings.showFeedback)
                 Toggle("Play sounds", isOn: $settings.playSounds)
@@ -101,6 +104,8 @@ struct GeneralTab: View {
             }
         }
         .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
+        .background(Quiet.background)
         .onDisappear { stopRecording() }
     }
 

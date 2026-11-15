@@ -68,11 +68,33 @@ public struct TestReport: Sendable {
     }
 }
 
-/// The management window. Tabs: General, Apps, Names, Activity, Permissions, Test.
+/// The pages of the management window (dk, 2026-11-15, prototype B). Daily use is in the menu bar panel, so the
+/// window has few pages, as text links at the top.
+public enum ManagePage: String, CaseIterable, Hashable, Sendable {
+    case settings, activity, plugins, advanced
+
+    public var title: String {
+        switch self {
+        case .settings: return "Settings"
+        case .activity: return "Activity"
+        case .plugins: return "Plugins"
+        case .advanced: return "Advanced"
+        }
+    }
+}
+
+/// The parts of the Advanced page: the app table, the names, the permissions and the test of a typed command.
+enum AdvancedPart: String, CaseIterable, Hashable {
+    case apps = "Apps", names = "Names", permissions = "Permissions", test = "Test"
+}
+
+/// The management window: white text on black, text links at the top, one page at a time.
 public struct ManageView: View {
     @Binding var settings: EarshotSettings
     let store: Store
     let hooks: ManageHooks
+    @State private var page: ManagePage = .settings
+    @State private var part: AdvancedPart = .apps
 
     public init(settings: Binding<EarshotSettings>, store: Store = Store(), hooks: ManageHooks = ManageHooks()) {
         _settings = settings
@@ -82,10 +104,23 @@ public struct ManageView: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            BrandHeader()
-            Divider()
-            tabs.padding()
+            HStack(alignment: .center) {
+                HStack(spacing: 8) {
+                    EarshotMark(tile: false, glyph: Brand.ear).frame(width: 18, height: 18)
+                    Text("earshot").font(.system(size: 15, weight: .bold))
+                }
+                Spacer()
+                TopLinks(pages: ManagePage.allCases.map { ($0, $0.title) }, selection: $page)
+                Spacer()
+                Text(Brand.version.map { "v\($0)" } ?? "").font(.system(size: 12)).foregroundStyle(Quiet.dim)
+                    .frame(minWidth: 80, alignment: .trailing)
+            }
+            .padding(.horizontal, 24).padding(.top, 14).padding(.bottom, 6)
+            content
         }
+        .background(Quiet.background)
+        .foregroundStyle(Quiet.text)
+        .preferredColorScheme(.dark)
         .tint(Brand.accent)
         .background(WindowReader().frame(width: 0, height: 0))
         .onChange(of: settings) { _, new in
@@ -94,15 +129,28 @@ public struct ManageView: View {
         }
     }
 
-    private var tabs: some View {
-        TabView {
-            GeneralTab(settings: $settings, hooks: hooks).tabItem { Text("General") }
-            AppsTab(store: store, hooks: hooks).tabItem { Text("Apps") }
-            NamesTab(store: store, hooks: hooks).tabItem { Text("Names") }
-            ActivityTab(store: store).tabItem { Text("Activity") }
-            PluginsTab(store: store, hooks: hooks).tabItem { Text("Plugins") }
-            PermissionsTab().tabItem { Text("Permissions") }
-            TestTab(store: store, hooks: hooks).tabItem { Text("Test") }
+    @ViewBuilder private var content: some View {
+        switch page {
+        case .settings:
+            GeneralTab(settings: $settings, hooks: hooks)
+        case .activity:
+            ActivityTab(store: store).padding(24)
+        case .plugins:
+            PluginsTab(store: store, hooks: hooks)
+        case .advanced:
+            VStack(alignment: .leading, spacing: 12) {
+                Picker("Part", selection: $part) {
+                    ForEach(AdvancedPart.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.segmented).labelsHidden().frame(maxWidth: 420)
+                switch part {
+                case .apps: AppsTab(store: store, hooks: hooks)
+                case .names: NamesTab(store: store, hooks: hooks)
+                case .permissions: PermissionsTab()
+                case .test: TestTab(store: store, hooks: hooks)
+                }
+            }
+            .padding(24)
         }
     }
 }
