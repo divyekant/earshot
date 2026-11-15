@@ -74,7 +74,7 @@ struct WindowChrome: NSViewRepresentable {
                          NSWindow.didEndLiveResizeNotification] {
                 observers.append(NotificationCenter.default.addObserver(forName: name, object: w, queue: .main) { [weak w] _ in
                     guard let w else { return }
-                    MainActor.assumeIsolated { WindowChrome.placeButtons(w) }
+                    MainActor.assumeIsolated { WindowChrome.keepClear(w); WindowChrome.placeButtons(w) }
                 })
             }
         }
@@ -83,12 +83,18 @@ struct WindowChrome: NSViewRepresentable {
     }
 
     @MainActor static func style(_ w: NSWindow) {
-        w.titleVisibility = .hidden
-        w.titlebarAppearsTransparent = true
-        w.styleMask.insert(.fullSizeContentView)
+        keepClear(w)
         w.backgroundColor = NSColor(srgbRed: 0x0C / 255, green: 0x0C / 255, blue: 0x0B / 255, alpha: 1)
         w.appearance = NSAppearance(named: .darkAqua)
         placeButtons(w)
+    }
+
+    /// Keeps the title bar clear, with no title, over the content. SwiftUI can set these values again when it updates
+    /// the window, so the chrome sets them again at each resize and each new key window.
+    @MainActor static func keepClear(_ w: NSWindow) {
+        if w.titleVisibility != .hidden { w.titleVisibility = .hidden }
+        if !w.titlebarAppearsTransparent { w.titlebarAppearsTransparent = true }
+        if !w.styleMask.contains(.fullSizeContentView) { w.styleMask.insert(.fullSizeContentView) }
     }
 
     /// Makes the title bar as high as the top bar of earshot, and puts the buttons in its middle, 20 pt from the left.

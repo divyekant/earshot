@@ -93,6 +93,10 @@ public struct MenuPanel: View {
         .foregroundStyle(Palette.ink)
         .preferredColorScheme(.dark)
         .onAppear(perform: load)
+        // The panel of the menu bar keeps its view between two opens, so onAppear runs only the first time. Read the
+        // notices, the lists and the commands again each time the panel opens (Mac check 2026-11-15: an approved
+        // plugin still showed "changed").
+        .background(PanelOpenProbe(opened: load).frame(width: 0, height: 0))
         // Escape closes the panel (Mac check 2026-11-15: the window style does not close on Escape by itself).
         .background(Button("Close") { dismiss() }.keyboardShortcut(.cancelAction).opacity(0).frame(width: 0, height: 0)
             .accessibilityHidden(true))
@@ -395,5 +399,31 @@ enum BoardOpen {
         case .inView, .outside: NSWorkspace.shared.open(url)
         case .blocked: break
         }
+    }
+}
+
+/// Calls `opened` each time the window of the view becomes the key window, that is, each time the panel opens.
+struct PanelOpenProbe: NSViewRepresentable {
+    let opened: () -> Void
+
+    func makeNSView(context: Context) -> Probe { Probe() }
+    func updateNSView(_ view: Probe, context: Context) { view.opened = opened }
+
+    final class Probe: NSView {
+        var opened: (() -> Void)?
+        private var observer: NSObjectProtocol?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            if let observer { NotificationCenter.default.removeObserver(observer) }
+            observer = nil
+            guard let w = window else { return }
+            observer = NotificationCenter.default.addObserver(forName: NSWindow.didBecomeKeyNotification, object: w,
+                                                              queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.opened?() }
+            }
+        }
+
+        deinit { if let observer { NotificationCenter.default.removeObserver(observer) } }
     }
 }
