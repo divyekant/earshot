@@ -253,7 +253,7 @@ struct NoteView: View {
                 // The time left to answer, as a line that empties.
                 TimelineView(.animation) { context in
                     let left = max(0, 1 - context.date.timeIntervalSince(shownAt) / max(0.1, duration))
-                    Rectangle().fill(Palette.ink.opacity(0.7)).frame(width: width * left, height: 2)
+                    Rectangle().fill(Palette.ink.opacity(0.3)).frame(width: width * left, height: 2)
                 }
             }
         }

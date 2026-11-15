@@ -166,6 +166,12 @@ final class PageWordsTests: XCTestCase {
         XCTAssertEqual(SystemWords.accessLine(states), "4 of 5 allowed · the fifth is optional")
         states[.microphone] = .denied
         XCTAssertEqual(SystemWords.accessLine(states), "3 of 5 allowed")
+        states[.microphone] = .granted
+        states[.speech] = .notAsked
+        XCTAssertEqual(SystemWords.accessLine(states), "3 of 5 allowed")
+        XCTAssertEqual(SystemWords.accessLine(states, engine: .parakeet), "3 of 5 allowed · the others are optional")
+        XCTAssertTrue(SystemWords.optional(.speech, engine: .parakeet))
+        XCTAssertFalse(SystemWords.optional(.speech, engine: .apple))
         let apps = [AppEntry(id: "notes", name: "Notes", bundleID: "n"), AppEntry(id: "notion", name: "Notion", bundleID: "o")]
         let unsure = TestReport(heard: "open no", route: RouteResult(intent: .openApp(appID: "notes"), confidence: 0.54, tier: .fuzzy,
                                                                     ms: 6, alternatives: [.openApp(appID: "notion")]))
