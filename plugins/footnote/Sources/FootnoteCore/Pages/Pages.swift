@@ -153,7 +153,10 @@ extension Engine {
         let todayBody = warning + section("Late", late, late: true) + section("Today", todayItems, empty: "Nothing for today.")
             + section("Tomorrow", tomorrowItems) + section("Quiet", quiet) + table + muted
         let dateLine = TimeText.fullDay(today, cal)
-        write(page(title: "Today", sub: dateLine, body: todayBody), "today.html")
+        let todayPage = page(title: "Today", sub: dateLine, body: todayBody)
+        write(todayPage, "today.html")
+        // earshot shows index.html of the pages folder in its window and its panel (docs/PLUGINS.md 5.4).
+        write(todayPage, "index.html")
 
         // All open: by project, then the items with no project.
         var allBody = ""
@@ -181,7 +184,7 @@ extension Engine {
 
         // One page for each open project.
         let since = now.addingTimeInterval(-30 * 86400).timeIntervalSince1970
-        var keep: Set<String> = ["today.html", "all-open.html", "search.html", "main-points.html", "flags.html", "kept.html"]
+        var keep: Set<String> = ["index.html", "today.html", "all-open.html", "search.html", "main-points.html", "flags.html", "kept.html"]
         writeKeptList()
         // The page of a closed project stays in the folder (phase 2 build spec 7.5).
         for p in store.projects(openOnly: false) where p.state == "closed" { keep.insert("project-\(p.slug).html") }

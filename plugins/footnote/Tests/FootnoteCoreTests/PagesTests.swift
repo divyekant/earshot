@@ -39,6 +39,9 @@ final class PagesTests: XCTestCase {
             XCTAssertFalse(page.contains("<link"))
         }
         XCTAssertTrue(FileManager.default.fileExists(atPath: e.pagesFolder.appendingPathComponent("all-open.html").path))
+        // earshot shows index.html in its window and panel: it is the Today page.
+        let index = try String(contentsOf: e.pagesFolder.appendingPathComponent("index.html"), encoding: .utf8)
+        XCTAssertEqual(index, today)
     }
 
     func testPagesAtMostOnceASecond() throws {
