@@ -30,6 +30,25 @@ If the `plugin.json` file changes, the approval stops. Approve the plugin again.
 
 If you install a new build of the plugin program, click "Read again". earshot stops the old program and starts the new one. The approval stays. earshot sees a change in the program file and in each file directly in the plugin folder.
 
+### 2.1 Rename a plugin
+
+A plugin can get a new id. Give the old id in the key `formerID` of the new `plugin.json`. Install the new plugin in `plugins/<new id>/`, and keep the old folder `plugins/<old id>/` until earshot reads the plugins folder again.
+
+At "Read again", and at each start, earshot does the rename only if all of these conditions are true:
+
+- The owner approved the old plugin, and `plugins/<old id>/plugin.json` is still the approved file (the SHA-256 agrees).
+- The new manifest has no problems and no approval of its own.
+- The old and the new manifest have the same `contract`, `leads`, `context` and `network`. The owner approved these keys. A change of `name`, `version` or `run` needs no new approval, the same as a new build of the program.
+
+Then earshot does these steps:
+
+1. It stops the old plugin and waits for its program to stop (5 s at most).
+2. It moves `plugin-data/<old id>/` to `plugin-data/<new id>/`. If the new folder exists, it moves each item that the new folder does not have. It deletes no data: an item that is in both folders stays in the old folder.
+3. It moves the approval to the new id, with the hash of the new `plugin.json`.
+4. It deletes the old plugin folder `plugins/<old id>/`. This folder has the old program, not data.
+
+If one condition is false, earshot does not rename. The new plugin then needs the approval of the owner, and the old plugin keeps its data folder. If a step fails, earshot tries again at the next "Read again".
+
 ## 3. The manifest: plugin.json
 
 ```json
@@ -55,6 +74,7 @@ If you install a new build of the plugin program, click "Read again". earshot st
 | `context` | No | The context for each command: `app` (the bundle id of the front app), `windowTitle`, `url`, `document`, `selection`. The default is none. See section 5.1. |
 | `run` | Yes | The program and its arguments. A relative path starts at the plugin folder. |
 | `network` | No | The network hosts that the plugin says it uses. The default is none. earshot shows it in the Plugins tab. earshot does not enforce it. |
+| `formerID` | No | The id of the plugin before a rename. See section 2.1. |
 
 ### 3.1 Rules for lead words
 
@@ -94,7 +114,7 @@ earshot starts the program with posix_spawn. The program reads JSON lines from s
 - earshot makes macOS treat the program as a separate process for the privacy permissions. The program does not get the Microphone or the Accessibility permission of earshot.
   - Test on the Mac, 2026-11-11, builds 2e53860 and abc46df: a test plugin ran `AXIsProcessTrusted` through osascript. The result was `false` in the plugin, and `true` in a shell with the Accessibility permission. The plugin was a child process of earshot.
   - A plugin that needs a permission, for example Reminders, must get its own permission from macOS.
-  - Test on the Mac, 2026-11-11, PA plugin at commit e8e87cf: earshot started the PA (`EarshotPA.app/Contents/MacOS/earshot-pa`) as a plugin. The PA asked for full access to Reminders. macOS gave the access to the PA 3 s after its start. The program has an `Info.plist` in its app bundle and in the linker section `__TEXT,__info_plist`, and a stable code signature. Use the same layout for a plugin that needs a permission.
+  - Test on the Mac, 2026-11-11, Footnote plugin at commit e8e87cf: earshot started Footnote (`Footnote.app/Contents/MacOS/footnote`) as a plugin. Footnote asked for full access to Reminders. macOS gave the access to Footnote 3 s after its start. The program has an `Info.plist` in its app bundle and in the linker section `__TEXT,__info_plist`, and a stable code signature. Use the same layout for a plugin that needs a permission.
 - The program gets only these environment variables: `EARSHOT_PLUGIN_DATA` (a data folder for the plugin), `EARSHOT_CONTRACT` (`1`), `PATH`, `HOME`, `LANG` and `TMPDIR`.
 - The data folder is `~/Library/Application Support/earshot/plugin-data/<id>/`. An update of the plugin does not change this folder.
 - A page in this folder is a plugin page. If a plugin page is in the front window, no label of the page goes to Jev (tier 2), and "Jev sees the screen" takes no picture (R-MD-1, D-10).

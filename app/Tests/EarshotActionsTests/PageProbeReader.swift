@@ -3,7 +3,7 @@ import ApplicationServices
 import EarshotCore
 @testable import EarshotActions
 
-/// The two read methods of the PA phase 4 probes (W1, spec section 6). Only the bench uses this file.
+/// The two read methods of the Footnote phase 4 probes (W1, spec section 6). Only the bench uses this file.
 /// The plugin thread makes the real page reader in earshot from the numbers of the bench.
 ///
 /// Read only: this file has only calls that copy a value. It does not press, scroll, select, type or change

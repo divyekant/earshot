@@ -76,14 +76,14 @@ jobs:
           ls -la "$EARSHOT_APP_OUT/Contents/Frameworks"
           codesign --verify --deep --strict "$EARSHOT_APP_OUT"
 
-  # The PA plugin (plugins/pa) is a separate Swift package. It is not a part of the app (R-PL-1).
-  pa:
-    name: PA plugin build and test
+  # The Footnote plugin (plugins/footnote) is a separate Swift package. It is not a part of the app (R-PL-1).
+  footnote:
+    name: Footnote plugin build and test
     runs-on: macos-26
     timeout-minutes: 30
     defaults:
       run:
-        working-directory: plugins/pa
+        working-directory: plugins/footnote
     steps:
       - uses: actions/checkout@v4
 
@@ -103,11 +103,11 @@ jobs:
         # pipefail: a failed test must fail the step. Without it, tee hid a failure.
         run: |
           set -o pipefail
-          swift test 2>&1 | tee "$RUNNER_TEMP/pa-test.log"
+          swift test 2>&1 | tee "$RUNNER_TEMP/footnote-test.log"
 
       - name: Probe and mark lines
         if: always()
-        run: grep -E "PROBE|MARK|CONTRACT" "$RUNNER_TEMP/pa-test.log" || true
+        run: grep -E "PROBE|MARK|CONTRACT" "$RUNNER_TEMP/footnote-test.log" || true
 
       # Phase 2, Q1: the GGUF files of candidates 3 and 4, at a fixed revision with a SHA-256 check.
       # CI only checks the download. The bench of candidates 3 and 4 runs on the Mac (Apple GPU):
@@ -115,15 +115,15 @@ jobs:
       - name: Cache the embedding models
         uses: actions/cache@v4
         with:
-          path: ~/pa-models
-          key: pa-models-qwen3-370f27d-gemma-0f741b5
+          path: ~/footnote-models
+          key: footnote-models-qwen3-370f27d-gemma-0f741b5
 
       - name: Get the embedding models
         run: |
-          scripts/get-model.sh qwen3 ~/pa-models
-          scripts/get-model.sh gemma ~/pa-models
+          scripts/get-model.sh qwen3 ~/footnote-models
+          scripts/get-model.sh gemma ~/footnote-models
 
-      # Phase 2, Q1: the embedding bench on the made-up fixtures (docs/experiments/E10-pa-embedding.md).
+      # Phase 2, Q1: the embedding bench on the made-up fixtures (docs/experiments/E10-footnote-embedding.md).
       # The hash model and the macOS sentence model only. The contextual model is out: E10 has its numbers, and its
       # request for macOS data can wait for many minutes on the CI machine.
       - name: Embedding bench
@@ -131,24 +131,24 @@ jobs:
         timeout-minutes: 12
         run: |
           set -uo pipefail
-          swift build -c release --product earshot-pa
-          fx=Tests/PACoreTests/Fixtures/phase2
+          swift build -c release --product footnote
+          fx=Tests/FootnoteCoreTests/Fixtures/phase2
           for e in hash nl-sentence; do
             for d in full 256; do
               echo "=== bench $e, numbers: $d"
               if [ "$d" = full ]; then extra=""; else extra="--dims 256"; fi
-              .build/release/earshot-pa --embed-bench "$fx" --embedder "$e" --get-assets $extra 2>/dev/null || echo "bench $e failed"
+              .build/release/footnote --embed-bench "$fx" --embedder "$e" --get-assets $extra 2>/dev/null || echo "bench $e failed"
             done
           done
 
       - name: Build the app bundle (no install)
         env:
-          PA_NO_INSTALL: "1"
+          FOOTNOTE_NO_INSTALL: "1"
         run: |
           set -euo pipefail
-          scripts/install-pa.sh
-          otool -s __TEXT __info_plist .build/EarshotPA.app/Contents/MacOS/earshot-pa | head -n 3
-          codesign -dv .build/EarshotPA.app 2>&1 | grep -E "Identifier|Signature"
+          scripts/install-footnote.sh
+          otool -s __TEXT __info_plist .build/Footnote.app/Contents/MacOS/footnote | head -n 3
+          codesign -dv .build/Footnote.app 2>&1 | grep -E "Identifier|Signature"
           # The model runtime is in the bundle, and the program finds it (rpath @executable_path/../Frameworks).
-          test -d .build/EarshotPA.app/Contents/Frameworks/llama.framework
-          .build/EarshotPA.app/Contents/MacOS/earshot-pa --embed-bench Tests/PACoreTests/Fixtures/phase2 --embedder hash | head -n 4
+          test -d .build/Footnote.app/Contents/Frameworks/llama.framework
+          .build/Footnote.app/Contents/MacOS/footnote --embed-bench Tests/FootnoteCoreTests/Fixtures/phase2 --embedder hash | head -n 4

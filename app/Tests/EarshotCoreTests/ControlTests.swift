@@ -108,7 +108,7 @@ final class ControlTests: XCTestCase {
     }
 
     func testPluginApprovalIsRefused() throws {
-        let out = tool().run(["plugins", "approve", "pa"])
+        let out = tool().run(["plugins", "approve", "footnote"])
         XCTAssertEqual(out.code, 1)
         XCTAssertTrue(out.lines[0].contains("Manage > Plugins"))
         XCTAssertNil(Store(folder: folder).load([String: String].self, PluginContract.approvalsFile))
@@ -116,13 +116,13 @@ final class ControlTests: XCTestCase {
     }
 
     func testPluginsListReadsTheFolder() throws {
-        let dir = folder.appendingPathComponent("plugins/pa", isDirectory: true)
+        let dir = folder.appendingPathComponent("plugins/footnote", isDirectory: true)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        try Data(#"{"contract":1,"id":"pa","name":"Helper","leads":["note"],"run":["/bin/cat"]}"#.utf8)
+        try Data(#"{"contract":1,"id":"footnote","name":"Helper","leads":["note"],"run":["/bin/cat"]}"#.utf8)
             .write(to: dir.appendingPathComponent("plugin.json"))
         let out = tool().run(["plugins"])
         XCTAssertEqual(out.code, 0)
-        XCTAssertTrue(out.lines[0].hasPrefix("pa "), out.lines[0])
+        XCTAssertTrue(out.lines[0].hasPrefix("footnote "), out.lines[0])
         XCTAssertTrue(out.lines[0].contains("not approved"))
     }
 

@@ -1,0 +1,15 @@
+{
+  "contract": 1,
+  "id": "footnote",
+  "name": "Footnote",
+  "version": "0.5.0",
+  "leads": ["remind me", "todo", "task", "note", "keep this", "new project",
+            "what is due", "what due", "what about", "where is",
+            "done", "snooze", "drop", "move", "quiet",
+            "main points", "summarize", "summarise", "what projects", "finish project",
+            "keep", "what is new", "what new"],
+  "context": ["app", "windowTitle", "url", "document", "selection", "pageText"],
+  "run": ["./Footnote.app/Contents/MacOS/footnote"],
+  "network": [],
+  "formerID": "pa"
+}

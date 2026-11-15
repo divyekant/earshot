@@ -38,7 +38,7 @@ Examples:
 "$EARSHOT" settings set mode alwaysOn
 "$EARSHOT" settings set wakePhrase hey atlas
 "$EARSHOT" settings set playSounds off
-"$EARSHOT" plugins restart pa
+"$EARSHOT" plugins restart footnote
 "$EARSHOT" run "todo buy milk" --actions
 ```
 

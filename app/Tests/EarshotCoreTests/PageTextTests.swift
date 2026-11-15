@@ -78,25 +78,25 @@ final class PageTextTests: XCTestCase {
     func testAsks() {
         let asks = PageTextAsks()
         let t0 = Date()
-        asks.sent(id: "c1", pluginID: "pa", url: "https://fox.example", at: t0)
-        XCTAssertEqual(asks.ask(re: "c9", pluginID: "pa", at: t0), .failure(.init("no command with this id")))
-        XCTAssertEqual(asks.ask(re: nil, pluginID: "pa", at: t0), .failure(.init("no command with this id")))
+        asks.sent(id: "c1", pluginID: "footnote", url: "https://fox.example", at: t0)
+        XCTAssertEqual(asks.ask(re: "c9", pluginID: "footnote", at: t0), .failure(.init("no command with this id")))
+        XCTAssertEqual(asks.ask(re: nil, pluginID: "footnote", at: t0), .failure(.init("no command with this id")))
         XCTAssertEqual(asks.ask(re: "c1", pluginID: "other", at: t0), .failure(.init("no command with this id")))
-        guard case .success(let c) = asks.ask(re: "c1", pluginID: "pa", at: t0.addingTimeInterval(1)) else { return XCTFail("refused") }
+        guard case .success(let c) = asks.ask(re: "c1", pluginID: "footnote", at: t0.addingTimeInterval(1)) else { return XCTFail("refused") }
         XCTAssertEqual(c.id, "c1")
         XCTAssertEqual(c.url, "https://fox.example")
-        XCTAssertEqual(asks.ask(re: "c1", pluginID: "pa", at: t0.addingTimeInterval(2)), .failure(.init("one ask for each command")))
-        asks.sent(id: "c2", pluginID: "pa", url: nil, at: t0)
-        XCTAssertEqual(asks.ask(re: "c2", pluginID: "pa", at: t0.addingTimeInterval(PageText.askSeconds + 1)), .failure(.init("too late")))
+        XCTAssertEqual(asks.ask(re: "c1", pluginID: "footnote", at: t0.addingTimeInterval(2)), .failure(.init("one ask for each command")))
+        asks.sent(id: "c2", pluginID: "footnote", url: nil, at: t0)
+        XCTAssertEqual(asks.ask(re: "c2", pluginID: "footnote", at: t0.addingTimeInterval(PageText.askSeconds + 1)), .failure(.init("too late")))
     }
 
     /// Old commands go, so that the list stays small.
     func testOldCommandsGo() {
         let asks = PageTextAsks()
         let t0 = Date()
-        asks.sent(id: "old", pluginID: "pa", url: nil, at: t0)
-        asks.sent(id: "new", pluginID: "pa", url: nil, at: t0.addingTimeInterval(PageText.askSeconds * 7))
-        XCTAssertEqual(asks.ask(re: "old", pluginID: "pa", at: t0), .failure(.init("no command with this id")))
+        asks.sent(id: "old", pluginID: "footnote", url: nil, at: t0)
+        asks.sent(id: "new", pluginID: "footnote", url: nil, at: t0.addingTimeInterval(PageText.askSeconds * 7))
+        XCTAssertEqual(asks.ask(re: "old", pluginID: "footnote", at: t0), .failure(.init("no command with this id")))
     }
 
     /// A page that is still loading: earshot reads again after 1 s, for 3 s at most (W1 follow-up).

@@ -103,25 +103,25 @@ Experimental until a second plugin exists. `docs/PLUGINS.md` gives the contract.
 | R-PL-4 | The owner approves each plugin. A changed manifest needs a new approval. A core command wins over a plugin lead. | Must |
 | R-PL-5 | A plugin cannot slow a command. earshot shows its note at once and does not wait for the plugin. | Must |
 
-### 3.9 PA plugin
+### 3.9 Footnote plugin
 
-Experimental, phase 1. The PA (personal assistant) is the first plugin of earshot. It is a separate program in `plugins/pa/`. The design document and `/mnt/project-files/earshot-pa/phase1-build-spec.md` give the reasons.
+Experimental, phase 1. Footnote is the private personal assistant of the owner, and the first plugin of earshot. Its name was "PA" before 2026-11-15, and its requirement IDs were R-PA-n. Older commits and project files use the old names. It is a separate program in `plugins/footnote/`. The design document and `/mnt/project-files/earshot-pa/phase1-build-spec.md` give the reasons.
 
 | ID | Requirement | Priority |
 |---|---|---|
-| R-PA-1 | The PA is one local program with one store file. It needs no server software and no account. | Must |
-| R-PA-2 | No PA data leaves the Mac. Exception, chosen by the owner: the titles, times and project names of open to-dos and reminders go to Apple Reminders, which syncs through iCloud. A later exception for research is not in phase 1. | Must |
-| R-PA-3 | The PA changes only its own store, its own pages and its own list in Apple Reminders. It never sends, books, pays, or changes a file of the owner. | Must |
-| R-PA-4 | Rules decide what to do and when. Search finds. No model writes text. The PA shows the owner's words, words of the owner's kept documents, mail, notes and calendar events, fixed labels, times and counts. One embedding model of 0.6B or less can compare text. A formula with some thousand weights can score a sentence. | Must |
-| R-PA-5 | A to-do that the PA found in a source is a proposal until the owner confirms it. A flag is a proposal until the owner says "keep". | Must |
-| R-PA-6 | If the PA is not sure of a time, it saves the item with no time and says so. The PA never loses a capture. | Must |
-| R-PA-7 | The PA interrupts the owner only by a rule that is set to "alert". By default, only time interrupts. | Must |
-| R-PA-8 | The PA answers a capture or a change in 100 ms or less, and a search in 300 ms or less. A PA command does not slow earshot (R-PL-5). | Must |
-| R-PA-9 | The PA keeps the text of a document only if the owner kept the document or its folder. It keeps the text of the notes of the Notes app only while that source is on. From a mail, it keeps only the sender name, the subject and one sentence, and only for a flag. If the owner drops a document or switches a source off, the PA deletes the text and the numbers at once. The PA keeps the text of a web page only if the owner said "keep this" for that page. If the owner drops the page, the PA deletes the text, the numbers and the copy at once. | Must |
-| R-PA-10 | A project that the search set has a mark and shows with "?". The owner can correct it with one command. The PA counts the corrections and shows them. | Must |
-| R-PA-11 | The PA only reads the calendar, Mail and Notes. It changes nothing in them and starts none of them. Each source has a switch. | Must |
-| R-PA-12 | The formula for flags learns only from the owner's "keep" and "drop" answers, on this Mac. The PA uses new weights only if they are better on the owner's last answers. | Should |
-| R-PA-13 | The PA gets the text of a web page only from earshot, and only after a command of the owner for the page in front. The PA has no network code and no Accessibility permission. | Must |
+| R-FN-1 | Footnote is one local program with one store file. It needs no server software and no account. | Must |
+| R-FN-2 | No Footnote data leaves the Mac. Exception, chosen by the owner: the titles, times and project names of open to-dos and reminders go to Apple Reminders, which syncs through iCloud. A later exception for research is not in phase 1. | Must |
+| R-FN-3 | Footnote changes only its own store, its own pages and its own list in Apple Reminders. It never sends, books, pays, or changes a file of the owner. | Must |
+| R-FN-4 | Rules decide what to do and when. Search finds. No model writes text. Footnote shows the owner's words, words of the owner's kept documents, mail, notes and calendar events, fixed labels, times and counts. One embedding model of 0.6B or less can compare text. A formula with some thousand weights can score a sentence. | Must |
+| R-FN-5 | A to-do that Footnote found in a source is a proposal until the owner confirms it. A flag is a proposal until the owner says "keep". | Must |
+| R-FN-6 | If Footnote is not sure of a time, it saves the item with no time and says so. Footnote never loses a capture. | Must |
+| R-FN-7 | Footnote interrupts the owner only by a rule that is set to "alert". By default, only time interrupts. | Must |
+| R-FN-8 | The Footnote answers a capture or a change in 100 ms or less, and a search in 300 ms or less. A Footnote command does not slow earshot (R-PL-5). | Must |
+| R-FN-9 | Footnote keeps the text of a document only if the owner kept the document or its folder. It keeps the text of the notes of the Notes app only while that source is on. From a mail, it keeps only the sender name, the subject and one sentence, and only for a flag. If the owner drops a document or switches a source off, Footnote deletes the text and the numbers at once. Footnote keeps the text of a web page only if the owner said "keep this" for that page. If the owner drops the page, Footnote deletes the text, the numbers and the copy at once. | Must |
+| R-FN-10 | A project that the search set has a mark and shows with "?". The owner can correct it with one command. The Footnote counts the corrections and shows them. | Must |
+| R-FN-11 | Footnote only reads the calendar, Mail and Notes. It changes nothing in them and starts none of them. Each source has a switch. | Must |
+| R-FN-12 | The formula for flags learns only from the owner's "keep" and "drop" answers, on this Mac. Footnote uses new weights only if they are better on the owner's last answers. | Should |
+| R-FN-13 | Footnote gets the text of a web page only from earshot, and only after a command of the owner for the page in front. Footnote has no network code and no Accessibility permission. | Must |
 
 ### 3.10 Command line
 

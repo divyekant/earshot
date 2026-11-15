@@ -3,7 +3,7 @@ import EarshotCore
 @testable import EarshotActions
 import XCTest
 
-/// The probes of PA phase 4, package W1 (spec `phase4-build-spec.md`, section 6): can earshot read the text of the
+/// The probes of Footnote phase 4, package W1 (spec `phase4-build-spec.md`, section 6): can earshot read the text of the
 /// web page in front through the Accessibility interface? It compares two read methods (A: the tree walk,
 /// B: the text range) on made-up local pages in `Tests/Fixtures/pageprobe`.
 ///
@@ -217,7 +217,7 @@ final class PageReadBench: XCTestCase {
         log("P2fresh", row)
     }
 
-    /// The clean probe 7 (PA phase 5 spec, section 6.1): `EARSHOT_PAGE_PROBES=8`. A second Chrome with an empty
+    /// The clean probe 7 (Footnote phase 5 spec, section 6.1): `EARSHOT_PAGE_PROBES=8`. A second Chrome with an empty
     /// profile in a temporary folder, brought to the front. Arm 1: no flag. Arm 2 (the control):
     /// `--force-renderer-accessibility`, for the probe process only. The probe sets no attribute: it only reads.
     /// It records the screen lock flag, the front app, the count of elements and the web area at 1, 3 and 15 s, and

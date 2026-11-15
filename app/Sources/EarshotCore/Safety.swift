@@ -112,7 +112,7 @@ public enum SafetyPolicy {
     public static let pluginDataPath = "/earshot/plugin-data/"
 
     /// True for a page that a plugin wrote: a file in the plugin data folder. Such a page holds the owner's private
-    /// data, for example the to-dos or the mail flags of the PA.
+    /// data, for example the to-dos or the mail flags of Footnote.
     public static func pluginPage(url: String?) -> Bool {
         guard let url, let u = URL(string: url), u.isFileURL else { return false }
         return u.standardizedFileURL.path.contains(pluginDataPath)

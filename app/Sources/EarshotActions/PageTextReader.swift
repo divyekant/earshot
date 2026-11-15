@@ -18,7 +18,7 @@ public struct PageTextResult: Sendable {
 
 /// Reads the text of the web page in the front window, for the context key "pageText" (docs/PLUGINS.md 5.3).
 ///
-/// The method is the tree walk of the W1 probes (PA phase 4): it was complete on all six probe pages in Chrome and
+/// The method is the tree walk of the W1 probes (Footnote phase 4): it was complete on all six probe pages in Chrome and
 /// Safari, and gave no value of a one-line field.
 ///
 /// Read only: the reader only copies values. It does not press, scroll, select, type or change the focus.
