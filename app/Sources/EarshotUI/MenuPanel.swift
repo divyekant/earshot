@@ -16,7 +16,19 @@ public enum PanelText {
     /// The first line: the words that earshot heard, in quotes. A dictation keeps no words in the log, so it uses
     /// the intent ("Type …").
     public static func title(_ r: ActivityRecord) -> String {
-        r.heard.isEmpty ? r.intent : "“\(r.heard)”"
+        if r.heard.isEmpty { return r.intent }
+        // A dictation keeps only its word count in the log, for example "(15 words)" (CommandPipeline+LogText).
+        if let n = wordCountOnly(r.heard) { return "Dictation · \(n) word\(n == 1 ? "" : "s")" }
+        return "“\(r.heard)”"
+    }
+
+    /// The count of a heard text that is only "(N words)" or "(1 word)", else nil.
+    static func wordCountOnly(_ heard: String) -> Int? {
+        let t = heard.trimmingCharacters(in: .whitespaces)
+        guard t.hasPrefix("("), t.hasSuffix(")") else { return nil }
+        let parts = t.dropFirst().dropLast().split(separator: " ")
+        guard parts.count == 2, let n = Int(parts[0]), parts[1] == "words" || parts[1] == "word" else { return nil }
+        return n
     }
 
     /// The second line in plain words: what earshot did, without the router details. The note of a record is, for
@@ -70,6 +82,7 @@ public struct MenuPanel: View {
     let model: PanelModel
     let store: Store
     @State private var records: [ActivityRecord] = []
+    @Environment(\.dismiss) private var dismiss
     @State private var plugins: [PluginPages] = []
     /// The part under the mode: nil for the last commands, else the id of a plugin with pages.
     @State private var part: String?
@@ -107,6 +120,9 @@ public struct MenuPanel: View {
         .preferredColorScheme(.dark)
         .tint(Brand.accent)
         .onAppear(perform: load)
+        // Escape closes the panel (Mac check 2026-11-15: the window style does not close on Escape by itself).
+        .background(Button("Close") { dismiss() }.keyboardShortcut(.cancelAction).opacity(0).frame(width: 0, height: 0)
+            .accessibilityHidden(true))
     }
 
     private var header: some View {
@@ -182,7 +198,7 @@ public struct MenuPanel: View {
             HStack {
                 Toggle("Start at login", isOn: model.startsAtLogin).toggleStyle(.checkbox).font(.system(size: 12))
                 Spacer()
-                Button("Settings…", action: model.openSettings).buttonStyle(PillButtonStyle())
+                Button("Settings…") { dismiss(); model.openSettings() }.buttonStyle(PillButtonStyle())
                 Button("Quit", action: model.quit).buttonStyle(PillButtonStyle())
             }
         }

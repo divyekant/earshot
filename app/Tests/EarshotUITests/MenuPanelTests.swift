@@ -30,6 +30,13 @@ final class MenuPanelTests: XCTestCase {
         XCTAssertTrue(PanelText.shows(r))
     }
 
+    func testWordCountOnlyIsADictation() {
+        XCTAssertEqual(PanelText.title(record(heard: "(15 words)", intent: "Type \"…\"", note: "typed")), "Dictation · 15 words")
+        XCTAssertEqual(PanelText.title(record(heard: "(1 word)", intent: "Type \"…\"", note: "typed")), "Dictation · 1 word")
+        XCTAssertEqual(PanelText.title(record(heard: "Type. (14 words).", intent: "Type \"…\"", note: "typed")),
+                       "“Type. (14 words).”")
+    }
+
     func testRecentSkipsRecordsWithNoCommandAndKeepsTheNewestFirst() {
         let rows = [
             record(heard: "a", intent: "A", note: "", at: 1),
