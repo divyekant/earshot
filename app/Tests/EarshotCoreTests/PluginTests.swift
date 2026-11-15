@@ -85,6 +85,22 @@ final class PluginTests: XCTestCase {
         XCTAssertFalse(catalog.scan()[0].approved)
     }
 
+    /// Off keeps the approval, but the plugin does not run (the Plugins page, design canvas 2026-11-15).
+    func testOffKeepsTheApproval() throws {
+        try write("footnote", good)
+        let catalog = PluginCatalog(store: Store(folder: folder))
+        try catalog.setApproved(catalog.scan()[0], true)
+        XCTAssertTrue(catalog.scan()[0].usable)
+        try catalog.setOn("footnote", false)
+        let off = catalog.scan()[0]
+        XCTAssertTrue(off.approved)
+        XCTAssertFalse(off.on)
+        XCTAssertFalse(off.usable)
+        try catalog.setOn("footnote", true)
+        XCTAssertTrue(catalog.scan()[0].usable)
+        XCTAssertEqual(catalog.off, [])
+    }
+
     // MARK: Rename (docs/PLUGINS.md 2.1)
 
     private let oldManifest = """

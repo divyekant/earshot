@@ -106,22 +106,22 @@ uv run app/scripts/weekly-report.py --since 2026-11-03 --until 2026-11-10
 
 ## Set up
 
-1. Open `app/build/Earshot.app`. An ear icon shows in the menu bar. earshot has no Dock icon.
-2. Click the ear icon, then click **Settings…** in the panel.
-3. Open **Advanced > Permissions**. Give each permission:
+1. Open `app/build/Earshot.app`. The earshot icon (voice bars) shows in the menu bar. earshot has no Dock icon.
+2. Click the earshot icon, then click **Open earshot** in the panel.
+3. Open the **System** page. Click **Allow** in each row:
 
    | Permission | Why earshot needs it |
    |---|---|
    | Accessibility | Read the screen, focus fields, type and click. |
    | Microphone | Hear commands. Audio stays on this Mac. |
-   | Speech recognition | Use the Apple speech engine on this Mac. |
+   | Speech recognition (optional on macOS 26) | Use the Apple speech engine on macOS 14 and 15. On macOS 26, the speech engines run without it. |
    | Input Monitoring | Read the hold key while another app is in front. |
    | Screen Recording (optional) | Read text that has no accessibility label, with on-device text recognition. |
    | Contacts (optional) | Find a chat by the name of a contact. This is off until you turn it on. |
 
-4. Open the **Apps** tab. Click **Discover apps**. earshot reads the menus of your apps.
-5. Select the apps that earshot may act in. Click **Approve**. earshot acts only in approved apps.
-6. Open the **Names** tab. Make sure that the names of your chats are in the list. Add a name if it is missing.
+4. Open the **Apps** page. If the list is empty, click **Read my apps**. earshot reads the menus of your apps.
+5. The **New** group shows the apps that wait for you. Click **Allow** for each app that earshot may act in, or click **Allow all**. earshot acts only in allowed apps.
+6. Click an app with chats. Make sure that the names of your chats are in **People and channels**. If a name is missing, type it in **Add a person or channel**.
 
 ## Use
 
@@ -131,11 +131,11 @@ uv run app/scripts/weekly-report.py --since 2026-11-03 --until 2026-11-10
 
 earshot shows a small note with the result, for example "→ Slack · Ravi".
 
-To change the hold key, open **Settings… > Settings**.
+To change the hold key, open the **Settings** page.
 
-To try a command without your voice, open the **Test** tab. Type the command and click **Run**. By default, the Test tab shows the decision only. It acts only if you turn on **Also do the action**.
+To try a command without your voice, open **System > Try a command**. Type the command and click **Try**. By default, earshot shows the decision only. It acts only if you turn on **Also do it**.
 
-To see the time of each step of each command, open the **Activity** tab.
+To see the time of each step of each command, open the **Activity** page and click a command.
 
 ### Always-on mode
 
@@ -143,7 +143,7 @@ Always-on mode is off by default. In this mode, earshot listens for a wake phras
 
 To turn on always-on mode:
 
-1. Open **Settings… > Settings**.
+1. Open the **Settings** page.
 2. Set **Mode** to **Always on**. The first time, earshot downloads the wake phrase models (about 18 MB). The download sends no audio.
 3. Click **Teach earshot your voice…**, then say the phrase 5 times. Say it the same way each time. earshot keeps a voice summary (256 numbers) and the sound pattern of the phrase on this Mac. It does not keep the audio.
 
@@ -161,11 +161,11 @@ earshot never presses Send or does a risky action from always-on mode. The hold 
 |---|---|
 | Automatic (default) | Uses the Apple speech engine. |
 | Apple | Apple speech on this Mac. On macOS 26, earshot uses SpeechTranscriber. On older macOS, on Intel Macs, and if SpeechTranscriber does not load, earshot uses Apple on-device dictation (SFSpeechRecognizer). Both keep the audio on this Mac. |
-| Parakeet | NVIDIA Parakeet through transcribe.cpp. earshot does not include the model file. Set the path to a Parakeet GGUF file in **Settings… > Settings**. If the path is empty, earshot uses the model file of the Hex app, if it is installed. |
+| Parakeet | NVIDIA Parakeet through transcribe.cpp. earshot does not include the model file. Set the path to a Parakeet GGUF file on the **Settings** page. If the path is empty, earshot uses the model file of the Hex app, if it is installed. |
 
 ### Jev (optional)
 
-1. Open **Settings… > Settings**.
+1. Open the **Settings** page.
 2. Paste your Jev key. earshot saves the key in the Keychain.
 3. Turn on **Ask Jev** under **When the rules are unsure**.
 

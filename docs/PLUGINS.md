@@ -16,19 +16,19 @@ A plugin does not add a verb or an intent to earshot. All plugins use one intent
 
 ## 2. Install a plugin
 
-1. Open the Manage window of earshot.
-2. Open the Plugins tab.
+1. Open the earshot window: click the earshot icon in the menu bar, then click "Open earshot".
+2. Open the Plugins page.
 3. Click "Open the plugins folder".
 4. Put the plugin in its own folder in the plugins folder. The folder name must be the plugin id.
-5. Click "Read again".
-6. Read the lead words, the context and the network line of the plugin.
-7. Turn on "Approved".
+5. Click "Look for new plugins". The plugin shows in a card that "Waits for you".
+6. Read the card: what the plugin gets, its lead words and its network line.
+7. Click "Approve <name>". To decide later, click "Not now".
 
 The plugins folder is `~/Library/Application Support/earshot/plugins/`. Each plugin is in `plugins/<id>/`, with its `plugin.json` file.
 
 If the `plugin.json` file changes, the approval stops. Approve the plugin again.
 
-If you install a new build of the plugin program, click "Read again". earshot stops the old program and starts the new one. The approval stays. earshot sees a change in the program file and in each file directly in the plugin folder.
+If you install a new build of the plugin program, click "Look for new plugins" or "Restart". earshot stops the old program and starts the new one. The approval stays. earshot sees a change in the program file and in each file directly in the plugin folder.
 
 ### 2.1 Rename a plugin
 
@@ -73,13 +73,13 @@ If one condition is false, earshot does not rename. The new plugin then needs th
 | `leads` | Yes | The words that start a command for the plugin. 1 to 5 words each. |
 | `context` | No | The context for each command: `app` (the bundle id of the front app), `windowTitle`, `url`, `document`, `selection`. The default is none. See section 5.1. |
 | `run` | Yes | The program and its arguments. A relative path starts at the plugin folder. |
-| `network` | No | The network hosts that the plugin says it uses. The default is none. earshot shows it in the Plugins tab. earshot does not enforce it. |
+| `network` | No | The network hosts that the plugin says it uses. The default is none. earshot shows it on the Plugins page. earshot does not enforce it. |
 | `formerID` | No | The id of the plugin before a rename. See section 2.1. |
 | `settings` | No | The settings that the owner can change in the earshot window. See section 3.2. The default is none. |
 
 ### 3.1 Rules for lead words
 
-earshot does not use a lead in these conditions. The Plugins tab shows the reason.
+earshot does not use a lead in these conditions. The Plugins page shows the lead in coral, with the reason.
 
 - The first word starts a core command, for example "open", "type", "click", "send", "find", "show", "scroll", "back", "undo", "stop", "yes" or "no".
 - The first word is a filler word, for example "please", "can", "to" or "the".
@@ -120,7 +120,7 @@ Some more rules:
 - With the hold key, a sentence that starts with a lead goes to the plugin. It does not go into the focused text box.
 - After a bare "type", the next sentence is dictation (R-NV-4). A lead in it is text, and earshot types it.
 - In always-on mode, the wake phrase and the voice check apply as for each other command.
-- The Test tab routes typed commands to plugins.
+- System > Try a command routes typed commands to plugins.
 - On a sign-in, code or payment page, earshot sends no context. The plugin gets the text only.
 
 The activity log keeps the lead and the number of words. It does not keep the words.
@@ -138,7 +138,8 @@ earshot starts the program with posix_spawn. The program reads JSON lines from s
 - A page in this folder is a plugin page. If a plugin page is in the front window, no label of the page goes to Jev (tier 2), and "Jev sees the screen" takes no picture (R-MD-1, D-10).
 - stderr goes to `/dev/null`.
 - earshot starts each approved plugin when earshot starts. The plugin runs while earshot runs.
-- If the plugin stops, earshot starts it again after 2 s. After 3 starts in 60 s, the plugin stays off until the next change in the Plugins tab, or the next start of earshot.
+- The owner can turn off an approved plugin with the On and Off switch on the Plugins page. earshot stops the program and sends it no command. The approval stays, so On starts it again with no new approval. earshot keeps the off plugins in `plugins-off.json`.
+- If the plugin stops, earshot starts it again after 2 s. After 3 starts in 60 s, the plugin stays stopped. The Plugins page and the panel then show "<name> stopped". The plugin starts again when the owner clicks "Start again" or "Look for new plugins", or at the next start of earshot.
 - When earshot quits, stdin of the plugin closes. The plugin must stop when stdin closes.
 - earshot drops a line that is longer than 64 KB, and a line that is not a message.
 
@@ -172,7 +173,7 @@ The context keys:
 - earshot sends only the keys that the manifest names. A key with no value is absent.
 - earshot reads `document` and `selection` only for a plugin that names them. The read comes before the command goes to the plugin. The note does not wait for the plugin.
 - On a sign-in, code or payment page, earshot sends no context.
-- The Plugins tab shows each key in words. It shows `selection` and `pageText` in orange: the plugin gets the text that you selected or the text of the page, and can keep it.
+- The Plugins page shows each key in words, in "What <name> gets". It shows `selection` and `pageText` in amber: the plugin gets the text that you selected or the text of the page, and can keep it.
 - The activity log keeps no context value.
 
 ### 5.2 From the plugin to earshot
@@ -288,12 +289,42 @@ A plugin can write local HTML pages to its data folder, in `<store>/plugin-data/
 - earshot reads the page again each time the owner opens the link or the panel.
 - earshot's own window is never a command target, so a page in the window never goes to Jev.
 
+### 5.5 Lists as data: board.json
+
+A plugin can also write its lists as data, in `pages/board.json`. Then earshot draws the lists with its own type and rows, in the window and in the menu bar panel. The plugin then looks like a part of earshot. The HTML pages stay for the browser. The file is optional and needs no new manifest key, so the approval does not change. earshot only shows the text: it never runs it as a command (R-PL-3).
+
+```json
+{
+  "version": 1,
+  "panel": { "title": "Today", "rows": [{ "text": "Call the plumber", "when": "17:00", "mark": "todo" }],
+             "empty": "Nothing for today." },
+  "tabs": [
+    { "id": "today", "title": "Today", "sub": "1 for today", "date": "Sat 14 Nov",
+      "sections": [
+        { "title": "Late", "tone": "late", "rows": [] },
+        { "title": "Today", "rows": [{ "text": "Call the plumber", "detail": "Kitchen", "when": "17:00", "mark": "todo" }],
+          "empty": "Nothing for today." },
+        { "title": "The last 7 days", "numbers": [{ "label": "done", "value": 4 }] }
+      ],
+      "hint": "Say “done” with the words of a to-do." }
+  ],
+  "settingsTab": "Rules"
+}
+```
+
+- `panel`: up to 6 rows under the header of the panel. If `rows` is empty, the panel shows `empty`. If `empty` is not there, the panel shows no list.
+- `tabs`: up to 8 pages in the window, as tabs. Each tab has sections. A section has a `title`, and `rows`, `numbers` or a plain `text`.
+- A row has `text`, and optional `detail`, `when`, `late`, `mark` and `open`. `mark` is `todo`, `doc`, `flag` or `note`. `tone: "late"` and `late: true` draw the time in the color for late items.
+- `open` uses the rule of "open <target>" (section 4). A file name with no folder opens from the pages folder.
+- `settingsTab` is the name of the tab with the settings of section 3.2. The default is "Settings".
+- earshot draws at most 200 rows in a section and reads a file of 1 MB at most. If the file is not valid, earshot shows `index.html` (section 5.4).
+
 ## 6. The example plugin
 
 `app/examples/plugins/echo/` is a small plugin in shell. It answers each command with the number of its words. To try it:
 
 1. Copy the folder `echo` into the plugins folder.
-2. In the Plugins tab, click "Read again", and approve "Echo".
+2. On the Plugins page, click "Look for new plugins", then click "Approve Echo".
 3. Hold the key and say "say back the blue fox".
 4. The note shows "Echo: 3 words".
 

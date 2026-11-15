@@ -49,7 +49,7 @@ final class MenuPanelTests: XCTestCase {
         XCTAssertEqual(PanelText.recent(rows).map(\.heard), ["c", "b", "a"])
     }
 
-    func testManagePagesAreFourTextLinks() {
-        XCTAssertEqual(ManagePage.allCases.map(\.title), ["Settings", "Activity", "Plugins", "Advanced"])
+    func testManagePagesAreFiveTextLinks() {
+        XCTAssertEqual(ManagePage.allCases.map(\.title), ["Activity", "Settings", "Apps", "Plugins", "System"])
     }
 }

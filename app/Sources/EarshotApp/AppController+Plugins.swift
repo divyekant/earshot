@@ -27,7 +27,7 @@ extension AppController {
                     guard let self else { return }
                     self.control?.collect("\(manifest.name): \(text)")
                     if self.settings.showFeedback || alert {
-                        feedback.show("\(manifest.name): \(text)", ok: true, seconds: Self.pluginAnswerSeconds)
+                        feedback.showAnswer(from: manifest.name, text: text, seconds: Self.pluginAnswerSeconds)
                     }
                     if alert, self.settings.playSounds {
                         NSSound(named: FeedbackSound.done.systemName).map { $0.volume = FeedbackSound.done.volume; $0.play() }
