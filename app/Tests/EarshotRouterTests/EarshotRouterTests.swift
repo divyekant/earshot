@@ -906,7 +906,7 @@ final class EarshotRouterTests: XCTestCase {
         }
         let open = await labels(page)
         XCTAssertTrue(open.contains { $0.contains("Budget plan") }, "\(open)")
-        page.url = "file:///Users/me/Library/Application%20Support/earshot/plugin-data/pa/today.html"
+        page.url = "file:///Users/me/Library/Application%20Support/earshot/plugin-data/footnote/today.html"
         let plugin = await labels(page)
         XCTAssertFalse(plugin.contains { $0.contains("Budget plan") }, "\(plugin)")
         page.url = "https://notes.example/login"

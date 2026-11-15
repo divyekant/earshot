@@ -97,11 +97,15 @@ public struct PluginManifest: Codable, Hashable, Sendable {
     /// The network hosts that the plugin says it uses. Empty means none. The Plugins tab shows it for the approval.
     /// It is a statement of the plugin: earshot does not enforce it.
     public var network: [String]
+    /// The id that this plugin had before a rename, or nil. earshot moves the data folder and the approval of the old
+    /// id to the new id only if the approved old manifest asks for the same leads, context and network
+    /// (docs/PLUGINS.md 2.1).
+    public var formerID: String?
 
     public init(contract: Int = PluginContract.version, id: String, name: String, version: String = "0.1.0",
-                leads: [String], context: [String] = [], run: [String], network: [String] = []) {
+                leads: [String], context: [String] = [], run: [String], network: [String] = [], formerID: String? = nil) {
         self.contract = contract; self.id = id; self.name = name; self.version = version
-        self.leads = leads; self.context = context; self.run = run; self.network = network
+        self.leads = leads; self.context = context; self.run = run; self.network = network; self.formerID = formerID
     }
 
     /// Reads each field if it is in the file. A missing optional field gets its default.
@@ -115,6 +119,12 @@ public struct PluginManifest: Codable, Hashable, Sendable {
         context = try c.decodeIfPresent([String].self, forKey: .context) ?? []
         run = try c.decode([String].self, forKey: .run)
         network = try c.decodeIfPresent([String].self, forKey: .network) ?? []
+        formerID = try c.decodeIfPresent(String.self, forKey: .formerID)
+    }
+
+    /// True for a good id: only a-z, 0-9 and "-".
+    public static func validID(_ id: String) -> Bool {
+        !id.isEmpty && id.unicodeScalars.allSatisfy { CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyz0123456789-").contains($0) }
     }
 
     /// The problems that stop earshot from loading the manifest. Empty if the manifest is good.
@@ -122,9 +132,7 @@ public struct PluginManifest: Codable, Hashable, Sendable {
     public var problems: [String] {
         var out: [String] = []
         if contract != PluginContract.version { out.append("contract \(contract) is not \(PluginContract.version)") }
-        if id.isEmpty || !id.unicodeScalars.allSatisfy({ CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyz0123456789-").contains($0) }) {
-            out.append("the id must use only a-z, 0-9 and \"-\"")
-        }
+        if !Self.validID(id) { out.append("the id must use only a-z, 0-9 and \"-\"") }
         if leads.isEmpty { out.append("no lead words") }
         if run.first?.isEmpty ?? true { out.append("no program to run") }
         let unknown = context.filter { !PluginContract.contextKeys.contains($0) }
@@ -192,7 +200,7 @@ public enum PluginTargetOpen {
         let raw = open.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !raw.isEmpty else { return (nil, "the target has no address") }
         if let u = URL(string: raw), let scheme = u.scheme?.lowercased(), !raw.hasPrefix("/") {
-            // A "message:" address shows one mail in Mail. It sends nothing (phase 3 of the PA).
+            // A "message:" address shows one mail in Mail. It sends nothing (phase 3 of Footnote).
             if scheme == "message" {
                 guard raw.lowercased().hasPrefix("message://"), raw.count > "message://".count else {
                     return (nil, "not a mail address")
@@ -265,6 +273,97 @@ public struct PluginCatalog: Sendable {
     public static func hash(_ data: Data) -> String {
         SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
+
+    // MARK: Rename of a plugin (docs/PLUGINS.md 2.1)
+
+    /// The data folder of all plugins: <store>/plugin-data/.
+    public var dataFolder: URL { store.folder.appendingPathComponent("plugin-data", isDirectory: true) }
+
+    /// The renames that earshot can do now. A plugin in plugins/<new>/ names its old id in "formerID". earshot moves
+    /// the data folder and the approval only if all of these are true:
+    /// - the old folder plugins/<old>/ still has the manifest that the owner approved (the hash agrees),
+    /// - the old manifest has the old id, and the new manifest has no problems and no approval of its own,
+    /// - the old and the new manifest have the same contract, leads, context and network.
+    /// The owner approved these four. A change of the name, the version or the program path needs no new approval,
+    /// the same as an update of the program files (R-PL-4).
+    public func pendingRenames() -> [PluginRename] {
+        let fm = FileManager.default
+        guard let dirs = try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.isDirectoryKey]) else { return [] }
+        let approved = approvals
+        var out: [PluginRename] = []
+        for dir in dirs where (try? dir.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
+            guard let data = try? Data(contentsOf: dir.appendingPathComponent(PluginContract.manifestName)),
+                  let new = try? JSONDecoder().decode(PluginManifest.self, from: data),
+                  let old = new.formerID, old != new.id, PluginManifest.validID(old),
+                  new.id == dir.lastPathComponent, new.problems.isEmpty, approved[new.id] == nil,
+                  let oldHash = approved[old] else { continue }
+            let oldDir = folder.appendingPathComponent(old, isDirectory: true)
+            guard let oldData = try? Data(contentsOf: oldDir.appendingPathComponent(PluginContract.manifestName)),
+                  Self.hash(oldData) == oldHash,
+                  let was = try? JSONDecoder().decode(PluginManifest.self, from: oldData), was.id == old,
+                  was.contract == new.contract, was.leads == new.leads,
+                  Set(was.context) == Set(new.context), Set(was.network) == Set(new.network) else { continue }
+            out.append(PluginRename(from: old, to: new.id, newHash: Self.hash(data)))
+        }
+        return out.sorted { $0.to < $1.to }
+    }
+
+    /// Does one rename. Stop the old plugin first. The steps:
+    /// 1. moves plugin-data/<old>/ to plugin-data/<new>/. If the new folder exists, it moves each item that the new
+    ///    folder does not have, and keeps the rest in the old folder (it deletes no data),
+    /// 2. moves the approval to the new id, with the hash of the new manifest,
+    /// 3. deletes the old plugin folder plugins/<old>/ (the old program, not data).
+    /// If a step fails, the next steps do not run, and the next reload tries again. Returns the items that stayed in
+    /// the old data folder.
+    @discardableResult
+    public func apply(_ r: PluginRename) throws -> [String] {
+        let fm = FileManager.default
+        let oldData = dataFolder.appendingPathComponent(r.from, isDirectory: true)
+        let newData = dataFolder.appendingPathComponent(r.to, isDirectory: true)
+        var kept: [String] = []
+        if fm.fileExists(atPath: oldData.path) {
+            if !fm.fileExists(atPath: newData.path) {
+                try fm.moveItem(at: oldData, to: newData)
+            } else {
+                kept = try Self.merge(oldData, into: newData, fm)
+                if kept.isEmpty { try fm.removeItem(at: oldData) }
+            }
+        }
+        var all = approvals
+        all[r.to] = r.newHash
+        all[r.from] = nil
+        try store.save(all, PluginContract.approvalsFile)
+        try fm.removeItem(at: folder.appendingPathComponent(r.from, isDirectory: true))
+        return kept
+    }
+
+    /// Moves each item of `old` that `new` does not have. Goes into folders that both have.
+    /// Returns the paths (from `old`) of the files that stayed, because `new` has a file with the same name.
+    static func merge(_ old: URL, into new: URL, _ fm: FileManager, _ prefix: String = "") throws -> [String] {
+        var kept: [String] = []
+        for name in try fm.contentsOfDirectory(atPath: old.path) {
+            let from = old.appendingPathComponent(name), to = new.appendingPathComponent(name)
+            var fromDir: ObjCBool = false, toDir: ObjCBool = false
+            _ = fm.fileExists(atPath: from.path, isDirectory: &fromDir)
+            if !fm.fileExists(atPath: to.path, isDirectory: &toDir) {
+                try fm.moveItem(at: from, to: to)
+            } else if fromDir.boolValue && toDir.boolValue {
+                let left = try merge(from, into: to, fm, prefix + name + "/")
+                if left.isEmpty { try fm.removeItem(at: from) } else { kept += left }
+            } else {
+                kept.append(prefix + name)
+            }
+        }
+        return kept
+    }
+}
+
+/// One rename of a plugin that earshot can do (docs/PLUGINS.md 2.1).
+public struct PluginRename: Equatable, Sendable {
+    public let from: String
+    public let to: String
+    /// The SHA-256 of the new manifest. The approval moves to it.
+    public let newHash: String
 }
 
 // MARK: - Messages (JSON lines)

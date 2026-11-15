@@ -22,7 +22,7 @@ What works now:
 - Always-on mode, off by default: a wake phrase and a check of your voice. The end-of-turn rules still change after live tests.
 - A "not sure" note with two choices. earshot learns from your answer.
 - Plugins, experimental (`docs/PLUGINS.md`).
-- The PA plugin, experimental: reminders, to-dos, notes and projects by voice, with a copy in Apple Reminders for the iPhone (`docs/PA.md`).
+- The Footnote plugin, experimental: reminders, to-dos, notes and projects by voice, with a copy in Apple Reminders for the iPhone (`docs/FOOTNOTE.md`).
 
 What does not work yet:
 - "Mail <name>" opens Mail only. It does not start a new mail.

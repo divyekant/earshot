@@ -329,17 +329,17 @@ Limits:
 - `run --actions` asks two things: the program that starts the command line has the Accessibility permission, and the socket peer has the code signature of earshot. A program of the same user that can change the earshot files can still do much. The command line does not protect against such a program.
 
 
-## D-16. EmbeddingGemma-300M for the search by sense of the PA
+## D-16. EmbeddingGemma-300M for the search by sense of Footnote
 
-Date: 2026-11-11. Status: accepted by the owner. Requirements: R-PA-4, R-PA-8, R-MD-4. Numbers: `docs/experiments/E10-pa-embedding.md`.
+Date: 2026-11-11. Status: accepted by the owner. Requirements: R-FN-4, R-FN-8, R-MD-4. Numbers: `docs/experiments/E10-footnote-embedding.md`.
 
-The PA selects the embedding model by numbers on a made-up holdout set (PA phase 2 build spec, section 6). Only EmbeddingGemma-300M passes the Search mark: 92 of 100 in the first 3, with 768 numbers. Keywords alone get 78. No candidate passes the Project mark.
+Footnote selects the embedding model by numbers on a made-up holdout set (Footnote phase 2 build spec, section 6). Only EmbeddingGemma-300M passes the Search mark: 92 of 100 in the first 3, with 768 numbers. Keywords alone get 78. No candidate passes the Project mark.
 
 Decision:
 
-- The PA uses EmbeddingGemma-300M (Q8_0 GGUF) in llama.cpp on the Apple GPU, with 768 numbers. The setting `searchModel` is `"gemma"`.
+- Footnote uses EmbeddingGemma-300M (Q8_0 GGUF) in llama.cpp on the Apple GPU, with 768 numbers. The setting `searchModel` is `"gemma"`.
 - The model has the Gemma terms, not an open-source license. R-MD-4 prefers an open-source license, so the owner made this choice on 2026-11-11.
-- The install script downloads the model at a fixed revision with a SHA-256 check. The PA program has no network code.
+- The install script downloads the model at a fixed revision with a SHA-256 check. The Footnote program has no network code.
 - Project proposals stay off by default (`"proposeProject": false`), because no candidate passes the Project mark.
 
 Rejected:
@@ -352,40 +352,40 @@ Rejected:
 | Keywords only | Search 78 of 100. Questions in other words find less. |
 | EmbeddingGemma with 256 numbers | Search 90 of 100, at the mark with no margin. The full 768 numbers cost about 107 MB more while the model is loaded. |
 
-## D-17. The PA reads Mail and Notes through the apps, with Apple events
+## D-17. Footnote reads Mail and Notes through the apps, with Apple events
 
-Date: 2026-11-12. Status: accepted (PA phase 3 build spec, section 2). Requirements: R-PA-9, R-PA-11.
+Date: 2026-11-12. Status: accepted (Footnote phase 3 build spec, section 2). Requirements: R-FN-9, R-FN-11.
 
 Decision:
 
-- The PA reads Mail and Notes through the Mail app and the Notes app, with Apple events (macOS permission "Automation"). The owner clicks "Allow" one time for each app.
-- The PA reads only while the app runs. It never starts the app. It sends one small event at a time, with a pause of 200 ms between events, and a time limit of 20 s for one batch.
+- Footnote reads Mail and Notes through the Mail app and the Notes app, with Apple events (macOS permission "Automation"). The owner clicks "Allow" one time for each app.
+- Footnote reads only while the app runs. It never starts the app. It sends one small event at a time, with a pause of 200 ms between events, and a time limit of 20 s for one batch.
 - All scripts are fixed texts in one source file. A CI test fails if a script has a word of a change (`send`, `delete`, `move`, `set `, `make`, `save`, `reply`, `forward`, `redirect`, `duplicate`).
-- Probe numbers (2026-11-12, run 3): all headers of one message 0.5 s, the text of one message 1.5 s. During a text read, Mail answers other events up to 2.2 s late. So the PA does not read while Mail is the front app, and it reads few texts in one read.
+- Probe numbers (2026-11-12, run 3): all headers of one message 0.5 s, the text of one message 1.5 s. During a text read, Mail answers other events up to 2.2 s late. So Footnote does not read while Mail is the front app, and it reads few texts in one read.
 
 Rejected:
 
 | Option | Why it was rejected |
 |---|---|
-| Full Disk Access with the mail files and the Envelope Index | It needs manual steps in System Settings. It opens all private data of the Mac to the PA, not only mail. The file format is private and changes. |
+| Full Disk Access with the mail files and the Envelope Index | It needs manual steps in System Settings. It opens all private data of the Mac to Footnote, not only mail. The file format is private and changes. |
 | A mailbox export (`.mbox`) | A manual step for each read. |
-| A mail interface with network code (IMAP or an API) | The PA has no network code (R-PA-2). It would need a sign-in and a password store. |
+| A mail interface with network code (IMAP or an API) | Footnote has no network code (R-FN-2). It would need a sign-in and a password store. |
 
 ## D-18. The text of a web page comes from the page in front, through the Accessibility read of earshot
 
-Date: 2026-11-12. Status: accepted (PA phase 4 build spec, section 2). Requirements: R-PA-9, R-PA-13, R-PL-2.
+Date: 2026-11-12. Status: accepted (Footnote phase 4 build spec, section 2). Requirements: R-FN-9, R-FN-13, R-PL-2.
 
 Decision:
 
-- The PA gets the text of a web page only from earshot (contract key `pageText`, `docs/PLUGINS.md`, section 5.3). earshot reads the page in front with Accessibility, after a command of the owner for that page.
-- The PA selects the main text with a fixed rule (experiment E12) and keeps it as passages. It writes no text.
-- The PA has no network code and no Accessibility permission.
+- Footnote gets the text of a web page only from earshot (contract key `pageText`, `docs/PLUGINS.md`, section 5.3). earshot reads the page in front with Accessibility, after a command of the owner for that page.
+- Footnote selects the main text with a fixed rule (experiment E12) and keeps it as passages. It writes no text.
+- Footnote has no network code and no Accessibility permission.
 
 Rejected:
 
 | Option | Why it was rejected |
 |---|---|
-| A fetch of the address by the PA or by a helper program | It needs network code (R-PA-2). It gets no text of a page behind a sign-in. It needs an HTML parser. |
+| A fetch of the address by Footnote or by a helper program | It needs network code (R-FN-2). It gets no text of a page behind a sign-in. It needs an HTML parser. |
 | Apple event scripts for each browser | A script for each app (R-MT-1). Chrome needs a manual setting for scripts. |
-| The Accessibility permission for the PA | A manual step for the owner. It gives the PA control of each app. |
+| The Accessibility permission for Footnote | A manual step for the owner. It gives Footnote control of each app. |
 

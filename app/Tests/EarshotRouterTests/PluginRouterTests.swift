@@ -11,10 +11,10 @@ final class SpyChooser: Tier2Chooser {
 /// The plugin lead rule (R-PL-2, R-PL-4). Made-up leads and text only.
 final class PluginRouterTests: XCTestCase {
     let leads = [
-        PluginLead(pluginID: "pa", lead: "remind me to"),
-        PluginLead(pluginID: "pa", lead: "remind me"),
-        PluginLead(pluginID: "pa", lead: "what is due"),
-        PluginLead(pluginID: "pa", lead: "note"),
+        PluginLead(pluginID: "footnote", lead: "remind me to"),
+        PluginLead(pluginID: "footnote", lead: "remind me"),
+        PluginLead(pluginID: "footnote", lead: "what is due"),
+        PluginLead(pluginID: "footnote", lead: "note"),
     ]
 
     private func context(_ plugins: [PluginLead]? = nil) -> RouteContext {
@@ -27,32 +27,32 @@ final class PluginRouterTests: XCTestCase {
 
     func testLeadGivesTheRestAsText() async {
         let r = await route("Remind me to call the plumber at 5.")
-        XCTAssertEqual(r.intent, .handOff(pluginID: "pa", lead: "remind me to", text: "call the plumber at 5"))
+        XCTAssertEqual(r.intent, .handOff(pluginID: "footnote", lead: "remind me to", text: "call the plumber at 5"))
         XCTAssertEqual(r.tier, .rules)
         XCTAssertGreaterThanOrEqual(r.confidence, SafetyPolicy.minimumConfidence)
     }
 
     func testLongestLeadWins() async {
         let r = await route("remind me to water the plants")
-        XCTAssertEqual(r.intent, .handOff(pluginID: "pa", lead: "remind me to", text: "water the plants"))
+        XCTAssertEqual(r.intent, .handOff(pluginID: "footnote", lead: "remind me to", text: "water the plants"))
         let short = await route("remind me tomorrow about the fern")
-        XCTAssertEqual(short.intent, .handOff(pluginID: "pa", lead: "remind me", text: "tomorrow about the fern"))
+        XCTAssertEqual(short.intent, .handOff(pluginID: "footnote", lead: "remind me", text: "tomorrow about the fern"))
     }
 
     func testLeadWithNoRest() async {
         let r = await route("What is due?")
-        XCTAssertEqual(r.intent, .handOff(pluginID: "pa", lead: "what is due", text: ""))
+        XCTAssertEqual(r.intent, .handOff(pluginID: "footnote", lead: "what is due", text: ""))
     }
 
     func testFillersBeforeTheLead() async {
         let r = await route("Hey, can you remind me to buy bread")
-        XCTAssertEqual(r.intent, .handOff(pluginID: "pa", lead: "remind me to", text: "buy bread"))
+        XCTAssertEqual(r.intent, .handOff(pluginID: "footnote", lead: "remind me to", text: "buy bread"))
     }
 
     /// "remind me to open Slack" must not open Slack: the words after the lead are text.
     func testCommandWordsAfterTheLeadAreText() async {
         let r = await route("remind me to open Slack and message the team")
-        XCTAssertEqual(r.intent, .handOff(pluginID: "pa", lead: "remind me to", text: "open Slack and message the team"))
+        XCTAssertEqual(r.intent, .handOff(pluginID: "footnote", lead: "remind me to", text: "open Slack and message the team"))
         XCTAssertEqual(CommandRouter.steps("remind me to open Slack and message the team", context: context()).count, 1,
                        "a plugin lead is never cut into a chain")
     }
@@ -60,7 +60,7 @@ final class PluginRouterTests: XCTestCase {
     /// A trailing "and send" is text for the plugin. It never becomes a send (R-NV-5).
     func testTrailingSendIsNotASend() async {
         let r = await route("note buy stamps and send")
-        XCTAssertEqual(r.intent, .handOff(pluginID: "pa", lead: "note", text: "buy stamps and send"))
+        XCTAssertEqual(r.intent, .handOff(pluginID: "footnote", lead: "note", text: "buy stamps and send"))
         XCTAssertFalse(r.sendAfter)
     }
 
@@ -115,7 +115,7 @@ final class PluginRouterTests: XCTestCase {
 
     /// The speech engine can write one word in more than one way. "todo" matches "to do" and "to-do".
     func testLeadIgnoresSpacesAndHyphens() {
-        let todo = [PluginLead(pluginID: "pa", lead: "todo")]
+        let todo = [PluginLead(pluginID: "footnote", lead: "todo")]
         for spoken in ["todo buy stamps", "To do buy stamps", "to-do, buy stamps", "Hey, to-do buy stamps"] {
             XCTAssertEqual(PluginRouter.match(spoken, plugins: todo, apps: [])?.rest, "buy stamps", spoken)
         }
@@ -147,10 +147,10 @@ final class PluginRouterTests: XCTestCase {
     // MARK: - "open <target>" (docs/PLUGINS.md, section 5.2)
 
     let targets = [
-        PluginTargetName(pluginID: "pa", name: "today", open: "/tmp/pa/today.html"),
-        PluginTargetName(pluginID: "pa", name: "all open", open: "/tmp/pa/all-open.html"),
-        PluginTargetName(pluginID: "pa", name: "Kitchen", open: "/tmp/pa/kitchen.html"),
-        PluginTargetName(pluginID: "pa", name: "Notes", open: "/tmp/pa/notes.html"),
+        PluginTargetName(pluginID: "footnote", name: "today", open: "/tmp/footnote/today.html"),
+        PluginTargetName(pluginID: "footnote", name: "all open", open: "/tmp/footnote/all-open.html"),
+        PluginTargetName(pluginID: "footnote", name: "Kitchen", open: "/tmp/footnote/kitchen.html"),
+        PluginTargetName(pluginID: "footnote", name: "Notes", open: "/tmp/footnote/notes.html"),
     ]
 
     private func routeTarget(_ text: String) async -> RouteResult {
@@ -162,7 +162,7 @@ final class PluginRouterTests: XCTestCase {
                                ("hey, open my kitchen", "Kitchen"), ("open all-open", "all open")] {
             let r = await routeTarget(spoken)
             guard case let .openTarget(id, n, _) = r.intent else { XCTFail("\(spoken): \(r.intent)"); continue }
-            XCTAssertEqual(id, "pa", spoken)
+            XCTAssertEqual(id, "footnote", spoken)
             XCTAssertEqual(n, name, spoken)
             XCTAssertEqual(r.tier, .rules, spoken)
         }
@@ -193,7 +193,7 @@ final class PluginRouterTests: XCTestCase {
 
     /// The target check runs on each "open" command (R-SP-1). 1,000 checks with 200 targets.
     func testTargetIsFast() {
-        let many = (0..<200).map { PluginTargetName(pluginID: "pa", name: "project \($0)", open: "/tmp/\($0).html") }
+        let many = (0..<200).map { PluginTargetName(pluginID: "footnote", name: "project \($0)", open: "/tmp/\($0).html") }
         let words = ["open", "project", "150"]
         let t0 = DispatchTime.now().uptimeNanoseconds
         for _ in 0..<1000 { _ = PluginRouter.target(words, targets: many, apps: Fixtures.apps) }

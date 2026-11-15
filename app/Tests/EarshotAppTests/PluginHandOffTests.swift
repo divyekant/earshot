@@ -6,7 +6,7 @@ import XCTest
 
 /// A fake hand-off: it keeps each call.
 final class FakePlugins: PluginHandOff {
-    var leads: [PluginLead] = [PluginLead(pluginID: "pa", lead: "remind me to")]
+    var leads: [PluginLead] = [PluginLead(pluginID: "footnote", lead: "remind me to")]
     var targetNames: [PluginTargetName] = []
     var keys = ["app"]
     func contextKeys(of pluginID: String) -> [String] { keys }
@@ -77,13 +77,13 @@ final class PluginHandOffTests: XCTestCase {
     /// "open today" runs the core open action with the target of the plugin. The plugin gets no command (R-PL-3).
     func testOpenTargetIsTheCoreOpen() async {
         let fake = FakePlugins()
-        fake.targetNames = [PluginTargetName(pluginID: "pa", name: "today", open: "/tmp/pa/today.html")]
+        fake.targetNames = [PluginTargetName(pluginID: "footnote", name: "today", open: "/tmp/footnote/today.html")]
         let runner = FieldRunner()
         let (p, e) = pipeline(fake, runner: runner)
         e.text = "Open today."
         let r = await p.finish(mode: .hold)
         XCTAssertTrue(r.ok, r.note)
-        XCTAssertEqual(runner.runs.first?.0, .openTarget(pluginID: "pa", name: "today", open: "/tmp/pa/today.html"))
+        XCTAssertEqual(runner.runs.first?.0, .openTarget(pluginID: "footnote", name: "today", open: "/tmp/footnote/today.html"))
         XCTAssertTrue(fake.calls.isEmpty)
     }
 
@@ -270,7 +270,7 @@ final class PluginHandOffTests: XCTestCase {
         XCTAssertEqual(answers, 0)
     }
 
-    /// A plugin command with a page read never reaches tier 2 (Jev), also with tier 2 on (R-MD-1, D-9, PA phase 4
+    /// A plugin command with a page read never reaches tier 2 (Jev), also with tier 2 on (R-MD-1, D-9, Footnote phase 4
     /// spec section 11, "Not to Jev"). The page text goes only to the plugin. Made-up page words only.
     func testPageReadNeverReachesTier2() async throws {
         let host = try install("asker", run: ["./plugin.sh"], script: asker, context: ["pageText"])

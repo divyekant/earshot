@@ -55,6 +55,7 @@ final class PluginHost: PluginHandOff, @unchecked Sendable {
     /// and starts each approved plugin that does not run. A plugin runs while earshot runs: it keeps its own clock
     /// for alerts.
     func reload() {
+        renamePlugins()
         let found = catalog.scan()
         lock.lock()
         let wanted = found.filter { $0.approved && $0.problems.isEmpty }
@@ -68,6 +69,26 @@ final class PluginHost: PluginHandOff, @unchecked Sendable {
         lock.unlock()
         for p in stop.values { p.stop() }
         for entry in wanted { _ = running(entry) }
+    }
+
+    /// Does the renames that the catalog permits (docs/PLUGINS.md 2.1). It stops the plugin of the old id first, so
+    /// that no program has its data folder open during the move.
+    private func renamePlugins() {
+        let renames = catalog.pendingRenames()
+        guard !renames.isEmpty else { return }
+        lock.lock()
+        let old = renames.compactMap { r -> PluginProcess? in
+            defer { processes[r.from] = nil; targetCache[r.from] = nil }
+            return processes[r.from]
+        }
+        lock.unlock()
+        for p in old { p.stop() }
+        // Wait for the old program to close its files: 5 s at most. This happens one time, at the rename.
+        let end = Date().addingTimeInterval(5)
+        while old.contains(where: \.isRunning), Date() < end { usleep(50_000) }
+        // If the old program still runs, move nothing now. The next reload tries again.
+        guard !old.contains(where: \.isRunning) else { return }
+        for r in renames { _ = try? catalog.apply(r) }
     }
 
     var all: [PluginEntry] { lock.lock(); defer { lock.unlock() }; return entries }
