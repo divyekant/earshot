@@ -127,6 +127,26 @@ final class PluginTests: XCTestCase {
         XCTAssertTrue(catalog.pendingRenames().isEmpty, "a rename happens one time")
     }
 
+    /// Settings of the window (docs/PLUGINS.md 3.2) are part of the approval: new settings move the data, not the approval.
+    func testARenameWithNewSettingsMovesTheDataButNotTheApproval() throws {
+        let withSettings = newManifest.replacingOccurrences(of: #""formerID": "old-helper"}"#, with: """
+            "formerID": "old-helper", "settings": [{"key": "rules.time", "label": "L", "choices": ["alert", "off"], "default": "alert"}]}
+            """)
+        XCTAssertNotEqual(withSettings, newManifest)
+        let catalog = try renameSetUp(new: withSettings)
+        let renames = catalog.pendingRenames()
+        XCTAssertEqual(renames.map(\.to), ["helper"])
+        XCTAssertNil(renames[0].newHash)
+        try catalog.apply(renames[0])
+        let moved = catalog.dataFolder.appendingPathComponent("helper/sub/store.sqlite")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: moved.path))
+        let found = catalog.scan()
+        XCTAssertEqual(found.map(\.id), ["helper"])
+        XCTAssertFalse(found[0].approved, "the owner approves the new settings")
+        XCTAssertNil(catalog.approvals["old-helper"])
+        XCTAssertTrue(catalog.pendingRenames().isEmpty)
+    }
+
     func testARenameKeepsTheFilesThatTheNewFolderHas() throws {
         let catalog = try renameSetUp()
         let fm = FileManager.default

@@ -310,7 +310,9 @@ public struct PluginCatalog: Sendable {
                   let was = try? JSONDecoder().decode(PluginManifest.self, from: oldData), was.id == old,
                   was.contract == new.contract, was.leads == new.leads,
                   Set(was.context) == Set(new.context), Set(was.network) == Set(new.network) else { continue }
-            out.append(PluginRename(from: old, to: new.id, newHash: Self.hash(data)))
+            // The settings of the window (3.2) are part of what the owner approves. If they changed, earshot moves
+            // the data but not the approval, and the owner approves the new manifest.
+            out.append(PluginRename(from: old, to: new.id, newHash: was.settings == new.settings ? Self.hash(data) : nil))
         }
         return out.sorted { $0.to < $1.to }
     }
@@ -318,7 +320,7 @@ public struct PluginCatalog: Sendable {
     /// Does one rename. Stop the old plugin first. The steps:
     /// 1. moves plugin-data/<old>/ to plugin-data/<new>/. If the new folder exists, it moves each item that the new
     ///    folder does not have, and keeps the rest in the old folder (it deletes no data),
-    /// 2. moves the approval to the new id, with the hash of the new manifest,
+    /// 2. moves the approval to the new id, with the hash of the new manifest (no approval if `newHash` is nil),
     /// 3. deletes the old plugin folder plugins/<old>/ (the old program, not data).
     /// If a step fails, the next steps do not run, and the next reload tries again. Returns the items that stayed in
     /// the old data folder.
@@ -369,8 +371,9 @@ public struct PluginCatalog: Sendable {
 public struct PluginRename: Equatable, Sendable {
     public let from: String
     public let to: String
-    /// The SHA-256 of the new manifest. The approval moves to it.
-    public let newHash: String
+    /// The SHA-256 of the new manifest. The approval moves to it. Nil if the settings changed: then the approval
+    /// does not move, and the owner approves the new manifest.
+    public let newHash: String?
 }
 
 // MARK: - Messages (JSON lines)

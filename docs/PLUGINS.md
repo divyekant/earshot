@@ -44,7 +44,7 @@ Then earshot does these steps:
 
 1. It stops the old plugin and waits for its program to stop (5 s at most).
 2. It moves `plugin-data/<old id>/` to `plugin-data/<new id>/`. If the new folder exists, it moves each item that the new folder does not have. It deletes no data: an item that is in both folders stays in the old folder.
-3. It moves the approval to the new id, with the hash of the new `plugin.json`.
+3. It moves the approval to the new id, with the hash of the new `plugin.json`. If the `settings` (section 3.2) of the old and the new manifest are not the same, it does not move the approval: the owner approves the new plugin in the Plugins page.
 4. It deletes the old plugin folder `plugins/<old id>/`. This folder has the old program, not data.
 
 If one condition is false, earshot does not rename. The new plugin then needs the approval of the owner, and the old plugin keeps its data folder. If a step fails, earshot tries again at the next "Read again".
