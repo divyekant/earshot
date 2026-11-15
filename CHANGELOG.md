@@ -6,6 +6,17 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-15
+
+This release gives the PA plugin the new name Footnote, and gives earshot a new look. A click on the menu bar icon opens a panel. The window has four text links in place of seven tabs, and shows the plugin pages. Footnote 0.4.0 keeps the text of web pages and finds their words with "where is".
+
+To update a Mac that has the PA plugin:
+
+1. Install the new earshot.
+2. Run `plugins/footnote/scripts/install-footnote.sh`. The old PA install script is gone.
+3. Click "Read again" in the Plugins page, or run `earshot plugins reload`. earshot moves the PA data and the approval to Footnote. You do not approve again.
+4. macOS asks again for access to Reminders, Calendar, Mail and Notes, because the app ID changed. Allow each one.
+
 ### Added
 
 - A plugin that writes `pages/index.html` in its data folder gets a link with its name in the window, and a part in the menu bar panel. Footnote shows its Today page there. Script is off in the page view (R-PL-3, R-FN-3).
@@ -192,7 +203,8 @@ The first public release. earshot is early software. Expect bugs and changes to 
 
 - earshot never presses Send, or does another action that cannot be undone, without an explicit command (R-NV-5, R-ON-5).
 
-[Unreleased]: https://github.com/divyekant/earshot/compare/v0.5.0...develop
+[Unreleased]: https://github.com/divyekant/earshot/compare/v0.6.0...develop
+[0.6.0]: https://github.com/divyekant/earshot/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/divyekant/earshot/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/divyekant/earshot/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/divyekant/earshot/compare/v0.2.0...v0.3.0
