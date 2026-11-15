@@ -6,6 +6,10 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+### Added
+
+- A plugin can list settings in plugin.json (key `settings`). earshot shows them as a form in the window and writes each change to the settings file of the plugin. Footnote lists its six alert / list / off rules: Settings… > Footnote > Settings. Footnote needs one new approval in the Plugins page (R-PL-4, R-FN-3).
+
 ## [0.6.0] - 2026-11-15
 
 This release gives the PA plugin the new name Footnote, and gives earshot a new look. A click on the menu bar icon opens a panel. The window has four text links in place of seven tabs, and shows the plugin pages. Footnote 0.4.0 keeps the text of web pages and finds their words with "where is".

@@ -75,6 +75,7 @@ If one condition is false, earshot does not rename. The new plugin then needs th
 | `run` | Yes | The program and its arguments. A relative path starts at the plugin folder. |
 | `network` | No | The network hosts that the plugin says it uses. The default is none. earshot shows it in the Plugins tab. earshot does not enforce it. |
 | `formerID` | No | The id of the plugin before a rename. See section 2.1. |
+| `settings` | No | The settings that the owner can change in the earshot window. See section 3.2. The default is none. |
 
 ### 3.1 Rules for lead words
 
@@ -86,6 +87,23 @@ earshot does not use a lead in these conditions. The Plugins tab shows the reaso
 - The lead has more than 5 words.
 
 If two plugins have the same lead, the plugin with the first id (in alphabetical order) gets it.
+
+### 3.2 Settings in the window
+
+A plugin can list settings that the owner changes in the earshot window, with no edit of a file. Version 1 has one kind of setting: a choice of fixed values.
+
+```json
+"settings": [
+  {"key": "rules.time", "label": "A reminder reaches its time", "choices": ["alert", "list", "off"], "default": "alert", "group": "When to tell you"}
+]
+```
+
+- `key` is the place of the value in `<store>/plugin-data/<id>/settings.json`. Names are joined by ".", 4 names at most. Each name uses only A-Z, a-z, 0-9 and "_".
+- `label` is the line in the window. `group` is an optional heading. `default` must be one of `choices`.
+- A plugin has 30 settings at most. A bad setting is a problem of the manifest, and the plugin does not start.
+- earshot writes a changed value at once. It changes only that key and keeps all other keys of the file. The plugin must read the file again when it changes.
+- earshot shows a value from the file only if it is one of the choices. Else it shows the default.
+- The settings are part of plugin.json, so a new or changed setting needs a new approval (R-PL-4). The Plugins page lists the keys.
 
 ## 4. How earshot routes a plugin command
 
@@ -262,7 +280,7 @@ The reasons for no text: "no Accessibility permission", "no front app", "no fron
 
 ### 5.4 Pages in the window
 
-A plugin can write local HTML pages to its data folder, in `<store>/plugin-data/<id>/pages/`. If that folder has `index.html`, and the plugin is approved and has no problem, the earshot window gets a link with the name of the plugin, and the menu bar panel gets a part for it. The manifest needs no new key, so the approval does not change.
+A plugin can write local HTML pages to its data folder, in `<store>/plugin-data/<id>/pages/`. If that folder has `index.html`, and the plugin is approved and has no problem, the earshot window gets a link with the name of the plugin, and the menu bar panel gets a part for it. A plugin with settings (section 3.2) also gets the link, and its section has a switch between "Pages" and "Settings". The manifest needs no new key, so the approval does not change.
 
 - earshot shows `index.html` with script off and keeps no web data.
 - A link to a file in the pages folder opens in the page view.

@@ -94,6 +94,31 @@ enum ManageLink: Hashable {
     }
 }
 
+/// The section of one plugin: its pages, its settings, or both with a switch between them.
+struct PluginSection: View {
+    let pages: PluginPages
+    let reload: Int
+    @State private var showSettings = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if pages.hasIndex && !pages.settings.isEmpty {
+                Picker("View", selection: $showSettings) {
+                    Text("Pages").tag(false)
+                    Text("Settings").tag(true)
+                }
+                .pickerStyle(.segmented).labelsHidden().frame(maxWidth: 240)
+                .padding(.vertical, 8)
+            }
+            if pages.hasIndex && !(showSettings && !pages.settings.isEmpty) {
+                PluginPageView(pages: pages, reload: reload)
+            } else {
+                PluginSettingsForm(pages: pages)
+            }
+        }
+    }
+}
+
 /// The parts of the Advanced page: the app table, the names, the permissions and the test of a typed command.
 enum AdvancedPart: String, CaseIterable, Hashable {
     case apps = "Apps", names = "Names", permissions = "Permissions", test = "Test"
@@ -152,7 +177,7 @@ public struct ManageView: View {
     @ViewBuilder private var content: some View {
         switch page {
         case .plugin(let p):
-            PluginPageView(pages: p, reload: opened)
+            PluginSection(pages: p, reload: opened)
         case .page(let fixed):
             fixedPage(fixed)
         }

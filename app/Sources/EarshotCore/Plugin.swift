@@ -101,11 +101,16 @@ public struct PluginManifest: Codable, Hashable, Sendable {
     /// id to the new id only if the approved old manifest asks for the same leads, context and network
     /// (docs/PLUGINS.md 2.1).
     public var formerID: String?
+    /// The settings that the owner can change in the earshot window (docs/PLUGINS.md 3.2). earshot writes each
+    /// value to settings.json in the data folder of the plugin. Empty means none.
+    public var settings: [PluginSetting]
 
     public init(contract: Int = PluginContract.version, id: String, name: String, version: String = "0.1.0",
-                leads: [String], context: [String] = [], run: [String], network: [String] = [], formerID: String? = nil) {
+                leads: [String], context: [String] = [], run: [String], network: [String] = [], formerID: String? = nil,
+                settings: [PluginSetting] = []) {
         self.contract = contract; self.id = id; self.name = name; self.version = version
         self.leads = leads; self.context = context; self.run = run; self.network = network; self.formerID = formerID
+        self.settings = settings
     }
 
     /// Reads each field if it is in the file. A missing optional field gets its default.
@@ -120,6 +125,7 @@ public struct PluginManifest: Codable, Hashable, Sendable {
         run = try c.decode([String].self, forKey: .run)
         network = try c.decodeIfPresent([String].self, forKey: .network) ?? []
         formerID = try c.decodeIfPresent(String.self, forKey: .formerID)
+        settings = try c.decodeIfPresent([PluginSetting].self, forKey: .settings) ?? []
     }
 
     /// True for a good id: only a-z, 0-9 and "-".
@@ -137,6 +143,7 @@ public struct PluginManifest: Codable, Hashable, Sendable {
         if run.first?.isEmpty ?? true { out.append("no program to run") }
         let unknown = context.filter { !PluginContract.contextKeys.contains($0) }
         if !unknown.isEmpty { out.append("unknown context: " + unknown.joined(separator: ", ")) }
+        out += PluginSetting.problems(settings)
         return out
     }
 }

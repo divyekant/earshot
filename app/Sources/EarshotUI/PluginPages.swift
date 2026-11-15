@@ -15,11 +15,22 @@ public struct PluginPages: Hashable, Identifiable, Sendable {
     public var name: String
     /// The folder of the pages.
     public var folder: URL
+    /// The settings that the window shows as a form (docs/PLUGINS.md 3.2).
+    public var settings: [PluginSetting]
+    /// The settings file of the plugin.
+    public var settingsFile: URL
+    /// True if the pages folder has index.html.
+    public var hasIndex: Bool
     public var index: URL { folder.appendingPathComponent("index.html") }
 
-    public init(id: String, name: String, folder: URL) { self.id = id; self.name = name; self.folder = folder }
+    public init(id: String, name: String, folder: URL, settings: [PluginSetting] = [], settingsFile: URL? = nil,
+                hasIndex: Bool = true) {
+        self.id = id; self.name = name; self.folder = folder; self.settings = settings
+        self.settingsFile = settingsFile ?? folder.deletingLastPathComponent().appendingPathComponent("settings.json")
+        self.hasIndex = hasIndex
+    }
 
-    /// The approved plugins with no problems whose pages folder has index.html, sorted by id.
+    /// The approved plugins with no problems whose pages folder has index.html, or that have settings, sorted by id.
     public static func find(store: Store) -> [PluginPages] {
         let catalog = PluginCatalog(store: store)
         return find(entries: catalog.scan(), dataFolder: catalog.dataFolder)
@@ -28,10 +39,12 @@ public struct PluginPages: Hashable, Identifiable, Sendable {
     /// The same as `find(store:)`, for the tests.
     public static func find(entries: [PluginEntry], dataFolder: URL) -> [PluginPages] {
         entries.filter { $0.approved && $0.problems.isEmpty }.compactMap { e in
-            let folder = dataFolder.appendingPathComponent(e.id, isDirectory: true)
-                .appendingPathComponent("pages", isDirectory: true)
-            let page = PluginPages(id: e.id, name: e.manifest.name, folder: folder)
-            return FileManager.default.fileExists(atPath: page.index.path) ? page : nil
+            let data = dataFolder.appendingPathComponent(e.id, isDirectory: true)
+            let folder = data.appendingPathComponent("pages", isDirectory: true)
+            let index = FileManager.default.fileExists(atPath: folder.appendingPathComponent("index.html").path)
+            guard index || !e.manifest.settings.isEmpty else { return nil }
+            return PluginPages(id: e.id, name: e.manifest.name, folder: folder, settings: e.manifest.settings,
+                               settingsFile: data.appendingPathComponent("settings.json"), hasIndex: index)
         }
     }
 
