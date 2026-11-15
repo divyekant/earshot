@@ -1,0 +1,81 @@
+{
+  "blocks": [
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0,
+      "t": "Orchard Lane Surgery",
+      "zone": "banner"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0.94,
+      "t": "Appointments Prescriptions Contact",
+      "zone": "nav"
+    },
+    {
+      "inMain": true,
+      "k": "h",
+      "level": 1,
+      "links": 0,
+      "t": "Flu vaccine clinics this autumn",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "The surgery runs walk-in flu vaccine clinics on three Saturdays: 28 September, 12 October and 26 October, from 9:00 to 12:30. You do not need an appointment.",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "The vaccine is free if you are 65 or older, pregnant, a carer, or if you have a long-term condition such as asthma, diabetes or heart disease. Children aged 2 and 3 get a nasal spray instead of an injection.",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "If you have a fever on the day, do not come. Book a later appointment instead.",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "Bring your NHS number if you know it. The whole visit takes about ten minutes, and we ask you to wait for five minutes after the vaccine.",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "If you cannot come on a Saturday, ask at reception for a weekday appointment with the practice nurse.",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "Page reviewed: 2 September",
+      "zone": "main"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0.32,
+      "t": "Orchard Lane Surgery, 3 Orchard Lane, Fenbury · Privacy notice · Complaints",
+      "zone": "footer"
+    }
+  ],
+  "browser": "com.google.Chrome",
+  "complete": true,
+  "elements": 34,
+  "ms": 4.6,
+  "sensitive": "",
+  "url": "file:///d25.html"
+}

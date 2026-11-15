@@ -26,6 +26,12 @@ final class PluginHost: PluginHandOff, @unchecked Sendable {
     let dataFolder: URL
     /// An answer or an alert from a plugin. It comes on a background queue. It is text to show, never a command (R-PL-3).
     var onAnswer: ((PluginMessage, PluginManifest) -> Void)?
+    /// An ask for page text that the host accepted (docs/PLUGINS.md 5.3). It comes on a background queue.
+    /// The app reads the page and gives the lines to `reply`. The host checks the ask first: the manifest names
+    /// "pageText", the command went to this plugin, it is the first ask, and it is in time.
+    var onPageTextAsk: ((PageTextAsks.Command, PluginManifest, _ reply: @escaping ([Data]) -> Void) -> Void)?
+    /// The commands that a plugin can ask page text for.
+    let pageAsks = PageTextAsks()
     /// The most starts of one plugin in `startWindow` seconds. After that, the plugin stays off until a reload.
     static let maxStarts = 3
     static let startWindow: TimeInterval = 60
@@ -49,6 +55,7 @@ final class PluginHost: PluginHandOff, @unchecked Sendable {
     /// and starts each approved plugin that does not run. A plugin runs while earshot runs: it keeps its own clock
     /// for alerts.
     func reload() {
+        renamePlugins()
         let found = catalog.scan()
         lock.lock()
         let wanted = found.filter { $0.approved && $0.problems.isEmpty }
@@ -62,6 +69,26 @@ final class PluginHost: PluginHandOff, @unchecked Sendable {
         lock.unlock()
         for p in stop.values { p.stop() }
         for entry in wanted { _ = running(entry) }
+    }
+
+    /// Does the renames that the catalog permits (docs/PLUGINS.md 2.1). It stops the plugin of the old id first, so
+    /// that no program has its data folder open during the move.
+    private func renamePlugins() {
+        let renames = catalog.pendingRenames()
+        guard !renames.isEmpty else { return }
+        lock.lock()
+        let old = renames.compactMap { r -> PluginProcess? in
+            defer { processes[r.from] = nil; targetCache[r.from] = nil }
+            return processes[r.from]
+        }
+        lock.unlock()
+        for p in old { p.stop() }
+        // Wait for the old program to close its files: 5 s at most. This happens one time, at the rename.
+        let end = Date().addingTimeInterval(5)
+        while old.contains(where: \.isRunning), Date() < end { usleep(50_000) }
+        // If the old program still runs, move nothing now. The next reload tries again.
+        guard !old.contains(where: \.isRunning) else { return }
+        for r in renames { _ = try? catalog.apply(r) }
     }
 
     var all: [PluginEntry] { lock.lock(); defer { lock.unlock() }; return entries }
@@ -96,7 +123,11 @@ final class PluginHost: PluginHandOff, @unchecked Sendable {
         case .failure(let why): return why.text
         }
         let context = available.filter { entry.manifest.context.contains($0.key) }
-        process.send(.command(id: UUID().uuidString, lead: lead, text: text, context: context))
+        let id = UUID().uuidString
+        if entry.manifest.context.contains(PageText.key) {
+            pageAsks.sent(id: id, pluginID: entry.id, url: available["url"])
+        }
+        process.send(.command(id: id, lead: lead, text: text, context: context))
         return nil
     }
 
@@ -185,8 +216,33 @@ final class PluginHost: PluginHandOff, @unchecked Sendable {
             lock.unlock()
         case "answer":
             onAnswer?(message, manifest)
+        case PageText.key:
+            pageTextAsk(message, from: manifest)
         default:
             break  // An unknown type is dropped: a newer plugin can talk to an older earshot.
+        }
+    }
+}
+
+extension PluginHost {
+    /// One ask for page text (docs/PLUGINS.md 5.3). A plugin whose manifest does not name "pageText" gets no answer.
+    /// A refused ask gets an error line. An accepted ask goes to `onPageTextAsk`.
+    func pageTextAsk(_ message: PluginMessage, from manifest: PluginManifest) {
+        guard manifest.context.contains(PageText.key) else { return }
+        lock.lock()
+        let process = processes[manifest.id]
+        lock.unlock()
+        guard let process else { return }
+        let re = message.re ?? ""
+        switch pageAsks.ask(re: message.re, pluginID: manifest.id) {
+        case .failure(let refusal):
+            process.send(lines: [PageText.errorLine(re: re, refusal.reason)])
+        case .success(let command):
+            guard let onPageTextAsk else {
+                process.send(lines: [PageText.errorLine(re: re, "earshot cannot read pages now")])
+                return
+            }
+            onPageTextAsk(command, manifest) { [weak process] lines in process?.send(lines: lines) }
         }
     }
 }
@@ -352,6 +408,12 @@ final class PluginProcess: @unchecked Sendable {
         guard let handle = input, var line = try? JSONEncoder().encode(request) else { return }
         line.append(0x0A)
         writes.async { try? handle.write(contentsOf: line) }
+    }
+
+    /// Sends lines that are ready, in order. Each line ends with a newline.
+    func send(lines: [Data]) {
+        guard let handle = input, !lines.isEmpty else { return }
+        writes.async { for line in lines { try? handle.write(contentsOf: line) } }
     }
 
     /// Stops the plugin: SIGTERM, then the pipes close. A write that waits for a full pipe ends with an error.

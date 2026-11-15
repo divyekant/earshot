@@ -1,0 +1,167 @@
+{
+  "blocks": [
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0.28,
+      "t": "Tallyfold Server 4.2 manual · Download · Forum",
+      "zone": "banner"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0,
+      "t": "Contents",
+      "zone": "nav"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 1,
+      "t": "1 Install",
+      "zone": "nav"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 1,
+      "t": "2 Configure",
+      "zone": "nav"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 1,
+      "t": "3 Users and roles",
+      "zone": "nav"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 1,
+      "t": "4 Back up a database",
+      "zone": "nav"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 1,
+      "t": "4.1 Full backup",
+      "zone": "nav"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 1,
+      "t": "4.2 Restore",
+      "zone": "nav"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 1,
+      "t": "5 Upgrade",
+      "zone": "nav"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 1,
+      "t": "6 Error codes",
+      "zone": "nav"
+    },
+    {
+      "inMain": false,
+      "k": "h",
+      "level": 1,
+      "links": 0,
+      "t": "4 Back up a database"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0,
+      "t": "Tallyfold Server stores each ledger as one database file. A backup copies the file while the server runs, so users can keep working. Make a backup before each upgrade and at least once a day."
+    },
+    {
+      "inMain": false,
+      "k": "h",
+      "level": 2,
+      "links": 0,
+      "t": "4.1 Full backup"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0,
+      "t": "Run the backup command as the user that owns the server. The command writes a compressed copy to the folder that you name."
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0,
+      "t": "tallyfold backup --ledger main --to /srv/backups --keep 14"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0,
+      "t": "The option --keep removes old copies of the same ledger and keeps the newest 14. Without --keep, the command keeps every copy, and the disk can fill up."
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0,
+      "t": "A backup of a ledger of 2 GB takes about 40 seconds on a normal server. During the backup, writes are slower, but no write is lost."
+    },
+    {
+      "inMain": false,
+      "k": "h",
+      "level": 2,
+      "links": 0,
+      "t": "4.2 Restore"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0,
+      "t": "To restore, stop the server first. A restore replaces the ledger file, and the server must not write to it at the same time."
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0,
+      "t": "tallyfold stop tallyfold restore --ledger main --from /srv/backups/main-2024-05-02.tfz tallyfold start"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0,
+      "t": "After a restore, all entries made after the time of the backup are gone. Tell your users before you restore."
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0,
+      "t": "Page last changed: 2 May. Applies to version 4.2 and later."
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0.93,
+      "t": "Previous: 3 Users and roles | Next: 5 Upgrade"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0.18,
+      "t": "Was this page useful? Yes No"
+    }
+  ],
+  "browser": "com.google.Chrome",
+  "complete": true,
+  "elements": 73,
+  "ms": 8.1,
+  "sensitive": "",
+  "url": "file:///d03.html"
+}

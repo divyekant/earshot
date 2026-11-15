@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">
+<title>Probe docs · Configure the cache · Quillmark CLI</title>
+<style>
+body { margin: 0; font: 15px/1.6 system-ui, sans-serif; }
+.bar { background: #223; color: #fff; padding: 8px 16px; }
+.bar a { color: #cde; margin-left: 14px; }
+.layout { display: grid; grid-template-columns: 240px 1fr; }
+nav.tree { background: #f4f4f8; padding: 12px; font-size: 14px; }
+nav.tree ul { list-style: none; padding-left: 14px; margin: 2px 0; }
+main { padding: 16px 32px; max-width: 760px; }
+pre { background: #f0f0f0; padding: 10px; }
+code { font-family: Menlo, monospace; }
+</style>
+</head>
+<body>
+<div class="bar"><b>Quillmark</b> docs <a href="#">Guide</a><a href="#">Reference</a><a href="#">Changelog</a>
+  <form role="search" style="display:inline"><input type="search" placeholder="Search the docs" aria-label="Search the docs"></form>
+</div>
+<div class="layout">
+<nav class="tree" aria-label="Contents">
+  <ul>
+    <li><a href="#">Start</a>
+      <ul><li><a href="#">Install</a></li><li><a href="#">First project</a></li></ul></li>
+    <li><a href="#">Configure</a>
+      <ul><li><a href="#">The config file</a></li><li><a href="#" aria-current="page">The cache</a></li><li><a href="#">Themes</a></li></ul></li>
+    <li><a href="#">Commands</a>
+      <ul><li><a href="#">build</a></li><li><a href="#">serve</a></li><li><a href="#">clean</a></li></ul></li>
+  </ul>
+</nav>
+<main>
+  <h1>Configure the cache</h1>
+  <p>Quillmark keeps the result of each page build in a cache folder. With a warm cache, a build of a site with 2,000 pages takes about 4 seconds instead of 50 seconds. This page tells how to move the cache, limit its size and clear it.</p>
+  <h2>Where the cache is</h2>
+  <p>By default the cache is in the folder <code>.quillmark/cache</code> next to the config file. To move it, set the key <code>cache.path</code> in <code>quillmark.toml</code>:</p>
+  <pre><code>[cache]
+path = "/tmp/qm-cache"
+max_size_mb = 500</code></pre>
+  <p>A relative path is relative to the folder of the config file. The folder must be writable. If Quillmark cannot write to it, the build stops with the error <code>E041 cache not writable</code>.</p>
+  <h2>Limit the size</h2>
+  <p>The key <code>max_size_mb</code> sets the largest size of the cache in megabytes. The default is 1,000. When the cache is full, Quillmark removes the entries that it used least recently until the cache is at 80 percent of the limit.</p>
+  <h2>Clear the cache</h2>
+  <p>Clear the cache after you change a theme file that the cache does not track, for example a font. Use this command:</p>
+  <pre><code>quillmark clean --cache</code></pre>
+  <p>The command removes the cache folder and nothing else. The next build is a cold build.</p>
+  <h2>Cache keys</h2>
+  <table>
+    <tr><th>Input</th><th>Part of the key</th></tr>
+    <tr><td>Page source</td><td>Yes</td></tr>
+    <tr><td>Templates</td><td>Yes</td></tr>
+    <tr><td>Fonts and images</td><td>No</td></tr>
+  </table>
+  <p class="updated">Last updated 9 June</p>
+  <p><a href="#">Previous: The config file</a> · <a href="#">Next: Themes</a></p>
+</main>
+</div>
+<footer style="padding:10px 16px;font-size:13px;color:#555">Quillmark is free software. <a href="#">Source</a> · <a href="#">Licence</a></footer>
+</body>
+</html>

@@ -1,0 +1,89 @@
+{
+  "blocks": [
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0,
+      "t": "Linwick Museum",
+      "zone": "banner"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0.73,
+      "t": "Visit · Exhibitions · Learn · Shop · Tickets",
+      "zone": "nav"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "Gallery 3 · 12 April to 29 September",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "h",
+      "level": 1,
+      "links": 0,
+      "t": "Paper Boats: folded ships from 1890 to today",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "This exhibition shows more than 200 paper boats, from a schoolboy's newspaper boat of 1893 to a three-metre model of a sailing ship folded from one sheet. Many were made by sailors on long voyages, who folded boats from charts, letters and labels.",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "The largest piece is the \"Ellen Varley\", a model of a tea clipper that the folder Mattias Rehn made over four winters. It needed 1,100 hours of work and no glue at all.",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "In the last room, visitors can fold their own boat and float it on a long water table. Paper and instructions are free.",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "h",
+      "level": 2,
+      "links": 0,
+      "t": "Tickets",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "Adults £9, children under 16 free. Tickets include entry to the rest of the museum. Members get in free and can bring one guest.",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0.9,
+      "t": "Book tickets · Add to calendar",
+      "zone": "main"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0.27,
+      "t": "Linwick Museum is open Tuesday to Sunday, 10:00 to 17:00. Join our mailing list",
+      "zone": "footer"
+    }
+  ],
+  "browser": "com.google.Chrome",
+  "complete": true,
+  "elements": 44,
+  "ms": 8.2,
+  "sensitive": "",
+  "url": "file:///d23.html"
+}

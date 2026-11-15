@@ -1,0 +1,88 @@
+{
+  "blocks": [
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0.46,
+      "t": "Footloose Travel Journal Walks · Rail trips · Gear · Subscribe",
+      "zone": "banner"
+    },
+    {
+      "inMain": true,
+      "k": "h",
+      "level": 1,
+      "links": 0,
+      "t": "Two days on the Wenmoor ridge without a car",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "Words by Ossian Kerr · Spring issue",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "You can walk the whole Wenmoor ridge in two days and never need a car. The train from the city stops at Brackley Halt at the west end of the ridge, and the bus from Corby Cross at the east end runs back to the main line every two hours.",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "The first day is the longer one: 19 kilometres from Brackley Halt to the youth hostel at Tarn Gap. The path climbs steadily for the first hour, then stays on the top of the ridge with views on both sides. There is no water on the ridge, so carry at least two litres.",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "There is no water on the ridge, so carry at least two litres.",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "The hostel at Tarn Gap has 24 beds and a drying room, and it serves a simple dinner if you book by noon the day before. A bed in a shared room costs £29.",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "The trig point on Hollin Top, the highest point of the ridge at 612 metres.",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "Day two is 14 kilometres and mostly downhill. Leave Tarn Gap by 10:00 to catch the 15:20 bus from Corby Cross. The last bus of the day leaves at 17:20; if you miss it, the nearest taxi firm is in Wexham, 20 minutes away.",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "In winter, snow can cover the path markers on the top. Walk the ridge from May to October unless you are used to finding your way with a map and compass.",
+      "zone": "article"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0.43,
+      "t": "Footloose Travel Journal · Back issues · Write for us",
+      "zone": "footer"
+    }
+  ],
+  "browser": "com.google.Chrome",
+  "complete": true,
+  "elements": 41,
+  "ms": 5.8,
+  "sensitive": "",
+  "url": "file:///d16.html"
+}

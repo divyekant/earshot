@@ -1,0 +1,90 @@
+{
+  "blocks": [
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0.15,
+      "t": "Strike action on 4 and 5 March may affect some routes. Check here"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 1,
+      "t": "Westborough Buses Timetables Tickets Service changes Lost property"
+    },
+    {
+      "inMain": false,
+      "k": "h",
+      "level": 1,
+      "links": 0,
+      "t": "Route 7 diverted at Quarry Hill from 10 February"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0,
+      "t": "Because of gas main work on Quarry Hill, route 7 will not serve the stops between the Fire Station and Elm Parade from Monday 10 February until about Friday 21 March."
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0,
+      "t": "Buses towards the city go along Station Road and Brook Street instead. Buses towards Hillcrest use the same diversion in the other direction."
+    },
+    {
+      "inMain": false,
+      "k": "h",
+      "level": 2,
+      "links": 0,
+      "t": "Stops that are not served"
+    },
+    {
+      "inMain": false,
+      "k": "li",
+      "links": 0,
+      "t": "Quarry Hill, Post Office"
+    },
+    {
+      "inMain": false,
+      "k": "li",
+      "links": 0,
+      "t": "Quarry Hill, St Anne's Church"
+    },
+    {
+      "inMain": false,
+      "k": "li",
+      "links": 0,
+      "t": "Quarry Hill, Top"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0,
+      "t": "Use the temporary stop on Brook Street, outside number 40, or the stops at the Fire Station and Elm Parade. The timetable does not change, but buses can be up to five minutes late at busy times."
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0,
+      "t": "Notice published 3 February. Reference SC-0217."
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 1,
+      "t": "Sign up for alerts about route 7"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 1,
+      "t": "Contact us Accessibility"
+    }
+  ],
+  "browser": "com.google.Chrome",
+  "complete": true,
+  "elements": 46,
+  "ms": 6.4,
+  "sensitive": "",
+  "url": "file:///d22.html"
+}

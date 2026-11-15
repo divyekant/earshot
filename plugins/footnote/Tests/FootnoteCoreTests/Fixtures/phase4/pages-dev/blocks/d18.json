@@ -1,0 +1,118 @@
+{
+  "blocks": [
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 1,
+      "t": "Sportsdesk Football Cricket Rugby Results",
+      "zone": "nav"
+    },
+    {
+      "inMain": true,
+      "k": "h",
+      "level": 1,
+      "links": 0,
+      "t": "Clatterbridge United 2, Harwood Rovers 2: late penalty saves a point",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "Match report by Imogen Barr, at Foundry Lane. Saturday 28 September.",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "A penalty in the 93rd minute from captain Lewis Achterberg gave Clatterbridge United a 2-2 draw against Harwood Rovers, after the home side had been two goals down at half time.",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "Harwood scored twice in the first 20 minutes. Femi Adeyinka headed in a corner after eight minutes, and Rory Gault added a second from outside the box after a mistake in the home defence.",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "United improved after the break. Substitute Kai Moreno pulled one goal back in the 61st minute with a low shot. In added time, Harwood's goalkeeper brought down Moreno in the box, and Achterberg scored the penalty to the left.",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "The draw keeps United in ninth place in the table, with 14 points from 10 games. They play away at Steeple Norton on Tuesday.",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "The attendance was 3,412.",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "h",
+      "level": 2,
+      "links": 0,
+      "t": "League table",
+      "zone": "aside"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "1 Steeple Norton 24",
+      "zone": "aside"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "2 Harwood Rovers 21",
+      "zone": "aside"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "3 Ashby Town 19",
+      "zone": "aside"
+    },
+    {
+      "inMain": true,
+      "k": "h",
+      "level": 2,
+      "links": 0,
+      "t": "Live scores",
+      "zone": "aside"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 1,
+      "t": "See all games",
+      "zone": "aside"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0.44,
+      "t": "© Sportsdesk · Betting help",
+      "zone": "footer"
+    }
+  ],
+  "browser": "com.google.Chrome",
+  "complete": true,
+  "elements": 46,
+  "ms": 6.6,
+  "sensitive": "",
+  "url": "file:///d18.html"
+}

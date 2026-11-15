@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">
+<title>Back up a database – Tallyfold Server manual</title>
+<style>body{margin:0;font:15px/1.55 sans-serif}#top{background:#0b3d2e;color:#fff;padding:6px 14px}#side{position:fixed;top:40px;left:0;width:210px;bottom:0;overflow:auto;background:#f2f5f3;padding:10px;font-size:13px}#doc{margin-left:240px;padding:10px 30px;max-width:760px}pre{background:#f4f4f4;padding:8px}</style>
+</head><body>
+<div id="top" role="banner">Tallyfold Server 4.2 manual · <a href="#" style="color:#aee">Download</a> · <a href="#" style="color:#aee">Forum</a></div>
+<div id="side" role="navigation">
+<div><b>Contents</b></div>
+<div><a href="#">1 Install</a></div><div><a href="#">2 Configure</a></div><div><a href="#">3 Users and roles</a></div>
+<div><a href="#">4 Back up a database</a></div><div style="padding-left:10px"><a href="#">4.1 Full backup</a></div><div style="padding-left:10px"><a href="#">4.2 Restore</a></div>
+<div><a href="#">5 Upgrade</a></div><div><a href="#">6 Error codes</a></div>
+</div>
+<div id="doc">
+<h1 data-l="main">4 Back up a database</h1>
+<p data-l="main">Tallyfold Server stores each ledger as one database file. A backup copies the file while the server runs, so users can keep working. Make a backup before each upgrade and at least once a day.</p>
+<h2 data-l="main">4.1 Full backup</h2>
+<p data-l="main">Run the backup command as the user that owns the server. The command writes a compressed copy to the folder that you name.</p>
+<pre data-l="main">tallyfold backup --ledger main --to /srv/backups --keep 14</pre>
+<p data-l="main">The option --keep removes old copies of the same ledger and keeps the newest 14. Without --keep, the command keeps every copy, and the disk can fill up.</p>
+<p data-l="main">A backup of a ledger of 2 GB takes about 40 seconds on a normal server. During the backup, writes are slower, but no write is lost.</p>
+<h2 data-l="main">4.2 Restore</h2>
+<p data-l="main">To restore, stop the server first. A restore replaces the ledger file, and the server must not write to it at the same time.</p>
+<pre data-l="main">tallyfold stop
+tallyfold restore --ledger main --from /srv/backups/main-2024-05-02.tfz
+tallyfold start</pre>
+<p data-l="main">After a restore, all entries made after the time of the backup are gone. Tell your users before you restore.</p>
+<p data-l="neutral">Page last changed: 2 May. Applies to version 4.2 and later.</p>
+<div><a href="#">Previous: 3 Users and roles</a> | <a href="#">Next: 5 Upgrade</a></div>
+<div style="font-size:12px;color:#666;margin-top:20px">Was this page useful? <a href="#">Yes</a> <a href="#">No</a></div>
+</div>
+</body></html>

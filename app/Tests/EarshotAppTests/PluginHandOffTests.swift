@@ -6,7 +6,7 @@ import XCTest
 
 /// A fake hand-off: it keeps each call.
 final class FakePlugins: PluginHandOff {
-    var leads: [PluginLead] = [PluginLead(pluginID: "pa", lead: "remind me to")]
+    var leads: [PluginLead] = [PluginLead(pluginID: "footnote", lead: "remind me to")]
     var targetNames: [PluginTargetName] = []
     var keys = ["app"]
     func contextKeys(of pluginID: String) -> [String] { keys }
@@ -16,6 +16,15 @@ final class FakePlugins: PluginHandOff {
     func handOff(pluginID: String, lead: String, text: String, available: [String: String]) -> String? {
         calls.append((pluginID, lead, text, available))
         return reason
+    }
+}
+
+/// A tier 2 that keeps each question and its options. A plugin command must never reach it.
+final class RecordingTier2: Tier2Chooser {
+    var asked: [String] = []
+    func choose(_ text: String, options: [String], budgetMs: Int) async -> Int? {
+        asked.append(([text] + options).joined(separator: " | "))
+        return 0
     }
 }
 
@@ -68,13 +77,13 @@ final class PluginHandOffTests: XCTestCase {
     /// "open today" runs the core open action with the target of the plugin. The plugin gets no command (R-PL-3).
     func testOpenTargetIsTheCoreOpen() async {
         let fake = FakePlugins()
-        fake.targetNames = [PluginTargetName(pluginID: "pa", name: "today", open: "/tmp/pa/today.html")]
+        fake.targetNames = [PluginTargetName(pluginID: "footnote", name: "today", open: "/tmp/footnote/today.html")]
         let runner = FieldRunner()
         let (p, e) = pipeline(fake, runner: runner)
         e.text = "Open today."
         let r = await p.finish(mode: .hold)
         XCTAssertTrue(r.ok, r.note)
-        XCTAssertEqual(runner.runs.first?.0, .openTarget(pluginID: "pa", name: "today", open: "/tmp/pa/today.html"))
+        XCTAssertEqual(runner.runs.first?.0, .openTarget(pluginID: "footnote", name: "today", open: "/tmp/footnote/today.html"))
         XCTAssertTrue(fake.calls.isEmpty)
     }
 
@@ -203,6 +212,94 @@ final class PluginHandOffTests: XCTestCase {
         let deadline = Date().addingTimeInterval(2)
         while host.targets(of: "echo").isEmpty, Date() < deadline { RunLoop.current.run(until: Date().addingTimeInterval(0.05)) }
         XCTAssertEqual(host.targets(of: "echo"), [PluginTarget(id: "t1", name: "stamps", kind: "todo")])
+    }
+
+    /// The page text plugin: it asks for page text twice after each command, and says what came back.
+    private let asker = """
+    #!/bin/sh
+    while IFS= read -r line; do
+      case "$line" in
+        *'"type":"command"'*)
+          id=$(printf '%s' "$line" | sed -n 's/.*"id":"\\([^"]*\\)".*/\\1/p')
+          printf '{"type":"pageText","re":"%s"}\\n' "$id"
+          printf '{"type":"pageText","re":"%s"}\\n' "$id"
+          ;;
+        *'"error"'*)
+          e=$(printf '%s' "$line" | sed -n 's/.*"error":"\\([^"]*\\)".*/\\1/p')
+          printf '{"type":"answer","kind":"note","text":"error %s"}\\n' "$e"
+          ;;
+        *'"blocks"'*)
+          printf '{"type":"answer","kind":"note","text":"blocks"}\\n'
+          ;;
+      esac
+    done
+    """
+
+    /// docs/PLUGINS.md 5.3: the first ask gets the page, the second ask gets an error. The ask carries the address
+    /// at the time of the command.
+    func testPageTextAsk() throws {
+        let host = try install("asker", run: ["./plugin.sh"], script: asker, context: ["pageText"])
+        defer { host.stopAll() }
+        var asked: [PageTextAsks.Command] = []
+        host.onPageTextAsk = { command, manifest, reply in
+            XCTAssertEqual(manifest.id, "asker")
+            asked.append(command)
+            reply(PageText.lines(re: command.id, url: command.url, title: "Fox", blocks: [PageBlock(t: "The fox")], complete: true))
+        }
+        let answered = expectation(description: "answers")
+        answered.expectedFulfillmentCount = 2
+        var got: [String] = []
+        host.onAnswer = { message, _ in got.append(message.shownText ?? ""); answered.fulfill() }
+        XCTAssertNil(host.handOff(pluginID: "asker", lead: "note", text: "x", available: ["url": "https://fox.example"]))
+        wait(for: [answered], timeout: 5)
+        XCTAssertEqual(Set(got), ["blocks", "error one ask for each command"])
+        XCTAssertEqual(asked.map(\.url), ["https://fox.example"])
+    }
+
+    /// A plugin whose manifest does not name "pageText" gets no page text and no answer to its ask.
+    func testPageTextAskNeedsTheKey() throws {
+        let host = try install("asker", run: ["./plugin.sh"], script: asker, context: ["app"])
+        defer { host.stopAll() }
+        var asked = false
+        host.onPageTextAsk = { _, _, _ in asked = true }
+        var answers = 0
+        host.onAnswer = { _, _ in answers += 1 }
+        XCTAssertNil(host.handOff(pluginID: "asker", lead: "note", text: "x", available: ["url": "https://fox.example"]))
+        RunLoop.current.run(until: Date().addingTimeInterval(1))
+        XCTAssertFalse(asked)
+        XCTAssertEqual(answers, 0)
+    }
+
+    /// A plugin command with a page read never reaches tier 2 (Jev), also with tier 2 on (R-MD-1, D-9, Footnote phase 4
+    /// spec section 11, "Not to Jev"). The page text goes only to the plugin. Made-up page words only.
+    func testPageReadNeverReachesTier2() async throws {
+        let host = try install("asker", run: ["./plugin.sh"], script: asker, context: ["pageText"])
+        defer { host.stopAll() }
+        let spy = RecordingTier2()
+        let engine = TextEngine()
+        let runner = FieldRunner()
+        runner.url = "https://heron.example/weir"
+        let p = CommandPipeline(engine: engine, router: CommandRouter(tier2: spy), actions: runner, names: FakeNames(),
+                                apps: { Fixture.apps }, allNames: { Fixture.names }, frontBundleID: { "com.google.Chrome" })
+        p.plugins = host
+        let pageWords = "The amber heron crossed the quiet weir at dawn"
+        var asks = 0
+        host.onPageTextAsk = { command, _, reply in
+            asks += 1
+            reply(PageText.lines(re: command.id, url: command.url, title: "Heron", blocks: [PageBlock(t: pageWords)],
+                                 complete: true))
+        }
+        let answered = expectation(description: "answers")
+        answered.expectedFulfillmentCount = 2
+        host.onAnswer = { _, _ in answered.fulfill() }
+        engine.text = "Note keep this page."
+        let r = await p.finish(mode: .hold)
+        XCTAssertTrue(r.ok, r.note)
+        await fulfillment(of: [answered], timeout: 5)
+        XCTAssertEqual(asks, 1)
+        XCTAssertTrue(spy.asked.isEmpty, "tier 2 got: \(spy.asked)")
+        XCTAssertFalse(r.note.contains("heron"), r.note)
+        XCTAssertFalse(r.heard.contains("heron"), r.heard)
     }
 
     func testNotApprovedDoesNotStart() throws {

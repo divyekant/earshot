@@ -1,0 +1,24 @@
+main	Fieldnote 5.4
+neutral	Latest
+neutral	Released on 27 October 2026 for macOS, Windows, iOS and Android
+main	Version 5.4 brings offline maps for a full region, a faster sync and a new export to spreadsheets. It needs macOS 13, Windows 10, iOS 16 or Android 11, or later.
+main	New
+main	Offline maps: download a full region, up to 2 GB, and not only the area on the screen.
+main	Export a notebook to an .xlsx file with one row for each observation.
+main	Voice notes now show a text version on iOS and Android. The text is made on the device.
+main	A dark map style for work at night.
+main	Changed
+main	Sync is about 4 times faster for notebooks with more than 1,000 photos, because the app now sends only the changed parts.
+main	The photo limit for one observation is now 30. It was 12.
+main	The coordinate format setting moved from the map menu to Settings > Units.
+main	The free plan now includes 3 notebooks. It was 2.
+main	Fixed
+main	The app could close when you rotated the phone during a GPS fix.
+main	Dates before 1970 showed as 1 January 1970 in exports.
+main	On Windows, the search did not find words with accents.
+main	A shared notebook sometimes showed the wrong owner.
+main	Battery use in the background on Android 14 was too high.
+main	Known problems
+main	On macOS 13, the dark map style shows contour lines too light. A fix comes in 5.4.1. Until then, use the standard style for work with contour lines.
+main	Before you update
+main	Version 5.4 changes the format of the local database. After the update, an older version of the app cannot open your notebooks. If you use Fieldnote on more than one device, update all of them before you start a sync.

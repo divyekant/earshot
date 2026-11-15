@@ -17,26 +17,14 @@ struct EarshotApp: App {
     @StateObject private var app = AppController()
 
     var body: some Scene {
+        // The menu bar panel (dk, 2026-11-15): the state, Pause, the mode and the last commands.
         MenuBarExtra {
-            Text(app.listenLabel)
-            Text(app.status)
-            Divider()
-            Button(app.isPaused ? "Resume listening" : "Pause for 1 hour") {
-                if app.isPaused { app.resume() } else { app.pause(seconds: AppController.pauseSeconds) }
-            }
-            Picker("Mode", selection: Binding(get: { app.settings.mode }, set: { app.setMode($0) })) {
-                Text("Hold key").tag(InputMode.hold)
-                Text("Always on").tag(InputMode.alwaysOn)
-            }
-            Divider()
-            OpenManageButton()
-            Toggle("Start at login", isOn: Binding(get: { app.startsAtLogin }, set: { app.setStartsAtLogin($0) }))
-            Divider()
-            Button("Quit earshot") { NSApplication.shared.terminate(nil) }
+            PanelHost(app: app)
         } label: {
             Image(systemName: ListenIcon.symbol(app.listen))
                 .accessibilityLabel("earshot: " + app.listenLabel)
         }
+        .menuBarExtraStyle(.window)
         Window("earshot", id: "manage") {
             ManageView(settings: $app.settings, store: app.store, hooks: app.hooks)
                 .frame(minWidth: 680, minHeight: 460)
@@ -44,14 +32,27 @@ struct EarshotApp: App {
     }
 }
 
-private struct OpenManageButton: View {
+/// The panel of the menu bar icon, with the values and actions of the app.
+private struct PanelHost: View {
+    @ObservedObject var app: AppController
     @Environment(\.openWindow) private var openWindow
+
     var body: some View {
-        Button("Manage…") {
-            openWindow(id: "manage")
-            // T6: activate the app, move the window to this Space and bring it to the front.
-            ManageWindow.bringToFront()
-        }
+        MenuPanel(model: PanelModel(
+            listen: app.listen, symbol: ListenIcon.symbol(app.listen), listenLabel: app.listenLabel, status: app.status,
+            isPaused: app.isPaused,
+            mode: Binding(get: { app.settings.mode }, set: { app.setMode($0) }),
+            startsAtLogin: Binding(get: { app.startsAtLogin }, set: { app.setStartsAtLogin($0) }),
+            cloudOn: app.settings.tier2 == .jev || app.settings.jevSeesScreen,
+            pause: { app.pause(seconds: AppController.pauseSeconds) },
+            resume: { app.resume() },
+            openSettings: {
+                openWindow(id: "manage")
+                // T6: activate the app, move the window to this Space and bring it to the front.
+                ManageWindow.bringToFront()
+            },
+            quit: { NSApplication.shared.terminate(nil) }
+        ), store: app.store)
     }
 }
 

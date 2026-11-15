@@ -1,0 +1,151 @@
+{
+  "blocks": [
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0,
+      "t": "Cookies on the council website. We use some essential cookies to make this service work."
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0.13,
+      "t": "Holloway District Council Menu",
+      "zone": "banner"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0.75,
+      "t": "Home › Parking › Permits"
+    },
+    {
+      "inMain": true,
+      "k": "h",
+      "level": 1,
+      "links": 0,
+      "t": "Apply for a resident parking permit",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "You can apply for a resident parking permit if you live in a controlled parking zone and your car is registered at your address.",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "A permit lets you park in the resident bays of your zone at any time. It does not guarantee a space.",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "h",
+      "level": 2,
+      "links": 0,
+      "t": "Cost",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "li",
+      "links": 0,
+      "t": "First permit for a household: £85 a year",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "li",
+      "links": 0,
+      "t": "Second permit: £140 a year",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "li",
+      "links": 0,
+      "t": "Electric cars: £30 a year",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "h",
+      "level": 2,
+      "links": 0,
+      "t": "What you need",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "Have these ready before you start:",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "li",
+      "links": 0,
+      "t": "the registration number of the car",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "li",
+      "links": 0,
+      "t": "a council tax bill or a tenancy agreement from the last 3 months",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "li",
+      "links": 0,
+      "t": "the logbook (V5C) in your name at this address",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "The council checks your documents within 5 working days. The permit is digital, so you do not get a paper copy for the windscreen.",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "If you move house, cancel the permit. The council refunds the unused full months.",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 1,
+      "t": "Start now",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "Last updated: 8 April",
+      "zone": "main"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0.58,
+      "t": "Accessibility · Contact the council · Privacy notice © Holloway District Council",
+      "zone": "footer"
+    }
+  ],
+  "browser": "com.google.Chrome",
+  "complete": true,
+  "elements": 70,
+  "ms": 10.1,
+  "sensitive": "",
+  "url": "file:///d08.html"
+}

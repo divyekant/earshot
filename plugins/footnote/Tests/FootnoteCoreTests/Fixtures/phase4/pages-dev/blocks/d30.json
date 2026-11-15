@@ -1,0 +1,110 @@
+{
+  "blocks": [
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0,
+      "t": "The Civic Weekly",
+      "zone": "banner"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0.76,
+      "t": "Politics · Towns · Opinion · Podcasts",
+      "zone": "nav"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "Opinion · Ruth Adair-Mensah · 7 minute read",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "h",
+      "level": 1,
+      "links": 0,
+      "t": "Our high streets need benches, not more parking",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 1,
+      "t": "Share Email Copy link",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0.15,
+      "t": "When the council in Thornbury removed twelve parking spaces on Market Street and put in benches, planters and a covered bike rack, the traders warned that the street would die. Two years later, the empty shops on the street have fallen from nine to three, according to the council's own count.",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0.12,
+      "t": "This is not a surprise to anyone who has read the research on walking and spending. People who arrive on foot spend less on each visit than drivers, but they come more often, and over a month they spend more. A street where people can sit down is a street where they stay.",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0.05,
+      "t": "The argument against benches is usually about who sits on them. That argument says more about us than about the benches. An older person who cannot walk the length of the high street without a rest will simply shop online instead.",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "Councils should set a simple rule: no part of a high street more than 50 metres from a seat. It is cheap, it is quick, and it does more for trade than another car park at the edge of town.",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0.29,
+      "t": "Ruth Adair-Mensah writes about towns and planning. More from this writer",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "h",
+      "level": 2,
+      "links": 0,
+      "t": "More opinion",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 1,
+      "t": "Why bus fares should be free for under-18s",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 1,
+      "t": "The case for small schools",
+      "zone": "main"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0.58,
+      "t": "The Civic Weekly · Subscribe · Letters to the editor",
+      "zone": "footer"
+    }
+  ],
+  "browser": "com.google.Chrome",
+  "complete": true,
+  "elements": 71,
+  "ms": 4.5,
+  "sensitive": "",
+  "url": "file:///d30.html"
+}

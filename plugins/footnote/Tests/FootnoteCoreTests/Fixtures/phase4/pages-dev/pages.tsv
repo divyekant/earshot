@@ -1,0 +1,31 @@
+page	kind	landmarks
+d01	news	landmarks
+d02	blog	none
+d03	documentation	roles
+d04	product	landmarks
+d05	forum	none
+d06	recipe	partial
+d07	encyclopedia	none
+d08	authority service	landmarks
+d09	pricing	none
+d10	job	landmarks
+d11	how-to	none
+d12	event	landmarks
+d13	terms	none
+d14	web mail	none
+d15	web editor	none
+d16	magazine	landmarks
+d17	questions page	none
+d18	sports news	landmarks
+d19	podcast notes	landmarks
+d20	property listing	none
+d21	release notes	landmarks
+d22	service notice	none
+d23	museum exhibition	landmarks
+d24	paper abstract	none
+d25	clinic notice	landmarks
+d26	product test	landmarks
+d27	school letter	none
+d28	course lesson	partial
+d29	question and answers	none
+d30	opinion	landmarks

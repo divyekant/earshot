@@ -1,0 +1,30 @@
+main	Retry policy
+main	When a job fails, Tessel can run it again. The retry policy of a queue controls how many times a job runs again and how long Tessel waits between two attempts.
+main	By default a job gets 5 attempts. The wait time starts at 10 seconds and doubles after each failed attempt, up to a limit of 15 minutes.
+main	Set the policy for a queue
+main	Put a retry block in the queue section of tessel.toml:
+main	[queues.email] retry.max_attempts = 8 retry.first_wait = "30s" retry.factor = 2.0 retry.max_wait = "1h" retry.jitter = true
+main	With these values, the waits are 30 seconds, 1 minute, 2 minutes, and so on. After the eighth failed attempt, Tessel moves the job to the dead letter queue.
+main	Options
+main	Option
+main	Default
+main	Meaning
+main	max_attempts
+main	5
+main	The total number of attempts, with the first run included.
+main	first_wait
+main	10s
+main	The wait before the second attempt.
+main	factor
+main	2.0
+main	Tessel multiplies the wait by this number after each failure.
+main	max_wait
+main	15m
+main	The longest wait between two attempts.
+main	jitter
+main	false
+main	If true, Tessel changes each wait by a random amount of up to 20 percent, so that many failed jobs do not start again at the same moment.
+main	Errors that must not retry
+main	Some errors do not go away. A retry of a job with a wrong address is a waste. Raise tessel.Permanent in the job, and Tessel moves the job to the dead letter queue at once:
+main	from tessel import job, Permanent @job(queue="email") def send_receipt(order_id): order = load(order_id) if not order.email: raise Permanent("order has no address") deliver(order)
+main	Note: A timeout counts as a failed attempt. If a job is stopped because the worker shuts down, the attempt does not count.

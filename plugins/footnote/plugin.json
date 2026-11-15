@@ -1,0 +1,23 @@
+{
+  "contract": 1,
+  "id": "footnote",
+  "name": "Footnote",
+  "version": "0.5.0",
+  "leads": ["remind me", "todo", "task", "note", "keep this", "new project",
+            "what is due", "what due", "what about", "where is",
+            "done", "snooze", "drop", "move", "quiet",
+            "main points", "summarize", "summarise", "what projects", "finish project",
+            "keep", "what is new", "what new"],
+  "context": ["app", "windowTitle", "url", "document", "selection", "pageText"],
+  "run": ["./Footnote.app/Contents/MacOS/footnote"],
+  "network": [],
+  "formerID": "pa",
+  "settings": [
+    {"key": "rules.time", "label": "A reminder reaches its time", "choices": ["alert", "list", "off"], "default": "alert", "group": "When to tell you"},
+    {"key": "rules.due", "label": "A to-do is due today or tomorrow", "choices": ["alert", "list", "off"], "default": "list", "group": "When to tell you"},
+    {"key": "rules.silence", "label": "An open to-do has had no change for some days", "choices": ["alert", "list", "off"], "default": "list", "group": "When to tell you"},
+    {"key": "rules.nearEvent", "label": "A calendar event starts soon", "choices": ["alert", "list", "off"], "default": "alert", "group": "When to tell you"},
+    {"key": "rules.newArrival", "label": "Something new comes in for a project", "choices": ["alert", "list", "off"], "default": "list", "group": "When to tell you"},
+    {"key": "rules.request", "label": "A mail or a note asks you for something", "choices": ["alert", "list", "off"], "default": "list", "group": "When to tell you"}
+  ]
+}

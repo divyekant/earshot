@@ -1,0 +1,397 @@
+{
+  "blocks": [
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 1,
+      "t": "Fair Test Home and garden Tech Money Become a member",
+      "zone": "nav"
+    },
+    {
+      "inMain": true,
+      "k": "h",
+      "level": 1,
+      "links": 0,
+      "t": "We tested 6 cordless vacuum cleaners: the Tervo V9 wins",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "By the Fair Test lab team · Tested in August",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "We tested six cordless stick vacuums from £149 to £499 in our lab and in three real homes. Each one cleaned the same carpet, hard floor and stairs, and we measured the run time from a full battery.",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "The Tervo V9 picked up the most dust on carpet and ran for 48 minutes in normal mode. At £279 it is not the cheapest, but it beat two models that cost more than £400.",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0.53,
+      "t": "Get our test results first. Sign up for the free newsletter",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "Model",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "Price",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "Run time",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "Score",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "Tervo V9",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "£279",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "48 min",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "84",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "Aldwin Stick Pro",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "£449",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "41 min",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "79",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "Hoxley Air 2",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "£199",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "32 min",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "71",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "Brightwell Swift",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "£149",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "24 min",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "58",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "Model",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "Tervo V9",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "Aldwin Stick Pro",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "Hoxley Air 2",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "Brightwell Swift",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "Price",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "£279",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "£449",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "£199",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "£149",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "Run time",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "48 min",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "41 min",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "32 min",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "24 min",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "Score",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "84",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "79",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "71",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "58",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "Model",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "Price",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "Run time",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "cell",
+      "links": 0,
+      "t": "Score",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "The cheapest model, the Brightwell Swift, is a poor buy: its battery lasted 24 minutes and it left visible dust on the carpet after three passes.",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "Two models were too heavy to use on stairs for long. If you have stairs, look for a model under 2.5 kg.",
+      "zone": "article"
+    },
+    {
+      "inMain": true,
+      "k": "h",
+      "level": 2,
+      "links": 0,
+      "t": "Read next",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 1,
+      "t": "Robot vacuums: are they worth it?",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 1,
+      "t": "Best washing machines",
+      "zone": "main"
+    }
+  ],
+  "browser": "com.google.Chrome",
+  "complete": true,
+  "elements": 138,
+  "ms": 11.5,
+  "sensitive": "",
+  "url": "file:///d26.html"
+}

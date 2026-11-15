@@ -1,0 +1,133 @@
+{
+  "blocks": [
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0.79,
+      "t": "Pebblecal · Download · Docs · Release notes",
+      "zone": "nav"
+    },
+    {
+      "inMain": true,
+      "k": "h",
+      "level": 1,
+      "links": 0,
+      "t": "Pebblecal 3.8",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "Released 19 June",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "h",
+      "level": 2,
+      "links": 0,
+      "t": "New",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "li",
+      "links": 0,
+      "t": "Travel time: an event with a place can show the time to get there, by car or by public transport. Turn it on in Settings, Events.",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "li",
+      "links": 0,
+      "t": "Week numbers in the month view.",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "li",
+      "links": 0,
+      "t": "Import of .ics files with more than 10,000 events.",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "h",
+      "level": 2,
+      "links": 0,
+      "t": "Changed",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "li",
+      "links": 0,
+      "t": "The default reminder for all-day events is now 9:00 on the day, not midnight.",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "li",
+      "links": 0,
+      "t": "Pebblecal needs macOS 13 or later.",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "h",
+      "level": 2,
+      "links": 0,
+      "t": "Fixed",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "li",
+      "links": 0,
+      "t": "A repeating event moved by one hour after a change of daylight saving time.",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "li",
+      "links": 0,
+      "t": "Search did not find events with an accent in the title.",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "li",
+      "links": 0,
+      "t": "The app used too much memory with many shared calendars.",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 0,
+      "t": "Before you upgrade, export a backup in File, Export. Version 3.8 changes the database, and an older version cannot open it.",
+      "zone": "main"
+    },
+    {
+      "inMain": true,
+      "k": "p",
+      "links": 1,
+      "t": "Older release notes",
+      "zone": "main"
+    },
+    {
+      "inMain": false,
+      "k": "p",
+      "links": 0.13,
+      "t": "Pebblecal is made by a small team in Utrecht. Contact",
+      "zone": "footer"
+    }
+  ],
+  "browser": "com.google.Chrome",
+  "complete": true,
+  "elements": 63,
+  "ms": 9.6,
+  "sensitive": "",
+  "url": "file:///d21.html"
+}
