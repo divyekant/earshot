@@ -70,6 +70,11 @@ public struct MenuPanel: View {
     let model: PanelModel
     let store: Store
     @State private var records: [ActivityRecord] = []
+    @State private var plugins: [PluginPages] = []
+    /// The part under the mode: nil for the last commands, else the id of a plugin with pages.
+    @State private var part: String?
+    /// Counts the times the panel opens, so a plugin page reads its file again.
+    @State private var opened = 0
 
     public init(model: PanelModel, store: Store) {
         self.model = model
@@ -85,7 +90,14 @@ public struct MenuPanel: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            recent
+            if !plugins.isEmpty { parts }
+            if let id = part, let p = plugins.first(where: { $0.id == id }) {
+                PluginPageView(pages: p, reload: opened, zoom: 0.7)
+                    .frame(height: 340)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            } else {
+                recent
+            }
             footer
         }
         .padding(18)
@@ -115,7 +127,7 @@ public struct MenuPanel: View {
     @ViewBuilder private var recent: some View {
         let shown = PanelText.recent(records)
         VStack(alignment: .leading, spacing: 0) {
-            GroupHeading(text: "Last commands").padding(.bottom, 4)
+            if plugins.isEmpty { GroupHeading(text: "Last commands").padding(.bottom, 4) }
             if shown.isEmpty {
                 Text("No commands yet. Hold the key and say “open Notes”.").font(.system(size: 13)).foregroundStyle(Quiet.dim)
                     .padding(.vertical, 8)
@@ -137,6 +149,29 @@ public struct MenuPanel: View {
         }
     }
 
+    /// "Last commands", then one part for each plugin with pages, for example "Footnote".
+    private var parts: some View {
+        HStack(spacing: 4) {
+            partButton("Last commands", nil)
+            ForEach(plugins) { p in partButton(p.name, p.id) }
+        }
+        .padding(3)
+        .background(RoundedRectangle(cornerRadius: 10).fill(Brand.hex(0x141414)))
+    }
+
+    private func partButton(_ title: String, _ id: String?) -> some View {
+        let on = part == id
+        return Button { part = id } label: {
+            Text(title).font(.system(size: 12, weight: on ? .semibold : .regular))
+                .foregroundStyle(on ? Quiet.text : Quiet.dim)
+                .frame(maxWidth: .infinity).padding(.vertical, 6)
+                .background(RoundedRectangle(cornerRadius: 8).fill(on ? Brand.hex(0x2A2A2A) : Color.clear))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(on ? .isSelected : [])
+    }
+
     private var footer: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(model.cloudOn ? "Cloud on: Jev can get the command words" : "Cloud off · all on this Mac")
@@ -155,5 +190,8 @@ public struct MenuPanel: View {
 
     private func load() {
         records = PanelText.recent(ActivityLog(store: store).last(40))
+        plugins = PluginPages.find(store: store)
+        if let id = part, !plugins.contains(where: { $0.id == id }) { part = nil }
+        opened += 1
     }
 }

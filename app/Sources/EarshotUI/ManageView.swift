@@ -83,6 +83,17 @@ public enum ManagePage: String, CaseIterable, Hashable, Sendable {
     }
 }
 
+/// A link at the top of the window: the pages of a plugin, or one of the fixed pages.
+enum ManageLink: Hashable {
+    case plugin(PluginPages)
+    case page(ManagePage)
+
+    /// The plugin pages first, then the fixed pages.
+    static func all(plugins: [PluginPages]) -> [(page: ManageLink, title: String)] {
+        plugins.map { (ManageLink.plugin($0), $0.name) } + ManagePage.allCases.map { (ManageLink.page($0), $0.title) }
+    }
+}
+
 /// The parts of the Advanced page: the app table, the names, the permissions and the test of a typed command.
 enum AdvancedPart: String, CaseIterable, Hashable {
     case apps = "Apps", names = "Names", permissions = "Permissions", test = "Test"
@@ -93,7 +104,10 @@ public struct ManageView: View {
     @Binding var settings: EarshotSettings
     let store: Store
     let hooks: ManageHooks
-    @State private var page: ManagePage = .settings
+    @State private var page: ManageLink = .page(.settings)
+    @State private var plugins: [PluginPages] = []
+    /// Counts the times the owner opens a plugin link, so its page view reads the file again.
+    @State private var opened = 0
     @State private var part: AdvancedPart = .apps
 
     public init(settings: Binding<EarshotSettings>, store: Store = Store(), hooks: ManageHooks = ManageHooks()) {
@@ -110,7 +124,7 @@ public struct ManageView: View {
                     Text("earshot").font(.system(size: 15, weight: .bold))
                 }
                 Spacer()
-                TopLinks(pages: ManagePage.allCases.map { ($0, $0.title) }, selection: $page)
+                TopLinks(pages: ManageLink.all(plugins: plugins), selection: $page)
                 Spacer()
                 Text(Brand.version.map { "v\($0)" } ?? "").font(.system(size: 12)).foregroundStyle(Quiet.dim)
                     .frame(minWidth: 80, alignment: .trailing)
@@ -123,6 +137,12 @@ public struct ManageView: View {
         .preferredColorScheme(.dark)
         .tint(Brand.accent)
         .background(WindowReader().frame(width: 0, height: 0))
+        .onAppear(perform: findPlugins)
+        .onChange(of: page) { _, new in
+            if case .plugin = new { opened += 1 }
+            // An approval in the Plugins page can add or remove a link.
+            findPlugins()
+        }
         .onChange(of: settings) { _, new in
             try? store.save(new, "settings.json")
             hooks.settingsChanged?(new)
@@ -131,6 +151,21 @@ public struct ManageView: View {
 
     @ViewBuilder private var content: some View {
         switch page {
+        case .plugin(let p):
+            PluginPageView(pages: p, reload: opened)
+        case .page(let fixed):
+            fixedPage(fixed)
+        }
+    }
+
+    /// Reads the plugins with pages again, for example after an approval in the Plugins page.
+    private func findPlugins() {
+        plugins = PluginPages.find(store: store)
+        if case .plugin(let p) = page, !plugins.contains(p) { page = .page(.settings) }
+    }
+
+    @ViewBuilder private func fixedPage(_ fixed: ManagePage) -> some View {
+        switch fixed {
         case .settings:
             GeneralTab(settings: $settings, hooks: hooks)
         case .activity:

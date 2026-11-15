@@ -260,6 +260,16 @@ The rules of the read:
 
 The reasons for no text: "no Accessibility permission", "no front app", "no front window", "not a web page", "no web page at the time of the command", "the page changed", "sign-in, code or payment page", "no command with this id", "one ask for each command", "too late".
 
+### 5.4 Pages in the window
+
+A plugin can write local HTML pages to its data folder, in `<store>/plugin-data/<id>/pages/`. If that folder has `index.html`, and the plugin is approved and has no problem, the earshot window gets a link with the name of the plugin, and the menu bar panel gets a part for it. The manifest needs no new key, so the approval does not change.
+
+- earshot shows `index.html` with script off and keeps no web data.
+- A link to a file in the pages folder opens in the page view.
+- earshot opens any other link in its app only if "open <target>" allows it (section 4): http, https and `message://` addresses, documents and plain folders. It ignores all other links.
+- earshot reads the page again each time the owner opens the link or the panel.
+- earshot's own window is never a command target, so a page in the window never goes to Jev.
+
 ## 6. The example plugin
 
 `app/examples/plugins/echo/` is a small plugin in shell. It answers each command with the number of its words. To try it:
