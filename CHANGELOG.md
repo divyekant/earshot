@@ -14,14 +14,15 @@ To update a Mac that has the PA plugin:
 
 1. Install the new earshot.
 2. Run `plugins/footnote/scripts/install-footnote.sh`. The old PA install script is gone.
-3. Click "Read again" in the Plugins page, or run `earshot plugins reload`. earshot moves the PA data and the approval to Footnote. You do not approve again.
+3. Click "Read again" in the Plugins page, or run `earshot plugins reload`. earshot moves the PA data to Footnote. Then turn on "Approved" for Footnote in the Plugins page: its plugin.json now lists settings, so earshot does not move the old approval.
 4. macOS asks again for access to Reminders, Calendar, Mail and Notes, because the app ID changed. Allow each one.
 
 ### Added
 
+- A plugin can list settings in plugin.json (key `settings`). earshot shows them as a form in the window and writes each change to the settings file of the plugin. Footnote lists its six alert / list / off rules: Settings… > Footnote > Settings. Footnote needs one new approval in the Plugins page (R-PL-4, R-FN-3).
 - A plugin that writes `pages/index.html` in its data folder gets a link with its name in the window, and a part in the menu bar panel. Footnote shows its Today page there. Script is off in the page view (R-PL-3, R-FN-3).
 - A click on the menu bar icon opens a panel: the listen state, Pause, the mode, the last commands in plain words, and the cloud state. Escape closes it. "Settings…" in the panel opens the window. A dictation shows as "Dictation · N words" (R-FB-1, R-MD-1).
-- A plugin can name its old id in the manifest key `formerID`. earshot then moves the data folder and the approval to the new id, but only if the approved old manifest has the same contract, leads, context and network (docs/PLUGINS.md 2.1, R-PL-4).
+- A plugin can name its old id in the manifest key `formerID`. earshot then moves the data folder and the approval to the new id (the approval only if the `settings` are the same), but only if the approved old manifest has the same contract, leads, context and network (docs/PLUGINS.md 2.1, R-PL-4).
 - A plugin can ask for the text of the web page in front after a command (context key `pageText`). earshot shows "→ <plugin> · reads this page" for each read. It sends no text on a sign-in, code or payment page, and never the value of a one-line field (R-PL-2, R-PL-5).
 - Footnote 0.4.0: "keep this" on a web page keeps the main text of the page, if earshot sends it. The note "Text kept · <title> · <n> words" comes after the first answer. "where is" finds words in kept pages. The list `kept pages` and a text copy of each page are local pages with no script (R-FN-9).
 - Footnote: "main points" for a web page, off by default (setting `pagePoints`). In the sealed test it found 2 or more of 3 key sentences on 6 of 10 pages, below the pass mark of 8. With the setting off, the answer is "Main points work for kept files only." (R-FN-4).

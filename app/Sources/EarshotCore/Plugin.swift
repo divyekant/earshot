@@ -101,11 +101,16 @@ public struct PluginManifest: Codable, Hashable, Sendable {
     /// id to the new id only if the approved old manifest asks for the same leads, context and network
     /// (docs/PLUGINS.md 2.1).
     public var formerID: String?
+    /// The settings that the owner can change in the earshot window (docs/PLUGINS.md 3.2). earshot writes each
+    /// value to settings.json in the data folder of the plugin. Empty means none.
+    public var settings: [PluginSetting]
 
     public init(contract: Int = PluginContract.version, id: String, name: String, version: String = "0.1.0",
-                leads: [String], context: [String] = [], run: [String], network: [String] = [], formerID: String? = nil) {
+                leads: [String], context: [String] = [], run: [String], network: [String] = [], formerID: String? = nil,
+                settings: [PluginSetting] = []) {
         self.contract = contract; self.id = id; self.name = name; self.version = version
         self.leads = leads; self.context = context; self.run = run; self.network = network; self.formerID = formerID
+        self.settings = settings
     }
 
     /// Reads each field if it is in the file. A missing optional field gets its default.
@@ -120,6 +125,7 @@ public struct PluginManifest: Codable, Hashable, Sendable {
         run = try c.decode([String].self, forKey: .run)
         network = try c.decodeIfPresent([String].self, forKey: .network) ?? []
         formerID = try c.decodeIfPresent(String.self, forKey: .formerID)
+        settings = try c.decodeIfPresent([PluginSetting].self, forKey: .settings) ?? []
     }
 
     /// True for a good id: only a-z, 0-9 and "-".
@@ -137,6 +143,7 @@ public struct PluginManifest: Codable, Hashable, Sendable {
         if run.first?.isEmpty ?? true { out.append("no program to run") }
         let unknown = context.filter { !PluginContract.contextKeys.contains($0) }
         if !unknown.isEmpty { out.append("unknown context: " + unknown.joined(separator: ", ")) }
+        out += PluginSetting.problems(settings)
         return out
     }
 }
@@ -303,7 +310,9 @@ public struct PluginCatalog: Sendable {
                   let was = try? JSONDecoder().decode(PluginManifest.self, from: oldData), was.id == old,
                   was.contract == new.contract, was.leads == new.leads,
                   Set(was.context) == Set(new.context), Set(was.network) == Set(new.network) else { continue }
-            out.append(PluginRename(from: old, to: new.id, newHash: Self.hash(data)))
+            // The settings of the window (3.2) are part of what the owner approves. If they changed, earshot moves
+            // the data but not the approval, and the owner approves the new manifest.
+            out.append(PluginRename(from: old, to: new.id, newHash: was.settings == new.settings ? Self.hash(data) : nil))
         }
         return out.sorted { $0.to < $1.to }
     }
@@ -311,7 +320,7 @@ public struct PluginCatalog: Sendable {
     /// Does one rename. Stop the old plugin first. The steps:
     /// 1. moves plugin-data/<old>/ to plugin-data/<new>/. If the new folder exists, it moves each item that the new
     ///    folder does not have, and keeps the rest in the old folder (it deletes no data),
-    /// 2. moves the approval to the new id, with the hash of the new manifest,
+    /// 2. moves the approval to the new id, with the hash of the new manifest (no approval if `newHash` is nil),
     /// 3. deletes the old plugin folder plugins/<old>/ (the old program, not data).
     /// If a step fails, the next steps do not run, and the next reload tries again. Returns the items that stayed in
     /// the old data folder.
@@ -362,8 +371,9 @@ public struct PluginCatalog: Sendable {
 public struct PluginRename: Equatable, Sendable {
     public let from: String
     public let to: String
-    /// The SHA-256 of the new manifest. The approval moves to it.
-    public let newHash: String
+    /// The SHA-256 of the new manifest. The approval moves to it. Nil if the settings changed: then the approval
+    /// does not move, and the owner approves the new manifest.
+    public let newHash: String?
 }
 
 // MARK: - Messages (JSON lines)

@@ -206,7 +206,7 @@ public struct MenuPanel: View {
 
     private func load() {
         records = PanelText.recent(ActivityLog(store: store).last(40))
-        plugins = PluginPages.find(store: store)
+        plugins = PluginPages.find(store: store).filter(\.hasIndex)
         if let id = part, !plugins.contains(where: { $0.id == id }) { part = nil }
         opened += 1
     }

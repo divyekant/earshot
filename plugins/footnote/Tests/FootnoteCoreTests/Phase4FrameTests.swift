@@ -15,6 +15,25 @@ final class Phase4FrameTests: XCTestCase {
         XCTAssertEqual(o["network"] as? [String], [], "no network code (spec rule 13)")
     }
 
+    /// The settings form of earshot (docs/PLUGINS.md 3.2) names real keys of settings.json with the same defaults.
+    func testManifestSettingsMatchTheSettingsFile() throws {
+        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appendingPathComponent("plugin.json")
+        let o = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+        let settings = try XCTUnwrap(o["settings"] as? [[String: Any]])
+        XCTAssertEqual(settings.count, 6)
+        let defaults = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(FootnoteSettings())) as? [String: Any])
+        for s in settings {
+            let key = try XCTUnwrap(s["key"] as? String)
+            var node: Any? = defaults
+            for part in key.split(separator: ".") { node = (node as? [String: Any])?[String(part)] }
+            XCTAssertEqual(node as? String, s["default"] as? String, key)
+            XCTAssertEqual(s["choices"] as? [String], ["alert", "list", "off"], key)
+            let mode = try XCTUnwrap(node as? String)
+            XCTAssertNotNil(RuleMode(rawValue: mode), key)
+        }
+    }
+
     func testSettingDefaults() throws {
         XCTAssertTrue(FootnoteSettings().pageText)
         XCTAssertFalse(FootnoteSettings().pagePoints)
