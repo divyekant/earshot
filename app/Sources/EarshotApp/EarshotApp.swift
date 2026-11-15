@@ -35,6 +35,9 @@ struct EarshotApp: App {
             ManageView(settings: $app.settings, store: app.store, hooks: app.hooks, live: app.live)
                 .frame(minWidth: 860, minHeight: 560)
         }
+        // The window draws its own top bar under a clear title bar. With the default style, SwiftUI on macOS 26 drew
+        // an opaque title bar over the page links (Mac check 2026-11-15). This style keeps the title bar clear.
+        .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1040, height: 720)
     }
 }
