@@ -6,7 +6,7 @@ This document gives the command line of earshot. The requirements are R-CT-1 to 
 
 The app program is also the command line. If the first word is a control word, the program runs one command and stops. No window opens.
 
-The control words are `settings`, `plugins`, `run`, `status`, `reload` and `help`.
+The control words are `settings`, `plugins`, `run`, `status`, `reload`, `snapshot` and `help`.
 
 The program is in the app bundle:
 
@@ -31,6 +31,7 @@ EARSHOT=~/projects/earshot-t0/app/build/Earshot.app/Contents/MacOS/earshot
 | `run <words> --actions --wait <s>` | Also waits up to `<s>` seconds for the plugin answers. The default is 3 s. The maximum is 20 s. |
 | `status` | Shows the version, the commit, the mode, the state and the running plugins. |
 | `reload` | Makes the running app read `settings.json` and the plugins folder again. |
+| `snapshot <folder>` | Writes a PNG file of each screen and state of the window, the panel, the note and the menu bar icon to `<folder>`, for the design check. It reads a copy of the store, so it changes no file. It starts no microphone, no key monitor and no plugin. |
 
 Examples:
 
