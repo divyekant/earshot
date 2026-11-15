@@ -30,7 +30,7 @@ public struct PluginPages: Hashable, Identifiable, Sendable {
         self.hasIndex = hasIndex
     }
 
-    /// The approved plugins with no problems whose pages folder has index.html, or that have settings, sorted by id.
+    /// The approved plugins with no problems whose pages folder has index.html or board.json, or that have settings.
     public static func find(store: Store) -> [PluginPages] {
         let catalog = PluginCatalog(store: store)
         return find(entries: catalog.scan(), dataFolder: catalog.dataFolder)
@@ -42,7 +42,8 @@ public struct PluginPages: Hashable, Identifiable, Sendable {
             let data = dataFolder.appendingPathComponent(e.id, isDirectory: true)
             let folder = data.appendingPathComponent("pages", isDirectory: true)
             let index = FileManager.default.fileExists(atPath: folder.appendingPathComponent("index.html").path)
-            guard index || !e.manifest.settings.isEmpty else { return nil }
+            let board = FileManager.default.fileExists(atPath: folder.appendingPathComponent(Board.fileName).path)
+            guard index || board || !e.manifest.settings.isEmpty else { return nil }
             return PluginPages(id: e.id, name: e.manifest.name, folder: folder, settings: e.manifest.settings,
                                settingsFile: data.appendingPathComponent("settings.json"), hasIndex: index)
         }

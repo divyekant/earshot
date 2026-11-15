@@ -288,6 +288,36 @@ A plugin can write local HTML pages to its data folder, in `<store>/plugin-data/
 - earshot reads the page again each time the owner opens the link or the panel.
 - earshot's own window is never a command target, so a page in the window never goes to Jev.
 
+### 5.5 Lists as data: board.json
+
+A plugin can also write its lists as data, in `pages/board.json`. Then earshot draws the lists with its own type and rows, in the window and in the menu bar panel. The plugin then looks like a part of earshot. The HTML pages stay for the browser. The file is optional and needs no new manifest key, so the approval does not change. earshot only shows the text: it never runs it as a command (R-PL-3).
+
+```json
+{
+  "version": 1,
+  "panel": { "title": "Today", "rows": [{ "text": "Call the plumber", "when": "17:00", "mark": "todo" }],
+             "empty": "Nothing for today." },
+  "tabs": [
+    { "id": "today", "title": "Today", "sub": "1 for today", "date": "Sat 14 Nov",
+      "sections": [
+        { "title": "Late", "tone": "late", "rows": [] },
+        { "title": "Today", "rows": [{ "text": "Call the plumber", "detail": "Kitchen", "when": "17:00", "mark": "todo" }],
+          "empty": "Nothing for today." },
+        { "title": "The last 7 days", "numbers": [{ "label": "done", "value": 4 }] }
+      ],
+      "hint": "Say “done” with the words of a to-do." }
+  ],
+  "settingsTab": "Rules"
+}
+```
+
+- `panel`: up to 6 rows under the header of the panel. If `rows` is empty, the panel shows `empty`. If `empty` is not there, the panel shows no list.
+- `tabs`: up to 8 pages in the window, as tabs. Each tab has sections. A section has a `title`, and `rows`, `numbers` or a plain `text`.
+- A row has `text`, and optional `detail`, `when`, `late`, `mark` and `open`. `mark` is `todo`, `doc`, `flag` or `note`. `tone: "late"` and `late: true` draw the time in the color for late items.
+- `open` uses the rule of "open <target>" (section 4). A file name with no folder opens from the pages folder.
+- `settingsTab` is the name of the tab with the settings of section 3.2. The default is "Settings".
+- earshot draws at most 200 rows in a section and reads a file of 1 MB at most. If the file is not valid, earshot shows `index.html` (section 5.4).
+
 ## 6. The example plugin
 
 `app/examples/plugins/echo/` is a small plugin in shell. It answers each command with the number of its words. To try it:

@@ -16,19 +16,26 @@ import SwiftUI
 struct EarshotApp: App {
     @StateObject private var app = AppController()
 
+    init() {
+        // The type of the site and the design canvas, from Contents/Resources/Fonts. The system font if it fails.
+        _ = Typeface.register()
+    }
+
     var body: some Scene {
-        // The menu bar panel (dk, 2026-11-15): the state, Pause, the mode and the last commands.
+        // The menu bar panel (dk, 2026-11-15, design canvas "Panel A"): the state, Pause, the mode, the lists of a
+        // plugin and the last commands.
         MenuBarExtra {
             PanelHost(app: app)
         } label: {
-            Image(systemName: ListenIcon.symbol(app.listen))
+            Image(nsImage: MenuBarIcon.image(app.live))
                 .accessibilityLabel("earshot: " + app.listenLabel)
         }
         .menuBarExtraStyle(.window)
         Window("earshot", id: "manage") {
-            ManageView(settings: $app.settings, store: app.store, hooks: app.hooks)
-                .frame(minWidth: 680, minHeight: 460)
+            ManageView(settings: $app.settings, store: app.store, hooks: app.hooks, live: app.live)
+                .frame(minWidth: 860, minHeight: 560)
         }
+        .defaultSize(width: 1040, height: 720)
     }
 }
 
@@ -39,20 +46,24 @@ private struct PanelHost: View {
 
     var body: some View {
         MenuPanel(model: PanelModel(
-            listen: app.listen, symbol: ListenIcon.symbol(app.listen), listenLabel: app.listenLabel, status: app.status,
-            isPaused: app.isPaused,
+            live: app.live,
             mode: Binding(get: { app.settings.mode }, set: { app.setMode($0) }),
             startsAtLogin: Binding(get: { app.startsAtLogin }, set: { app.setStartsAtLogin($0) }),
-            cloudOn: app.settings.tier2 == .jev || app.settings.jevSeesScreen,
+            level: app.feedback.level,
+            notices: { app.refreshNotices(); return app.notices },
+            act: { app.act($0, open: open) },
             pause: { app.pause(seconds: AppController.pauseSeconds) },
             resume: { app.resume() },
-            openSettings: {
-                openWindow(id: "manage")
-                // T6: activate the app, move the window to this Space and bring it to the front.
-                ManageWindow.bringToFront()
-            },
+            open: open,
             quit: { NSApplication.shared.terminate(nil) }
         ), store: app.store)
+    }
+
+    /// Opens the window at a page. T6: activate the app, move the window to this Space and bring it to the front.
+    private func open(_ page: WindowPage) {
+        WindowNav.shared.show(page)
+        openWindow(id: "manage")
+        ManageWindow.bringToFront()
     }
 }
 
@@ -92,11 +103,15 @@ final class AppController: ObservableObject {
     private var engineWhy = ""
     /// The wake phrase models (D-11). They load when always-on mode is on, and stay loaded.
     private var wake: WakeModels?
-    private var wakeLoad: Task<Void, Never>?
+    var wakeLoad: Task<Void, Never>?
     /// The state of the wake phrase models, for the management window.
     private var wakeState = "The wake phrase models load when you turn on always-on mode."
     /// The download part, 0 to 1, while the models download.
-    private let wakeProgress = Counter()
+    let wakeProgress = Counter()
+    /// The things that need the owner now, for the panel banners and the mark on the menu bar icon.
+    @Published var notices: [Notice] = []
+    /// Reads the notices again every few seconds, so that the menu bar icon shows a new problem.
+    var noticeTimer: Timer?
     /// The microphone of the running wake listener: its voice profile is the profile of this microphone (E6).
     private var listenerMic: InputDevice?
     /// Starts always-on again with the right voice profile when the default microphone changes.
@@ -193,6 +208,7 @@ final class AppController: ObservableObject {
         pipeline.playSound = { kind in DispatchQueue.main.async { NSSound(named: kind.systemName).map { $0.volume = kind.volume; $0.play() } } }
         pipeline.wakePhrase = settings.wakePhrase
         startPlugins()
+        startNotices()
         startControl()
         prepareEngine()
         startInput()
@@ -230,7 +246,10 @@ final class AppController: ObservableObject {
             refreshNames: { appID in await names.refresh(appIDs: [appID]) },
             feedback: feedback,
             settingsChanged: { [weak self] new in self?.apply(new) },
-            pluginsChanged: { [plugins] in plugins.reload() },
+            pluginsChanged: { [weak self, plugins] in
+                plugins.reload()
+                self?.refreshNotices()
+            },
             leadRefusal: { lead in PluginRouter.refusal(lead, apps: store.apps) },
             voice: VoiceHooks(
                 status: { [weak self] in self?.voiceStatus() ?? "" },
@@ -239,7 +258,13 @@ final class AppController: ObservableObject {
                     guard let self else { throw WakeError("earshot is closing.") }
                     return try await self.teachVoice(phrase: phrase, clips: clips)
                 },
-                forget: { [weak self] in self?.forgetVoice() }))
+                forget: { [weak self] in self?.forgetVoice() }),
+            pluginRun: { [plugins] id in plugins.status(of: id) },
+            restartPlugin: { [weak self, plugins] id in
+                let why = plugins.restart(id)
+                self?.refreshNotices()
+                return why
+            })
     }
 
     /// Runs the catalogue scan. On an error, for example DiscoveryError.accessibilityOff (first live test: the scan

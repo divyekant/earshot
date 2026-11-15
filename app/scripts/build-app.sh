@@ -18,6 +18,10 @@ cp scripts/Info.plist "$app/Contents/Info.plist"
 # The source commit. scripts/update-app.sh compares it with the installed app.
 /usr/libexec/PlistBuddy -c "Add :EarshotCommit string $(git rev-parse HEAD 2>/dev/null || echo unknown)" "$app/Contents/Info.plist"
 cp ../assets/brand/AppIcon.icns "$app/Contents/Resources/AppIcon.icns"
+# The type of the window, the panel and the note (Schibsted Grotesk and JetBrains Mono, SIL OFL 1.1), with the
+# license texts. EarshotUI registers the fonts at start (Typeface.register).
+mkdir -p "$app/Contents/Resources/Fonts"
+cp Resources/Fonts/*.ttf Resources/Fonts/OFL-*.txt "$app/Contents/Resources/Fonts/"
 # transcribe.cpp (Parakeet). EarshotSpeech finds it at @executable_path/../Frameworks (T1).
 cp -R "$bin/CTranscribe.framework" "$app/Contents/Frameworks/"
 # Resource bundles of the SwiftPM modules, if any.
