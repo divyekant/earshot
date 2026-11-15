@@ -117,6 +117,10 @@ public final class FeedbackNote: FeedbackSink {
         p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         let host = NSHostingView(rootView: NoteStage(model: model))
         host.frame = NSRect(origin: .zero, size: NoteModel.stage)
+        // A clear layer, so that no part of the stage around the note can show as a dark area.
+        host.wantsLayer = true
+        host.layer?.backgroundColor = .clear
+        host.layer?.isOpaque = false
         p.contentView = host
         return p
     }
@@ -125,7 +129,11 @@ public final class FeedbackNote: FeedbackSink {
 /// The state of the note. Used on the main thread only.
 final class NoteModel: ObservableObject {
     /// The clear area of the panel. The note sits at its bottom center, so it can grow and move without a new frame.
-    static let stage = CGSize(width: 640, height: 360)
+    static let stage = CGSize(width: 720, height: 360)
+    /// The clear room around the note, inside the view that fades. SwiftUI draws a fading view into its own layer,
+    /// and that layer ends at the frame of the view. Without this room, the dark shadow showed as a black rectangle
+    /// behind the round note while it faded in or out (Mac check 2026-11-15).
+    static let shadowRoom: CGFloat = 40
     /// The note starts 12 pt lower and rises.
     static let lift: CGFloat = 12
 
@@ -144,11 +152,12 @@ struct NoteStage: View {
             Spacer(minLength: 0)
             if model.visible {
                 NoteView(content: model.content, level: model.level, duration: model.duration, shownAt: model.shownAt)
+                    .padding(EdgeInsets(top: NoteModel.shadowRoom, leading: NoteModel.shadowRoom,
+                                        bottom: NoteModel.lift + 24, trailing: NoteModel.shadowRoom))
                     .transition(.asymmetric(insertion: .opacity.combined(with: .offset(y: NoteModel.lift)), removal: .opacity))
                     .id(model.content.kindKey)
             }
         }
-        .padding(.bottom, NoteModel.lift + 24)
         .frame(width: NoteModel.stage.width, height: NoteModel.stage.height)
         .animation(Motion.note, value: model.content)
     }
