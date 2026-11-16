@@ -171,13 +171,21 @@ def sealed_run(set_name: str, data_file: Path, sha_file: Path, arms: list[str], 
     if bad:
         raise RuntimeError("SHA-256 check failed: " + "; ".join(bad))
     items, labels = read_jsonl(data_file), read_tsv(labels_path)
-    rows, kinds = [], []
+    rows, kinds, out = [], [], ["id\tarm\tneed\tscore\tgate"]
     for a in arms:
         preds = predict(a, items)
+        gated = apply_code_gate(items, preds)
+        for it in items:
+            p = gated.get(it["id"], {})
+            need = (p.get("when") if p.get("when") in ("list", "now") else "list") if p.get("need") == "1" else "none"
+            gate = ("replied" if it.get("replied") else "from owner") if code_gate(it) else ""
+            out.append(f"{it['id']}\t{a}\t{need}\t{float(p.get('need_score', 0) or 0):.4f}\t{gate}")
         rows.append((f"{set_name} / {a}", score_items(items, labels, preds)))
         kinds.append(f"- {a}: {kind_counts(items, labels, preds)}")
     text = table(rows) + "\n\nD1 mail by kind:\n" + "\n".join(kinds)
     runs_dir.mkdir(parents=True, exist_ok=True)
+    # Ids and results only, for the writer of the set. The build thread does not read this file.
+    (runs_dir / f"{set_name}-predictions.tsv").write_text("\n".join(out) + "\n")
     stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     record.write_text(f"# Sealed run: {set_name}\n\n{stamp}. SHA-256 checked. Arms: {', '.join(arms)}.\n\n{text}\n")
     return text

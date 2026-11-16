@@ -30,7 +30,7 @@ final class DecideBenchTests: XCTestCase {
         bench.out = { printed.append($0) }
         try bench.run(items: items, predictions: pred)
         let rows = try String(contentsOf: pred, encoding: .utf8).split(separator: "\n").map { $0.components(separatedBy: "\t") }
-        XCTAssertEqual(rows[0], ["id", "need", "need_score", "when", "sentence", "facts", "sentences"])
+        XCTAssertEqual(rows[0], ["id", "need", "need_score", "when", "sentence", "facts", "sentences", "gate"])
         XCTAssertEqual(rows.count, 4)
         let m1 = rows[1]
         XCTAssertEqual(m1[1], "1")

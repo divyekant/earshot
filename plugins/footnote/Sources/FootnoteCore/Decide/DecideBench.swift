@@ -78,6 +78,7 @@ public final class DecideBench {
 
     /// Writes the predictions: `id`, `need` (1 or 0), `need_score`, `when` (none or list), `sentence`, `facts`, and
     /// `sentences`: the sentences of the prepared text (quoted, forwarded and signature parts cut), for the model input.
+    /// `gate`: the reason of the rules gate that held the item (bulk filter, gate 2 or gate 3), or empty.
     public func run(items url: URL, predictions: URL) throws {
         guard let model = RequestModel.fitted else { throw SourceError("no request model") }
         let items = try Self.read(url)
@@ -89,7 +90,7 @@ public final class DecideBench {
             if firstPass[k].map({ it.m.date < $0 }) ?? true { firstPass[k] = it.m.date }
         }
         let bench = FlagBench(folder: url.deletingLastPathComponent(), embedder: nil)
-        var lines = ["id\tneed\tneed_score\twhen\tsentence\tfacts\tsentences"]
+        var lines = ["id\tneed\tneed_score\twhen\tsentence\tfacts\tsentences\tgate"]
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = TimeZone(identifier: "UTC")!
         let reader = TimeReader(calendar: cal)
@@ -102,7 +103,8 @@ public final class DecideBench {
             l.known = it.senderKnown ?? (firstPass[it.ownerAddress + " " + it.m.fromAddress.lowercased()].map { $0 < it.m.date } ?? false)
             let p = bench.prepared(l)
             var score = -99.0, sentence = ""
-            if bench.gateReason(l) == nil {
+            let gate = bench.gateReason(l)
+            if gate == nil {
                 let r = model.score(l.m, p, owner: bench.owner, ownerAddresses: bench.ownerAddresses, known: l.known)
                 score = r.score
                 sentence = r.best.map { p.sentences[$0].text } ?? ""
@@ -116,7 +118,7 @@ public final class DecideBench {
             // All sentences of the prepared text, also those that gate 2 does not keep: the model reads them all.
             let all = RequestFeatures.prepare(it.m.text).flatMap { RequestFeatures.sentences($0) }
                 .map(clean).joined(separator: Self.sentenceSeparator)
-            lines.append("\(it.m.id)\t\(flag ? 1 : 0)\t\(String(format: "%.3f", score))\t\(flag ? "list" : "none")\t\(clean(sentence))\t\(Self.facts(it, p, now: it.now, reader: reader))\t\(all)")
+            lines.append("\(it.m.id)\t\(flag ? 1 : 0)\t\(String(format: "%.3f", score))\t\(flag ? "list" : "none")\t\(clean(sentence))\t\(Self.facts(it, p, now: it.now, reader: reader))\t\(all)\t\(gate ?? "")")
         }
         try (lines.joined(separator: "\n") + "\n").write(to: predictions, atomically: true, encoding: .utf8)
         out("Rules arm (\(model.variant) at \(model.threshold)): \(items.count) items, \(flags) flags")
