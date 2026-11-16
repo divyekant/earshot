@@ -10,7 +10,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 
-from .formats import is_note, is_request, pair_group, same_sentence
+from .formats import code_gate, is_note, is_request, pair_group, same_sentence
 
 D1_MAIL_FOUND = 34 / 40
 D1_MAIL_FALSE = 10 / 400
@@ -77,7 +77,11 @@ def apply_when_gate(item: dict, when: str, known: bool) -> str:
 
 def d1_mail(items, labels, preds) -> Result:
     lab = {r["id"]: r for r in labels}
-    mails = [it for it in items if not is_note(it)]
+    # RULE-need.md, "The label and the bulk filter": the marks count only the mails that pass the filter. The
+    # labeled requests that the filter holds are the cost of the filter, a count for information.
+    all_mails = [it for it in items if not is_note(it)]
+    held = sum(1 for it in all_mails if code_gate(it) and is_request(lab[it["id"]]))
+    mails = [it for it in all_mails if not code_gate(it)]
     req = [it for it in mails if is_request(lab[it["id"]])]
     found = false = sentence = flags = 0
     for it in mails:
@@ -92,11 +96,12 @@ def d1_mail(items, labels, preds) -> Result:
                 sentence += 1
         else:
             false += 1
-    n, r = len(mails), len(req)
+    # The false limit stays a share of all mails (S1: 10 of 400), as the marks were set; the held mails cannot flag.
+    n, r = len(all_mails), len(req)
     ok = (r > 0 and found >= math.ceil(D1_MAIL_FOUND * r) and false <= math.floor(D1_MAIL_FALSE * n)
           and sentence >= math.ceil(D1_MAIL_SENTENCE * r))
     return Result("D1 mail", {"mails": n, "requests": r, "flags": flags, "found": found, "false": false,
-                              "sentence correct": sentence}, ok if r else None)
+                              "sentence correct": sentence, "requests held by the filter": held}, ok if r else None)
 
 
 def d1_notes(items, labels, preds) -> Result:

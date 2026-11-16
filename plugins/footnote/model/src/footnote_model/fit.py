@@ -18,6 +18,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from transformers import AutoModel, AutoTokenizer
 
+from .formats import code_gate
 from .encode import Window, item_windows, pair_ids
 
 NEED = ("none", "list", "now")
@@ -71,6 +72,9 @@ def item_examples(tok, items, labels, swift) -> list[ItemEx]:
     out = []
     lab = {r["id"]: r for r in labels} if labels else {}
     for it in items:
+        # RULE-need.md: no fit on mails that the bulk filter holds; the model never reads them.
+        if labels and code_gate(it):
+            continue
         sw = swift[it["id"]]
         sents = [s for s in sw.get("sentences", "").split("\x1e") if s.strip()]
         ws = item_windows(tok, it["id"], sw["facts"], it.get("subject", ""), sents)
