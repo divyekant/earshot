@@ -19,7 +19,7 @@ import tempfile
 from pathlib import Path
 
 from . import marks
-from .formats import code_gate, is_note, read_jsonl, read_tsv, write_jsonl
+from .formats import code_gate, is_note, read_jsonl, read_tsv, same_sentence, write_jsonl
 
 MODEL_DIR = Path(__file__).resolve().parents[2]
 PLUGIN_DIR = MODEL_DIR.parent
@@ -172,7 +172,7 @@ def check_sha(sha_file: Path, files: list[Path]) -> list[str]:
 
 
 def sealed_run(set_name: str, data_file: Path, sha_file: Path, arms: list[str], runs_dir: Path = RUNS_DIR,
-               predict=arm_predictions) -> str:
+               predict=arm_predictions, expect_held: int | None = None) -> str:
     """One run on a sealed item set. It prints counts only and records the run."""
     from .formats import label_file
     record = runs_dir / f"{set_name}.md"
@@ -183,18 +183,26 @@ def sealed_run(set_name: str, data_file: Path, sha_file: Path, arms: list[str], 
     if bad:
         raise RuntimeError("SHA-256 check failed: " + "; ".join(bad))
     items, labels = read_jsonl(data_file), read_tsv(labels_path)
-    rows, kinds, out = [], [], ["id\tarm\tneed\tscore\tgate"]
+    held_n = sum(1 for it in items if not is_note(it) and code_gate(it))
+    if expect_held is not None and held_n != expect_held:
+        # The writer of the set counted the held mails from the fields. A different count stops the run before
+        # any arm runs, so the set stays unused.
+        raise RuntimeError(f"the bulk filter holds {held_n} mails, the writer expects {expect_held}. No arm ran.")
+    lab = {r["id"]: r for r in labels}
+    rows, kinds, out = [], [], ["id\tarm\tneed\tsentence_found\theld"]
     for a in arms:
         preds = predict(a, items)
         gated = apply_code_gate(items, preds)
         for it in items:
             p = gated.get(it["id"], {})
             need = (p.get("when") if p.get("when") in ("list", "now") else "list") if p.get("need") == "1" else "none"
-            gate = code_gate(it) or ""
-            out.append(f"{it['id']}\t{a}\t{need}\t{float(p.get('need_score', 0) or 0):.4f}\t{gate}")
+            l = lab.get(it["id"], {})
+            found = need != "none" and (same_sentence(p.get("sentence", ""), l.get("sentence", ""))
+                                        or same_sentence(p.get("sentence", ""), l.get("sentence2", "")))
+            out.append(f"{it['id']}\t{a}\t{need}\t{'yes' if found else 'no'}\t{'yes' if code_gate(it) else 'no'}")
         rows.append((f"{set_name} / {a}", score_items(items, labels, preds)))
         kinds.append(f"- {a}: {kind_counts(items, labels, preds)}")
-    text = table(rows) + "\n\nD1 mail by kind:\n" + "\n".join(kinds)
+    text = (table(rows) + f"\n\nMails held by the bulk filter: {held_n}.\n\nD1 mail by kind:\n" + "\n".join(kinds))
     runs_dir.mkdir(parents=True, exist_ok=True)
     # Ids and results only, for the writer of the set. The build thread does not read this file.
     (runs_dir / f"{set_name}-predictions.tsv").write_text("\n".join(out) + "\n")

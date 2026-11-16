@@ -110,7 +110,12 @@ class SealedTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 bench.sealed_run("S9", data, sha, ["x"], runs_dir=d / "runs", predict=fake)
             sha.write_text(f"{bench.sha256(data)}  S9.jsonl.gz\n{bench.sha256(label_file(data))}  S9-labels.tsv\n")
-            out = bench.sealed_run("S9", data, sha, ["x"], runs_dir=d / "runs", predict=fake)
+            # A held count that differs from the writer's count stops the run, and the set stays unused.
+            with self.assertRaises(RuntimeError):
+                bench.sealed_run("S9", data, sha, ["x"], runs_dir=d / "runs", predict=fake, expect_held=3)
+            out = bench.sealed_run("S9", data, sha, ["x"], runs_dir=d / "runs", predict=fake, expect_held=0)
+            pred = (d / "runs" / "S9-predictions.tsv").read_text().splitlines()
+            self.assertEqual(pred[1], "m1\tx\tlist\tyes\tno")
             self.assertIn("found 1", out)
             self.assertNotIn("Could you", out)
             with self.assertRaises(RuntimeError):

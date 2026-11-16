@@ -52,7 +52,7 @@ def cmd_bench(a) -> int:
 
 def cmd_sealed(a) -> int:
     try:
-        print(bench.sealed_run(a.name, Path(a.file), Path(a.sha256), a.arm))
+        print(bench.sealed_run(a.name, Path(a.file), Path(a.sha256), a.arm, expect_held=a.expect_held))
     except RuntimeError as e:
         print(f"Refused: {e}")
         return 1
@@ -76,6 +76,7 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("file")
     s.add_argument("--sha256", required=True)
     s.add_argument("--arm", action="append", default=None)
+    s.add_argument("--expect-held", type=int, default=None, help="mails the bulk filter must hold, from the writer")
     s.set_defaults(fn=cmd_sealed)
     a = ap.parse_args(argv)
     if getattr(a, "arm", "x") is None:

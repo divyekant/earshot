@@ -4,7 +4,7 @@ import glob, json, re, sys, collections
 sys.path.insert(0, "/home/user/earshot/plugins/footnote/model/src")
 from footnote_model.formats import write_jsonl, write_tsv, NEED_LABEL_COLUMNS, PAIR_LABEL_COLUMNS, made_up_problems
 OUT = "/home/user/earshot/plugins/footnote/model/data"
-BANNED = ["Nadia Brandt", "Walter Osei", "Tomasz Wilk", "Ingrid Halvorsen", "Dev Malhotra", "Ruth Abernathy", "Kenji Morales"]
+BANNED = ["Nadia Brandt", "Walter Osei", "Tomasz Wilk", "Ingrid Halvorsen", "Dev Malhotra", "Ruth Abernathy", "Kenji Morales", "Thornby", "Low Tide Studio", "The Anchor", "Saltmarsh Weekender", "Glass Harbour", "The Furlongs", "Castle Wharf"]
 def rows(pat):
     out = {}
     for f in sorted(glob.glob(pat)):
