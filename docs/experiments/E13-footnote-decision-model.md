@@ -91,3 +91,33 @@ D1 fails on S1 for every arm. The build spec stop rule applied, and dk chose "Ta
 | BERT text s21 | 37 | 35 | 30 |
 
 Harness fault: the model and control arms did not apply the full bulk filter in this run. See the note in `runs/S1.md`. From round 3, every arm runs behind the full bulk filter, and the facts line has `owner in` (to, cc or none) and `greets` (owner, other, group or none). A second model arm runs behind gate 2 of the rules (`model+g2:`).
+
+## M1 round 3 and the S3 arms (fixed before the S3 run)
+
+Round 3 is targeted data from 8 new writers. It adds 963 items (agreement 0.956 to 0.972), 399 D2 pairs and 600 D3 pairs (agreement 0.995 to 1.0). Round 3 is fit data only. The short notes of one owner of each mail writer are a dev set for the note threshold (`short-notes-dev3`, 39 notes).
+
+Gates for every arm, in this order:
+
+1. The full Swift bulk filter (`code_gate`). The run stops if it does not hold 186 of the 400 S3 mails (`--expect-held 186`).
+2. The `now` gate: `now` only from a known sender.
+3. Arm `model+g2` only: gate 2 of the rules ("greets another" or "not for owner").
+
+Arms for the one run on S3 (2026-11-16, before the run):
+
+| Arm | Model | Seed | Thresholds (mail, note, now) |
+|---|---|---|---|
+| rules | Swift rules of today | none | rules |
+| control | logistic models on EmbeddingGemma vectors (`r3-control`) | none | 0.61, 0.82, 0.56 |
+| model | ettin-encoder-17m, 10 epochs, lr 8e-5, items only, rounds 1 to 3 (`r3-ettin-text-s21`) | 21 | 0.02, 0.16, 0.38 |
+| model+g2 | the same model behind gate 2 | 21 | 0.02, 0.16, 0.38 |
+
+Dev results with the bulk filter (D1 mail found / false; requests that pass the filter):
+
+| Arm | dev1 (42 requests, 334 mails) | dev2 (58 requests, 334 mails) | short notes dev3 (20 to-dos) |
+|---|---|---|---|
+| Ettin text s13 | 36/7 | 48/1 | 18 found, 2 false |
+| Ettin text s21 | 37/7 | 52/4 | 19 found, 1 false |
+| Ettin text s34 | 37/8 | 52/6 | 20 found, 1 false |
+| control | 25/6 | 27/8 | 2 found, 0 false |
+
+Seed rule as before: the median dev2 found count is 52 (s21 and s34). The first of the two, s21, is used. D4 passes on dev for all three seeds.
