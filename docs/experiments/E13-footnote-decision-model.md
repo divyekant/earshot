@@ -156,3 +156,17 @@ Model: ettin-encoder-17m text model, round 3 settings (10 epochs, lr 8e-5, items
 - Output for each arm and seed (`footnote_model.x1`): the D1 mail, notes and D4 lines; false flags and misses by kind; the fewest false flags at 34 or more found over all mail thresholds; a score file (id, arm, seed, request score, `now` score, held).
 - Check of the tool: base s21 on HW3 gives the S3 result again (39 found, 32 false; with gate 2 34 found, 20 false).
 - Reading rule (design thread): "data closes the gap" if, in both directions, the median seed has 34 or more found and 12 or fewer false flags at the dev threshold, for the model or the model behind gate 2. "Partly" if the false flags fall by half or more against base but stay above 12. "No" for all other results.
+
+## S2 pair arms (declared before the one S2 run, 2026-11-16)
+
+The design thread set a time limit of 19:00 UTC for new pair arms. The student arm is dropped: its teachers saw the same pairs, so it learns the labels. The EmbeddingGemma-input arm has one seed only: the other seeds ran beside the X1 fits on the same 4 cores and were stopped for X1. The mean of 6 models is not an arm (BERT pair s34 did not finish).
+
+| Arm | Model | Thresholds (fit, closes) | Dev D2 project (dev1, dev2) |
+|---|---|---|---|
+| control | EmbeddingGemma pair features, logistic (`r3-control`) | 0.7236, 0.7925 | 59 of 60, 31 of 33 |
+| model | ettin-encoder-17m pair model, round 3 data, 3 epochs, lr 5e-5 (`r3-ettin-pair-s21`) | 0.9073, 0.8086 | 85 of 89, 40 of 41 |
+| model+eg | the same, and the 4 EmbeddingGemma pair features go into the pair heads (`r4-ettin-eg-s13`) | 0.9439, 0.9634 | 85 of 89, 44 of 44 |
+
+- `model` is the round 3 pair run that passes D2 project on dev1 and dev2. `model+eg` has one seed, so it has no seed choice.
+- The control arm is fit again in the run, with the fit-pair features from the cache of the dev runs. On dev it gives the same D2 project counts as `r3-control`; D2 item changes by 2 proposals (49 to 51) and D3 by 1, because the vectors of llama-server differ a little from run to run.
+- The run uses `fm sealed-pairs` on `fit-s2` and `close-s2`, one time each. D2 project is the result line; D2 item is a second line. `runs/S2-fit-predictions.tsv` and `runs/S2-close-predictions.tsv` have the pair id, arm, score and threshold. No text.

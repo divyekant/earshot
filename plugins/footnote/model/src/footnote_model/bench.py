@@ -211,6 +211,18 @@ def sealed_run(set_name: str, data_file: Path, sha_file: Path, arms: list[str], 
     return text
 
 
+_FEATS: dict[str, list[float]] = {}
+
+
+def _test_features(pairs: list[dict]) -> dict[str, list[float]]:
+    """The EmbeddingGemma pair features of the test pairs, made one time in this process and never written."""
+    from . import control
+    todo = [p for p in pairs if p["id"] not in _FEATS]
+    if todo:
+        _FEATS.update(control.pair_feature_map(todo))
+    return {p["id"]: _FEATS[p["id"]] for p in pairs}
+
+
 def pair_arm_scores(arm: str, task: str, pairs: list[dict]) -> tuple[dict[str, float], float]:
     """The score of each pair and the threshold of the arm, from its dev run.
 
@@ -222,14 +234,21 @@ def pair_arm_scores(arm: str, task: str, pairs: list[dict]) -> tuple[dict[str, f
     kind, _, where = arm.partition(":")
     d = Path(where)
     if kind == "control":
-        from .control_run import ControlArm
+        import numpy as np
         from .stage1 import load_pairs, load_rounds
         prefix = "fit" if task == "fit" else "close"
-        arm_ = ControlArm().fit([], [], {}, {task: load_rounds(load_pairs, prefix, "train")})
-        return arm_.pair_scores(task, pairs), json.loads((d / "thresholds.json").read_text())[task]
+        tp, tl = load_rounds(load_pairs, prefix, "train")
+        # The same fit as ControlArm._fit_pairs. FEATURE_CACHE (if set) keeps the features of the fit pairs.
+        tf = control.pair_feature_map(tp, os.environ.get("FEATURE_CACHE"))
+        lab = {r["id"]: float(r["label"]) for r in tl}
+        lr = control.Logistic(lam=0.0, steps=800, lr=1.0).fit(np.array([tf[p["id"]] for p in tp]),
+                                                               np.array([lab[p["id"]] for p in tp]))
+        f = _test_features(pairs)
+        s = lr.p(np.array([f[p["id"]] for p in pairs]))
+        return {p["id"]: float(s[k]) for k, p in enumerate(pairs)}, json.loads((d / "thresholds.json").read_text())[task]
     if kind == "model":
         model, tok, cfg = fit.load(d)
-        feats = control.pair_feature_map(pairs) if cfg.get("extra") else None
+        feats = _test_features(pairs) if cfg.get("extra") else None
         sc = fit.predict_pairs(model, tok, fit.pair_examples(tok, pairs, None, task, feats))
         return sc, json.loads((d / "thresholds.json").read_text())[task]
     if kind == "mean":
