@@ -4,7 +4,7 @@ import glob, json, re, sys, collections
 sys.path.insert(0, "/home/user/earshot/plugins/footnote/model/src")
 from footnote_model.formats import write_jsonl, write_tsv, NEED_LABEL_COLUMNS, PAIR_LABEL_COLUMNS, made_up_problems
 OUT = "/home/user/earshot/plugins/footnote/model/data"
-BANNED = ["Nadia Brandt", "Walter Osei", "Tomasz Wilk", "Ingrid Halvorsen", "Dev Malhotra"]
+BANNED = ["Nadia Brandt", "Walter Osei", "Tomasz Wilk", "Ingrid Halvorsen", "Dev Malhotra", "Ruth Abernathy", "Kenji Morales"]
 def rows(pat):
     out = {}
     for f in sorted(glob.glob(pat)):
@@ -30,7 +30,7 @@ def items(writers, dev_owner_count=1):
     for w in writers:
         its = [json.loads(l) for f in sorted(glob.glob(f"/home/user/e13-raw/{w}/items-*.jsonl")) for l in open(f) if l.strip()]
         lab = rows(f"/home/user/e13-raw/lab/{w}/*-labels.tsv"); intent = rows(f"/home/user/e13-tools/intent/{w}/intent-*.tsv")
-        owners = sorted({it["owner"]["name"] for it in its}); devo = set(owners[-dev_owner_count:])
+        owners = sorted({it["owner"]["name"] for it in its}); devo = set(owners[-dev_owner_count:]) if dev_owner_count else set()
         for it in its:
             i = it["id"]
             if any(b in json.dumps(it) for b in BANNED): stats["banned"] += 1; continue
@@ -47,7 +47,7 @@ def pairs(writers, task, dev_owner_count=2):
     for w in writers:
         ps = [json.loads(l) for f in sorted(glob.glob(f"/home/user/e13-raw/{w}/{task}-*.jsonl")) for l in open(f) if l.strip()]
         lab = rows(f"/home/user/e13-raw/lab/{w}/*-labels.tsv"); intent = rows(f"/home/user/e13-tools/intent/{w}/*-intent.tsv")
-        owners = sorted({p["owner"]["name"] for p in ps}); devo = set(owners[-dev_owner_count:])
+        owners = sorted({p["owner"]["name"] for p in ps}); devo = set(owners[-dev_owner_count:]) if dev_owner_count else set()
         for p in ps:
             i = p["id"]
             if any(b in json.dumps(p) for b in BANNED): stats["banned"] += 1; continue
@@ -60,12 +60,12 @@ if __name__ == "__main__":
     what = sys.argv[1]
     sfx = sys.argv[3] if len(sys.argv) > 3 else ""  # round 2: "2" writes items-fit2, items-dev2, ...
     if what == "items":
-        f, d = items(sys.argv[2].split(","))
+        f, d = items(sys.argv[2].split(","), 0 if sfx == "3" else 1)  # round 3 is fit only
         for name, (a, b) in ((f"items-fit{sfx}", f), (f"items-dev{sfx}", d)):
-            write_jsonl(f"{OUT}/{name}.jsonl.gz", a); write_tsv(f"{OUT}/{name}-labels.tsv", NEED_LABEL_COLUMNS, b)
+            if a: write_jsonl(f"{OUT}/{name}.jsonl.gz", a); write_tsv(f"{OUT}/{name}-labels.tsv", NEED_LABEL_COLUMNS, b)
     else:
         task = what  # fit or close
-        f, d = pairs(sys.argv[2].split(","), task)
+        f, d = pairs(sys.argv[2].split(","), task, 0 if sfx == "3" else 2)
         for name, (a, b) in ((f"{task}-train{sfx}", f), (f"{task}-dev{sfx}", d)):
-            write_jsonl(f"{OUT}/{name}.jsonl.gz", a); write_tsv(f"{OUT}/{name}-labels.tsv", PAIR_LABEL_COLUMNS, b)
+            if a: write_jsonl(f"{OUT}/{name}.jsonl.gz", a); write_tsv(f"{OUT}/{name}-labels.tsv", PAIR_LABEL_COLUMNS, b)
     print(dict(stats))

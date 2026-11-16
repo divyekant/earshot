@@ -20,12 +20,13 @@ def load_items(name):
 
 
 def load_rounds(load, *args):
-    """Round 1 file and, if it is there, the round 2 file (name + "2"), joined."""
+    """Round 1 file and the files of later rounds (name + "2", name + "3"), joined. Round 3 has fit files only."""
     a, b = load(*args)
-    p = DATA / (f"{args[0]}-{args[1]}2.jsonl.gz" if len(args) == 2 else f"{args[0]}2.jsonl.gz")
-    if p.exists():
-        a2, b2 = load(*args[:-1], args[-1] + "2")
-        a, b = a + a2, b + b2
+    for r in ("2", "3"):
+        p = DATA / (f"{args[0]}-{args[1]}{r}.jsonl.gz" if len(args) == 2 else f"{args[0]}{r}.jsonl.gz")
+        if p.exists():
+            a2, b2 = load(*args[:-1], args[-1] + r)
+            a, b = a + a2, b + b2
     return a, b
 
 
