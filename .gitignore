@@ -15,3 +15,5 @@ logs/
 # E0 probe: personal test contacts stay on the Mac
 probe/people.json
 app/build/
+__pycache__/
+*.pyc
