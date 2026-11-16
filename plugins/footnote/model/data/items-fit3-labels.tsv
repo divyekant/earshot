@@ -1,0 +1,964 @@
+id	need	kind	sentence	sentence2
+xa-0001	none	other-person		
+xa-0002	now	person	Can you tell me by 8 tonight if you can take them?	
+xa-0003	none	hard-ad		
+xa-0004	none	bulk		
+xa-0005	list	duty	The filing portal closes on 21 September and the figures need your signature on page 2.	
+xa-0006	none	other-person		
+xa-0007	none	transactional		
+xa-0008	none	other-person		
+xa-0009	list	person	Chiamaka - can you put together the first-aid box for the day?	
+xa-0010	none	bulk		
+xa-0011	none	personal		
+xa-0012	none	hard-ad		
+xa-0013	list	person	Can you tell me by Sunday evening if you can take them?	
+xa-0015	list	person	I need you to tell me which day I can come and change them, any morning before 11 is good for me.	
+xa-0016	none	trick		
+xa-0017	none	replied		
+xa-0018	none	other-person		
+xa-0019	now	person	Can I send Kelechi to buy a new battery from the shop on Ojuelegba?	Please answer me quick ma
+xa-0020	list	person	Can I send Kelechi to buy a new battery from the shop on Ojuelegba this week?	
+xa-0021	none	bulk		
+xa-0022	none	own		
+xa-0023	list	implied	The shop rent for the next half year is due on 1 October.	
+xa-0024	none	offer		
+xa-0025	none	hard-ad		
+xa-0026	none	bulk		
+xa-0027	list	person	I need your signature on the new one before Friday's delivery, otherwise the order goes as cash on delivery.	
+xa-0028	none	quoted		
+xa-0029	none	done		
+xa-0030	none	polite		
+xa-0031	none	other-person		
+xa-0032	none	other-person		
+xa-0033	none	other-person		
+xa-0034	none	hard-ad		
+xa-0035	none	bulk		
+xa-0036	list	duty	Payment is due by 15 October.	Your waste service bill for July to September is 18,000 naira.
+xa-0037	none	survey		
+xa-0038	none	transactional		
+xa-0039	none	bulk		
+xa-0040	none	personal		
+xa-0041	list	note-todo	Medlink rep - ask re: credit limit increase to 2.5m	
+xa-0042	none	note-fact		
+xa-0043	none	note-fact		
+xa-0044	list	note-todo	buy: ORS x2 cartons, gloves M, receipt rolls	ring Adewale re: Thursday
+xa-0045	none	note-fact		
+xa-0046	none	note-fact		
+xa-0047	list	note-todo	order party shoes before 20th	
+xa-0048	list	note-todo	renew premises licence before Dec!!	
+xa-0049	list	note-todo	get her the wrapper from Balogun, the blue one she liked	
+xa-0050	none	note-fact		
+xa-0051	none	other-person		
+xa-0052	none	bulk		
+xa-0053	none	other-person		
+xa-0054	none	hard-ad		
+xa-0056	none	other-person		
+xa-0057	none	bulk		
+xa-0058	list	person	Can you tell me by Thursday if you will skipper the Tortuga with two of them on board?	
+xa-0059	none	polite		
+xa-0061	now	person	Tell me before 7 so I can buy the tickets, after that the 19:00 bus is full.	Can you pick them up?
+xa-0062	list	person	Can you pick them up?	Tell me by Wednesday so I can buy the tickets.
+xa-0063	none	hard-ad		
+xa-0064	none	trick		
+xa-0065	none	other-person		
+xa-0066	list	duty	The lab order for your cholesterol panel is attached and it expires on 30 October.	The doctor wants new blood results on her desk for your control on 4 November.
+xa-0067	none	replied		
+xa-0068	list	person	I need you to choose: the Dutch one like last time, which is 62,000 a tin, or the local marine varnish at 28,000, which lasts maybe two summers.	
+xa-0069	none	own		
+xa-0070	none	other-person		
+xa-0071	none	done		
+xa-0072	none	hard-ad		
+xa-0073	none	done		
+xa-0074	none	bulk		
+xa-0075	none	other-person		
+xa-0076	none	offer		
+xa-0077	now	person	Let me know tonight if you're coming so I can buy bait at the stall before it closes at 9.	
+xa-0078	list	person	Let me know by Friday if you're coming so I can buy bait at the stall.	
+xa-0079	none	personal		
+xa-0080	none	other-person		
+xa-0081	list	duty	Pension payments stop when the certificate is more than 12 months old.	Our records show that your proof of life certificate was last received on 2 November 2025.
+xa-0082	none	bulk		
+xa-0083	list	person	Papa, I also need a photo of both sides of your carnet before Friday so I can buy your flight to Antofagasta with the senior fare.	
+xa-0084	none	transactional		
+xa-0085	list	person	Will you be at home on Saturday morning?	
+xa-0086	none	hard-ad		
+xa-0087	none	survey		
+xa-0088	none	bulk		
+xa-0089	none	personal		
+xa-0090	none	bulk		
+xa-0091	none	note-fact		
+xa-0092	list	note-todo	answer Armando: varnish - Dutch one? 62 vs 28	ask Hernan what he used on Lucero
+xa-0093	none	note-fact		
+xa-0094	list	note-todo	notary - fe de vida before 2 Nov	bring carnet + pension card
+xa-0095	list	note-todo	Cata bday 2 Dec - call early + send flowers to Providencia (the yellow ones)	
+xa-0096	none	note-fact		
+xa-0097	none	note-fact		
+xa-0098	none	note-fact		
+xa-0099	list	note-todo	buy batteries for the handheld VHF	check flares expiry
+xa-0100	list	note-todo	pick up atorvastatin - farmacia closes 20:00	
+xa-0101	none	other-person		
+xa-0102	none	bulk		
+xa-0103	none	hard-ad		
+xa-0104	none	other-person		
+xa-0105	none	transactional		
+xa-0106	none	bulk		
+xa-0107	none	polite		
+xa-0108	none	other-person		
+xa-0109	none	done		
+xa-0110	none	hard-ad		
+xa-0111	none	trick		
+xa-0113	now	person	Can you fix the 40 strings and send the file before their build locks at 8:00 tomorrow?	
+xa-0114	list	person	Can you fix the 40 strings and send the file before their build locks at 14:00 tomorrow?	
+xa-0115	list	person	Can you take them on at your usual rate?	I need a yes or no by Monday.
+xa-0116	none	replied		
+xa-0117	none	other-person		
+xa-0118	none	own		
+xa-0119	list	person	Do you want me to copy everything from the old disk, or only the Documents and the translation memory folders?	I need to know this before I start on it on Friday.
+xa-0120	list	duty	Your residence tax third installment of 38,600 yen is due on 30 November.	
+xa-0121	none	personal		
+xa-0122	none	other-person		
+xa-0123	none	done		
+xa-0124	none	hard-ad		
+xa-0125	none	offer		
+xa-0126	none	bulk		
+xa-0127	none	other-person		
+xa-0128	now	person	Can you be home to let him in?	
+xa-0129	list	person	Can you be home to let him in?	
+xa-0130	list	person	can you put the one page into English by the 30th?	
+xa-0131	none	personal		
+xa-0132	none	bulk		
+xa-0133	none	other-person		
+xa-0134	none	transactional		
+xa-0135	list	duty	Mochi's yearly vaccine is due this month.	
+xa-0136	none	hard-ad		
+xa-0137	none	survey		
+xa-0138	none	bulk		
+xa-0139	list	person	haruka do you still have my snow boots from last winter?	
+xa-0140	none	bulk		
+xa-0141	list	note-todo	Mochi - kidney food (renal LP) 2kg - order	
+xa-0142	none	note-fact		
+xa-0143	none	note-fact		
+xa-0144	list	note-todo	ring Hiraishi re: old disk - wipe?	
+xa-0145	none	note-fact		
+xa-0146	none	done		
+xa-0147	none	note-fact		
+xa-0148	list	note-todo	book dentist - left molar again	
+xa-0149	list	note-todo	Kitamura invoice 30th	back up TM to the USB
+xa-0150	list	note-todo	snow tyres - ask Daisuke if he booked the stand	
+xa-0151	none	other-person		
+xa-0152	none	hard-ad		
+xa-0153	none	bulk		
+xa-0154	none	other-person		
+xa-0155	none	transactional		
+xa-0156	none	bulk		
+xa-0157	none	personal		
+xa-0158	none	other-person		
+xa-0159	none	trick		
+xa-0160	list	person	Could you take my place on the science stand and speak to the parents about the new course choices?	Let me know by Monday so I can tell the depute.
+xa-0161	now	person	Could you email me cover work for his S2 class tonight, so I can print it before period 1?	
+xa-0162	list	person	Could you email me cover work for his S2 class by Wednesday, so I can print it before period 5?	
+xa-0164	none	replied		
+xa-0165	none	hard-ad		
+xa-0166	list	implied	The coursework marks portal closes at 17:00 on 11 December.	Your N5 class has 4 candidates with no mark entered yet: Bain, Chisholm, Kerr and Urquhart.
+xa-0167	none	own		
+xa-0168	none	other-person		
+xa-0169	none	done		
+xa-0170	list	person	I need you to decide before Thursday if we mix them across the whole roof or put the blue ones on the back pitch.	
+xa-0171	none	done		
+xa-0172	none	bulk		
+xa-0173	none	other-person		
+xa-0174	none	offer		
+xa-0175	none	hard-ad		
+xa-0176	none	polite		
+xa-0177	none	other-person		
+xa-0178	now	person	Tell me by 9 tonight so I can ask Mum otherwise, she goes to bed early.	Can you take the morning off and have Freya?
+xa-0179	list	person	Can you take the morning off and have Freya?	Tell me by the weekend so I can ask Mum otherwise.
+xa-0180	list	person	Can you run the last training session on your own?	Let me know by Thursday so I can tell the parents.
+xa-0181	none	bulk		
+xa-0182	none	transactional		
+xa-0183	none	other-person		
+xa-0184	none	survey		
+xa-0185	list	duty	Your Skoda's MOT runs out on 14 December.	We have slots on the 10th and the 11th, and then nothing until the New Year.
+xa-0186	none	hard-ad		
+xa-0187	none	personal		
+xa-0188	none	bulk		
+xa-0189	now	person	Can you come, or tell me if there is something I can wedge it with?	
+xa-0190	none	bulk		
+xa-0191	list	note-todo	slates - mix or back pitch? ask Isla before Thurs	
+xa-0192	none	note-fact		
+xa-0193	none	note-fact		
+xa-0194	list	note-todo	order methyl orange + wash bottles	
+xa-0195	none	note-fact		
+xa-0196	none	note-fact		
+xa-0197	none	note-fact		
+xa-0198	list	note-todo	book Mum & Dad Boxing Day lunch somewhere with no stairs (Dad's knee)	
+xa-0199	list	note-todo	get Neil + Hannah a card & a bottle of the Speyside	
+xa-0200	list	note-todo	ring council re: septic tank consent - ask for Mr Dey	
+xa-0201	none	other-person		
+xa-0202	none	bulk		
+xa-0203	none	hard-ad		
+xa-0204	none	other-person		
+xa-0205	none	transactional		
+xa-0206	none	bulk		
+xa-0207	none	personal		
+xa-0208	none	other-person		
+xa-0209	now	person	Can you confirm by 9 tonight if Mateo will be there?	
+xa-0210	list	person	Can you confirm by Thursday if Mateo will be there?	
+xa-0211	none	trick		
+xa-0213	none	hard-ad		
+xa-0214	list	person	Would you do it with her?	I need to tell her by Friday.
+xa-0215	none	replied		
+xa-0216	list	person	I need to know which day you can bring the CR-V in, and if you want me to store the summer set here again ($60 for the season).	
+xa-0217	list	duty	The permission form and the $45 fee for the Grade 10 trip to the FortWhyte nature centre are due on 25 September.	
+xa-0218	none	own		
+xa-0219	none	other-person		
+xa-0220	none	done		
+xa-0221	none	done		
+xa-0222	none	bulk		
+xa-0223	none	other-person		
+xa-0224	none	offer		
+xa-0225	none	hard-ad		
+xa-0226	none	personal		
+xa-0227	none	other-person		
+xa-0228	list	person	Since your shift got moved, could you be the team's first aid person for the weekend?	Let me know by Wednesday.
+xa-0229	now	person	Can you come in for 19:00 tonight?	Please answer by 4 so I can call the agency otherwise.
+xa-0230	list	person	Can you come in for 19:00 that night?	Please answer by next Friday so I can call the agency otherwise.
+xa-0231	none	bulk		
+xa-0232	none	transactional		
+xa-0233	none	other-person		
+xa-0234	none	survey		
+xa-0235	list	duty	Stalls without a 2026-27 tag are towed from 1 December.	Our list shows no tag yet for stall 22.
+xa-0236	list	person	Would you swap your night of the 27th for my night of the 23rd?	
+xa-0237	none	personal		
+xa-0238	none	bulk		
+xa-0239	none	hard-ad		
+xa-0240	none	bulk		
+xa-0241	none	note-fact		
+xa-0242	list	note-todo	Mateo dentist - book after Brandon tourney	
+xa-0243	list	note-todo	ask Renee re: Xmas Eve off	
+xa-0245	list	note-todo	make flan + call Gabi to plan video call	
+xa-0246	none	note-fact		
+xa-0247	none	note-fact		
+xa-0248	list	note-todo	renew nursing licence before 31 Dec (college portal)	
+xa-0249	none	note-fact		
+xa-0250	list	note-todo	buy: melatonin, tape for M's stick, bday card for Jen	
+xb-0001	none	other-person		
+xb-0002	none	other-person		
+xb-0003	none	other-person		
+xb-0005	none	other-person		
+xb-0006	none	other-person		
+xb-0007	none	other-person		
+xb-0009	list	implied	Lucía: the first aid kit you took home after the regatta has to be back in the boathouse before we go out on Saturday at 7:30, the club won't let us launch without it.	
+xb-0010	list	person	The inspector comes Monday the 9th, so please fill in and sign that line before then.	
+xb-0011	none	hard-ad		
+xb-0012	none	hard-ad		
+xb-0013	none	hard-ad		
+xb-0014	none	hard-ad		
+xb-0015	list	person	Which one do you want?	
+xb-0016	none	bulk		
+xb-0017	none	bulk		
+xb-0018	none	bulk		
+xb-0019	now	person	Can you leave the spare key with Ramón at the door on your way?	
+xb-0020	list	person	Can you leave the spare key with Ramón at the door on Thursday night?	
+xb-0021	now	person	Can I book him in with you at 8?	I told her I'd text her back tonight.
+xb-0022	list	person	Can I squeeze him in with you at 14?	I'll call her back in the morning, so just tell me before 11.
+xb-0023	list	implied	The girl says the obra social changed the system and now the authorisation form must be signed by the account holder, and that is you since we moved the plan.	I have pills until Tuesday.
+xb-0024	list	duty	Mateo is the only student of 3° B who still has no medical certificate for the Córdoba trip.	
+xb-0025	list	person	The parrilla wants the final number on Thursday, so tell me by Wednesday night if you're coming?	
+xb-0026	none	bulk		
+xb-0027	none	hard-ad		
+xb-0028	none	hard-ad		
+xb-0029	none	bulk		
+xb-0030	none	transactional		
+xb-0031	none	transactional		
+xb-0032	none	transactional		
+xb-0033	none	trick		
+xb-0034	none	trick		
+xb-0035	none	personal		
+xb-0036	none	personal		
+xb-0037	none	replied		
+xb-0038	none	own		
+xb-0039	none	offer		
+xb-0040	none	done		
+xb-0041	list	note-todo	VTV car - book before 30/11	
+xb-0042	none	note-fact		
+xb-0043	list	note-todo	Mateo - med cert for Córdoba!!	sign Mamá's form + scan back
+xb-0044	none	note-fact		
+xb-0045	none	done		
+xb-0046	list	note-todo	ask G how much we put in	
+xb-0047	none	note-fact		
+xb-0048	list	note-todo	colegio vet - annual fee, pay by 15/12 (online, card)	
+xb-0049	none	note-fact		
+xb-0050	list	note-todo	back door lock sticks again - ring locksmith (the one Ramón knows)	
+xb-0051	none	other-person		
+xb-0052	none	other-person		
+xb-0053	none	other-person		
+xb-0055	none	other-person		
+xb-0056	none	other-person		
+xb-0057	none	other-person		
+xb-0059	list	person	Kwabena, you have the only spare key of the vestry, so please open it on Sunday at 6:30 for the early rehearsal.	
+xb-0060	list	person	Mr Mensah, kindly send us the final invoice with your VAT number before the 15th, otherwise Efua cannot process it in this month's run.	
+xb-0061	none	hard-ad		
+xb-0062	none	hard-ad		
+xb-0063	none	hard-ad		
+xb-0064	none	hard-ad		
+xb-0065	list	person	Do you want the 2 m³ now and the rest when it is ready, or do you prefer to wait and take everything together?	
+xb-0066	none	bulk		
+xb-0067	none	bulk		
+xb-0068	none	bulk		
+xb-0069	now	person	I'm on the ward till 7 and can't leave, can you pick her up?	
+xb-0070	list	person	I'm on the ward till 7 that day, can you pick her up?	
+xb-0071	now	person	Can you bring the oak and the sapele samples and confirm you can make it?	
+xb-0072	list	person	Can you bring the oak and the sapele samples and confirm you can make it?	
+xb-0073	list	implied	The planer motor started smoking again this morning so I switched it off at the wall.	The Palmview wardrobe doors need planing the whole of next week.
+xb-0074	list	implied	Mum's review at Korle Bu is on Thursday at 9, the eye clinic, and they want someone with her because of the drops.	I'm in London, and Auntie Grace has her own hospital that same morning.
+xb-0075	now	person	Where should I offload?	
+xb-0076	none	bulk		
+xb-0077	none	hard-ad		
+xb-0078	none	hard-ad		
+xb-0079	none	transactional		
+xb-0080	none	transactional		
+xb-0081	none	transactional		
+xb-0082	none	trick		
+xb-0083	none	trick		
+xb-0084	none	personal		
+xb-0085	none	personal		
+xb-0086	none	replied		
+xb-0087	none	own		
+xb-0088	none	survey		
+xb-0089	none	done		
+xb-0090	none	polite		
+xb-0091	list	note-todo	workshop meter low - buy units before Mon	
+xb-0092	none	note-fact		
+xb-0093	list	note-todo	buy: Kofi school shoes (sz 4), wood glue x2, 120 grit	
+xb-0094	none	done		
+xb-0095	list	note-todo	call Mum - tablets AFTER food	
+xb-0096	none	note-fact		
+xb-0097	list	note-todo	Palmview final invoice + VAT no. - before 15th!	
+xb-0098	none	note-fact		
+xb-0099	list	note-todo	ask Dede: Owusu island height 900 or 920?	get planer motor rewound (Kojo's cousin, Abossey Okai)
+xb-0100	none	done		
+xb-0101	none	other-person		
+xb-0102	none	other-person		
+xb-0103	none	other-person		
+xb-0105	none	other-person		
+xb-0106	none	other-person		
+xb-0107	none	other-person		
+xb-0109	list	person	Can you let us know by Monday?	Emi: you said you'd find out if your school's ski lockers at Rusutsu are free over the holidays.
+xb-0110	list	person	Tanabe-san, could you check his draft for the Japanese captions before it goes to print on Monday?	
+xb-0111	none	hard-ad		
+xb-0112	none	hard-ad		
+xb-0113	none	hard-ad		
+xb-0114	none	hard-ad		
+xb-0115	list	person	Shall I do the grind, or only the normal tune?	
+xb-0116	none	bulk		
+xb-0117	none	bulk		
+xb-0118	none	bulk		
+xb-0119	now	person	Can you take me?	Please call me tonight.
+xb-0120	list	person	Can you take me?	
+xb-0121	now	person	Could you take them?	
+xb-0122	list	person	Could you take them?	
+xb-0123	list	implied	Next week I am in Tokyo on business from Tuesday to Thursday, and our lesson is on Wednesday evening.	
+xb-0124	list	implied	I'm stuck in Tokyo with the year-end closing, and the cake shop in Otaru only takes orders three days ahead.	
+xb-0125	list	group	can you both tell me by friday which weekend works?	
+xb-0126	none	bulk		
+xb-0127	none	hard-ad		
+xb-0128	none	hard-ad		
+xb-0129	none	bulk		
+xb-0130	none	transactional		
+xb-0131	none	transactional		
+xb-0132	none	trick		
+xb-0133	none	trick		
+xb-0134	none	personal		
+xb-0135	none	replied		
+xb-0136	none	own		
+xb-0137	none	offer		
+xb-0138	none	done		
+xb-0139	none	quoted		
+xb-0140	none	polite		
+xb-0141	list	note-todo	call Otaru cake shop - chestnut, for Sat, order by Wed	
+xb-0142	none	note-fact		
+xb-0143	list	note-todo	Fujimoto - move lesson to Fri 19:00? msg him	
+xb-0144	none	note-fact		
+xb-0145	list	note-todo	tell Yuka which weekend - by Fri	
+xb-0146	list	note-todo	passport exp 3/2027!! renew - photo first, then ward office	
+xb-0147	none	note-fact		
+xb-0148	none	done		
+xb-0149	list	note-todo	check Ciarán's column - captions	print 2nd yr test x 85
+xb-0150	none	note-fact		
+xb-0151	none	other-person		
+xb-0152	none	other-person		
+xb-0153	none	other-person		
+xb-0155	none	other-person		
+xb-0156	none	other-person		
+xb-0157	none	other-person		
+xb-0159	list	person	Rhys - you're the only one left who is signed off on the level crossing gates at Cwm Road, so please confirm by Friday which of the four days you can do.	
+xb-0160	list	person	Rhys, could you feed Mabli on Saturday and Sunday morning?	
+xb-0161	none	hard-ad		
+xb-0162	none	hard-ad		
+xb-0163	none	hard-ad		
+xb-0164	none	hard-ad		
+xb-0165	list	implied	I can fit a new one, £65 with the part, or clean the old one for £25 but I can't promise it'll last.	Your call.
+xb-0166	none	bulk		
+xb-0167	none	bulk		
+xb-0168	none	bulk		
+xb-0169	now	person	Could you have Osian tomorrow from 7:30?	Let me know tonight so I can try Mark's mum if not.
+xb-0170	list	person	Could you have Osian on Friday from 7:30?	Let me know by Wednesday so I can try Mark's mum if not.
+xb-0171	now	person	Could you let him in?	Can you text or ring me so I know before I try to sleep?
+xb-0172	list	person	Could you let him in?	
+xb-0173	list	implied	The MOT on Mam's old Polo runs out on the 30th and it's still on your drive, insured in your name.	
+xb-0174	list	implied	The hall is booked for us on Saturday the 21st, but the caretaker only has your name on the key list, not mine, since you signed the form in September.	He's there until 4 on Friday.
+xb-0175	list	duty	The rent for plot 14 for 2027 is £42.00 and is due by 30 November.	
+xb-0176	none	bulk		
+xb-0177	none	hard-ad		
+xb-0178	none	hard-ad		
+xb-0179	none	hard-ad		
+xb-0180	none	transactional		
+xb-0181	none	transactional		
+xb-0182	none	transactional		
+xb-0183	none	trick		
+xb-0184	none	trick		
+xb-0185	none	personal		
+xb-0186	none	replied		
+xb-0187	none	own		
+xb-0188	none	survey		
+xb-0189	none	offer		
+xb-0190	none	polite		
+xb-0191	list	note-todo	MOT Polo - book (Leckwith garage?) or SORN before 30th	ask Cat if Mark still wants it
+xb-0192	none	note-fact		
+xb-0193	list	note-todo	order broad beans Aquadulce + garlic - sale till Mon	sow by mid Nov
+xb-0194	none	note-fact		
+xb-0195	list	note-todo	pay allotment rent £42 ref PLOT14 (by 30/11)	
+xb-0196	none	done		
+xb-0197	none	done		
+xb-0198	list	note-todo	ring Cat re ISA bank details (she sends them to Daf herself)	
+xb-0199	none	note-fact		
+xb-0200	list	note-todo	fix Lili's music box before xmas (spring?)	buy 13A fuses
+xb-0201	none	other-person		
+xb-0202	none	other-person		
+xb-0203	none	bulk		
+xb-0205	none	other-person		
+xb-0206	none	other-person		
+xb-0207	none	other-person		
+xb-0209	list	person	Marie-Ève: you offered to host the Christmas exchange in January, can you tell us by Sunday which Saturday works with Simon's shifts?	
+xb-0210	list	person	Marie-Ève, could you do the final read again?	Please tell me if that works for you.
+xb-0211	none	hard-ad		
+xb-0212	none	hard-ad		
+xb-0213	none	hard-ad		
+xb-0214	none	hard-ad		
+xb-0215	list	person	Which one do you want this year?	
+xb-0216	none	bulk		
+xb-0217	none	bulk		
+xb-0218	none	bulk		
+xb-0219	now	person	can you get the twins?	
+xb-0220	list	person	can you get the twins?	
+xb-0221	now	person	Can you deliver them tonight, or by 7:30 at the latest?	
+xb-0222	list	person	Can you deliver them by noon?	
+xb-0223	list	implied	Félix came back from recess today with his boots full of snow and his socks soaked, and there are no spare socks or mittens in his cubby anymore.	
+xb-0224	list	implied	And my eye appointment at Saint-Sacrement is on the 18th at 10:30, the one I waited eight months for.	My car is at the garage until the 20th, they have to order a part from Montréal.
+xb-0225	list	person	Could you send me a quote and a date?	Ideally the text would be ready by 4 December, because the packaging supplier closes for the holidays.
+xb-0226	none	bulk		
+xb-0227	none	hard-ad		
+xb-0228	none	hard-ad		
+xb-0229	none	hard-ad		
+xb-0230	none	transactional		
+xb-0231	none	transactional		
+xb-0232	none	trick		
+xb-0233	none	trick		
+xb-0234	none	personal		
+xb-0235	none	replied		
+xb-0236	none	own		
+xb-0237	none	offer		
+xb-0238	none	done		
+xb-0239	none	done		
+xb-0240	none	polite		
+xb-0241	list	note-todo	Félix cubby: 2 pairs socks + mittens tmrw	return lost & found pair (washed)
+xb-0242	none	note-fact		
+xb-0243	list	note-todo	Ginette eye appt 18th 10:30 St-Sacrement - drive her? check Simon's shift	block the morning in agenda
+xb-0244	none	note-fact		
+xb-0245	list	note-todo	Pelletier: answer which contract (450 or 520 w/ stairs)	
+xb-0246	none	done		
+xb-0247	list	note-todo	quote Boréal packaging - 900 w + tables, send today/tmrw	due 4/12
+xb-0248	none	done		
+xb-0249	none	note-fact		
+xb-0250	list	note-todo	TPS/TVQ Q4 - file + pay before 31/1	
+xc-0001	none	other-person		
+xc-0002	none	hard-ad		
+xc-0003	now	person	Can you drop him at the gate at 7:45 tomorrow on your way in?	Tell me tonight so I can let him know before he goes to bed.
+xc-0004	list	person	Can you drop him at the gate at 7:45 Thursday on your way in?	Tell me by Wednesday night so I can sort something else if not.
+xc-0005	none	note-fact		
+xc-0006	none	bulk		
+xc-0007	none	other-person		
+xc-0008	list	duty	It still needs your signature in box 4.	The pay run for October closes on Friday at noon.
+xc-0009	none	transactional		
+xc-0010	none	bulk		
+xc-0011	list	group	Aroha: can you send me the final U15 team list with surnames by Friday?	
+xc-0012	none	trick		
+xc-0013	none	personal		
+xc-0014	list	note-todo	ring Dr Moana re Tama referral	
+xc-0015	none	other-person		
+xc-0016	none	hard-ad		
+xc-0017	list	person	Let me know which you'd like and they'll be ready Saturday morning.	I can replace it for $25 or leave it as is, but it won't last the summer league.
+xc-0018	none	replied		
+xc-0019	now	person	Are you home to open the side gate, or can I grab the key from under the pot?	
+xc-0020	list	person	Could you leave the side gate unlocked on Friday, or should I grab the key from under the pot?	
+xc-0022	none	own		
+xc-0023	none	survey		
+xc-0024	none	offer		
+xc-0025	list	note-todo	Y10 report comments - finish by thurs	print rubric x30
+xc-0026	none	hard-ad		
+xc-0027	none	other-person		
+xc-0028	none	bulk		
+xc-0029	none	done		
+xc-0030	none	note-fact		
+xc-0031	none	bulk		
+xc-0032	list	note-todo	renew rego - due 14 Nov	ask Rewi re car wof
+xc-0033	none	other-person		
+xc-0034	none	hard-ad		
+xc-0035	list	person	Aroha, can you read over the risk form and sign it before Wednesday?	
+xc-0036	none	bulk		
+xc-0037	list	implied	The garage on Adelaide Rd has a slot Thursday at 8 and the keys are on the hook.	The Corolla's WOF runs out on Saturday and I'm in Napier all week.
+xc-0038	list	duty	The registration for your dog PĪWI (tag 22-0918) ends on 30 November 2026.	You can pay online at https://pay.harbourcity.example.org/dogs with reference DR-77140, or at any Council service centre.
+xc-0039	none	note-fact		
+xc-0041	none	transactional		
+xc-0042	none	done		
+xc-0043	list	note-todo	email Grace re U15 photo day	
+xc-0044	none	other-person		
+xc-0045	none	personal		
+xc-0046	none	note-fact		
+xc-0047	list	note-todo	move Tama dentist to after 4 (ring them)	return library bks - 2 overdue
+xc-0048	none	trick		
+xc-0049	none	bulk		
+xc-0050	none	note-fact		
+xc-0051	none	hard-ad		
+xc-0052	now	person	Can you pick her up from Mar Blau at 13:00 today?	Call me when you have her.
+xc-0053	list	person	Can you pick her up from Mar Blau at 13:00 on Friday and take her?	
+xc-0054	none	other-person		
+xc-0055	list	note-todo	order 700x28 tyres Ruedalia x10	call gestoría re IVA Q3
+xc-0056	list	person	Can you send me a photo of each by the 25th?	
+xc-0057	none	bulk		
+xc-0058	none	transactional		
+xc-0059	none	other-person		
+xc-0060	list	implied	The shop rent for October has not come into my account yet.	My bank returns the direct debit as unpaid after the 10th and then charges both of us a fee.
+xc-0061	none	note-fact		
+xc-0062	none	personal		
+xc-0063	now	person	Can you open instead of me?	
+xc-0064	list	person	Can you open instead of me that day?	
+xc-0065	none	other-person		
+xc-0066	none	hard-ad		
+xc-0067	none	bulk		
+xc-0068	list	person	Joaquín, can you bring the track pump and two spare tubes to the start on Sunday?	
+xc-0069	none	note-fact		
+xc-0070	none	trick		
+xc-0072	none	replied		
+xc-0073	none	hard-ad		
+xc-0074	none	bulk		
+xc-0075	list	note-todo	Lucía cumple 14 nov - book bowling Bonaire	buy gift: bell + helmet stickers (the cat ones)
+xc-0076	list	implied	We still have no payment of 18 euros for Lucía, and the travel agency closes the list on Monday.	
+xc-0077	none	other-person		
+xc-0078	none	transactional		
+xc-0079	none	own		
+xc-0080	none	note-fact		
+xc-0081	none	other-person		
+xc-0082	none	survey		
+xc-0083	none	hard-ad		
+xc-0084	none	offer		
+xc-0085	none	other-person		
+xc-0086	list	person	Joaquín, could you tell me by Thursday if you can come to the parent meeting on 5 November at 17:00?	
+xc-0087	none	bulk		
+xc-0088	list	note-todo	check bank 30th - autónomo cuota went out twice?	if yes ring Sonia
+xc-0089	none	done		
+xc-0090	none	personal		
+xc-0092	none	note-fact		
+xc-0093	none	done		
+xc-0094	none	bulk		
+xc-0095	now	implied	I wait 10 minutes more at the door, then the boxes go back to the depot and the next try is Thursday.	I am at the door of Ciclos Turia, Carrer de Cuba 14, with 3 boxes from Ruedalia.
+xc-0096	list	note-todo	ITV van - make appt (expires dec)	mamá: take her to the eye doctor 24th
+xc-0097	list	group	Can you both tell me by Sunday how many you are?	
+xc-0098	none	note-fact		
+xc-0099	none	trick		
+xc-0100	list	note-todo	answer Quique: 2.5 for paella (me, Lucía, Inma?)	flute - did she practise? ask
+xc-0101	none	other-person		
+xc-0102	now	person	Can you take him at 6:00?	Text me before you go to bed so I know.
+xc-0103	list	person	Can you take him at 6:00 Saturday?	Tell me by Thursday so I can ask Steve for a lift if not.
+xc-0104	none	hard-ad		
+xc-0105	none	note-fact		
+xc-0106	none	bulk		
+xc-0107	list	person	Tell me before Thursday if you want them in November, so I can order the pads with my next delivery.	
+xc-0108	none	transactional		
+xc-0109	none	other-person		
+xc-0110	none	bulk		
+xc-0111	list	duty	Ousmane's consent form for the second dose of the hepatitis B vaccine has not come back to the school.	The CLSC nurse comes on 12 November, and students without a signed form are not vaccinated that day.
+xc-0112	none	hard-ad		
+xc-0113	list	note-todo	renew Awa passport - photos first (Jean-Coutu?)	flu shots kids: book CLSC online
+xc-0114	none	other-person		
+xc-0115	none	trick		
+xc-0116	none	replied		
+xc-0117	now	person	Can you come home or call the concierge to open your door now?	
+xc-0118	list	person	Can you let him in to look at the pipes under your tub?	
+xc-0120	none	personal		
+xc-0121	none	bulk		
+xc-0122	none	note-fact		
+xc-0123	none	other-person		
+xc-0124	none	hard-ad		
+xc-0125	list	person	Fatoumata, can you send me your vacation choices for January by Friday?	
+xc-0126	list	note-todo	call Luc - winter tires date (before 15 nov!)	
+xc-0127	none	bulk		
+xc-0128	none	other-person		
+xc-0129	list	duty	Your health insurance card expires on 31 December 2026.	To renew it, you must have your photo taken at one of our partner points of service and sign the renewal form.
+xc-0130	none	note-fact		
+xc-0131	none	done		
+xc-0132	none	hard-ad		
+xc-0133	none	transactional		
+xc-0134	list	note-todo	Awa costume: buy cat ears + tail (Dollarama)	sign O. school trip form
+xc-0136	list	group	Fatoumata: can you send me the alto attendance list for October by Wednesday?	
+xc-0137	none	offer		
+xc-0138	none	personal		
+xc-0139	list	implied	He's only in the building until Thursday, then he's on a job in Laval for three weeks.	My plumber says the leak is the seal around your tub drain, not my side.
+xc-0140	none	own		
+xc-0141	none	note-fact		
+xc-0142	none	trick		
+xc-0143	none	bulk		
+xc-0144	list	note-todo	buy hockey tape + mouthguard	RSVP Ami baby shower 21st
+xc-0145	none	other-person		
+xc-0146	none	bulk		
+xc-0147	none	done		
+xc-0148	list	note-todo	nights wk of 23rd -> ask Ami to take Awa tues + wed after school	
+xc-0149	none	replied		
+xc-0150	none	note-fact		
+xc-0151	now	person	Can you be home and let him in?	Please send me a message tonight so I don't worry.
+xc-0152	list	person	Can you be home and let him in?	
+xc-0153	none	other-person		
+xc-0154	none	hard-ad		
+xc-0155	none	note-fact		
+xc-0156	now	person	Can you pick me up at the north exit?	If it's too late for you, tell me before 21:00 and I'll book a hotel near the station.
+xc-0157	list	person	Can you pick me up at the north exit?	If it's too late for you, tell me by Friday and I'll book a hotel near the station.
+xc-0158	none	other-person		
+xc-0159	none	bulk		
+xc-0160	list	note-todo	Morita clinic - ring re blood test results	cut paste + wire 2mm (Kawabata)
+xc-0161	none	transactional		
+xc-0162	none	hard-ad		
+xc-0163	list	implied	The membership fee for 2027 (3,000 yen) is the only one still open on my list.	I close the society accounts for the auditor on 30 November.
+xc-0164	none	other-person		
+xc-0165	none	bulk		
+xc-0166	none	personal		
+xc-0167	list	person	Shall I keep it for you until Saturday?	
+xc-0169	none	trick		
+xc-0170	none	note-fact		
+xc-0172	list	person	Sato-san, could you bring your black pine #3 for the photo session on Saturday?	
+xc-0173	none	hard-ad		
+xc-0174	none	own		
+xc-0175	none	bulk		
+xc-0176	none	other-person		
+xc-0177	none	survey		
+xc-0178	list	note-todo	New Year cards - buy 60 at post office	update address list: Takeda moved to Nara
+xc-0179	none	done		
+xc-0180	none	offer		
+xc-0181	list	implied	The shop stops taking orders on Sunday, and I'm with Michiko all week.	The New Year mochi order form from Fukuya is on the table by the phone.
+xc-0182	none	note-fact		
+xc-0183	none	other-person		
+xc-0184	none	bulk		
+xc-0185	none	personal		
+xc-0186	none	trick		
+xc-0187	list	note-todo	pay Inoue 3,000 yen - membership 2027	mochi order: big box, before Sun!
+xc-0189	list	person	Mr Sato, could you tell me by Friday whether you can run the club on 16 December alone?	
+xc-0190	none	hard-ad		
+xc-0191	list	duty	Your prescription for amlodipine runs out on 2 December.	Please book by phone at 06-5555-0148 or at the front desk.
+xc-0192	none	note-fact		
+xc-0193	none	bulk		
+xc-0195	list	note-todo	ask Daisuke re album - printed yet?	Keiko 70th gift: scarf? buy before 10th
+xc-0196	none	bulk		
+xc-0197	none	replied		
+xc-0198	list	note-todo	thank Kondo for van - bottle of sake?	
+xc-0199	none	transactional		
+xc-0200	none	note-fact		
+xc-0201	now	person	Any chance you can cover the 7:00 opening shift tomorrow?	I need to know by 10 tonight so I can ring round if you can't.
+xc-0202	list	person	Any chance you can cover the 7:00 opening shift on Saturday?	I need to know by Thursday so I can ring round if you can't.
+xc-0203	none	hard-ad		
+xc-0204	none	other-person		
+xc-0205	none	note-fact		
+xc-0206	none	bulk		
+xc-0207	list	implied	His flight from Lagos lands in Manchester on Friday at 6 in the evening.	He has never been to Manchester and he doesn't know the trams at all, and you know how he is with maps.
+xc-0208	none	transactional		
+xc-0209	none	other-person		
+xc-0210	none	hard-ad		
+xc-0211	none	bulk		
+xc-0212	none	trick		
+xc-0213	list	person	I need the £20 deposit by Thursday to hold the slot, I've had too many no-shows this month.	If you want a different length or colour, tell me before then so I can get the hair in.
+xc-0214	list	note-todo	ch3 draft to Gareth - fri	renew railcard (exp 14/10)
+xc-0215	none	replied		
+xc-0216	none	other-person		
+xc-0217	none	personal		
+xc-0218	none	own		
+xc-0219	now	person	Can you sign it and send it tonight?	They need it in the ethics inbox by 8:00 tomorrow morning, otherwise it waits until January.
+xc-0220	list	person	Can you sign it and send it before then?	They need it in the ethics inbox by 14:00 tomorrow, otherwise it waits until January.
+xc-0221	none	other-person		
+xc-0222	none	hard-ad		
+xc-0223	none	note-fact		
+xc-0224	list	person	Chiamaka, please send me yours by Monday as well.	
+xc-0225	none	bulk		
+xc-0227	none	offer		
+xc-0228	list	note-todo	book GP - knee again after long run	
+xc-0229	none	done		
+xc-0230	list	implied	ugh the council left a sticker on our blue bin, says it's contaminated (Tomás's pizza boxes obvs) and they won't take it till it's sorted.	
+xc-0231	list	duty	As lead tenant, you must sign the new agreement in the tenant portal by 30 November.	
+xc-0232	none	other-person		
+xc-0233	list	group	Chi, can you let me know by Wednesday if you're up for leg 2?	
+xc-0234	none	hard-ad		
+xc-0235	none	note-fact		
+xc-0236	none	transactional		
+xc-0237	none	other-person		
+xc-0238	none	bulk		
+xc-0239	none	bulk		
+xc-0240	list	note-todo	abstract BHN due 30 nov!!	ask Hilary re fridge space for Jan samples
+xc-0241	none	personal		
+xc-0242	none	trick		
+xc-0243	none	note-fact		
+xc-0244	none	other-person		
+xc-0245	none	survey		
+xc-0246	list	note-todo	send Kemi £20 deposit	
+xc-0247	none	done		
+xc-0248	none	note-fact		
+xc-0249	none	polite		
+xc-0250	list	note-todo	ring Mummy re dates (23rd-2nd)	return library book - overdue since 15th
+xd-0001	none	other-person		
+xd-0002	none	bulk		
+xd-0003	none	hard-ad		
+xd-0004	list	note-todo	ask Rafa which supplier now	
+xd-0005	now	person	Can you pick her up?	Tell me tonight so I can ask my brother if not.
+xd-0006	list	person	Can you pick her up?	Tell me by Thursday so I can ask my brother if not.
+xd-0007	none	bulk		
+xd-0008	none	other-person		
+xd-0009	list	duty	Your professional registration as a pharmacist (N° 4471) expires on 30 November 2026.	
+xd-0010	none	transactional		
+xd-0011	list	group	Lucía: can you bring the first aid kit from the pharmacy and stand at the 3k water table?	
+xd-0012	none	note-fact		
+xd-0013	none	hard-ad		
+xd-0014	none	polite		
+xd-0016	none	bulk		
+xd-0017	none	trick		
+xd-0018	list	note-todo	Inés - sign permiso planetario + 200 pesos in envelope	Tomás - library book back (Wed)
+xd-0019	list	person	Do you want us to repair it before you collect them?	
+xd-0020	none	replied		
+xd-0021	none	other-person		
+xd-0022	now	person	Can you open the pharmacy tomorrow at 8:00 instead of 10?	Let me know tonight, if not I open myself.
+xd-0023	list	person	Can you open the pharmacy on Tuesday the 27th at 8:00 instead of 10?	Let me know this week, if not I open myself.
+xd-0024	none	hard-ad		
+xd-0025	none	offer		
+xd-0026	none	note-fact		
+xd-0027	none	bulk		
+xd-0028	none	other-person		
+xd-0029	list	duty	Tomás's six-month check-up with Dra. Ibarra was due in September.	
+xd-0030	none	transactional		
+xd-0031	none	bulk		
+xd-0032	list	note-todo	call them w/ meter photo	
+xd-0033	none	other-person		
+xd-0034	list	person	Can you sign it and scan it to me before Wednesday?	I need your signature as the pharmacist on the copy of the register page.
+xd-0035	none	hard-ad		
+xd-0036	none	own		
+xd-0037	none	done		
+xd-0038	list	person	could you look at the price of the bus for Friday 11 and back on Monday?	
+xd-0039	none	note-fact		
+xd-0040	none	bulk		
+xd-0041	none	trick		
+xd-0042	none	other-person		
+xd-0043	list	note-todo	order cake (Flor's friend?)	invites by Fri
+xd-0044	now	person	Can you come back or tell me who has a key so the plumber can go in?	It gets worse every minute.
+xd-0045	none	bulk		
+xd-0046	none	personal		
+xd-0047	none	note-fact		
+xd-0048	list	note-todo	carnet de salud vence 15/12 - get turno at the policlínica	
+xd-0049	none	transactional		
+xd-0050	none	note-fact		
+xd-0051	none	other-person		
+xd-0052	none	hard-ad		
+xd-0053	list	note-todo	pay Yaw wk 36 (Fri) - 450 + transport	
+xd-0054	now	person	Can you send Kojo to fix it before then?	
+xd-0055	list	person	Can you send Kojo to fix it before then?	
+xd-0056	none	bulk		
+xd-0057	list	group	Can you make one and tell me the cost before the end of the month so I share it among us?	
+xd-0058	none	transactional		
+xd-0059	none	other-person		
+xd-0060	list	duty	The permit for this business expired on 30 September 2026.	
+xd-0061	none	bulk		
+xd-0062	none	polite		
+xd-0063	none	note-fact		
+xd-0064	none	other-person		
+xd-0065	none	hard-ad		
+xd-0066	now	person	where did you put it?	
+xd-0067	list	note-todo	ask Kojo re: finish (oil not lacquer)	
+xd-0068	none	other-person		
+xd-0069	list	person	Which one do you want me to order?	
+xd-0070	none	bulk		
+xd-0071	none	trick		
+xd-0073	none	replied		
+xd-0074	none	note-fact		
+xd-0075	now	person	Can you collect her?	
+xd-0076	list	person	Can you collect her?	
+xd-0077	none	other-person		
+xd-0078	none	bulk		
+xd-0079	none	hard-ad		
+xd-0080	list	note-todo	KMA permit 600 - pay at Suame sub-office, bring old permit + TIN	
+xd-0081	list	duty	The second term fees for Efua Mensah are GHS 1,850.00 and fall due on the first day of term, Tuesday 6 January 2027.	
+xd-0082	none	own		
+xd-0083	none	done		
+xd-0084	none	other-person		
+xd-0085	none	note-fact		
+xd-0086	list	person	Can you confirm by Friday that this height still works with your frame design?	
+xd-0087	none	offer		
+xd-0088	none	quoted		
+xd-0089	none	personal		
+xd-0090	none	other-person		
+xd-0091	list	note-todo	buy sandpaper 120/240 + 2 brushes	
+xd-0092	none	hard-ad		
+xd-0093	list	implied	The roof of the kitchen leaks again over the gas cooker, near the corner where you put the cement last year.	Talk to her when you come back tonight.
+xd-0094	none	transactional		
+xd-0095	none	note-fact		
+xd-0096	none	bulk		
+xd-0097	none	polite		
+xd-0098	list	note-todo	call Akosua, not Opoku	
+xd-0099	none	survey		
+xd-0100	none	note-fact		
+xd-0101	none	other-person		
+xd-0102	none	hard-ad		
+xd-0103	list	note-todo	äiti: buy slippers size 37 + hand cream	visit Sun 14-16
+xd-0104	now	person	Can you sing the alto solo in tomorrow's Independence Day service at the Old Church?	Tell me tonight, please.
+xd-0105	list	person	Can you sing the alto solo at the Christmas concert on Sunday 13 December too?	Tell me by Wednesday, please.
+xd-0106	none	bulk		
+xd-0107	none	transactional		
+xd-0108	list	duty	Your passport (no. ending 4419) expires on 14 January 2027.	
+xd-0109	none	polite		
+xd-0110	none	other-person		
+xd-0111	list	group	Eeva: could you take the reading hour on Monday 23 November?	
+xd-0112	none	note-fact		
+xd-0114	none	hard-ad		
+xd-0115	none	replied		
+xd-0116	now	person	Could you come this evening, even for half an hour?	
+xd-0117	list	note-todo	talvirenkaat: book change at Rengas-Ari before 1.11	
+xd-0118	list	person	Do you want me to put two new ones on the front (about 220 euros with fitting), or do we use these for one more winter?	I need to know by Wednesday to order them.
+xd-0119	none	bulk		
+xd-0120	none	other-person		
+xd-0121	none	trick		
+xd-0122	none	note-fact		
+xd-0123	none	bulk		
+xd-0124	none	done		
+xd-0125	now	person	Can you leave your key in the maintenance box in the hall tonight, or tell me if you are home in the morning?	
+xd-0126	list	person	Can you leave your key in the maintenance box in the hall on Thursday evening, or tell me if you are home on Friday morning?	
+xd-0127	none	other-person		
+xd-0128	list	note-todo	kirjasto: return 3 books by 14.10	
+xd-0129	none	hard-ad		
+xd-0130	none	bulk		
+xd-0131	none	other-person		
+xd-0132	none	note-fact		
+xd-0133	none	own		
+xd-0134	list	duty	The periodic inspection of your car ZKT-418 (Toyota Corolla 2014) must be done by 30 November 2026.	
+xd-0135	none	offer		
+xd-0136	none	done		
+xd-0137	list	person	Mrs Korhonen, could you confirm to me that someone is at home on that morning?	
+xd-0138	none	personal		
+xd-0139	list	note-todo	ask Kirsi new address (at rehearsal Thu)	
+xd-0141	none	hard-ad		
+xd-0142	none	transactional		
+xd-0143	list	group	Mum, Mikko: can you both tell me by Sunday if Christmas Eve at Mum's place in Tampere works, or if we do it here in Helsinki?	
+xd-0144	none	note-fact		
+xd-0145	none	bulk		
+xd-0146	none	other-person		
+xd-0147	none	bulk		
+xd-0148	list	note-todo	passport: photo at Kuvaliike Hämeenkatu, then apply online	
+xd-0149	list	person	Could I borrow your big enamel pot for the rice porridge?	
+xd-0150	none	note-fact		
+xd-0151	none	other-person		
+xd-0152	none	hard-ad		
+xd-0153	list	note-todo	Mochi vet - booster shot by end Oct	
+xd-0154	now	person	Can you pick it up on your way and bring it to the court tomorrow at 7:00?	Reply tonight so I know if I need to bring my old balls.
+xd-0155	none	bulk		
+xd-0156	list	person	Can you pick it up on your way and bring it to the court on Saturday at 7:00?	Reply by Thursday so I know if I need to bring my old balls.
+xd-0157	none	other-person		
+xd-0158	none	note-fact		
+xd-0159	none	bulk		
+xd-0160	none	hard-ad		
+xd-0161	list	group	Hiroshi: can you write the test plan for the new photo mode by Friday?	
+xd-0162	now	person	Can you meet him at the north exit at 8:10 with the card?	
+xd-0163	list	person	Can you meet him at the north exit at 8:10 with the card?	
+xd-0164	none	bulk		
+xd-0166	none	transactional		
+xd-0167	list	note-todo	buy strings .010 + capo (Tanukikoji shop)	
+xd-0168	list	duty	The 3rd instalment of your 2026 municipal and prefectural resident tax (12,400 yen) falls due on 2 November 2026.	
+xd-0169	none	trick		
+xd-0170	list	duty	If nobody can be at home, please tell us another day by 7 October, or give us written permission to enter with the master key.	Please keep your cat in a closed room.
+xd-0171	none	other-person		
+xd-0172	none	bulk		
+xd-0173	none	replied		
+xd-0174	none	note-fact		
+xd-0175	list	person	Would you like us to switch her to the prescription renal food that we sell at the clinic, or keep the food you buy now and test again in three months?	
+xd-0176	none	hard-ad		
+xd-0177	none	other-person		
+xd-0178	none	offer		
+xd-0179	list	duty	Game Testing Handbook (3rd ed.) was due on 20 October 2026.	
+xd-0180	none	other-person		
+xd-0181	now	person	Are you at home?	I can wait 10 minutes at the entrance, after that it goes back to the depot.
+xd-0182	none	bulk		
+xd-0183	none	own		
+xd-0184	list	note-todo	My Number card renew - photo + form by 30/11	
+xd-0185	none	done		
+xd-0186	none	hard-ad		
+xd-0187	list	person	Tanabe-san, please verify the fix on build 0.9.6 and close QA-2281 by tomorrow noon, if the save works on all three snow levels.	
+xd-0188	none	done		
+xd-0189	none	note-fact		
+xd-0190	none	other-person		
+xd-0191	none	bulk		
+xd-0192	none	polite		
+xd-0193	none	bulk		
+xd-0194	list	note-todo	ask Megumi re: paid leave days left	
+xd-0195	none	bulk		
+xd-0197	none	bulk		
+xd-0198	none	note-fact		
+xd-0199	none	note-fact		
+xd-0200	list	note-todo	Yuki bday 12/12 - send hotate box from Otaru shop (order by 5/12)	
+xd-0201	none	other-person		
+xd-0202	list	note-todo	car tax due Nov - do online, not the post office	
+xd-0203	none	hard-ad		
+xd-0204	now	person	Can you open it at 6:45 so the newbies can change?	Text me tonight if you can't and I'll tell everyone to come in their togs.
+xd-0205	list	person	Can you open it at 6:45 so the newbies can change?	Text me by Thursday if you can't and I'll tell everyone to come in their togs.
+xd-0206	now	person	can you transfer it to them tonight?	
+xd-0207	list	person	can you transfer it to them this week?	
+xd-0208	none	bulk		
+xd-0209	none	other-person		
+xd-0210	list	group	Siobhán: could you draft the methods section by Sunday the 27th?	
+xd-0211	list	duty	The second instalment of your tuition fee (EUR 1,450) for the MSc Animal Welfare (part-time) was due on 30 October 2026.	
+xd-0212	none	note-fact		
+xd-0214	none	bulk		
+xd-0215	none	hard-ad		
+xd-0216	none	transactional		
+xd-0217	list	note-todo	ask Gráinne re: CPD day 4 Dec - paid or own leave?	
+xd-0218	none	polite		
+xd-0219	none	trick		
+xd-0220	none	other-person		
+xd-0221	list	duty	The NCT certificate for this vehicle expires on 12 December 2026.	
+xd-0222	list	person	What do you want me to do?	I can put on a new wheel for 85 euro, or true the old one for 20 but it won't last the winter.
+xd-0223	none	note-fact		
+xd-0224	none	hard-ad		
+xd-0226	none	other-person		
+xd-0227	none	bulk		
+xd-0228	list	note-todo	masters: ethics form to Dr Brennan before 1/12	
+xd-0229	none	offer		
+xd-0230	none	own		
+xd-0231	none	other-person		
+xd-0232	none	bulk		
+xd-0233	list	implied	Your current standing order is for the old amount, and the bank needs about ten days to change one.	
+xd-0234	none	note-fact		
+xd-0235	none	hard-ad		
+xd-0236	none	bulk		
+xd-0237	none	done		
+xd-0238	none	done		
+xd-0239	list	person	Can you order more before the Friday surgeries?	
+xd-0240	none	bulk		
+xd-0242	list	note-todo	pay back Niamh 12 (pizza Thurs)	
+xd-0243	none	survey		
+xd-0244	list	person	Would you be able to come home that weekend?	Let me know so I can do the beds.
+xd-0245	none	other-person		
+xd-0246	none	bulk		
+xd-0247	none	note-fact		
+xd-0248	list	note-todo	book NCT online (before 12/12) - Ballybrit 3/12?	
+xd-0249	none	polite		
+xd-0250	none	note-fact		

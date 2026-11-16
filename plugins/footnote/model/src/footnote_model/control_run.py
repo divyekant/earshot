@@ -11,7 +11,7 @@ import numpy as np
 
 from . import bench, control, marks
 from .formats import is_note
-from .stage1 import (item_preds, item_rows, load_items, load_pairs, load_rounds, pair_rows, select_item_thresholds,
+from .stage1 import (short_note_dev, item_preds, item_rows, load_items, load_pairs, load_rounds, pair_rows, select_item_thresholds,
                      select_pair_threshold)
 
 NEED = ("none", "list", "now")
@@ -65,6 +65,8 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     fi, fl = load_rounds(load_items, "items-fit")
     di, dl = load_rounds(load_items, "items-dev")
+    fi, fl, ni, nl = short_note_dev(fi, fl)
+    di, dl = di + ni, dl + nl
     if pairs_only:
         fi, fl, di, dl = [], [], [], []
     sw = bench.rules_predictions(fi + di) if fi else {}
@@ -85,6 +87,7 @@ def main():
         rows += pair_rows("control", task, pp, pl, sc, th[task])
     text = bench.table(rows)
     (out / "dev.md").write_text(f"thresholds {th}\n\n{text}\n")
+    (out / "thresholds.json").write_text(json.dumps(th))
     print(f"thresholds {th}")
     print(text)
 

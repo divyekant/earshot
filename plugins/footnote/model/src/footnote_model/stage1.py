@@ -30,6 +30,21 @@ def load_rounds(load, *args):
     return a, b
 
 
+def short_note_dev(items, labels):
+    """Round 3 has short notes for the owner's own eyes (design thread, 2026-11-16). The notes of the last owner by
+    name of each round 3 writer are a dev set for the note threshold only; they leave the fit data."""
+    r3 = {i["id"] for i in (load_items("items-fit3")[0] if (DATA / "items-fit3.jsonl.gz").exists() else [])}
+    by_writer = {}
+    for it in items:
+        if it["id"] in r3:
+            by_writer.setdefault(it["id"].split("-")[0], set()).add(it["owner"]["name"])
+    held = {w: max(o) for w, o in by_writer.items()}
+    dev_ids = {it["id"] for it in items if it["id"] in r3 and is_note(it) and it["owner"]["name"] == held[it["id"].split("-")[0]]}
+    keep = lambda xs: [x for x in xs if x["id"] not in dev_ids]
+    take = lambda xs: [x for x in xs if x["id"] in dev_ids]
+    return keep(items), keep(labels), take(items), take(labels)
+
+
 def round2_ids(name):
     p = DATA / f"{name}2.jsonl.gz"
     return {x["id"] for x in read_jsonl(p)} if p.exists() else set()
@@ -45,6 +60,10 @@ def splits(ids2):
 
 def item_rows(arm, di, dl, preds):
     rows = []
+    nd = [i for i in di if i["id"].startswith("x")]
+    if nd:
+        rows.append((f"short-notes-dev3 / {arm}", bench.score_items(nd, dl, {k: v for k, v in preds.items() if k.startswith("x")})))
+        di = [i for i in di if not i["id"].startswith("x")]
     for sfx, keep in splits(round2_ids("items-dev")):
         sub = [i for i in di if keep(i["id"])]
         rows.append((f"items-dev{sfx} / {arm}", bench.score_items(sub, dl, {k: v for k, v in preds.items() if keep(k)})))
@@ -146,6 +165,8 @@ def main(argv=None):
     tok = AutoTokenizer.from_pretrained(a.base)
     fi, fl = load_rounds(load_items, "items-fit")
     di, dl = load_rounds(load_items, "items-dev")
+    fi, fl, ni, nl = short_note_dev(fi, fl)
+    di, dl = di + ni, dl + nl
     if a.no_items:
         fi, fl = [], []
     sw = bench.rules_predictions(fi + di)

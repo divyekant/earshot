@@ -72,9 +72,10 @@ def model_predictions(run_dir: Path, items: list[dict], gate2: bool = False) -> 
 def control_predictions(run_dir: Path, items: list[dict]) -> dict[str, dict]:
     """The control arm: fit again on the fit data (it is deterministic), thresholds from its dev run."""
     from .control_run import ControlArm
-    from .stage1 import item_preds, load_items, load_rounds
+    from .stage1 import item_preds, load_items, load_rounds, short_note_dev
     th = json.loads((run_dir / "thresholds.json").read_text())
     fi, fl = load_rounds(load_items, "items-fit")
+    fi, fl, _, _ = short_note_dev(fi, fl)
     sw = rules_predictions(fi + items)
     arm = ControlArm().fit(fi, fl, sw, {})
     res = arm.item_res(items, sw)
