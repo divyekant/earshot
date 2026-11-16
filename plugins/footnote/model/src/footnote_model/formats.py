@@ -112,6 +112,15 @@ def is_note(item: dict) -> bool:
     return item.get("kind") == "note" or not item.get("from_address")
 
 
+def code_gate(item: dict) -> bool:
+    """Build spec 3 (design thread, 2026-11-16): facts gate the item before the model, like the bulk filter.
+    If the owner replied, or the owner sent the mail, the result is `none` and the model does not run."""
+    if item.get("replied"):
+        return True
+    sender = item.get("from_address", "").lower()
+    return bool(sender) and sender == item.get("owner", {}).get("address", "").lower()
+
+
 def same_sentence(a: str, b: str) -> bool:
     norm = lambda s: " ".join(clean_cell(s).split())
     return bool(a.strip()) and norm(a) == norm(b)

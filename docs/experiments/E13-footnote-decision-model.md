@@ -42,3 +42,12 @@ These are the numbers of E11. D4 of today has no judgment: each flag goes to the
 - The marks are computed in Python (`fm bench`), not in the Swift program. The Swift program gives the predictions and the facts line. Reason: the model arms run in Python until package M4, and one mark code serves all arms.
 - `limit` in the facts line is the earliest time limit in the text, not the limit of the selected sentence. Reason: the facts line goes into the model before a sentence is selected.
 - The D2 and D3 marks count proposals for each text: the pairs with the same text A are one group. The label formats are those of the rule files of the design thread.
+
+## Code gates before the model
+
+The code gates are part of the system, not of the model. The model does not learn them.
+
+- If `replied` is true, the result is `none`. The model does not run.
+- If the sender address is the owner address, the result is `none`. The model does not run.
+
+The bench applies the same gates to every arm (rules, control, models), so that the arms compare (`code_gate` in `formats.py`, `apply_code_gate` in `bench.py`). On the round 1 data, the gates hold 58 fit items and 17 dev items. No gated item has a request label.

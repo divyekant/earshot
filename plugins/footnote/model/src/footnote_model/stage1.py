@@ -10,7 +10,7 @@ import time
 from pathlib import Path
 
 from . import bench, fit, marks
-from .formats import is_note, pair_group, read_jsonl, read_tsv
+from .formats import code_gate, is_note, pair_group, read_jsonl, read_tsv
 
 DATA = bench.MODEL_DIR / "data"
 
@@ -31,7 +31,7 @@ def item_preds(res, items, t_mail, t_note, t_now):
     for it in items:
         r = res.get(it["id"], {"p_req": 0, "p_now": 0, "best": ""})
         t = t_note if is_note(it) else t_mail
-        need = r["p_req"] >= t
+        need = r["p_req"] >= t and not code_gate(it)
         when = ("now" if r["p_now"] >= t_now else "list") if need else "none"
         out[it["id"]] = {"need": "1" if need else "0", "when": when, "sentence": r["best"], "need_score": r["p_req"]}
     return out

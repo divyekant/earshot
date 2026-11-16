@@ -18,7 +18,7 @@ import tempfile
 from pathlib import Path
 
 from . import marks
-from .formats import is_note, read_jsonl, read_tsv, write_jsonl
+from .formats import code_gate, is_note, read_jsonl, read_tsv, write_jsonl
 
 MODEL_DIR = Path(__file__).resolve().parents[2]
 PLUGIN_DIR = MODEL_DIR.parent
@@ -56,7 +56,17 @@ def arm_predictions(arm: str, items: list[dict]) -> dict[str, dict]:
     raise ValueError(f"unknown arm: {arm}")
 
 
+def apply_code_gate(items: list[dict], preds: dict[str, dict]) -> dict[str, dict]:
+    """The same code gate for every arm (rules, control, models), so that the arms compare."""
+    out = dict(preds)
+    for it in items:
+        if code_gate(it) and it["id"] in out:
+            out[it["id"]] = {**out[it["id"]], "need": "0", "when": "none"}
+    return out
+
+
 def score_items(items: list[dict], labels: list[dict], preds: dict[str, dict]) -> list[marks.Result]:
+    preds = apply_code_gate(items, preds)
     out = []
     if any(not is_note(it) for it in items):
         out.append(marks.d1_mail(items, labels, preds))
