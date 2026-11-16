@@ -58,13 +58,14 @@ def pairs(writers, task, dev_owner_count=2):
     return fit, dev
 if __name__ == "__main__":
     what = sys.argv[1]
+    sfx = sys.argv[3] if len(sys.argv) > 3 else ""  # round 2: "2" writes items-fit2, items-dev2, ...
     if what == "items":
         f, d = items(sys.argv[2].split(","))
-        for name, (a, b) in (("items-fit", f), ("items-dev", d)):
+        for name, (a, b) in ((f"items-fit{sfx}", f), (f"items-dev{sfx}", d)):
             write_jsonl(f"{OUT}/{name}.jsonl.gz", a); write_tsv(f"{OUT}/{name}-labels.tsv", NEED_LABEL_COLUMNS, b)
     else:
         task = what  # fit or close
         f, d = pairs(sys.argv[2].split(","), task)
-        for name, (a, b) in ((f"{task}-train", f), (f"{task}-dev", d)):
+        for name, (a, b) in ((f"{task}-train{sfx}", f), (f"{task}-dev{sfx}", d)):
             write_jsonl(f"{OUT}/{name}.jsonl.gz", a); write_tsv(f"{OUT}/{name}-labels.tsv", PAIR_LABEL_COLUMNS, b)
     print(dict(stats))

@@ -1,0 +1,401 @@
+id	need	kind	sentence	sentence2
+wj-0001	none	personal		
+wj-0002	now	person	Can you sign the substitution sheet before you leave today?	
+wj-0003	none	transactional		
+wj-0004	list	person	Would Wednesday after pick up suit you for a short chat?	
+wj-0005	none	hard-ad		
+wj-0006	list	person	Would one of the children come out on Saturday to help me pick the apples, your father always did it and I cant go up the ladder now with my knee.	
+wj-0007	none	trick		
+wj-0008	none	polite		
+wj-0009	list	group	Could each of you send me your sections of the report by Friday 2 October?	
+wj-0010	none	other-person		
+wj-0011	none	bulk		
+wj-0012	list	duty	Please reply YES to confirm the appointment or call us on 091 555 0182 to change it.	
+wj-0013	none	replied		
+wj-0014	none	offer		
+wj-0015	none	transactional		
+wj-0016	list	duty	Your annual registration fee of EUR 65 is due by 30 September 2026.	
+wj-0017	list	person	r u around sunday for mams birthday dinner?	need numbers for the hotel by friday, they want a deposit.
+wj-0018	none	survey		
+wj-0019	none	done		
+wj-0020	none	done		
+wj-0021	now	person	Are you home?	I can wait 10 minutes then I have to move on.
+wj-0022	none	bulk		
+wj-0023	none	transactional		
+wj-0024	none	own		
+wj-0025	none	polite		
+wj-0026	none	trick		
+wj-0027	none	transactional		
+wj-0028	list	person	Would you be able to say a few words at the cake sale on the 10th about the sensory room plans?	
+wj-0029	list	note-todo	Ring the oil man before Declan goes back.	
+wj-0030	none	note-fact		
+wj-0031	none	note-fact		
+wj-0032	list	note-todo	Book NCT for the Skoda.	Check if Aoife's bus pass needs topping up.
+wj-0033	none	note-fact		
+wj-0034	none	note-fact		
+wj-0035	now	person	Can you open up at 8:15 tomorrow and take the assembly?	
+wj-0036	list	duty	Players who are not registered by 15 November will not be covered by the club insurance for the winter league.	
+wj-0037	list	implied	just remembered the NCT cert on the skoda runs out on the 30th and I'm not home till the 3rd.	
+wj-0038	none	bulk		
+wj-0039	none	hard-ad		
+wj-0040	none	bulk		
+wj-0041	none	polite		
+wj-0042	none	trick		
+wj-0043	none	transactional		
+wj-0044	none	other-person		
+wj-0045	none	replied		
+wj-0046	none	polite		
+wj-0047	none	offer		
+wj-0048	none	bulk		
+wj-0049	none	personal		
+wj-0050	none	hard-ad		
+wj-0051	none	survey		
+wj-0052	none	own		
+wj-0053	none	done		
+wj-0054	none	transactional		
+wj-0055	none	trick		
+wj-0056	none	bulk		
+wj-0057	none	personal		
+wj-0058	none	bulk		
+wj-0059	none	bulk		
+wj-0060	none	done		
+wj-0061	none	transactional		
+wj-0062	none	bulk		
+wj-0063	list	note-todo	Order the turkey and ham from Mulligan's by the 10th.	
+wj-0064	none	note-fact		
+wj-0065	list	note-todo	Email Fergal the updated literacy targets.	Ask Ger about the budget for Maths Week.
+wj-0066	none	note-fact		
+wj-0067	none	note-fact		
+wk-0003	none	bulk		
+wk-0008	none	transactional		
+wk-0013	none	trick		
+wk-0018	none	other-person		
+wk-0023	none	transactional		
+wk-0030	none	personal		
+wk-0034	none	note-fact		
+wk-0039	list	implied	District office wants the out-of-state trip packet by Oct 9 and I only have the budget page done.	The itinerary and the chaperone list are yours.
+wk-0044	none	polite		
+wk-0046	list	note-todo	Email Sun Valley Coach for a second quote, ask for 2 buses + equipment truck.	Count uniform jackets in XL and XXL before the freshmen fitting.
+wk-0051	list	group	Can you both meet Tuesday the 6th at 6:30 at the Coffee Corral on Cave Creek?	
+wk-0056	none	survey		
+wk-0063	none	bulk		
+wk-0069	now	person	Which gate do you want us at?	
+wk-0074	none	personal		
+wk-0079	none	bulk		
+wk-0081	none	note-fact		
+wk-0087	none	replied		
+wk-0093	none	bulk		
+wk-0098	none	transactional		
+wk-0101	list	note-todo	Ask Linda for the chaperone background check list.	
+wk-0105	list	implied	Open enrollment ends December 7 and you are the one with power of attorney, so the plan people will only talk to you.	I'll make the turkey, you guys bring Mom's tamales and the rice.
+wk-0110	none	replied		
+wk-0116	list	duty	Our records show your Arizona fingerprint clearance card expires on December 31, 2026.	
+wk-0121	none	done		
+wk-0127	none	note-fact		
+wk-0129	none	hard-ad		
+wk-0139	none	other-person		
+wk-0143	none	trick		
+wk-0148	list	person	Are you guys still coming at 2, or later because of Isa's game?	I need to know how many chairs to borrow from church.
+wk-0151	list	note-todo	Call Saguaro Health about switching Mom to Advantage Silver before Dec 7	check Dr. Patel is in network first
+wk-0155	none	done		
+wk-0160	none	done		
+wk-0169	none	hard-ad		
+wk-0173	none	transactional		
+wk-0178	list	person	Would you say a few words after dinner, maybe five minutes, and hand out the section awards?	Do we keep those for history or donate them?
+wk-0183	none	personal		
+wk-0188	none	transactional		
+wk-0189	list	note-todo	Write the banquet speech, 5 min max, Linda will time me	section awards: get the plaques from the engraver by Dec 3
+wk-0195	none	quoted		
+wk-0203	none	hard-ad		
+wk-0206	none	polite		
+wk-0210	none	transactional		
+wk-0215	list	implied	The winter concert programs go to the print shop on December 1 and I still don't have your program notes for Symphonic.	Also, the choir director asked if we can share the risers on the 10th.
+wk-0222	none	bulk		
+wk-0227	none	replied		
+wk-0233	none	note-fact		
+wk-0235	list	implied	mijo I want to go see your papa at the cemetery on Sunday after mass, it is his birthday on the 2.	Carmen can not drive me this time her knee.
+wk-0239	none	personal		
+wk-0244	none	transactional		
+wk-0249	none	other-person		
+wk-0256	none	bulk		
+wk-0261	none	done		
+wk-0266	none	note-fact		
+wk-0269	none	polite		
+wk-0273	list	person	Could Danny borrow one of the school keyboards over winter break to practice?	
+wk-0279	none	hard-ad		
+wk-0285	none	personal		
+wk-0292	none	bulk		
+wk-0299	list	note-todo	Check the fingerprint card status on the DPS site, applied 11/2	sign out Yamaha keyboard #3 to Danny Nguyen, back Jan 5
+wk-0302	none	done		
+wk-0305	none	quoted		
+wk-0310	none	polite		
+wk-0315	none	transactional		
+wk-0320	none	personal		
+wk-0328	none	note-fact		
+wk-0335	none	bulk		
+wl-0135	none	bulk		
+wl-0136	list	person	Quick one: could you send me the revised costing for style BW-2261 with the new fabric by Friday 11th?	
+wl-0137	none	trick		
+wl-0138	none	personal		
+wl-0139	list	duty	Please collect it in person with the delivery slip and your NID within 30 days.	
+wl-0140	none	other-person		
+wl-0141	none	hard-ad		
+wl-0142	list	implied	He says for the nikah registration he needs both of your NID copies and two passport size photos of each, and I only have Fahim's from his mother.	
+wl-0143	none	transactional		
+wl-0144	none	replied		
+wl-0145	none	survey		
+wl-0146	now	person	Can you still come to Gazipur by 7:30 tomorrow, and can you tell Charlotte tonight that the inspection is earlier?	If you can't come, I need to know tonight so I can ask Kamrul bhai to send someone else.
+wl-0147	none	offer		
+wl-0148	none	transactional		
+wl-0149	none	own		
+wl-0150	none	polite		
+wl-0151	none	transactional		
+wl-0152	list	implied	We cannot start cutting lot 2 without buyer approval of the shade band, cutting master is waiting.	
+wl-0153	none	bulk		
+wl-0154	none	done		
+wl-0156	none	bulk		
+wl-0157	list	group	I want you two to decide by Friday which of the decorators we take, Phoolkoli or the boy from Mohammadpur, because both are asking for advance.	
+wl-0158	none	hard-ad		
+wl-0159	none	transactional		
+wl-0160	list	person	Rafiq will cover Brightwell while you are away, please do a handover with him in the first week of December, any day that suits you both.	
+wl-0161	list	duty	The remaining payment of Tk 2,85,000 and the final fitting must be completed by 20 November so that the polishing can be done in time for 10 December.	
+wl-0162	none	done		
+wl-0163	none	note-fact		
+wl-0164	list	note-todo	BW-2261 costing - Charlotte by Fri 11th	Give Ammu my NID copy and 2 photos for the kazi.
+wl-0165	none	note-fact		
+wl-0166	none	note-fact		
+wl-0167	list	note-todo	Set a handover date with Rafiq for the first week of December.	
+wl-0168	none	note-fact		
+wl-0169	list	person	Please nominate two factories and send us the first costing by 6 November.	
+wl-0170	none	trick		
+wl-0171	none	other-person		
+wl-0173	list	duty	The last date for submission of the return of income for assessment year 2026-27 is 30 November 2026 (Tax Day).	Your return is not yet submitted.
+wl-0174	list	person	Would you send me the address of the venue, and a hotel near it that you would recommend?	
+wl-0175	none	bulk		
+wl-0176	none	replied		
+wl-0177	none	transactional		
+wl-0178	none	offer		
+wl-0179	list	group	Now please both of you sit together and send me one handover note for Brightwell and Nordhavn by 3 December.	
+wl-0180	none	hard-ad		
+wl-0181	none	polite		
+wl-0182	none	own		
+wl-0183	none	transactional		
+wl-0184	none	polite		
+wl-0185	none	other-person		
+wl-0186	none	transactional		
+wl-0187	none	transactional		
+wl-0188	list	person	I will print it, sign it on the 5th when you come to see the flat?	Only thing: he wants the tenant name as both of us, and your signature has to be on it with a copy of your NID before he gives the keys on the 15th.
+wl-0189	none	survey		
+wl-0190	none	done		
+wl-0191	now	person	Can you and your Abbu be at the Dhanmondi house by 8:30 with the NID cards?	Please tell me tonight, otherwise I have to call him back and ask for after Asr, and then the reception timing gets messed up.
+wl-0192	none	polite		
+wl-0193	list	duty	To complete the transfer, the new tenant must submit the signed lease agreement and the NID copy at the Uttara zonal office by 31 December 2026.	
+wl-0194	none	personal		
+wl-0195	none	bulk		
+wl-0196	none	personal		
+wl-0197	none	note-fact		
+wl-0198	list	note-todo	Ask the bank for the interest certificate.	file e-return myself, last year took 40 min
+wl-0199	none	note-fact		
+wl-0200	none	note-fact		
+wl-0201	list	note-todo	Take the lease and NID to the Titas office in Uttara before 31 Dec.	thank-you notes - office, Lima's QA floor, Charlotte
+wm-0068	list	person	As we prepare for the elders' meeting, kindly send me the completed pledge cards from your zone before the meeting on Thursday, so that I can update the register and present the true figures to the Pastor.	
+wm-0069	list	implied	Daddy, about the visa extension, the university says the application needs a sponsor letter from you and your last 3 months bank statement, and the international office wants everything by the 30th of September.	
+wm-0070	list	duty	Invoice INV-2209 is due for payment on 25 September 2026.	
+wm-0071	none	trick		
+wm-0072	none	bulk		
+wm-0073	none	hard-ad		
+wm-0074	now	person	Please, should I move the insulin to your house tonight or call the emergency technician, he charges 25,000 for night call?	
+wm-0075	none	other-person		
+wm-0076	none	personal		
+wm-0077	none	transactional		
+wm-0078	none	replied		
+wm-0079	list	group	The three of you should meet the contractor at the site on Saturday 26th at 10 am and agree on the better option before the church council sits.	
+wm-0080	none	polite		
+wm-0081	none	survey		
+wm-0082	list	duty	The premises licence for the above pharmacy expires on 31 December 2026.	Renewal applications open on 1 October 2026.
+wm-0083	none	bulk		
+wm-0084	none	offer		
+wm-0085	none	quoted		
+wm-0086	none	own		
+wm-0087	none	trick		
+wm-0088	none	transactional		
+wm-0089	none	bulk		
+wm-0090	none	personal		
+wm-0091	list	implied	The rent for the shop at Bodija for 2027 is now NGN 1,800,000, payable on or before 1 December as always.	
+wm-0092	none	hard-ad		
+wm-0093	none	done		
+wm-0094	none	transactional		
+wm-0095	none	polite		
+wm-0096	none	bulk		
+wm-0097	list	note-todo	Print 3 months statement from Heritage (June, July, Aug) and stamp it at the branch.	
+wm-0098	none	note-fact		
+wm-0099	none	note-fact		
+wm-0100	list	note-todo	Order 2 cartons of Amlodipine 5mg and 40 insulin pens from Olu-Medics.	Tell Kemi to log the fridge temperature twice a day from now.
+wm-0101	none	done		
+wm-0102	now	person	Please transfer the deposit to the hospital account before 7 pm when the cashier closes, I have sent the account details by SMS.	
+wm-0103	none	personal		
+wm-0104	list	person	Will you do it?	I need to give the organisers the names by 15 November.
+wm-0105	none	replied		
+wm-0106	none	other-person		
+wm-0107	none	trick		
+wm-0108	none	bulk		
+wm-0109	none	hard-ad		
+wm-0110	none	transactional		
+wm-0111	none	survey		
+wm-0112	none	personal		
+wm-0113	none	polite		
+wm-0114	none	done		
+wm-0115	none	offer		
+wm-0116	none	own		
+wm-0117	none	transactional		
+wm-0118	list	duty	The Superintendent Pharmacist must be present with the original practice licence and the controlled drugs register.	If the date is not suitable, a new date can be requested by 16 November only.
+wm-0119	none	bulk		
+wm-0120	none	hard-ad		
+wm-0121	none	personal		
+wm-0122	none	trick		
+wm-0123	none	done		
+wm-0124	none	personal		
+wm-0125	none	bulk		
+wm-0126	none	transactional		
+wm-0127	none	bulk		
+wm-0128	none	personal		
+wm-0129	list	note-todo	Ask Pastor whether the men can do the BP checks before or after the talk.	bring 2 BP machines + glucometer + strips from shop
+wm-0130	none	note-fact		
+wm-0131	none	note-fact		
+wm-0132	list	note-todo	Renew Kemi's contract before January and add the 15% raise.	Buy a second digital thermometer for the cold room.
+wm-0133	none	note-fact		
+wm-0134	none	note-fact		
+wn-0135	list	duty	Parents who wish their child to join must return the signed reply slip together with a cheque of HK$6,800 payable to "Kowloon Grace Secondary School" to the class teacher on or before 2 October 2026 (Friday).	
+wn-0136	now	person	Please reply me before 10:30 which option you choose, my workers are waiting.	
+wn-0137	list	duty	Please let us know your decision at your earliest convenience.	If you wish to renew, the new standard employment contract must be signed by both parties and the visa extension application submitted to the immigration office at least 4 weeks before the end of the current contract, i.e. on or before 17 December 2026.
+wn-0138	list	person	Could you send me the draft variance commentary by Friday noon?	
+wn-0139	none	bulk		
+wn-0140	none	other-person		
+wn-0141	none	trick		
+wn-0142	none	transactional		
+wn-0143	none	polite		
+wn-0144	none	hard-ad		
+wn-0145	none	survey		
+wn-0146	none	replied		
+wn-0147	none	own		
+wn-0148	none	offer		
+wn-0149	none	polite		
+wn-0150	none	transactional		
+wn-0151	none	done		
+wn-0152	none	transactional		
+wn-0153	none	bulk		
+wn-0154	none	bulk		
+wn-0155	none	transactional		
+wn-0156	none	trick		
+wn-0157	none	transactional		
+wn-0158	none	bulk		
+wn-0159	none	transactional		
+wn-0160	none	polite		
+wn-0161	none	hard-ad		
+wn-0162	none	bulk		
+wn-0163	list	note-todo	Sign the reply slip and write the cheque HK$6,800 to KGSS.	Check his passport expiry - I think it is 2027?
+wn-0164	none	note-fact		
+wn-0165	list	note-todo	Ask Analyn if she wants to renew for 2 more years, and if she wants home leave in Jan or later.	Tell Mandy at HappyHome our decision by end Oct.
+wn-0166	none	note-fact		
+wn-0167	list	note-todo	Report the fake email to the bank's fraud hotline tomorrow morning.	Pay the 2nd installment only to the Fortune Deco company account, as in the contract.
+wn-0168	none	note-fact		
+wn-0169	now	person	He said the account is under your name so he needs you to confirm by phone before he can turn on the gas, he will wait until 5pm only then go to next job.	
+wn-0170	list	person	Please let me have your management responses to points 2, 4 and 5 by 20 November.	
+wn-0171	list	duty	Final tax 2025/26 and 1st instalment of provisional tax 2026/27: HK$38,420, due on 10 January 2027.	
+wn-0172	list	implied	For the HK$10,000 renovation deposit at the management office: they say the completion form must be signed by the owner, they will not accept my signature as contractor.	
+wn-0173	list	group	Please reply by 4 December so I can tell Ms. Leung the final menu.	Could the three of you bring 2 hot dishes each (for 32 students)?
+wn-0174	none	trick		
+wn-0175	none	trick		
+wn-0176	none	replied		
+wn-0177	none	other-person		
+wn-0178	none	polite		
+wn-0179	none	transactional		
+wn-0180	none	own		
+wn-0181	none	done		
+wn-0182	none	done		
+wn-0183	none	polite		
+wn-0184	none	survey		
+wn-0185	none	hard-ad		
+wn-0186	none	transactional		
+wn-0187	none	transactional		
+wn-0188	none	bulk		
+wn-0189	none	bulk		
+wn-0190	none	transactional		
+wn-0191	none	bulk		
+wn-0192	none	transactional		
+wn-0193	none	bulk		
+wn-0194	none	transactional		
+wn-0195	none	bulk		
+wn-0196	none	transactional		
+wn-0197	list	note-todo	Sign the completion form at the management counter on Monday after work.	Check the final invoice, the 3rd payment is HK$55,950 (30%).
+wn-0198	none	done		
+wn-0199	list	note-todo	Book the hotel near Namba, 3 adults, 4 nights.	Theme park tickets for Ethan's birthday.
+wn-0200	none	note-fact		
+wn-0201	none	note-fact		
+wo-0202	now	person	What is the new code??	
+wo-0203	list	person	Can you confirm the quantities and sizes before 30 November?	
+wo-0204	list	person	My sister marries on Saturday 5 December in Groningen and we have the dinner the evening before, so can I take Friday 4 December free?	
+wo-0205	list	group	Who is in?	Let me know by Thursday so I buy enough food and beer.
+wo-0206	none	other-person		
+wo-0207	none	trick		
+wo-0208	none	replied		
+wo-0209	none	own		
+wo-0210	none	offer		
+wo-0211	none	done		
+wo-0212	none	quoted		
+wo-0213	none	survey		
+wo-0214	none	hard-ad		
+wo-0215	none	bulk		
+wo-0216	none	personal		
+wo-0217	none	polite		
+wo-0218	none	transactional		
+wo-0219	none	transactional		
+wo-0220	none	trick		
+wo-0221	none	hard-ad		
+wo-0222	none	bulk		
+wo-0223	none	personal		
+wo-0224	none	other-person		
+wo-0225	none	transactional		
+wo-0226	none	polite		
+wo-0227	none	polite		
+wo-0228	none	transactional		
+wo-0229	none	bulk		
+wo-0230	none	note-fact		
+wo-0231	list	note-todo	Order a new chain tool for Joost, the old one is broken.	Call the insurance about the stolen demo bike, police report nr 2026-118843.
+wo-0232	none	note-fact		
+wo-0233	none	note-fact		
+wo-0234	list	note-todo	Ask Henk about the warranty of the cargo bike frames from 2024.	
+wo-0235	now	person	We can put extra lines and fenders for you (60 EUR), but we need your OK before 20:00, after that my team goes home.	Otherwise please come yourself.
+wo-0236	list	implied	On Friday we have 14 bikes for repairs and the lease bikes of the hospital also.	The compressor in the workshop is dead since this morning, it makes smoke when I start it.
+wo-0237	list	duty	Your yearly check is open: please confirm or correct the address, activities and number of employees before 31 December 2026 in the online portal.	
+wo-0238	none	replied		
+wo-0239	none	own		
+wo-0240	none	trick		
+wo-0241	none	other-person		
+wo-0242	none	offer		
+wo-0243	none	done		
+wo-0244	none	done		
+wo-0245	none	survey		
+wo-0246	none	hard-ad		
+wo-0247	none	bulk		
+wo-0248	none	personal		
+wo-0249	none	personal		
+wo-0250	none	transactional		
+wo-0251	none	bulk		
+wo-0252	none	personal		
+wo-0253	none	hard-ad		
+wo-0254	none	trick		
+wo-0255	none	other-person		
+wo-0256	none	transactional		
+wo-0257	none	polite		
+wo-0258	none	bulk		
+wo-0259	none	transactional		
+wo-0260	none	personal		
+wo-0261	list	group	Can you both sign them digitally before 15 December?	
+wo-0262	none	transactional		
+wo-0263	list	note-todo	Bring the cushions and the sails home before the frost.	
+wo-0264	none	note-fact		
+wo-0265	list	note-todo	Book the restaurant in Amersfoort for Saturday 9 January, 6 people.	
+wo-0266	none	note-fact		
+wo-0267	list	note-todo	Tell Bram he can do the Velomax training for e-bike motors in February.	
+wo-0268	none	note-fact		

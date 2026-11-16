@@ -19,6 +19,50 @@ def load_items(name):
     return read_jsonl(DATA / f"{name}.jsonl.gz"), read_tsv(DATA / f"{name}-labels.tsv")
 
 
+def load_rounds(load, *args):
+    """Round 1 file and, if it is there, the round 2 file (name + "2"), joined."""
+    a, b = load(*args)
+    p = DATA / (f"{args[0]}-{args[1]}2.jsonl.gz" if len(args) == 2 else f"{args[0]}2.jsonl.gz")
+    if p.exists():
+        a2, b2 = load(*args[:-1], args[-1] + "2")
+        a, b = a + a2, b + b2
+    return a, b
+
+
+def round2_ids(name):
+    p = DATA / f"{name}2.jsonl.gz"
+    return {x["id"] for x in read_jsonl(p)} if p.exists() else set()
+
+
+def splits(ids2):
+    """(name suffix, keep) for all dev, and for dev1 and dev2 when round 2 is there."""
+    out = [(" (all)" if ids2 else "", lambda i: True)]
+    if ids2:
+        out += [("1", lambda i: i not in ids2), ("2", lambda i: i in ids2)]
+    return out
+
+
+def item_rows(arm, di, dl, preds):
+    rows = []
+    for sfx, keep in splits(round2_ids("items-dev")):
+        sub = [i for i in di if keep(i["id"])]
+        rows.append((f"items-dev{sfx} / {arm}", bench.score_items(sub, dl, {k: v for k, v in preds.items() if keep(k)})))
+    return rows
+
+
+def pair_rows(arm, task, pp, pl, sc, threshold):
+    rows = []
+    prefix = "fit" if task == "fit" else "close"
+    for sfx, keep in splits(round2_ids(f"{prefix}-dev")):
+        for kind in ("project", "item"):
+            sub = [p for p in pp if p["b"]["kind"] == kind and keep(p["id"])]
+            if sub:
+                r = marks.pairs_mark(task, sub, pl, sc, threshold)
+                r.decision += f" ({kind})"
+                rows.append((f"{task}-dev{sfx} / {arm}", [r]))
+    return rows
+
+
 def load_pairs(task, name):
     p = DATA / f"{task}-{name}.jsonl.gz"
     if not p.exists():
@@ -74,9 +118,11 @@ def select_item_thresholds(res, items, labels):
 
 
 def select_pair_threshold(task, pairs, labels, scores):
+    """The fixed grid stops at 0.98, and a fit head can give scores above it. So the candidates are the grid and
+    every score that a dev pair has: a threshold between two scores gives the same result as the higher score."""
     need = marks.D2_CORRECT if task == "fit" else marks.D3_CORRECT
-    best = (-1, 0.99)
-    for t in GRID:
+    best = (-1, 1.01)
+    for t in sorted(set(GRID) | {float(v) for v in scores.values()}):
         r = marks.pairs_mark(task, pairs, labels, scores, t)
         c = r.counts
         if c["proposals"] and c["correct"] >= need * c["proposals"] and c["correct"] >= best[0]:
@@ -91,22 +137,26 @@ def main(argv=None):
     ap.add_argument("--epochs", type=int, default=4)
     ap.add_argument("--lr", type=float, default=5e-5)
     ap.add_argument("--no-pairs", action="store_true")
+    ap.add_argument("--no-items", action="store_true", help="pair model only (two-model arm)")
+    ap.add_argument("--seed", type=int, default=13)
     a = ap.parse_args(argv)
     out = Path(a.out)
     from transformers import AutoTokenizer
     tok = AutoTokenizer.from_pretrained(a.base)
-    fi, fl = load_items("items-fit")
-    di, dl = load_items("items-dev")
+    fi, fl = load_rounds(load_items, "items-fit")
+    di, dl = load_rounds(load_items, "items-dev")
+    if a.no_items:
+        fi, fl = [], []
     sw = bench.rules_predictions(fi + di)
     ie = fit.item_examples(tok, fi, fl, sw)
     pe, dev_pairs = [], {}
     if not a.no_pairs:
         for task, prefix in (("fit", "fit"), ("closes", "close")):
-            tp, tl = load_pairs(prefix, "train")
+            tp, tl = load_rounds(load_pairs, prefix, "train")
             pe += fit.pair_examples(tok, tp, tl, task)
-            dev_pairs[task] = load_pairs(prefix, "dev")
+            dev_pairs[task] = load_rounds(load_pairs, prefix, "dev")
     t0 = time.time()
-    model, tok = fit.train(a.base, ie, pe, out, epochs=a.epochs, lr=a.lr)
+    model, tok = fit.train(a.base, ie, pe, out, epochs=a.epochs, lr=a.lr, seed=a.seed)
     fit_s = time.time() - t0
     res = fit.predict_items(model, tok, fit.item_examples(tok, di, None, sw))
     th = select_item_thresholds(res, di, dl)
@@ -115,18 +165,13 @@ def main(argv=None):
         f.write("id\tneed\tneed_score\twhen\tsentence\n")
         for i, p in preds.items():
             f.write(f"{i}\t{p['need']}\t{p['need_score']:.4f}\t{p['when']}\t{p['sentence']}\n")
-    rows = [(f"items-dev / {a.base}", bench.score_items(di, dl, preds))]
+    rows = item_rows(a.base, di, dl, preds)
     for task, (pp, pl) in dev_pairs.items():
         if not pp:
             continue
         sc = fit.predict_pairs(model, tok, fit.pair_examples(tok, pp, None, task))
         th[task] = select_pair_threshold(task, pp, pl, sc)
-        for kind in ("project", "item"):
-            sub = [p for p in pp if p["b"]["kind"] == kind]
-            if sub:
-                r = marks.pairs_mark(task, sub, pl, sc, th[task])
-                r.decision += f" ({kind})"
-                rows.append((f"{task}-dev / {a.base}", [r]))
+        rows += pair_rows(a.base, task, pp, pl, sc, th[task])
     text = bench.table(rows)
     (out / "thresholds.json").write_text(json.dumps(th))
     (out / "dev.md").write_text(f"fit {fit_s:.0f} s, thresholds {th}\n\n{text}\n")

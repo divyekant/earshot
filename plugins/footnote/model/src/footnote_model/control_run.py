@@ -11,7 +11,8 @@ import numpy as np
 
 from . import bench, control, marks
 from .formats import is_note
-from .stage1 import (item_preds, load_items, load_pairs, select_item_thresholds, select_pair_threshold)
+from .stage1 import (item_preds, item_rows, load_items, load_pairs, load_rounds, pair_rows, select_item_thresholds,
+                     select_pair_threshold)
 
 NEED = ("none", "list", "now")
 
@@ -56,26 +57,21 @@ class ControlArm:
 def main():
     out = Path(sys.argv[1])
     out.mkdir(parents=True, exist_ok=True)
-    fi, fl = load_items("items-fit")
-    di, dl = load_items("items-dev")
+    fi, fl = load_rounds(load_items, "items-fit")
+    di, dl = load_rounds(load_items, "items-dev")
     sw = bench.rules_predictions(fi + di)
-    pair_fit = {"fit": load_pairs("fit", "train"), "closes": load_pairs("close", "train")}
+    pair_fit = {"fit": load_rounds(load_pairs, "fit", "train"), "closes": load_rounds(load_pairs, "close", "train")}
     arm = ControlArm().fit(fi, fl, sw, pair_fit)
     res = arm.item_res(di, sw)
     th = select_item_thresholds(res, di, dl)
-    rows = [("items-dev / control", bench.score_items(di, dl, item_preds(res, di, th["mail"], th["note"], th["now"])))]
+    rows = item_rows("control", di, dl, item_preds(res, di, th["mail"], th["note"], th["now"]))
     for task, prefix in (("fit", "fit"), ("closes", "close")):
-        pp, pl = load_pairs(prefix, "dev")
+        pp, pl = load_rounds(load_pairs, prefix, "dev")
         if not pp or task not in arm.pair:
             continue
         sc = arm.pair_scores(task, pp)
         th[task] = select_pair_threshold(task, pp, pl, sc)
-        for kind in ("project", "item"):
-            sub = [p for p in pp if p["b"]["kind"] == kind]
-            if sub:
-                r = marks.pairs_mark(task, sub, pl, sc, th[task])
-                r.decision += f" ({kind})"
-                rows.append((f"{task}-dev / control", [r]))
+        rows += pair_rows("control", task, pp, pl, sc, th[task])
     text = bench.table(rows)
     (out / "dev.md").write_text(f"thresholds {th}\n\n{text}\n")
     print(f"thresholds {th}")
