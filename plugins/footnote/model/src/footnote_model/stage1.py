@@ -9,7 +9,7 @@ import json
 import time
 from pathlib import Path
 
-from . import bench, fit, marks
+from . import bench, control, fit, marks
 from .formats import code_gate, is_note, pair_group, read_jsonl, read_tsv
 
 DATA = bench.MODEL_DIR / "data"
@@ -159,6 +159,7 @@ def main(argv=None):
     ap.add_argument("--no-pairs", action="store_true")
     ap.add_argument("--no-items", action="store_true", help="pair model only (two-model arm)")
     ap.add_argument("--seed", type=int, default=13)
+    ap.add_argument("--eg", help="give the pair heads the EmbeddingGemma pair features; the value is a cache file")
     a = ap.parse_args(argv)
     out = Path(a.out)
     from transformers import AutoTokenizer
@@ -171,14 +172,17 @@ def main(argv=None):
         fi, fl = [], []
     sw = bench.rules_predictions(fi + di)
     ie = fit.item_examples(tok, fi, fl, sw)
-    pe, dev_pairs = [], {}
+    pe, dev_pairs, feats = [], {}, {}
     if not a.no_pairs:
         for task, prefix in (("fit", "fit"), ("closes", "close")):
             tp, tl = load_rounds(load_pairs, prefix, "train")
-            pe += fit.pair_examples(tok, tp, tl, task)
             dev_pairs[task] = load_rounds(load_pairs, prefix, "dev")
+            if a.eg:
+                feats.update(control.pair_feature_map(tp + dev_pairs[task][0], a.eg))
+            pe += fit.pair_examples(tok, tp, tl, task, feats)
     t0 = time.time()
-    model, tok = fit.train(a.base, ie, pe, out, epochs=a.epochs, lr=a.lr, seed=a.seed)
+    model, tok = fit.train(a.base, ie, pe, out, epochs=a.epochs, lr=a.lr, seed=a.seed,
+                           extra=len(next(iter(feats.values()))) if feats else 0)
     fit_s = time.time() - t0
     res = fit.predict_items(model, tok, fit.item_examples(tok, di, None, sw))
     th = select_item_thresholds(res, di, dl)
@@ -191,7 +195,8 @@ def main(argv=None):
     for task, (pp, pl) in dev_pairs.items():
         if not pp:
             continue
-        sc = fit.predict_pairs(model, tok, fit.pair_examples(tok, pp, None, task))
+        sc = fit.predict_pairs(model, tok, fit.pair_examples(tok, pp, None, task, feats))
+        (out / f"pair-scores-{task}-dev.json").write_text(json.dumps(sc))
         th[task] = select_pair_threshold(task, pp, pl, sc)
         rows += pair_rows(a.base, task, pp, pl, sc, th[task])
     text = bench.table(rows)

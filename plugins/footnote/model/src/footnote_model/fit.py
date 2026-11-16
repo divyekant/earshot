@@ -25,14 +25,17 @@ NEED = ("none", "list", "now")
 
 
 class DecisionModel(nn.Module):
-    def __init__(self, base: str):
+    def __init__(self, base: str, extra: int = 0):
+        """`extra`: the number of outside scores (for example the EmbeddingGemma pair features) that the pair heads
+        get next to the encoder vector. 0 gives the plain model."""
         super().__init__()
         self.encoder = AutoModel.from_pretrained(base)
         h = self.encoder.config.hidden_size
+        self.extra = extra
         self.need = nn.Linear(h, 3)
         self.sentence = nn.Linear(h, 1)
-        self.fit = nn.Linear(h, 1)
-        self.closes = nn.Linear(h, 1)
+        self.fit = nn.Linear(h + extra, 1)
+        self.closes = nn.Linear(h + extra, 1)
 
     def hidden(self, ids, mask):
         return self.encoder(input_ids=ids, attention_mask=mask).last_hidden_state
@@ -51,6 +54,7 @@ class PairEx:
     ids: list[int]
     task: str
     label: int
+    feats: tuple = ()
 
 
 def _pad(seqs, pad_id):
@@ -91,9 +95,18 @@ def item_examples(tok, items, labels, swift) -> list[ItemEx]:
     return out
 
 
-def pair_examples(tok, pairs, labels, task) -> list[PairEx]:
+def pair_examples(tok, pairs, labels, task, feats=None) -> list[PairEx]:
     lab = {r["id"]: int(r["label"]) for r in labels} if labels else {}
-    return [PairEx(p["id"], pair_ids(tok, p["owner"]["name"], p["a"], p["b"]), task, lab.get(p["id"], -1)) for p in pairs]
+    feats = feats or {}
+    return [PairEx(p["id"], pair_ids(tok, p["owner"]["name"], p["a"], p["b"]), task, lab.get(p["id"], -1),
+                   tuple(feats.get(p["id"], ()))) for p in pairs]
+
+
+def _pair_x(model, h, exs):
+    """The head input: the encoder vector, and the outside scores if the model uses them."""
+    if not model.extra:
+        return h
+    return torch.cat([h, torch.tensor([list(e.feats) for e in exs], dtype=h.dtype)], -1)
 
 
 def batches(exs, size, shuffle, rng):
@@ -136,7 +149,7 @@ def item_loss(model, batch, pad):
 
 def pair_loss(model, batch, pad):
     ids, mask = _pad([e.ids for e in batch], pad)
-    h = model.hidden(ids, mask)[:, 0]
+    h = _pair_x(model, model.hidden(ids, mask)[:, 0], batch)
     loss = 0
     for task, head in (("fit", model.fit), ("closes", model.closes)):
         sel = [i for i, e in enumerate(batch) if e.task == task and e.label >= 0]
@@ -146,12 +159,12 @@ def pair_loss(model, batch, pad):
     return loss
 
 
-def train(base: str, item_ex, pair_ex, out_dir: Path, epochs=4, lr=5e-5, batch=16, seed=13, log=print):
+def train(base: str, item_ex, pair_ex, out_dir: Path, epochs=4, lr=5e-5, batch=16, seed=13, log=print, extra=0):
     torch.manual_seed(seed)
     rng = random.Random(seed)
     torch.set_num_threads(4)
     tok = AutoTokenizer.from_pretrained(base)
-    model = DecisionModel(base)
+    model = DecisionModel(base, extra)
     pad = tok.pad_token_id
     opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=0.01)
     steps_total = epochs * (math.ceil(len(item_ex) / batch) + math.ceil(len(pair_ex) / batch))
@@ -175,7 +188,7 @@ def train(base: str, item_ex, pair_ex, out_dir: Path, epochs=4, lr=5e-5, batch=1
         log(f"epoch {ep + 1}: mean loss {total / max(1, len(bs)):.4f}, {time.time() - t0:.0f} s")
     out_dir.mkdir(parents=True, exist_ok=True)
     torch.save(model.state_dict(), out_dir / "model.pt")
-    (out_dir / "config.json").write_text(json.dumps({"base": base, "epochs": epochs, "lr": lr, "batch": batch, "seed": seed}))
+    (out_dir / "config.json").write_text(json.dumps({"base": base, "epochs": epochs, "lr": lr, "batch": batch, "seed": seed, "extra": extra}))
     return model, tok
 
 
@@ -208,7 +221,7 @@ def predict_pairs(model, tok, exs: list[PairEx], batch=64):
     out = {}
     for b in batches(exs, batch, False, None):
         ids, mask = _pad([e.ids for e in b], pad)
-        h = model.hidden(ids, mask)[:, 0]
+        h = _pair_x(model, model.hidden(ids, mask)[:, 0], b)
         for i, e in enumerate(b):
             head = model.fit if e.task == "fit" else model.closes
             out[e.pid] = float(torch.sigmoid(head(h[i : i + 1])).squeeze())
@@ -218,7 +231,7 @@ def predict_pairs(model, tok, exs: list[PairEx], batch=64):
 def load(out_dir: Path):
     cfg = json.loads((out_dir / "config.json").read_text())
     tok = AutoTokenizer.from_pretrained(cfg["base"])
-    model = DecisionModel(cfg["base"])
+    model = DecisionModel(cfg["base"], cfg.get("extra", 0))
     model.load_state_dict(torch.load(out_dir / "model.pt"))
     model.eval()
     return model, tok, cfg

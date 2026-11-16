@@ -121,9 +121,24 @@ class SealedTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 bench.sealed_run("S9", data, sha, ["x"], runs_dir=d / "runs", predict=fake)
 
-
-if __name__ == "__main__":
-    unittest.main()
+    def test_sealed_pairs_run_writes_scores_and_runs_one_time(self):
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            data = d / "fit-s9.jsonl.gz"
+            pairs = [{"id": f"p{i}", "a": {"kind": "capture", "text": "text"}, "b": {"kind": "project"}}
+                     for i in range(2)]
+            write_jsonl(data, pairs)
+            write_tsv(label_file(data), ["id", "label"], [{"id": "p0", "label": "1"}, {"id": "p1", "label": "0"}])
+            sha = d / "fit-s9.sha256"
+            sha.write_text(f"{bench.sha256(data)}  fit-s9.jsonl.gz\n{bench.sha256(label_file(data))}  fit-s9-labels.tsv\n")
+            fake = lambda arm, task, ps: ({"p0": 0.9, "p1": 0.2}, 0.5)
+            out = bench.sealed_pairs_run("S9p", data, sha, ["x"], runs_dir=d / "runs", score=fake)
+            self.assertIn("D2 (project)", out)
+            self.assertIn("correct 1", out)
+            pred = (d / "runs" / "S9p-predictions.tsv").read_text().splitlines()
+            self.assertEqual(pred[1], "p0\tx\t0.9000\t0.5000")
+            with self.assertRaises(RuntimeError):
+                bench.sealed_pairs_run("S9p", data, sha, ["x"], runs_dir=d / "runs", score=fake)
 
 
 class CodeGateTest(unittest.TestCase):
@@ -140,3 +155,7 @@ class CodeGateTest(unittest.TestCase):
         out = apply_code_gate(items, preds)
         self.assertEqual([out[i]["need"] for i in "12345"], ["0", "0", "1", "0", "0"])
         self.assertEqual(out["1"]["when"], "none")
+
+
+if __name__ == "__main__":
+    unittest.main()

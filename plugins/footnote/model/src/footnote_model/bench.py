@@ -19,7 +19,7 @@ import tempfile
 from pathlib import Path
 
 from . import marks
-from .formats import code_gate, is_note, read_jsonl, read_tsv, same_sentence, write_jsonl
+from .formats import code_gate, is_note, pair_task, read_jsonl, read_tsv, same_sentence, write_jsonl
 
 MODEL_DIR = Path(__file__).resolve().parents[2]
 PLUGIN_DIR = MODEL_DIR.parent
@@ -205,6 +205,68 @@ def sealed_run(set_name: str, data_file: Path, sha_file: Path, arms: list[str], 
     text = (table(rows) + f"\n\nMails held by the bulk filter: {held_n}.\n\nD1 mail by kind:\n" + "\n".join(kinds))
     runs_dir.mkdir(parents=True, exist_ok=True)
     # Ids and results only, for the writer of the set. The build thread does not read this file.
+    (runs_dir / f"{set_name}-predictions.tsv").write_text("\n".join(out) + "\n")
+    stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    record.write_text(f"# Sealed run: {set_name}\n\n{stamp}. SHA-256 checked. Arms: {', '.join(arms)}.\n\n{text}\n")
+    return text
+
+
+def pair_arm_scores(arm: str, task: str, pairs: list[dict]) -> tuple[dict[str, float], float]:
+    """The score of each pair and the threshold of the arm, from its dev run.
+
+    - `control:<dir>`: the EmbeddingGemma logistic, fit again on the pair fit data (deterministic).
+    - `model:<dir>`: a stage1 pair model. If it uses outside scores, they are made for these pairs.
+    - `mean:<dir>`: `<dir>/mean.json` has `runs` (model folders) and a threshold for each task. The score is
+      the mean of the model scores."""
+    from . import control, fit
+    kind, _, where = arm.partition(":")
+    d = Path(where)
+    if kind == "control":
+        from .control_run import ControlArm
+        from .stage1 import load_pairs, load_rounds
+        prefix = "fit" if task == "fit" else "close"
+        arm_ = ControlArm().fit([], [], {}, {task: load_rounds(load_pairs, prefix, "train")})
+        return arm_.pair_scores(task, pairs), json.loads((d / "thresholds.json").read_text())[task]
+    if kind == "model":
+        model, tok, cfg = fit.load(d)
+        feats = control.pair_feature_map(pairs) if cfg.get("extra") else None
+        sc = fit.predict_pairs(model, tok, fit.pair_examples(tok, pairs, None, task, feats))
+        return sc, json.loads((d / "thresholds.json").read_text())[task]
+    if kind == "mean":
+        cfg = json.loads((d / "mean.json").read_text())
+        all_sc = [pair_arm_scores(f"model:{r}", task, pairs)[0] for r in cfg["runs"]]
+        return {p["id"]: sum(s[p["id"]] for s in all_sc) / len(all_sc) for p in pairs}, cfg[task]
+    raise ValueError(f"unknown pair arm: {arm}")
+
+
+def sealed_pairs_run(set_name: str, data_file: Path, sha_file: Path, arms: list[str], runs_dir: Path = RUNS_DIR,
+                     score=pair_arm_scores) -> str:
+    """One run on a sealed pair set (D2 or D3). Counts only for the table. The id file has the score of each pair,
+    so that the writer of the set can tell calibration from ranking."""
+    from .formats import label_file
+    record = runs_dir / f"{set_name}.md"
+    if record.exists():
+        raise RuntimeError(f"{set_name} has a run already ({record}). A sealed set runs one time.")
+    labels_path = label_file(data_file)
+    bad = check_sha(sha_file, [data_file, labels_path])
+    if bad:
+        raise RuntimeError("SHA-256 check failed: " + "; ".join(bad))
+    task = pair_task(data_file)
+    pairs, labels = read_jsonl(data_file), read_tsv(labels_path)
+    rows, out = [], ["id\tarm\tscore\tthreshold"]
+    for a in arms:
+        sc, th = score(a, task, pairs)
+        res = []
+        for kind in ("project", "item"):
+            sub = [p for p in pairs if p["b"]["kind"] == kind]
+            if sub:
+                r = marks.pairs_mark(task, sub, labels, sc, th)
+                r.decision += f" ({kind})"
+                res.append(r)
+        rows.append((f"{set_name} / {a}", res))
+        out += [f"{p['id']}\t{a}\t{sc[p['id']]:.4f}\t{th:.4f}" for p in pairs]
+    text = table(rows)
+    runs_dir.mkdir(parents=True, exist_ok=True)
     (runs_dir / f"{set_name}-predictions.tsv").write_text("\n".join(out) + "\n")
     stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     record.write_text(f"# Sealed run: {set_name}\n\n{stamp}. SHA-256 checked. Arms: {', '.join(arms)}.\n\n{text}\n")

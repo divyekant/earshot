@@ -59,6 +59,15 @@ def cmd_sealed(a) -> int:
     return 0
 
 
+def cmd_sealed_pairs(a) -> int:
+    try:
+        print(bench.sealed_pairs_run(a.name, Path(a.file), Path(a.sha256), a.arm))
+    except RuntimeError as e:
+        print(f"Refused: {e}")
+        return 1
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="fm", description="The decision model of Footnote (E13).")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -78,6 +87,12 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--arm", action="append", default=None)
     s.add_argument("--expect-held", type=int, default=None, help="mails the bulk filter must hold, from the writer")
     s.set_defaults(fn=cmd_sealed)
+    sp = sub.add_parser("sealed-pairs", help="The one run on a sealed D2 or D3 pair set. Counts and pair scores.")
+    sp.add_argument("name")
+    sp.add_argument("file")
+    sp.add_argument("--sha256", required=True)
+    sp.add_argument("--arm", action="append", required=True)
+    sp.set_defaults(fn=cmd_sealed_pairs)
     a = ap.parse_args(argv)
     if getattr(a, "arm", "x") is None:
         a.arm = ["rules"]

@@ -70,3 +70,19 @@ def pair_features(pairs: list[dict]) -> np.ndarray:
         k += n
         feats.append([float(names[i] @ qa[i]), float(c.max()), float(c.mean()), float(n > 0)])
     return np.array(feats)
+
+
+def pair_feature_map(pairs: list[dict], cache: "os.PathLike | None" = None) -> dict[str, list[float]]:
+    """`pair_features` for each pair id. With `cache`, a JSON file keeps the features of earlier calls."""
+    from pathlib import Path
+
+    known: dict[str, list[float]] = {}
+    if cache and Path(cache).exists():
+        known = json.loads(Path(cache).read_text())
+    todo = [p for p in pairs if p["id"] not in known]
+    if todo:
+        for p, f in zip(todo, pair_features(todo)):
+            known[p["id"]] = [float(v) for v in f]
+        if cache:
+            Path(cache).write_text(json.dumps(known))
+    return {p["id"]: known[p["id"]] for p in pairs}
