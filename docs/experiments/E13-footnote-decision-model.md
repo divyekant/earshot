@@ -121,3 +121,18 @@ Dev results with the bulk filter (D1 mail found / false; requests that pass the 
 | control | 25/6 | 27/8 | 2 found, 0 false |
 
 Seed rule as before: the median dev2 found count is 52 (s21 and s34). The first of the two, s21, is used. D4 passes on dev for all three seeds.
+
+## S3 result (one run, 2026-11-16)
+
+D1 fails on S3 for every arm. The filter held 186 of 400 mails, as declared. Full counts: `plugins/footnote/model/runs/S3.md`.
+
+| Arm | D1 mail found (mark 34 of 40) | False flags (mark 10 of 400) | Sentence (mark 28) |
+|---|---|---|---|
+| rules | 24 | 20 | 22 |
+| control | 30 | 29 | 19 |
+| model (Ettin text s21) | 39 | 32 | 34 |
+| model+g2 | 34 | 20 | 31 |
+
+Notes: the model finds 43 of 50 to-dos with 9 false flags (false share 0.17, mark 0.10). D4: the model finds 7 of 11 `now` items from known senders (mark 8) and gives `now` correctly 7 of 7.
+
+Stage 1 fails. The stage 1 report (`/mnt/project-files/earshot-footnote-model/stage1-report.md`) has the failed marks, the findings, and the size and CPU time of the text model (67 MB in float32, 29.7 ms for 256 tokens on 1 cloud CPU thread).
