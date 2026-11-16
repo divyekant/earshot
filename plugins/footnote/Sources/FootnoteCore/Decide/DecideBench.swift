@@ -73,7 +73,11 @@ public final class DecideBench {
         return "owner: \(it.ownerName) | kind: \(it.note ? "note" : "mail") | sender: \(sender) | to: \(to) | limit: \(limit) | weekday: \(weekday)"
     }
 
-    /// Writes the predictions: `id`, `need` (1 or 0), `need_score`, `when` (none or list), `sentence`, `facts`.
+    /// The separator of the sentences in the column `sentences` (U+001E, record separator).
+    public static let sentenceSeparator = "\u{1E}"
+
+    /// Writes the predictions: `id`, `need` (1 or 0), `need_score`, `when` (none or list), `sentence`, `facts`, and
+    /// `sentences`: the sentences of the prepared text (quoted, forwarded and signature parts cut), for the model input.
     public func run(items url: URL, predictions: URL) throws {
         guard let model = RequestModel.fitted else { throw SourceError("no request model") }
         let items = try Self.read(url)
@@ -85,7 +89,7 @@ public final class DecideBench {
             if firstPass[k].map({ it.m.date < $0 }) ?? true { firstPass[k] = it.m.date }
         }
         let bench = FlagBench(folder: url.deletingLastPathComponent(), embedder: nil)
-        var lines = ["id\tneed\tneed_score\twhen\tsentence\tfacts"]
+        var lines = ["id\tneed\tneed_score\twhen\tsentence\tfacts\tsentences"]
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = TimeZone(identifier: "UTC")!
         let reader = TimeReader(calendar: cal)
@@ -105,8 +109,14 @@ public final class DecideBench {
             }
             let flag = score >= model.threshold
             if flag { flags += 1 }
-            let clean = sentence.replacingOccurrences(of: "\t", with: " ").replacingOccurrences(of: "\n", with: " ")
-            lines.append("\(it.m.id)\t\(flag ? 1 : 0)\t\(String(format: "%.3f", score))\t\(flag ? "list" : "none")\t\(clean)\t\(Self.facts(it, p, now: it.now, reader: reader))")
+            func clean(_ t: String) -> String {
+                t.replacingOccurrences(of: "\t", with: " ").replacingOccurrences(of: "\n", with: " ")
+                    .replacingOccurrences(of: "\r", with: " ").replacingOccurrences(of: Self.sentenceSeparator, with: " ")
+            }
+            // All sentences of the prepared text, also those that gate 2 does not keep: the model reads them all.
+            let all = RequestFeatures.prepare(it.m.text).flatMap { RequestFeatures.sentences($0) }
+                .map(clean).joined(separator: Self.sentenceSeparator)
+            lines.append("\(it.m.id)\t\(flag ? 1 : 0)\t\(String(format: "%.3f", score))\t\(flag ? "list" : "none")\t\(clean(sentence))\t\(Self.facts(it, p, now: it.now, reader: reader))\t\(all)")
         }
         try (lines.joined(separator: "\n") + "\n").write(to: predictions, atomically: true, encoding: .utf8)
         out("Rules arm (\(model.variant) at \(model.threshold)): \(items.count) items, \(flags) flags")

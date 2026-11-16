@@ -30,13 +30,14 @@ final class DecideBenchTests: XCTestCase {
         bench.out = { printed.append($0) }
         try bench.run(items: items, predictions: pred)
         let rows = try String(contentsOf: pred, encoding: .utf8).split(separator: "\n").map { $0.components(separatedBy: "\t") }
-        XCTAssertEqual(rows[0], ["id", "need", "need_score", "when", "sentence", "facts"])
+        XCTAssertEqual(rows[0], ["id", "need", "need_score", "when", "sentence", "facts", "sentences"])
         XCTAssertEqual(rows.count, 4)
         let m1 = rows[1]
         XCTAssertEqual(m1[1], "1")
         XCTAssertEqual(m1[3], "list")
         XCTAssertEqual(m1[4], "Could you send me the signed form by tomorrow?")
         XCTAssertEqual(m1[5], "owner: Ana Lim | kind: mail | sender: person | to: 1 | limit: tomorrow | weekday: Tue")
+        XCTAssertTrue(m1[6].components(separatedBy: DecideBench.sentenceSeparator).contains("Could you send me the signed form by tomorrow?"))
         XCTAssertEqual(rows[2][1], "0")
         XCTAssertTrue(rows[3][5].hasPrefix("owner: Ana Lim | kind: note | sender: owner | to: 0"))
         // Counts only: no text of an item in the printed line.
