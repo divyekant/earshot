@@ -12,12 +12,33 @@ import json
 import re
 from pathlib import Path
 
-ITEM_FIELDS = ("id", "kind", "owner", "now", "from_name", "from_address", "to", "cc", "subject", "date",
+ITEM_FIELDS = ("id", "owner", "now", "from_name", "from_address", "to", "cc", "subject", "date",
                "list_unsubscribe", "precedence", "auto_submitted", "junk", "replied", "body")
-NEED_LABEL_COLUMNS = ("id", "need", "when", "category", "sentence", "sentence2")
-PAIR_LABEL_COLUMNS = ("id", "label", "category")
-WHEN_VALUES = ("none", "list", "now")
+# The label formats of the rule files of the design thread (RULE-need.md, RULE-when.md, RULE-pair.md).
+NEED_LABEL_COLUMNS = ("id", "need", "kind", "sentence", "sentence2")
+PAIR_LABEL_COLUMNS = ("id", "label", "kind")
+NEED_VALUES = ("none", "list", "now")
 PAIR_TASKS = ("fit", "closes")
+
+
+def is_request(label: dict) -> bool:
+    """D1: `list` and `now` are both a request (RULE-need.md)."""
+    return label.get("need") in ("list", "now")
+
+
+def pair_task(path: Path) -> str:
+    """RULE-pair.md: D2 files start with `fit-`, D3 files start with `close-`."""
+    name = Path(path).name
+    if name.startswith("fit-"):
+        return "fit"
+    if name.startswith("close-"):
+        return "closes"
+    raise ValueError(f"a pair file name starts with fit- or close-: {name}")
+
+
+def pair_group(p: dict) -> str:
+    """The pairs with the same text A are one group: the candidates of one text."""
+    return p.get("group") or (p["a"].get("kind", "") + "\x1f" + p["a"].get("text", ""))
 
 # Made-up data only (build spec 2, rule 2): each address and each web link uses an example domain.
 _EXAMPLE_DOMAIN = re.compile(r"(^|\.)example\.(com|org|net)$")
@@ -86,6 +107,11 @@ def clean_cell(s: str) -> str:
     return s.replace("\t", " ").replace("\r", " ").replace("\n", " ")
 
 
+def is_note(item: dict) -> bool:
+    """RULE-need.md: a note has an empty `from_address`."""
+    return item.get("kind") == "note" or not item.get("from_address")
+
+
 def same_sentence(a: str, b: str) -> bool:
     norm = lambda s: " ".join(clean_cell(s).split())
     return bool(a.strip()) and norm(a) == norm(b)
@@ -126,15 +152,11 @@ def check_items(items: list[dict], labels: list[dict] | None) -> list[str]:
         if i in ids:
             problems.append(f"{i}: id is not unique")
         ids.add(i)
-        if it["kind"] not in ("mail", "note"):
-            problems.append(f"{i}: kind must be mail or note")
         own = it["owner"]
         if not isinstance(own, dict) or not own.get("name") or not own.get("address"):
             problems.append(f"{i}: owner needs name and address")
         elif not _EXAMPLE_DOMAIN.search(own["address"].split("@")[-1].lower()):
             problems.append(f"{i}: owner address is not an example address")
-        if it["kind"] == "note" and it["from_address"]:
-            problems.append(f"{i}: a note has an empty from_address")
         text = " ".join([it["from_address"], *it["to"], *it["cc"], it["body"], it["subject"]])
         for b in made_up_problems(text):
             problems.append(f"{i}: not an example domain: {b}")
@@ -147,19 +169,17 @@ def check_items(items: list[dict], labels: list[dict] | None) -> list[str]:
             if i not in by_id:
                 problems.append(f"{i}: label with no item")
                 continue
-            if r.get("need") not in ("0", "1"):
-                problems.append(f"{i}: need must be 0 or 1")
-            if r.get("when", "") not in WHEN_VALUES + ("",):
-                problems.append(f"{i}: when must be none, list, now or empty")
-            if r.get("need") == "0" and r.get("when") in ("list", "now"):
-                problems.append(f"{i}: when is {r['when']} but need is 0")
+            if r.get("need") not in NEED_VALUES:
+                problems.append(f"{i}: need must be none, list or now")
+            if r.get("need") == "now" and is_note(by_id[i]):
+                problems.append(f"{i}: a note is never now")
             body = " ".join(by_id[i]["body"].split())
             for col in ("sentence", "sentence2"):
                 s = r.get(col, "")
                 if s and " ".join(s.split()) not in body:
                     problems.append(f"{i}: {col} is not in the body")
-            if r.get("need") == "1" and by_id[i]["kind"] == "mail" and not r.get("sentence"):
-                problems.append(f"{i}: a mail request needs a sentence")
+            if is_request(r) and not r.get("sentence"):
+                problems.append(f"{i}: a request needs a sentence")
         for i in ids - seen:
             problems.append(f"{i}: item with no label")
     return problems
@@ -170,21 +190,19 @@ def check_pairs(pairs: list[dict], labels: list[dict] | None) -> list[str]:
     ids = set()
     for p in pairs:
         i = p.get("id", "?")
-        for f in ("id", "task", "group", "a", "b"):
+        for f in ("id", "owner", "a", "b"):
             if f not in p:
                 problems.append(f"{i}: missing {f}")
-        if any(f not in p for f in ("task", "a", "b")):
+        if any(f not in p for f in ("a", "b")):
             continue
         if i in ids:
             problems.append(f"{i}: id is not unique")
         ids.add(i)
-        if p["task"] not in PAIR_TASKS:
-            problems.append(f"{i}: task must be fit or closes")
         a, b = p["a"], p["b"]
         if not isinstance(a, dict) or not a.get("text") or not a.get("kind"):
             problems.append(f"{i}: a needs text and kind")
-        if not isinstance(b, dict) or not b.get("name") or not b.get("kind"):
-            problems.append(f"{i}: b needs kind and name")
+        if not isinstance(b, dict) or not b.get("name") or b.get("kind") not in ("project", "item"):
+            problems.append(f"{i}: b needs a name and the kind project or item")
         elif len(b.get("records", [])) > 5:
             problems.append(f"{i}: b has more than 5 records")
         text = json.dumps(p, ensure_ascii=False)

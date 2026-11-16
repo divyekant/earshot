@@ -18,7 +18,7 @@ import tempfile
 from pathlib import Path
 
 from . import marks
-from .formats import read_jsonl, read_tsv, write_jsonl
+from .formats import is_note, read_jsonl, read_tsv, write_jsonl
 
 MODEL_DIR = Path(__file__).resolve().parents[2]
 PLUGIN_DIR = MODEL_DIR.parent
@@ -58,11 +58,11 @@ def arm_predictions(arm: str, items: list[dict]) -> dict[str, dict]:
 
 def score_items(items: list[dict], labels: list[dict], preds: dict[str, dict]) -> list[marks.Result]:
     out = []
-    if any(it["kind"] == "mail" for it in items):
+    if any(not is_note(it) for it in items):
         out.append(marks.d1_mail(items, labels, preds))
-    if any(it["kind"] == "note" for it in items):
+    if any(is_note(it) for it in items):
         out.append(marks.d1_notes(items, labels, preds))
-    if any(r.get("when") for r in labels):
+    if any(r.get("need") == "now" for r in labels):
         out.append(marks.d4(items, labels, preds))
     return out
 

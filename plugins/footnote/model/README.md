@@ -26,34 +26,40 @@ uv run python -m unittest discover -s tests
 
 ## Formats
 
+The formats follow the rule files of the design thread: `RULE-need.md`, `RULE-when.md` and `RULE-pair.md` in the project folder `earshot-footnote-model/`.
+
 ### Item file (D1 and D4)
 
 JSON lines, plain or gzip. One mail or one note for each line. The fields of the phase 3 fixtures (`phase3-build-spec.md`, section 8.2), and these fields:
 
 | Field | Value |
 |---|---|
-| `kind` | `mail` or `note`. A note has an empty `from_address` and no `to`. |
 | `owner` | `{"name": "...", "address": "...@example.com"}` |
-| `now` | The time of the read, ISO 8601 in UTC. |
-| `sender_known` | Mail only. True if the owner replied to this sender before, or kept a flag of this sender before. |
+| `now` | The time of the read, ISO 8601 in UTC. The same as `date` or later. |
+| `sender_known` | Optional, mail only. True if the owner replied to this sender before, or kept a flag of this sender before. If it is not there, the bench uses an earlier mail of the same sender that passed gate 1. |
 
-The label file `<name>-labels.tsv` has the columns `id`, `need` (1 or 0), `when` (`none`, `list`, `now`, or empty if not labeled), `category` (for the analysis only, not an input), `sentence` and `sentence2` (character for character from `body`).
+A note has an empty `from_address` and an empty `to`.
+
+The label file `<name>-labels.tsv` has the columns `id`, `need`, `kind`, `sentence`, `sentence2`.
+
+- `need` is `none`, `list` or `now`. For D1, `list` and `now` are both a request. D4 is the value itself.
+- `kind` is for the analysis only. It is not an input.
+- `sentence` and `sentence2` are character for character from `body`.
 
 ### Pair file (D2 and D3)
 
-JSON lines. One text and one candidate for each line.
+JSON lines. One text and one candidate for each line. The file name starts with `fit-` (D2) or `close-` (D3).
 
 ```json
-{"id": "p0001", "task": "fit", "group": "g0001",
- "a": {"kind": "capture", "text": "ring the joiner about the worktop cut-outs"},
- "b": {"kind": "project", "name": "Kitchen", "records": ["order the oak worktop", "plumber on Monday"]}}
+{"id": "p0001", "owner": {"name": "Maya Rao", "address": "maya.rao@example.com"},
+ "a": {"kind": "capture", "text": "ask Harbour Ceramics for more samples"},
+ "b": {"kind": "project", "name": "Kitchen", "records": ["order the paint", "quote from the tiler"]}}
 ```
 
-- `task` is `fit` (D2) or `closes` (D3).
-- `group` joins the pairs of one text. A group has up to 5 candidates. The arm proposes the candidate with the highest score, or none.
-- `b.records` has up to 5 short records of the project or the open item.
+- `a.kind` is `capture`, `mail`, `note` or `passage`. `b.kind` is `project` or `item`. `b.records` has 5 or fewer records.
+- The pairs with the same text A are one group: the candidates of one text. The arm proposes the candidate with the highest score, or none.
 
-The label file has the columns `id`, `label` (1 or 0) and `category`.
+The label file has the columns `id`, `label` (1 or 0) and `kind`.
 
 ### Predictions file
 

@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from . import bench
-from .formats import check_items, check_pairs, label_file, read_jsonl, read_tsv
+from .formats import check_items, check_pairs, label_file, pair_task, read_jsonl, read_tsv
 from .importers import PHASE3_SETS, phase3_set
 
 PHASE3 = bench.PLUGIN_DIR / "Tests/FootnoteCoreTests/Fixtures/phase3/mail"
@@ -20,7 +20,8 @@ def cmd_check(a) -> int:
         rows = read_jsonl(f)
         lp = label_file(f)
         labels = read_tsv(lp) if lp.exists() else None
-        problems = check_pairs(rows, labels) if rows and "task" in rows[0] else check_items(rows, labels)
+        is_pairs = f.name.startswith(("fit-", "close-"))
+        problems = check_pairs(rows, labels) if is_pairs else check_items(rows, labels)
         for p in problems[:50]:
             print(f"{f.name}: {p}")
         print(f"{f.name}: {len(rows)} rows, {len(problems)} problems" + ("" if labels is not None else ", no label file"))

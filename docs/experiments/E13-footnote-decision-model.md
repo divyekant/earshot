@@ -41,4 +41,4 @@ These are the numbers of E11. D4 of today has no judgment: each flag goes to the
 
 - The marks are computed in Python (`fm bench`), not in the Swift program. The Swift program gives the predictions and the facts line. Reason: the model arms run in Python until package M4, and one mark code serves all arms.
 - `limit` in the facts line is the earliest time limit in the text, not the limit of the selected sentence. Reason: the facts line goes into the model before a sentence is selected.
-- Pairs have a `group` field and a `task` field. Reason: the D2 and D3 marks count proposals for each text, and a text has up to 5 candidates.
+- The D2 and D3 marks count proposals for each text: the pairs with the same text A are one group. The label formats are those of the rule files of the design thread.

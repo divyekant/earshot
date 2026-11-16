@@ -36,7 +36,8 @@ public final class DecideBench {
                   let owner = obj["owner"] as? [String: Any], let name = owner["name"] as? String else {
                 throw SourceError("line \(n + 1) has no owner")
             }
-            items.append(Item(m: m, note: (obj["kind"] as? String) == "note", ownerName: name,
+            // RULE-need.md: a note has an empty `from_address`.
+            items.append(Item(m: m, note: (obj["kind"] as? String) == "note" || m.fromAddress.isEmpty, ownerName: name,
                               ownerAddress: (owner["address"] as? String ?? "").lowercased(),
                               senderKnown: obj["sender_known"] as? Bool,
                               now: (obj["now"] as? String).flatMap { ISO8601DateFormatter().date(from: $0) } ?? m.date))
