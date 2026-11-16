@@ -19,13 +19,18 @@ NEED = ("none", "list", "now")
 
 class ControlArm:
     def fit(self, items, labels, sw, pair_sets):
+        self.pair = {}
+        if not items:
+            return self._fit_pairs(pair_sets)
         lab = {r["id"]: r for r in labels}
         x = self._item_x(items, sw)
         y_req = np.array([lab[i["id"]]["need"] != "none" for i in items], float)
         y_now = np.array([lab[i["id"]]["need"] == "now" for i in items], float)
         self.req = control.Logistic(lam=0.001, steps=800, lr=1.0).fit(x, y_req, weight_pos=3)
         self.now = control.Logistic(lam=0.001, steps=800, lr=1.0).fit(x, y_now, weight_pos=8)
-        self.pair = {}
+        return self._fit_pairs(pair_sets)
+
+    def _fit_pairs(self, pair_sets):
         for task, (pp, pl) in pair_sets.items():
             if pp:
                 pl = {r["id"]: float(r["label"]) for r in pl}
@@ -56,20 +61,26 @@ class ControlArm:
 
 def main():
     out = Path(sys.argv[1])
+    pairs_only = "--pairs-only" in sys.argv
     out.mkdir(parents=True, exist_ok=True)
     fi, fl = load_rounds(load_items, "items-fit")
     di, dl = load_rounds(load_items, "items-dev")
-    sw = bench.rules_predictions(fi + di)
+    if pairs_only:
+        fi, fl, di, dl = [], [], [], []
+    sw = bench.rules_predictions(fi + di) if fi else {}
     pair_fit = {"fit": load_rounds(load_pairs, "fit", "train"), "closes": load_rounds(load_pairs, "close", "train")}
     arm = ControlArm().fit(fi, fl, sw, pair_fit)
-    res = arm.item_res(di, sw)
-    th = select_item_thresholds(res, di, dl)
-    rows = item_rows("control", di, dl, item_preds(res, di, th["mail"], th["note"], th["now"]))
+    th, rows = {}, []
+    if not pairs_only:
+        res = arm.item_res(di, sw)
+        th = select_item_thresholds(res, di, dl)
+        rows = item_rows("control", di, dl, item_preds(res, di, th["mail"], th["note"], th["now"]))
     for task, prefix in (("fit", "fit"), ("closes", "close")):
         pp, pl = load_rounds(load_pairs, prefix, "dev")
         if not pp or task not in arm.pair:
             continue
         sc = arm.pair_scores(task, pp)
+        (out / f"pair-scores-{task}-dev.json").write_text(json.dumps(sc))
         th[task] = select_pair_threshold(task, pp, pl, sc)
         rows += pair_rows("control", task, pp, pl, sc, th[task])
     text = bench.table(rows)

@@ -51,3 +51,30 @@ The code gates are part of the system, not of the model. The model does not lear
 - If the sender address is the owner address, the result is `none`. The model does not run.
 
 The bench applies the same gates to every arm (rules, control, models), so that the arms compare (`code_gate` in `formats.py`, `apply_code_gate` in `bench.py`). On the round 1 data, the gates hold 58 fit items and 17 dev items. No gated item has a request label.
+
+## M1 round 2 and the stage 1 text arms (fixed before the S1 run)
+
+Round 2 added 1,994 items, 986 D2 pairs and 1,192 D3 pairs from 9 new writers. Each set had a second reader. Writer and reader agree on 0.976 to 1.0 of the labels. A third reader on 1 in 10 agrees on 199 of 201 items, 98 of 100 D2 pairs and 119 of 120 D3 pairs. The fit data keeps only the labels where writer and reader agree.
+
+dev1 is the round 1 dev set and does not change. dev2 has the new owners of round 2. The thresholds come from dev1 and dev2 together. All arms use the code gates.
+
+Arms for the one run on S1 (2026-11-16, before the run):
+
+| Arm | Model | Seed | Thresholds (mail, note, now) |
+|---|---|---|---|
+| rules | Swift rules of today | none | rules |
+| control | logistic models on EmbeddingGemma vectors | none | 0.62, 0.78, 0.56 |
+| Ettin text | ettin-encoder-17m, 10 epochs, lr 8e-5, items only | 13 | 0.15, 0.98, 0.31 |
+| BERT text | bert_uncased_L-4_H-256_A-4, 12 epochs, lr 1e-4, items only | 21 | 0.07, 0.14, 0.41 |
+
+The seed of each model arm is the seed with the median dev2 result. If two seeds are equal, the first seed is used.
+
+Dev results (3 seeds, D1 mail found / false):
+
+| Arm | dev1 (43 requests, 334 mails) | dev2 (64 requests, 334 mails) |
+|---|---|---|
+| Ettin text | 38/4, 39/2, 38/4 | 53/2, 54/4, 53/4 |
+| BERT text | 38/10, 37/8, 37/8 | 57/6, 53/7, 52/6 |
+| control | 27/6 | 28/6 |
+
+The dev2 found mark is 55. Ettin misses it by 1 or 2. The loop-end rule applies: no more tuning for dev2.

@@ -11,6 +11,7 @@ run, prints counts only, and records the run in `runs/`.
 from __future__ import annotations
 
 import datetime as dt
+import json
 import hashlib
 import os
 import subprocess
@@ -48,9 +49,54 @@ def rules_predictions(items: list[dict]) -> dict[str, dict]:
         return {row["id"]: row for row in read_tsv(out)}
 
 
+def model_predictions(run_dir: Path, items: list[dict]) -> dict[str, dict]:
+    """A fitted model arm (stage1 output folder) with its thresholds from dev. Nothing of the items is printed."""
+    from . import fit
+    from .stage1 import item_preds
+    th = json.loads((run_dir / "thresholds.json").read_text())
+    model, tok, _ = fit.load(run_dir)
+    sw = rules_predictions(items)
+    res = fit.predict_items(model, tok, fit.item_examples(tok, items, None, sw))
+    return item_preds(res, items, th["mail"], th["note"], th["now"])
+
+
+def control_predictions(run_dir: Path, items: list[dict]) -> dict[str, dict]:
+    """The control arm: fit again on the fit data (it is deterministic), thresholds from its dev run."""
+    from .control_run import ControlArm
+    from .stage1 import item_preds, load_items, load_rounds
+    th = json.loads((run_dir / "thresholds.json").read_text())
+    fi, fl = load_rounds(load_items, "items-fit")
+    sw = rules_predictions(fi + items)
+    arm = ControlArm().fit(fi, fl, sw, {})
+    res = arm.item_res(items, sw)
+    return item_preds(res, items, th["mail"], th["note"], th["now"])
+
+
+def kind_counts(items: list[dict], labels: list[dict], preds: dict[str, dict]) -> str:
+    """D1 mail: the false flags and the missed requests, as counts by label kind. No item text."""
+    from collections import Counter
+    preds = apply_code_gate(items, preds)
+    lab = {r["id"]: r for r in labels}
+    false, missed = Counter(), Counter()
+    for it in items:
+        if is_note(it):
+            continue
+        l, flag = lab[it["id"]], preds.get(it["id"], {}).get("need") == "1"
+        if flag and not marks.is_request(l):
+            false[l.get("kind", "?")] += 1
+        elif not flag and marks.is_request(l):
+            missed[l.get("kind", "?")] += 1
+    fmt = lambda c: ", ".join(f"{k} {v}" for k, v in sorted(c.items(), key=lambda x: (-x[1], x[0]))) or "none"
+    return f"false flags: {fmt(false)}; missed: {fmt(missed)}"
+
+
 def arm_predictions(arm: str, items: list[dict]) -> dict[str, dict]:
     if arm == "rules":
         return rules_predictions(items)
+    if arm.startswith("model:"):
+        return model_predictions(Path(arm[6:]), items)
+    if arm.startswith("control:"):
+        return control_predictions(Path(arm[8:]), items)
     if arm.startswith("pred:"):
         return {row["id"]: row for row in read_tsv(Path(arm[5:]))}
     raise ValueError(f"unknown arm: {arm}")
@@ -125,8 +171,12 @@ def sealed_run(set_name: str, data_file: Path, sha_file: Path, arms: list[str], 
     if bad:
         raise RuntimeError("SHA-256 check failed: " + "; ".join(bad))
     items, labels = read_jsonl(data_file), read_tsv(labels_path)
-    rows = [(f"{set_name} / {a}", score_items(items, labels, predict(a, items))) for a in arms]
-    text = table(rows)
+    rows, kinds = [], []
+    for a in arms:
+        preds = predict(a, items)
+        rows.append((f"{set_name} / {a}", score_items(items, labels, preds)))
+        kinds.append(f"- {a}: {kind_counts(items, labels, preds)}")
+    text = table(rows) + "\n\nD1 mail by kind:\n" + "\n".join(kinds)
     runs_dir.mkdir(parents=True, exist_ok=True)
     stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     record.write_text(f"# Sealed run: {set_name}\n\n{stamp}. SHA-256 checked. Arms: {', '.join(arms)}.\n\n{text}\n")
