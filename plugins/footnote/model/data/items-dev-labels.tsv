@@ -1,0 +1,402 @@
+id	need	kind	sentence	sentence2
+wa-0001	list	person	Could you swap your Saturday 12th late for my Sunday 13th early?	Let me know by Friday so I can tell Joanne before she finalises the October rota.
+wa-0002	none	bulk		
+wa-0003	none	personal		
+wa-0004	none	hard-ad		
+wa-0005	now	person	Could you bring the hall key with you tonight and let me know by 5 if you can't?	
+wa-0006	none	personal		
+wa-0007	list	duty	Please complete the online consent form and pay the £28 through ParentPay by Friday 25 September.	
+wa-0008	none	bulk		
+wa-0009	none	transactional		
+wa-0010	none	survey		
+wa-0011	none	other-person		
+wa-0012	none	done		
+wa-0013	none	bulk		
+wa-0014	none	transactional		
+wa-0015	list	person	Can you let me know by 10 October if you're both coming?	
+wa-0016	none	hard-ad		
+wa-0017	none	polite		
+wa-0018	none	trick		
+wa-0019	none	bulk		
+wa-0020	list	implied	Suresh is in Dubai for work that whole week and the taxi is £30 each way, Mrs Patel does not drive on the ring road.	They are doing the injection in my knee on Friday 9 October at 8.30 in the morning at the Royal, and they say I must not drive home after.
+wa-0021	none	replied		
+wa-0022	now	person	Are you able to come out and switch it off?	
+wa-0023	none	offer		
+wa-0024	none	transactional		
+wa-0025	none	bulk		
+wa-0026	none	bulk		
+wa-0027	none	done		
+wa-0028	none	personal		
+wa-0029	none	note-fact		
+wa-0030	list	note-todo	Check rota - I think I'm on a long day the 9th.	Ask Mehreen if she can take my 9th in return for the 12th swap.
+wa-0031	none	note-fact		
+wa-0032	list	note-todo	Renew the car tax online before the 30th, reminder letter is on the fridge.	
+wa-0033	none	done		
+wa-0034	list	note-todo	Tell Fi yes for both of us once the November rota is out.	
+wa-0035	list	group	Can each of you send me your annual leave requests for December by 30 October?	
+wa-0036	none	polite		
+wa-0037	none	transactional		
+wa-0038	none	polite		
+wa-0039	none	hard-ad		
+wa-0040	none	polite		
+wa-0041	list	duty	I'm just going through the books and Rohan's subs for the autumn term (£35) are still outstanding - could you pay by the end of the month?	
+wa-0042	none	survey		
+wa-0043	none	other-person		
+wa-0044	none	offer		
+wa-0045	none	trick		
+wa-0046	none	bulk		
+wa-0047	none	transactional		
+wa-0048	none	done		
+wa-0049	none	personal		
+wa-0050	none	bulk		
+wa-0051	none	transactional		
+wa-0052	none	hard-ad		
+wa-0053	none	bulk		
+wa-0054	none	polite		
+wa-0055	none	done		
+wa-0056	none	transactional		
+wa-0057	none	bulk		
+wa-0058	none	polite		
+wa-0059	none	replied		
+wa-0060	none	own		
+wa-0061	none	transactional		
+wa-0062	none	done		
+wa-0063	list	note-todo	Book Rohan's eye test for the Thursday at the optician on the high street.	
+wa-0064	none	note-fact		
+wa-0065	none	note-fact		
+wa-0066	list	note-todo	Send Joanne my December leave dates (23rd-27th).	Pay Rohan's football subs, £35, ref RNAT U9.
+wa-0067	none	note-fact		
+wb-0009	now	person	Can you take my 7p-7a tonight?	I have to tell the house sup by 4 or they'll float someone from 5 West and you know how that goes.
+wb-0010	none	bulk		
+wb-0011	none	transactional		
+wb-0012	none	polite		
+wb-0027	none	survey		
+wb-0028	none	replied		
+wb-0031	none	note-fact		
+wb-0045	none	bulk		
+wb-0046	none	polite		
+wb-0050	none	transactional		
+wb-0051	none	transactional		
+wb-0052	list	duty	Please upload your current insurance declarations page at https://my.peachtreeautofin.example.com/insurance by December 1, 2026.	
+wb-0053	none	personal		
+wb-0054	none	done		
+wb-0067	list	note-todo	upload the dec page to the peachtree site after I sleep	
+wb-0081	now	person	Please call me as soon as you see this, I tried your phone 3 times.	The agency says I need you to OK it before I take her to urgent care.
+wb-0082	none	bulk		
+wb-0083	none	survey		
+wb-0084	none	personal		
+wb-0085	none	transactional		
+wb-0086	none	hard-ad		
+wb-0101	none	note-fact		
+wb-0104	none	note-fact		
+wb-0129	none	done		
+wb-0130	none	transactional		
+wb-0131	none	hard-ad		
+wb-0132	none	personal		
+wb-0137	none	note-fact		
+wb-0144	none	other-person		
+wb-0145	none	trick		
+wb-0146	list	person	Would you be willing to lead a 30 minute tenor sectional before full rehearsal on Tuesday, December 1, at 6:30?	Please let me know by Sunday so I can tell the section.
+wb-0147	none	transactional		
+wb-0148	none	polite		
+wb-0149	none	transactional		
+wb-0150	none	bulk		
+wb-0167	list	note-todo	Pick up mama's compression socks at the medical supply on Moreland.	call Gloria re: shower chair, the old one wobbles
+wb-0190	none	done		
+wb-0191	none	hard-ad		
+wb-0192	none	transactional		
+wb-0193	none	personal		
+wb-0194	none	bulk		
+wb-0195	none	transactional		
+wb-0203	none	note-fact		
+wb-0230	list	duty	To renew, log in to the licensing portal at https://portal.statenursingboard.example.org, complete the continuing competency attestation, and pay the $65 renewal fee before your license expires.	Your Registered Nurse license RN-284417 expires on January 31, 2027.
+wb-0231	none	polite		
+wb-0232	none	transactional		
+wb-0233	none	personal		
+wb-0234	none	polite		
+wb-0239	none	note-fact		
+wb-0264	none	hard-ad		
+wb-0265	none	done		
+wb-0266	none	transactional		
+wb-0267	none	other-person		
+wb-0268	none	personal		
+wb-0271	list	note-todo	Renew on the board portal and pay the $65 this week.	save the receipt to the license folder
+wb-0275	now	person	Can you reply to me or call the office right away?	Maintenance is here but they said they need your OK to go into 3B because you're on the do-not-enter list.
+wb-0276	none	replied		
+wb-0277	none	transactional		
+wb-0278	none	polite		
+wb-0279	none	bulk		
+wb-0307	none	note-fact		
+wb-0330	none	bulk		
+wb-0331	none	personal		
+wb-0332	none	transactional		
+wb-0333	none	personal		
+wb-0334	none	hard-ad		
+wb-0335	list	note-todo	Mail Zuri's package to DeShawn and Kiara by Tuesday.	Gloria - gift card + card
+wc-0016	now	person	Please send someone.	
+wc-0017	none	transactional		
+wc-0018	none	transactional		
+wc-0019	list	person	Kindly confirm the rate of USD 95 per room per night with breakfast and revert by Friday so we can issue vouchers.	
+wc-0020	none	done		
+wc-0028	list	duty	The third term facility fee of LKR 38,500 is due on or before 30 September 2026.	
+wc-0033	list	note-todo	Call Lanka Fresh about the mango quality before the Thursday order.	
+wc-0058	none	survey		
+wc-0059	none	transactional		
+wc-0060	none	transactional		
+wc-0061	none	bulk		
+wc-0062	none	replied		
+wc-0067	none	note-fact		
+wc-0090	none	done		
+wc-0091	none	polite		
+wc-0092	none	transactional		
+wc-0093	none	transactional		
+wc-0094	none	replied		
+wc-0095	none	hard-ad		
+wc-0096	none	offer		
+wc-0100	list	note-todo	Ask Dilani for the names of last year's temps, two of them were good.	Need 2 temporary waiters and 1 kitchen helper, 20 Dec to 5 Jan.
+wc-0126	none	other-person		
+wc-0127	none	polite		
+wc-0128	none	trick		
+wc-0129	none	transactional		
+wc-0130	none	personal		
+wc-0132	none	note-fact		
+wc-0160	list	implied	It needs your signature before the 31st, otherwise the system extends the probation automatically by three months.	
+wc-0161	none	hard-ad		
+wc-0162	none	transactional		
+wc-0163	none	personal		
+wc-0164	none	personal		
+wc-0165	list	note-todo	Sign Kasun's confirmation letter before 31 Oct.	Fix the Christmas menu tasting date with Pradeep.
+wc-0193	none	trick		
+wc-0194	none	transactional		
+wc-0195	none	other-person		
+wc-0196	none	polite		
+wc-0197	none	polite		
+wc-0198	none	bulk		
+wc-0199	list	note-todo	Call the IT vendor on Thursday and ask for a firm date, the Christmas guests will complain otherwise.	
+wc-0200	none	note-fact		
+wc-0228	now	person	Can you come down to the lobby?	The bride's father wants to talk to the manager now, he is very upset and the decorator needs the hall in one hour.
+wc-0229	none	transactional		
+wc-0230	none	transactional		
+wc-0231	none	done		
+wc-0232	none	hard-ad		
+wc-0238	none	note-fact		
+wc-0261	list	person	Can you give them a friends and family rate?	Please tell me by the weekend, they are booking flights on Monday.
+wc-0262	none	transactional		
+wc-0263	none	transactional		
+wc-0264	none	offer		
+wc-0265	none	polite		
+wc-0266	none	hard-ad		
+wc-0271	list	note-todo	Check with reservations if we have 2 family rooms free on those dates.	
+wc-0272	none	note-fact		
+wc-0295	none	own		
+wc-0296	none	polite		
+wc-0297	none	survey		
+wc-0298	none	transactional		
+wc-0299	none	personal		
+wc-0300	none	transactional		
+wc-0306	none	note-fact		
+wc-0330	none	personal		
+wc-0331	none	transactional		
+wc-0332	none	transactional		
+wc-0333	none	personal		
+wc-0334	none	done		
+wd-0003	none	personal		
+wd-0008	none	bulk		
+wd-0013	none	bulk		
+wd-0018	none	bulk		
+wd-0023	none	transactional		
+wd-0028	none	done		
+wd-0031	none	note-fact		
+wd-0034	list	note-todo	Ask the coach about the U13 tour dates.	
+wd-0039	none	other-person		
+wd-0044	none	transactional		
+wd-0049	list	duty	Kindly settle the balance by 30 September 2026.	
+wd-0054	none	bulk		
+wd-0059	none	bulk		
+wd-0067	none	note-fact		
+wd-0070	list	person	If you are happy with the changes, could you sign the letter and send it back by 9 October?	
+wd-0077	none	bulk		
+wd-0078	none	personal		
+wd-0079	none	polite		
+wd-0088	none	replied		
+wd-0094	none	transactional		
+wd-0098	none	note-fact		
+wd-0103	now	person	Can you please come and turn off the water at your mains or tell me where the tap is?	
+wd-0110	none	personal		
+wd-0111	none	bulk		
+wd-0112	none	done		
+wd-0124	none	done		
+wd-0130	none	bulk		
+wd-0132	none	note-fact		
+wd-0147	none	replied		
+wd-0148	none	transactional		
+wd-0149	none	transactional		
+wd-0150	none	polite		
+wd-0151	none	hard-ad		
+wd-0163	none	bulk		
+wd-0166	list	note-todo	phone the insurer about the geyser claim, still no payout	
+wd-0171	list	duty	The attached subject choice form must be signed by a parent or guardian and returned to the academic office by Friday 20 November.	
+wd-0183	none	hard-ad		
+wd-0184	none	transactional		
+wd-0185	none	bulk		
+wd-0186	none	offer		
+wd-0187	none	personal		
+wd-0201	none	note-fact		
+wd-0215	none	other-person		
+wd-0216	none	bulk		
+wd-0217	none	hard-ad		
+wd-0218	none	polite		
+wd-0219	none	transactional		
+wd-0234	none	note-fact		
+wd-0235	now	person	They need somebody to fetch him before 1 o'clock because the nurse leaves at 1 today.	Please go, your phone keeps going to voicemail.
+wd-0254	none	polite		
+wd-0255	none	bulk		
+wd-0256	none	transactional		
+wd-0257	none	survey		
+wd-0266	none	note-fact		
+wd-0270	list	person	Would you be willing to take over as treasurer from January?	
+wd-0287	none	bulk		
+wd-0288	none	personal		
+wd-0289	none	other-person		
+wd-0290	none	bulk		
+wd-0298	none	note-fact		
+wd-0299	list	note-todo	Book the car service before we drive down.	
+wd-0321	none	personal		
+wd-0322	none	done		
+wd-0323	none	replied		
+wd-0324	none	bulk		
+wd-0325	none	survey		
+wd-0334	none	note-fact		
+we-0001	none	bulk		
+we-0002	none	personal		
+we-0003	list	person	Could you sign off the roster for the next fortnight by Thursday?	
+we-0004	none	transactional		
+we-0005	none	polite		
+we-0006	none	hard-ad		
+we-0007	none	other-person		
+we-0008	none	note-fact		
+we-0009	list	implied	Dad's back is playing up again and Linh is in Da Nang till next month, so we only have two on the floor for Saturday night.	
+we-0010	none	transactional		
+we-0011	none	done		
+we-0012	none	trick		
+we-0013	list	note-todo	Order more theraband, red and green.	Ask Priya how many signed up for the Thursday Pilates class.
+we-0014	none	survey		
+we-0015	list	duty	Please submit the renewal form and a copy of your current professional indemnity certificate through the provider portal before that date.	
+we-0016	none	polite		
+we-0017	none	offer		
+we-0018	none	replied		
+we-0019	none	note-fact		
+we-0020	none	done		
+we-0021	now	person	Is there a spare in the lockbox or should I wait for Bec?	
+we-0022	none	bulk		
+we-0023	none	personal		
+we-0024	none	transactional		
+we-0025	list	group	Please tell me by the 1st if you're in so I can lock the numbers with the winery.	
+we-0026	none	hard-ad		
+we-0027	none	note-fact		
+we-0028	list	person	Do any of your physios treat jaw problems?	If yes I would like to book a first appointment, any weekday after 4pm suits me.
+we-0029	none	personal		
+we-0030	none	personal		
+we-0031	list	note-todo	Book a table somewhere that is NOT a Vietnamese restaurant (Mum will critique the food all night).	
+we-0032	none	bulk		
+we-0033	none	transactional		
+we-0034	none	note-fact		
+we-0035	none	personal		
+we-0036	list	group	Everyone please put your dates in the sheet by Friday 14 November, so I can sort locums for the weeks we're thin.	
+we-0037	none	polite		
+we-0038	list	duty	The premium must be paid by 24 November 2026 for cover to continue without a break.	
+we-0039	none	bulk		
+we-0040	none	hard-ad		
+we-0041	none	note-fact		
+we-0042	none	done		
+we-0043	none	personal		
+we-0044	none	bulk		
+we-0045	none	trick		
+we-0046	now	person	Can you or someone come and turn the water off at your end?	
+we-0047	none	personal		
+we-0048	none	hard-ad		
+we-0049	none	polite		
+we-0050	none	replied		
+we-0051	list	note-todo	Call Raj about buying the second plinth before June (instant write-off still on?).	
+we-0052	none	transactional		
+we-0053	list	person	Also can you book the vet for Biscuit's vaccine?	
+we-0054	none	polite		
+we-0055	none	bulk		
+we-0056	none	other-person		
+we-0057	none	offer		
+we-0058	none	note-fact		
+we-0059	none	hard-ad		
+we-0060	none	done		
+we-0061	none	personal		
+we-0062	list	note-todo	Pay the Guardwell PI invoice ($1,284) before the 24th.	Put a copy of Priya's needling certificate in her staff file.
+we-0063	none	transactional		
+we-0064	none	bulk		
+we-0065	none	personal		
+we-0066	none	note-fact		
+we-0067	none	own		
+wf-0001	none	bulk		
+wf-0002	list	person	Is it possible to meet you next week for discuss about Karim's mark in history?	
+wf-0003	none	personal		
+wf-0004	now	person	Can you tell me by 3 pm today if Léa can still make it?	
+wf-0005	none	bulk		
+wf-0006	none	hard-ad		
+wf-0007	none	survey		
+wf-0008	none	transactional		
+wf-0009	none	other-person		
+wf-0010	none	polite		
+wf-0011	none	personal		
+wf-0012	none	done		
+wf-0013	none	trick		
+wf-0014	none	transactional		
+wf-0015	none	offer		
+wf-0016	none	done		
+wf-0017	list	person	can i give it monday instead of friday?	
+wf-0018	none	bulk		
+wf-0019	none	transactional		
+wf-0020	none	replied		
+wf-0021	none	own		
+wf-0022	none	hard-ad		
+wf-0023	list	implied	Each school sends one delegate with voting rights, and Saint-Laurent-Nord has nobody on the list yet.	I have to send the delegate names to the executive by 16 November.
+wf-0024	none	transactional		
+wf-0025	none	other-person		
+wf-0026	none	transactional		
+wf-0027	none	personal		
+wf-0028	none	bulk		
+wf-0029	list	note-todo	Write the comments for group 11-1 before Friday noon.	Check if Emma's essay mark is in (she gave it Monday)
+wf-0030	none	note-fact		
+wf-0031	none	note-fact		
+wf-0032	list	note-todo	Call Mme Haddad back about Karim's marks.	Buy tape for Léa's stick at Sports Express.
+wf-0033	none	note-fact		
+wf-0034	none	note-fact		
+wf-0035	list	duty	Our records show that the second instalment for Léa Gagnon (U12 B) is not paid yet.	A player with a balance after the due date cannot be on the ice for the first game.
+wf-0036	none	personal		
+wf-0037	none	done		
+wf-0038	none	trick		
+wf-0039	none	polite		
+wf-0040	none	polite		
+wf-0041	none	hard-ad		
+wf-0042	none	bulk		
+wf-0043	list	group	Can each of you tell me by Thursday which one you want, 204 or the library?	
+wf-0044	none	survey		
+wf-0045	none	done		
+wf-0046	none	transactional		
+wf-0047	none	personal		
+wf-0048	none	replied		
+wf-0049	none	offer		
+wf-0050	now	person	Can you reply or come down?	I can wait 10 min more, after the parcel go back to depot in Laval and you pick up there.
+wf-0051	none	polite		
+wf-0052	none	bulk		
+wf-0053	none	personal		
+wf-0054	none	transactional		
+wf-0056	none	transactional		
+wf-0057	none	hard-ad		
+wf-0058	none	bulk		
+wf-0059	none	personal		
+wf-0060	none	offer		
+wf-0061	none	transactional		
+wf-0062	none	bulk		
+wf-0063	list	note-todo	Print the voting card and the summary of the offer.	Ask Julie if retired members can vote (Antoine wants to know)
+wf-0064	none	note-fact		
+wf-0065	list	note-todo	answer Olivier for the Habs tickets	order the bus for the January field trip
+wf-0066	none	note-fact		
+wf-0067	none	note-fact		

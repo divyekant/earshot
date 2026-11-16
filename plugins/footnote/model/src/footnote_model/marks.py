@@ -118,22 +118,29 @@ def d1_notes(items, labels, preds) -> Result:
 
 
 def d4(items, labels, preds) -> Result:
+    """Build spec 6 and RULE-when.md, "The label and the gate". Three lines in one result:
+    found after the gate (labeled `now` from a known sender, given `now`; mark 0.70), correct after the gate (share
+    of the `now` results with a `now` label; mark 0.90), and for information the labeled `now` items from a sender
+    that is not known, with the model result before the gate."""
     lab = {r["id"]: r for r in labels}
     known = sender_known(items)
-    true_now = sum(1 for it in items if lab[it["id"]]["need"] == "now")
-    true_now_known = sum(1 for it in items if lab[it["id"]]["need"] == "now" and known.get(it["id"], False))
-    now = correct = 0
+    now_known = [it for it in items if lab[it["id"]]["need"] == "now" and known.get(it["id"], False)]
+    now_unknown = [it for it in items if lab[it["id"]]["need"] == "now" and not known.get(it["id"], False)]
+    given = correct = 0
     for it in items:
         p = preds.get(it["id"])
         w = apply_when_gate(it, p.get("when", "none"), known.get(it["id"], False)) if p else "none"
         if w == "now":
-            now += 1
+            given += 1
             correct += lab[it["id"]]["need"] == "now"
+    found = sum(1 for it in now_known if (preds.get(it["id"]) or {}).get("when") == "now")
+    before_gate = sum(1 for it in now_unknown if (preds.get(it["id"]) or {}).get("when") == "now")
     ok = None
-    if true_now:
-        ok = now > 0 and correct >= D4_CORRECT * now and correct >= D4_FOUND * true_now
-    return Result("D4", {"items": len(items), "now labeled": true_now, "of these from a known sender": true_now_known,
-                         "now given": now, "now correct": correct}, ok)
+    if now_known:
+        ok = given > 0 and correct >= D4_CORRECT * given and found >= D4_FOUND * len(now_known)
+    return Result("D4", {"now from a known sender": len(now_known), "found": found, "now given": given,
+                         "now correct": correct, "now from an unknown sender": len(now_unknown),
+                         "of these now before the gate": before_gate}, ok)
 
 
 def pairs_mark(task: str, pairs, labels, scores: dict, threshold: float) -> Result:
