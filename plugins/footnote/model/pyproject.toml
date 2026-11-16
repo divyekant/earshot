@@ -1,0 +1,17 @@
+[project]
+name = "footnote-model"
+version = "0.1.0"
+description = "The decision model of Footnote (experiment E13): data formats, bench and fit. Made-up data only."
+requires-python = ">=3.11"
+license = "MIT"
+dependencies = []
+
+[project.scripts]
+fm = "footnote_model.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/footnote_model"]

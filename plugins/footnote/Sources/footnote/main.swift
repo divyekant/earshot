@@ -171,6 +171,19 @@ if let i = args.firstIndex(of: "--page-bench"), i + 1 < args.count {
     exit(runPages())
 }
 
+// The rules arm of E13 (the decision model): footnote --decide-bench <items.jsonl> --out <predictions.tsv>.
+// It writes one prediction for each item and prints counts only (docs/experiments/E13-footnote-decision-model.md).
+if let i = args.firstIndex(of: "--decide-bench"), i + 1 < args.count {
+    guard let o = args.firstIndex(of: "--out"), o + 1 < args.count else { print("Use --out <predictions.tsv>."); exit(1) }
+    do {
+        try DecideBench().run(items: URL(fileURLWithPath: args[i + 1]), predictions: URL(fileURLWithPath: args[o + 1]))
+        exit(0)
+    } catch {
+        print("Bench error: \(error)")
+        exit(1)
+    }
+}
+
 // The bench of the request flags (phase 3, 8.5, E11): footnote --flags-bench <mail fixtures folder>
 // [--embedder <name> [--model <file.gguf>] [--gpu]] [--final <variant>:<threshold>]
 // [--write-weights <file> --variant <A|B> --threshold <t>] [--analyze <set> --threshold <t>]
@@ -268,7 +281,7 @@ if args.contains("--memory-bench") {
         autoreleasepool { e.handle(.command(id: "b\(i)", lead: "where is", text: "garden invoice \(i)", context: [:])) }
     }
     let before = memoryFootprint()
-    malloc_zone_pressure_relief(nil, 0)
+    releaseFreeHeap()
     let after = memoryFootprint()
     print("items \(rows.items), docs \(rows.docs), passages \(rows.passages)")
     print("footprint: at start \(mb(start)), after 50 searches \(mb(before)), after the trim \(mb(after))")
@@ -307,7 +320,7 @@ func scheduleTrim() {
         trimPending = false
         trimLock.unlock()
         #if canImport(Darwin)
-        malloc_zone_pressure_relief(nil, 0)
+        releaseFreeHeap()
         #endif
     }
 }

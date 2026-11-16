@@ -195,3 +195,10 @@ public struct BenchNameError: Error, CustomStringConvertible {
     public var name: String
     public var description: String { "unknown embedder \(name)" }
 }
+
+/// Gives free heap pages back to the system on macOS. It does nothing on Linux.
+public func releaseFreeHeap() {
+    #if os(macOS)
+    malloc_zone_pressure_relief(nil, 0)
+    #endif
+}

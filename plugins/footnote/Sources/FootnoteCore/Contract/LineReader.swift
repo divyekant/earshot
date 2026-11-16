@@ -23,3 +23,8 @@ public enum LineReader {
         if !buffer.isEmpty { onLine(buffer) }
     }
 }
+
+#if !canImport(ObjectiveC)
+/// Linux has no autorelease pool. This function runs the block, so that the same code builds in the Linux tests.
+@inline(__always) public func autoreleasepool<T>(invoking body: () throws -> T) rethrows -> T { try body() }
+#endif
