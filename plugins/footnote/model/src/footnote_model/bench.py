@@ -49,15 +49,24 @@ def rules_predictions(items: list[dict]) -> dict[str, dict]:
         return {row["id"]: row for row in read_tsv(out)}
 
 
-def model_predictions(run_dir: Path, items: list[dict]) -> dict[str, dict]:
-    """A fitted model arm (stage1 output folder) with its thresholds from dev. Nothing of the items is printed."""
+GATE2 = ("greets another", "not for owner")
+
+
+def model_predictions(run_dir: Path, items: list[dict], gate2: bool = False) -> dict[str, dict]:
+    """A fitted model arm (stage1 output folder) with its thresholds from dev. Nothing of the items is printed.
+    With `gate2`, gate 2 of the rules (the mail is for another person) holds the item before the model."""
     from . import fit
     from .stage1 import item_preds
     th = json.loads((run_dir / "thresholds.json").read_text())
     model, tok, _ = fit.load(run_dir)
     sw = rules_predictions(items)
     res = fit.predict_items(model, tok, fit.item_examples(tok, items, None, sw))
-    return item_preds(res, items, th["mail"], th["note"], th["now"])
+    preds = item_preds(res, items, th["mail"], th["note"], th["now"])
+    if gate2:
+        for i, r in sw.items():
+            if r.get("gate", "") in GATE2 and i in preds:
+                preds[i] = {**preds[i], "need": "0", "when": "none"}
+    return preds
 
 
 def control_predictions(run_dir: Path, items: list[dict]) -> dict[str, dict]:
@@ -95,6 +104,8 @@ def arm_predictions(arm: str, items: list[dict]) -> dict[str, dict]:
         return rules_predictions(items)
     if arm.startswith("model:"):
         return model_predictions(Path(arm[6:]), items)
+    if arm.startswith("model+g2:"):
+        return model_predictions(Path(arm[9:]), items, gate2=True)
     if arm.startswith("control:"):
         return control_predictions(Path(arm[8:]), items)
     if arm.startswith("pred:"):
@@ -178,7 +189,7 @@ def sealed_run(set_name: str, data_file: Path, sha_file: Path, arms: list[str], 
         for it in items:
             p = gated.get(it["id"], {})
             need = (p.get("when") if p.get("when") in ("list", "now") else "list") if p.get("need") == "1" else "none"
-            gate = ("replied" if it.get("replied") else "from owner") if code_gate(it) else ""
+            gate = code_gate(it) or ""
             out.append(f"{it['id']}\t{a}\t{need}\t{float(p.get('need_score', 0) or 0):.4f}\t{gate}")
         rows.append((f"{set_name} / {a}", score_items(items, labels, preds)))
         kinds.append(f"- {a}: {kind_counts(items, labels, preds)}")

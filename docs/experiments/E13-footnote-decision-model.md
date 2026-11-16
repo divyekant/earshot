@@ -78,3 +78,16 @@ Dev results (3 seeds, D1 mail found / false):
 | control | 27/6 | 28/6 |
 
 The dev2 found mark is 55. Ettin misses it by 1 or 2. The loop-end rule applies: no more tuning for dev2.
+
+## S1 result (one run, 2026-11-16)
+
+D1 fails on S1 for every arm. The build spec stop rule applied, and dk chose "Targeted data, then a new test". Full counts: `plugins/footnote/model/runs/S1.md`.
+
+| Arm | D1 mail found (mark 34 of 40) | False flags (mark 10 of 400) | Sentence (mark 28) |
+|---|---|---|---|
+| rules | 28 | 16 | 25 |
+| control | 23 | 25 | 15 |
+| Ettin text s13 | 35 | 22 (11 to 18 with the bulk filter) | 32 |
+| BERT text s21 | 37 | 35 | 30 |
+
+Harness fault: the model and control arms did not apply the full bulk filter in this run. See the note in `runs/S1.md`. From round 3, every arm runs behind the full bulk filter, and the facts line has `owner in` (to, cc or none) and `greets` (owner, other, group or none). A second model arm runs behind gate 2 of the rules (`model+g2:`).

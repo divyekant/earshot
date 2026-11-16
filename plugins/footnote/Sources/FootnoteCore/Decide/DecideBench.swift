@@ -70,7 +70,13 @@ public final class DecideBench {
         let days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
         let weekday = days[(cal.component(.weekday, from: now) + 6) % 7]
         let to = it.note ? 0 : it.m.to.count + it.m.cc.count
-        return "owner: \(it.ownerName) | kind: \(it.note ? "note" : "mail") | sender: \(sender) | to: \(to) | limit: \(limit) | weekday: \(weekday)"
+        // Design thread, 2026-11-16: the addressee facts that gate 2 of the rules uses.
+        let own = it.ownerAddress.lowercased()
+        let ownerIn = it.note ? "none" : it.m.to.contains { $0.lowercased() == own } ? "to"
+            : it.m.cc.contains { $0.lowercased() == own } ? "cc" : "none"
+        let names = Self.names(it.ownerName)
+        let greets = it.note ? "none" : p.greeting.map { $0 == "*" ? "group" : names.contains($0) ? "owner" : "other" } ?? "none"
+        return "owner: \(it.ownerName) | kind: \(it.note ? "note" : "mail") | sender: \(sender) | to: \(to) | owner in: \(ownerIn) | greets: \(greets) | limit: \(limit) | weekday: \(weekday)"
     }
 
     /// The separator of the sentences in the column `sentences` (U+001E, record separator).

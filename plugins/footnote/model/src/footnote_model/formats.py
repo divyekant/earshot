@@ -112,13 +112,36 @@ def is_note(item: dict) -> bool:
     return item.get("kind") == "note" or not item.get("from_address")
 
 
-def code_gate(item: dict) -> bool:
-    """Build spec 3 (design thread, 2026-11-16): facts gate the item before the model, like the bulk filter.
-    If the owner replied, or the owner sent the mail, the result is `none` and the model does not run."""
-    if item.get("replied"):
-        return True
+BULK_PRECEDENCE = ("bulk", "list", "junk")
+MAX_ADDRESSES = 20
+
+
+def code_gate(item: dict) -> str | None:
+    """The fact gates before any arm, as the product runs them (Swift `BulkFilter.reason`, phase 3 spec 8.1, and
+    build spec 3). The reason, or None if the item passes. A note has no gate."""
+    if is_note(item):
+        return None
+    own = item.get("owner", {}).get("address", "").lower()
     sender = item.get("from_address", "").lower()
-    return bool(sender) and sender == item.get("owner", {}).get("address", "").lower()
+    prec = item.get("precedence", "").lower()
+    addrs = [a.lower() for a in item.get("to", []) + item.get("cc", [])]
+    if item.get("junk"):
+        return "junk"
+    if sender and sender == own:
+        return "from owner"
+    if item.get("list_unsubscribe"):
+        return "list header"
+    if any(w in prec for w in BULK_PRECEDENCE):
+        return "precedence"
+    if item.get("auto_submitted") or "auto_reply" in prec:
+        return "automatic"
+    if own and own not in addrs:
+        return "owner not in to or cc"
+    if len(addrs) > MAX_ADDRESSES:
+        return "many addresses"
+    if item.get("replied"):
+        return "replied"
+    return None
 
 
 def same_sentence(a: str, b: str) -> bool:

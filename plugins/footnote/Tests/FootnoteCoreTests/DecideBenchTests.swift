@@ -36,7 +36,7 @@ final class DecideBenchTests: XCTestCase {
         XCTAssertEqual(m1[1], "1")
         XCTAssertEqual(m1[3], "list")
         XCTAssertEqual(m1[4], "Could you send me the signed form by tomorrow?")
-        XCTAssertEqual(m1[5], "owner: Ana Lim | kind: mail | sender: person | to: 1 | limit: tomorrow | weekday: Tue")
+        XCTAssertEqual(m1[5], "owner: Ana Lim | kind: mail | sender: person | to: 1 | owner in: to | greets: owner | limit: tomorrow | weekday: Tue")
         XCTAssertTrue(m1[6].components(separatedBy: DecideBench.sentenceSeparator).contains("Could you send me the signed form by tomorrow?"))
         XCTAssertEqual(rows[2][1], "0")
         XCTAssertTrue(rows[3][5].hasPrefix("owner: Ana Lim | kind: note | sender: owner | to: 0"))

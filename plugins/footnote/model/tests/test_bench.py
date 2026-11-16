@@ -125,10 +125,13 @@ class CodeGateTest(unittest.TestCase):
     def test_replied_and_own_mail_give_none(self):
         from footnote_model.bench import apply_code_gate
         owner = {"name": "A", "address": "a@example.com"}
-        items = [{"id": "1", "owner": owner, "from_address": "b@example.org", "replied": True},
-                 {"id": "2", "owner": owner, "from_address": "A@example.com", "replied": False},
-                 {"id": "3", "owner": owner, "from_address": "b@example.org", "replied": False}]
-        preds = {i: {"need": "1", "when": "now"} for i in "123"}
+        to = ["a@example.com"]
+        items = [{"id": "1", "owner": owner, "from_address": "b@example.org", "to": to, "replied": True},
+                 {"id": "2", "owner": owner, "from_address": "A@example.com", "to": to, "replied": False},
+                 {"id": "3", "owner": owner, "from_address": "b@example.org", "to": to, "replied": False},
+                 {"id": "4", "owner": owner, "from_address": "b@example.org", "to": to, "precedence": "list"},
+                 {"id": "5", "owner": owner, "from_address": "b@example.org", "to": ["c@example.org"]}]
+        preds = {i: {"need": "1", "when": "now"} for i in "12345"}
         out = apply_code_gate(items, preds)
-        self.assertEqual([out[i]["need"] for i in "123"], ["0", "0", "1"])
+        self.assertEqual([out[i]["need"] for i in "12345"], ["0", "0", "1", "0", "0"])
         self.assertEqual(out["1"]["when"], "none")
