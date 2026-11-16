@@ -136,3 +136,23 @@ D1 fails on S3 for every arm. The filter held 186 of 400 mails, as declared. Ful
 Notes: the model finds 43 of 50 to-dos with 9 false flags (false share 0.17, mark 0.10). D4: the model finds 7 of 11 `now` items from known senders (mark 8) and gives `now` correctly 7 of 7.
 
 Stage 1 fails. The stage 1 report (`/mnt/project-files/earshot-footnote-model/stage1-report.md`) has the failed marks, the findings, and the size and CPU time of the text model (67 MB in float32, 29.7 ms for 256 tokens on 1 cloud CPU thread).
+
+## Diagnostic X1: hand-written fit data (declared before the first fit)
+
+dk chose "Test hand-written data, in the cloud" (2026-11-16 17:02 UTC). S1 and S3 are open data now (`open/hw1.*`, `open/hw3.*`, the plan in `open/README.md`). X1 is a diagnostic. It gives no pass and changes nothing in Footnote.
+
+Model: ettin-encoder-17m text model, round 3 settings (10 epochs, lr 8e-5, items only), seeds 13, 21 and 34. All arms run behind the full bulk filter and the replied/own gate. Each arm is reported with and without rules gate 2.
+
+| Arm | Fit data | Test | Runs |
+|---|---|---|---|
+| base | writer data of rounds 1 to 3: the round 3 models `r3-ettin-text-s13/s21/s34`, no new fit | HW1 and HW3 | |
+| to-3 | writer data + HW1, weight 4 | HW3 | `x1-to3-w4-sN` |
+| to-1 | writer data + HW3, weight 4 | HW1 | `x1-to1-w4-sN` |
+| to-3 w1, to-1 w1 (if time allows) | the same, weight 1 | as above | `x1-to3-w1-sN`, `x1-to1-w1-sN` |
+
+- Weight 4 means: each hand-written item is in each epoch 4 times (`stage1 --add-items <file> --add-weight 4`). Mails that the bulk filter holds are not fit data, as for the writer data.
+- Thresholds: the round 3 rule on dev1, dev2 and the short-notes dev set only (false flags first, found second). No threshold, seed or setting comes from the test side.
+- Median seed: the seed with the median found count on the test side, then the fewest false flags (only for the report, not a selection).
+- Output for each arm and seed (`footnote_model.x1`): the D1 mail, notes and D4 lines; false flags and misses by kind; the fewest false flags at 34 or more found over all mail thresholds; a score file (id, arm, seed, request score, `now` score, held).
+- Check of the tool: base s21 on HW3 gives the S3 result again (39 found, 32 false; with gate 2 34 found, 20 false).
+- Reading rule (design thread): "data closes the gap" if, in both directions, the median seed has 34 or more found and 12 or fewer false flags at the dev threshold, for the model or the model behind gate 2. "Partly" if the false flags fall by half or more against base but stay above 12. "No" for all other results.

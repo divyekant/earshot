@@ -159,6 +159,9 @@ def main(argv=None):
     ap.add_argument("--no-pairs", action="store_true")
     ap.add_argument("--no-items", action="store_true", help="pair model only (two-model arm)")
     ap.add_argument("--seed", type=int, default=13)
+    ap.add_argument("--add-items", action="append", default=[],
+                    help="a hand-written item file (x.jsonl with x-labels.tsv) to add to the fit data (X1)")
+    ap.add_argument("--add-weight", type=int, default=1, help="each added item is in each epoch this many times")
     ap.add_argument("--eg", help="give the pair heads the EmbeddingGemma pair features; the value is a cache file")
     a = ap.parse_args(argv)
     out = Path(a.out)
@@ -170,8 +173,13 @@ def main(argv=None):
     di, dl = di + ni, dl + nl
     if a.no_items:
         fi, fl = [], []
-    sw = bench.rules_predictions(fi + di)
+    from .formats import label_file
+    added = [(read_jsonl(Path(f)), read_tsv(label_file(Path(f)))) for f in a.add_items]
+    sw = bench.rules_predictions(fi + di + [it for ai, _ in added for it in ai])
     ie = fit.item_examples(tok, fi, fl, sw)
+    for ai, al in added:
+        # X1 (open/README.md): the weight of a hand-written item is the number of copies in each epoch.
+        ie += fit.item_examples(tok, ai, al, sw) * a.add_weight
     pe, dev_pairs, feats = [], {}, {}
     if not a.no_pairs:
         for task, prefix in (("fit", "fit"), ("closes", "close")):
@@ -184,6 +192,10 @@ def main(argv=None):
     model, tok = fit.train(a.base, ie, pe, out, epochs=a.epochs, lr=a.lr, seed=a.seed,
                            extra=len(next(iter(feats.values()))) if feats else 0)
     fit_s = time.time() - t0
+    if a.add_items:
+        cfg = json.loads((out / "config.json").read_text())
+        cfg.update({"add_items": [Path(f).name for f in a.add_items], "add_weight": a.add_weight})
+        (out / "config.json").write_text(json.dumps(cfg))
     res = fit.predict_items(model, tok, fit.item_examples(tok, di, None, sw))
     th = select_item_thresholds(res, di, dl)
     preds = item_preds(res, di, th["mail"], th["note"], th["now"])
