@@ -6,6 +6,21 @@ requires-python = ">=3.11"
 license = "MIT"
 dependencies = []
 
+[dependency-groups]
+# The fit of stage 1 and stage 2 (build spec 4.2, 4.3). Not shipped. CPU wheels of torch.
+fit = ["torch>=2.5", "transformers>=4.48", "safetensors>=0.4", "numpy>=1.26"]
+
+[tool.uv]
+default-groups = []
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu" }]
+
 [project.scripts]
 fm = "footnote_model.cli:main"
 

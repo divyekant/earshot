@@ -110,11 +110,51 @@ class SealedTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 bench.sealed_run("S9", data, sha, ["x"], runs_dir=d / "runs", predict=fake)
             sha.write_text(f"{bench.sha256(data)}  S9.jsonl.gz\n{bench.sha256(label_file(data))}  S9-labels.tsv\n")
-            out = bench.sealed_run("S9", data, sha, ["x"], runs_dir=d / "runs", predict=fake)
+            # A held count that differs from the writer's count stops the run, and the set stays unused.
+            with self.assertRaises(RuntimeError):
+                bench.sealed_run("S9", data, sha, ["x"], runs_dir=d / "runs", predict=fake, expect_held=3)
+            out = bench.sealed_run("S9", data, sha, ["x"], runs_dir=d / "runs", predict=fake, expect_held=0)
+            pred = (d / "runs" / "S9-predictions.tsv").read_text().splitlines()
+            self.assertEqual(pred[1], "m1\tx\tlist\tyes\tno")
             self.assertIn("found 1", out)
             self.assertNotIn("Could you", out)
             with self.assertRaises(RuntimeError):
                 bench.sealed_run("S9", data, sha, ["x"], runs_dir=d / "runs", predict=fake)
+
+    def test_sealed_pairs_run_writes_scores_and_runs_one_time(self):
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            data = d / "fit-s9.jsonl.gz"
+            pairs = [{"id": f"p{i}", "a": {"kind": "capture", "text": "text"}, "b": {"kind": "project"}}
+                     for i in range(2)]
+            write_jsonl(data, pairs)
+            write_tsv(label_file(data), ["id", "label"], [{"id": "p0", "label": "1"}, {"id": "p1", "label": "0"}])
+            sha = d / "fit-s9.sha256"
+            sha.write_text(f"{bench.sha256(data)}  fit-s9.jsonl.gz\n{bench.sha256(label_file(data))}  fit-s9-labels.tsv\n")
+            fake = lambda arm, task, ps: ({"p0": 0.9, "p1": 0.2}, 0.5)
+            out = bench.sealed_pairs_run("S9p", data, sha, ["x"], runs_dir=d / "runs", score=fake)
+            self.assertIn("D2 (project)", out)
+            self.assertIn("correct 1", out)
+            pred = (d / "runs" / "S9p-predictions.tsv").read_text().splitlines()
+            self.assertEqual(pred[1], "p0\tx\t0.9000\t0.5000")
+            with self.assertRaises(RuntimeError):
+                bench.sealed_pairs_run("S9p", data, sha, ["x"], runs_dir=d / "runs", score=fake)
+
+
+class CodeGateTest(unittest.TestCase):
+    def test_replied_and_own_mail_give_none(self):
+        from footnote_model.bench import apply_code_gate
+        owner = {"name": "A", "address": "a@example.com"}
+        to = ["a@example.com"]
+        items = [{"id": "1", "owner": owner, "from_address": "b@example.org", "to": to, "replied": True},
+                 {"id": "2", "owner": owner, "from_address": "A@example.com", "to": to, "replied": False},
+                 {"id": "3", "owner": owner, "from_address": "b@example.org", "to": to, "replied": False},
+                 {"id": "4", "owner": owner, "from_address": "b@example.org", "to": to, "precedence": "list"},
+                 {"id": "5", "owner": owner, "from_address": "b@example.org", "to": ["c@example.org"]}]
+        preds = {i: {"need": "1", "when": "now"} for i in "12345"}
+        out = apply_code_gate(items, preds)
+        self.assertEqual([out[i]["need"] for i in "12345"], ["0", "0", "1", "0", "0"])
+        self.assertEqual(out["1"]["when"], "none")
 
 
 if __name__ == "__main__":
