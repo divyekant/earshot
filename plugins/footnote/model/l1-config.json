@@ -1,0 +1,19 @@
+{
+  "package": "E13 L1, local check on the owner's mail (declared 2026-11-23, before the first read of real mail)",
+  "days": 30,
+  "max_mails": 5000,
+  "arms": ["rules", "model", "model+g2"],
+  "primary_arm": "model+g2",
+  "model_root": "~/projects/earshot-l1-models",
+  "models": [
+    {"folder": "s13", "sha256": "7046a8116984c1654bd84456548e93d02fd3c002342400f50320f97bcf372d8c", "from": "r3-ettin-text-s13"},
+    {"folder": "s21", "sha256": "cbdd39f14c52241d13b09db36254f037c0e38a0b1f946d2c1490e3c12c88d78c", "from": "r3-ettin-text-s21"},
+    {"folder": "s34", "sha256": "d5fc9c9664589ef419d2b1c70aa6bd8b2bb0e5a96822513f96130a137e3cae7d", "from": "r3-ettin-text-s34"}
+  ],
+  "score": "mean of the 3 request scores",
+  "primary_threshold": 0.7,
+  "thresholds": [0.5, 0.7, 0.9],
+  "now_threshold": 0.35,
+  "dev_thresholds_of_the_mean": {"mail": 0.3, "note": 0.32, "now": 0.35},
+  "sample": {"seed": 20261123, "per_group": {"both": 12, "model only": 12, "rules only": 12, "none": 9}}
+}

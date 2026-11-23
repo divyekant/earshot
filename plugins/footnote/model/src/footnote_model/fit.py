@@ -25,11 +25,16 @@ NEED = ("none", "list", "now")
 
 
 class DecisionModel(nn.Module):
-    def __init__(self, base: str, extra: int = 0):
+    def __init__(self, base: str, extra: int = 0, local: Path | None = None):
         """`extra`: the number of outside scores (for example the EmbeddingGemma pair features) that the pair heads
-        get next to the encoder vector. 0 gives the plain model."""
+        get next to the encoder vector. 0 gives the plain model. `local`: a folder with the encoder config; the
+        encoder is made from it with no download, and `load_state_dict` gives all weights (package L1)."""
         super().__init__()
-        self.encoder = AutoModel.from_pretrained(base)
+        if local is not None:
+            from transformers import AutoConfig
+            self.encoder = AutoModel.from_config(AutoConfig.from_pretrained(local))
+        else:
+            self.encoder = AutoModel.from_pretrained(base)
         h = self.encoder.config.hidden_size
         self.extra = extra
         self.need = nn.Linear(h, 3)
@@ -230,8 +235,11 @@ def predict_pairs(model, tok, exs: list[PairEx], batch=64):
 
 def load(out_dir: Path):
     cfg = json.loads((out_dir / "config.json").read_text())
-    tok = AutoTokenizer.from_pretrained(cfg["base"])
-    model = DecisionModel(cfg["base"], cfg.get("extra", 0))
-    model.load_state_dict(torch.load(out_dir / "model.pt"))
+    # A folder `hf` beside the weights holds the tokenizer and the encoder config: then nothing is downloaded.
+    local = out_dir / "hf" if (out_dir / "hf").is_dir() else None
+    tok = AutoTokenizer.from_pretrained(local or cfg["base"])
+    model = DecisionModel(cfg["base"], cfg.get("extra", 0), local)
+    state = torch.load(out_dir / "model.pt")
+    model.load_state_dict({k: v.float() if v.is_floating_point() else v for k, v in state.items()})
     model.eval()
     return model, tok, cfg

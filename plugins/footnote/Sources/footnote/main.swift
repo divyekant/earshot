@@ -265,6 +265,32 @@ if let path = env["EARSHOT_PLUGIN_DATA"], !path.isEmpty {
         .appendingPathComponent("Library/Application Support/earshot/plugin-data/footnote", isDirectory: true)
 }
 
+// E13 package L1: footnote --decide-export <file> --days N [--max N]. The owner's recent inbox mail as an item file
+// of the decision model, with mode 0600, for the local check on this Mac. Read only. It prints counts only.
+if let i = args.firstIndex(of: "--decide-export"), i + 1 < args.count {
+    func value(_ flag: String) -> String? {
+        args.firstIndex(of: flag).flatMap { $0 + 1 < args.count ? args[$0 + 1] : nil }
+    }
+    #if os(macOS)
+    let source = AppleMail()
+    let settings = FootnoteSettings.load(folder.appendingPathComponent("settings.json")).settings
+    do {
+        let owner = DecideExport.owner(settings, accounts: (try? source.accountAddresses()) ?? [])
+        guard !owner.addresses.isEmpty else { print("No owner address."); exit(1) }
+        let export = DecideExport(days: Int(value("--days") ?? "30") ?? 30, maxMails: Int(value("--max") ?? "5000") ?? 5000)
+        _ = try export.run(source: source, ownerName: owner.name, ownerAddresses: owner.addresses,
+                           to: URL(fileURLWithPath: args[i + 1]))
+        exit(0)
+    } catch {
+        print("Export error: \(error)")
+        exit(1)
+    }
+    #else
+    print("The export needs the Mail app of a Mac.")
+    exit(1)
+    #endif
+}
+
 // Phase 5 (X1): footnote --memory-bench [--scale N]. A made-up store of the size of the owner's store (times N) in
 // a new temporary folder, 50 searches, then the footprint before and after the trim. No file of the owner.
 if args.contains("--memory-bench") {

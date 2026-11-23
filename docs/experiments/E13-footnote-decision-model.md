@@ -170,3 +170,18 @@ The design thread set a time limit of 19:00 UTC for new pair arms. The student a
 - `model` is the round 3 pair run that passes D2 project on dev1 and dev2. `model+eg` has one seed, so it has no seed choice.
 - The control arm is fit again in the run, with the fit-pair features from the cache of the dev runs. On dev it gives the same D2 project counts as `r3-control`; D2 item changes by 2 proposals (49 to 51) and D3 by 1, because the vectors of llama-server differ a little from run to run.
 - The run uses `fm sealed-pairs` on `fit-s2` and `close-s2`, one time each. D2 project is the result line; D2 item is a second line. `runs/S2-fit-predictions.tsv` and `runs/S2-close-predictions.tsv` have the pair id, arm, score and threshold. No text.
+
+## Package L1: check on the owner's recent mail (declared 2026-11-23, before the first read of real mail)
+
+dk chose "Check on my real mail, script only" (2026-11-23 20:58 UTC). Spec: `local-check-spec.md` of the design thread. It is a measurement: no pass and no fail of a mark. The mail text stays on the Mac; the threads get counts only.
+
+Declared configuration: `plugins/footnote/model/l1-config.json`.
+
+- Arms: rules (the shipped rules, `footnote --decide-bench`), model (mean request score of the 3 base Ettin text models of round 3, seeds 13, 21, 34), model+g2 (the model behind rules gate 2; primary). All arms run behind the bulk filter and the replied/own gate on the real header fields.
+- Thresholds of the mean score: 0.7 primary, also 0.5 and 0.9. `now`: 0.35, the dev threshold of the mean of 3 (dev1, dev2, short notes). The dev mail threshold of the mean is 0.3 (information only).
+- `now` gate: the export cannot see whether the owner wrote to an address before. The counts give `now` before the gate, and after a gate with the rule of `DecideBench` (an earlier mail of the sender in the export passed the filter).
+- Model files: the round 3 files of 2026-11-16, stored as 16-bit floats with the tokenizer and encoder config beside them (no download). SHA-256 in the config. Check: with these files, the mean of 3 on HW3 gives the old lines again (0.5: 38/25, g2 33/18; 0.7: 36/11, g2 32/8; 0.9: 35/7, g2 32/5).
+- Mail: the inbox of Mail.app, the last 30 days, at most 5,000 mails, newest first. The text is read only for mails that pass the bulk filter. Each mail in the export gets an id of the export (`l1-0001`), not the id of Mail.
+- List: up to 12 mails of each group (both, model+g2 only, rules only) and 9 random mails with no flag that pass the filter; random order with seed 20261123; the page does not show the groups.
+
+Commands: `footnote --decide-export <folder>/export.jsonl --days 30`, then `fm local-check score|counts|list|marks|clean --dir <folder>`. A test runs each command on made-up mail and checks that the output has no field of a mail.

@@ -68,6 +68,17 @@ def cmd_sealed_pairs(a) -> int:
     return 0
 
 
+def cmd_local_check(a) -> int:
+    from . import local_check
+    try:
+        return local_check.main(a.step, Path(a.dir).expanduser(), Path(a.config) if a.config else local_check.CONFIG,
+                                open_browser=not a.no_open)
+    except (RuntimeError, FileNotFoundError) as e:
+        # The message names a file of the check or a step, never a field of a mail.
+        print(f"Refused: {type(e).__name__}")
+        return 1
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="fm", description="The decision model of Footnote (E13).")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -93,6 +104,12 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("--sha256", required=True)
     sp.add_argument("--arm", action="append", required=True)
     sp.set_defaults(fn=cmd_sealed_pairs)
+    lc = sub.add_parser("local-check", help="E13 L1: rules and model on the owner's recent mail. Counts only.")
+    lc.add_argument("step", choices=["score", "counts", "list", "marks", "clean"])
+    lc.add_argument("--dir", required=True, help="the folder of the check (export.jsonl is there)")
+    lc.add_argument("--config", default=None)
+    lc.add_argument("--no-open", action="store_true", help="do not open the browser (list)")
+    lc.set_defaults(fn=cmd_local_check)
     a = ap.parse_args(argv)
     if getattr(a, "arm", "x") is None:
         a.arm = ["rules"]
