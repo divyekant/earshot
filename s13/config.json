@@ -1,0 +1,1 @@
+{"base": "jhu-clsp/ettin-encoder-17m", "epochs": 10, "lr": 8e-05, "batch": 16, "seed": 13}
