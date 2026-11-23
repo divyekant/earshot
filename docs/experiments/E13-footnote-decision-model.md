@@ -184,4 +184,7 @@ Declared configuration: `plugins/footnote/model/l1-config.json`.
 - Mail: the inbox of Mail.app, the last 30 days, at most 5,000 mails, newest first. The text is read only for mails that pass the bulk filter. Each mail in the export gets an id of the export (`l1-0001`), not the id of Mail.
 - List: up to 12 mails of each group (both, model+g2 only, rules only) and 9 random mails with no flag that pass the filter; random order with seed 20261123; the page does not show the groups.
 
+- Replied group (part A2, added before the first read of real mail): the mails that the bulk filter holds only because the owner replied. They most surely needed the owner. The export reads their text. All arms run on a copy with `replied` set to false; all other gates stay. Counts only, apart from part A (not in the flag counts, the overlap, the `now` lines or the list).
+- The check reads the inbox of Mail.app only. Mail that the owner moved out of the inbox in the 30 days is not in it. If the export stops at the cap of 5,000 mails, it says so, and the counts then cover fewer than 30 days.
+
 Commands: `footnote --decide-export <folder>/export.jsonl --days 30`, then `fm local-check score|counts|list|marks|clean --dir <folder>`. A test runs each command on made-up mail and checks that the output has no field of a mail.

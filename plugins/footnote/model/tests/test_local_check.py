@@ -14,20 +14,20 @@ from footnote_model.formats import write_jsonl
 SECRET = ("Quokka", "zephyr.vane", "Marigold-77", "l1-00")
 
 
-def mail(n, list_header=False):
+def mail(n, list_header=False, replied=False):
     return {"id": f"l1-{n:04d}", "kind": "mail", "owner": {"name": "ana lim", "address": "ana.lim@example.com"},
             "now": "2026-11-23T08:00:00Z", "from_name": f"Quokka Person {n}",
             "from_address": f"zephyr.vane{n}@example.org", "to": ["ana.lim@example.com"], "cc": [],
             "subject": f"Marigold-77 plan {n}", "date": f"2026-11-{10 + n % 10:02d}T08:00:00Z",
             "list_unsubscribe": list_header, "precedence": "", "auto_submitted": False, "junk": False,
-            "replied": False, "body": f"Could you check the Marigold-77 form, Quokka? {n}"}
+            "replied": replied, "body": f"Could you check the Marigold-77 form, Quokka? {n}"}
 
 
 class LocalCheckTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.d = Path(self.tmp.name)
-        write_jsonl(self.d / local_check.EXPORT, [mail(n, list_header=n % 7 == 0) for n in range(1, 61)])
+        write_jsonl(self.d / local_check.EXPORT, [mail(n, list_header=n % 7 == 0, replied=n % 11 == 0) for n in range(1, 61)])
         self.cfg_path = self.d.parent / f"cfg-{os.getpid()}.json"
         cfg = local_check.load_config()
         self.cfg_path.write_text(json.dumps(cfg))
@@ -64,6 +64,7 @@ class LocalCheckTest(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertIn("Mails read: 60", out)
         self.assertIn("list header 8", out)
+        self.assertIn("Replied group (A2): 5 mails", out)
         self.assert_clean(out)
         n = local_check.make_list(self.d, self.cfg)
         self.assertLessEqual(n, 45)

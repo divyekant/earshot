@@ -90,6 +90,13 @@ def score(d: Path, cfg: dict, rules=rules_in_folder, models=None) -> None:
     t0 = time.perf_counter()
     sw = rules(d, items)
     t_rules = time.perf_counter() - t0
+    # Part A2, the replied group: the mails that the filter holds only because the owner replied. All arms run on
+    # a copy with `replied` set to false; all other gates stay. A second rules run, so that the first one is as is.
+    replied = {it["id"] for it in items if code_gate(it) == "replied"}
+    copies = [dict(it, replied=False) if it["id"] in replied else it for it in items]
+    if replied:
+        sw2 = rules(d, copies)
+        sw = {**sw, **{i: sw2[i] for i in replied if i in sw2}}
     if models is None:
         import hashlib
         models = []
@@ -101,15 +108,15 @@ def score(d: Path, cfg: dict, rules=rules_in_folder, models=None) -> None:
     per_model, t_model = [], 0.0
     for m in models:
         if callable(m):
-            res = m(items, sw)
+            res = m(copies, sw)
         else:
             os.environ.setdefault("HF_HUB_OFFLINE", "1")
             os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
             from . import fit
             model, tok, _ = fit.load(Path(m))
             t1 = time.perf_counter()
-            # Mails that the bulk filter holds reach no arm, so the model does not read them.
-            passing = [it for it in items if code_gate(it) is None]
+            # Mails that the bulk filter holds reach no arm, so the model does not read them (except the replied group).
+            passing = [it for it in copies if code_gate(it) is None]
             res = fit.predict_items(model, tok, fit.item_examples(tok, passing, None, sw))
             t_model += time.perf_counter() - t1
         per_model.append(res)
@@ -123,8 +130,9 @@ def score(d: Path, cfg: dict, rules=rules_in_folder, models=None) -> None:
         reqs = [r.get(i, {}).get("p_req", 0.0) for r in per_model]
         nows = [r.get(i, {}).get("p_now", 0.0) for r in per_model]
         s = sw.get(i, {})
+        rules_flag = s.get("need") == "1" and (not bulk or bulk == "replied")
         rows.append("\t".join([i, bulk, "yes" if s.get("gate", "") in GATE2 else "no",
-                               "1" if s.get("need") == "1" and not bulk else "0",
+                               "1" if rules_flag else "0",
                                f"{sum(reqs) / len(reqs):.4f}", f"{sum(nows) / len(nows):.4f}",
                                "yes" if known[i] else "no"] + [f"{v:.4f}" for v in reqs]))
     (d / SCORES).write_text("\n".join(rows) + "\n")
@@ -191,6 +199,12 @@ def counts_text(d: Path, cfg: dict) -> str:
             out.append(f"now at {t}, {arm}: {len(now)} before the sender gate, {len(after)} after it "
                        "(known = an earlier mail of the sender passed the filter)")
     out.append("now, rules: 0 (the rules of today give no now)")
+    rep = [r for r in rows if r["bulk"] == "replied"]
+    line = f"Replied group (A2): {len(rep)} mails; flags of the rules {sum(r['rules'] == '1' for r in rep)}"
+    for t in cfg["thresholds"]:
+        line += (f"; at {t}: model {sum(float(r['p_req']) >= t for r in rep)}, "
+                 f"model+g2 {sum(float(r['p_req']) >= t and r['gate2'] == 'no' for r in rep)}")
+    out.append(line)
     if (d / COST).exists():
         out.append("Cost: " + ", ".join(f"{k} {v}" for k, v in json.loads((d / COST).read_text()).items()))
     return "\n".join(out)

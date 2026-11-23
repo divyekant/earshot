@@ -7,7 +7,8 @@ import Foundation
 ///
 /// - It reads through a `MailSource` only (read only; the Mac source uses the fixed scripts of `AppleScripts`).
 /// - It writes the file with mode 0600. The ids in the file are its own (`l1-0001`), not the ids of Mail.
-/// - It reads the text only of a mail that passes the bulk filter. A held mail keeps its header facts.
+/// - It reads the text of a mail that passes the bulk filter, and of a mail that the filter holds only because the
+///   owner replied (the replied group of the spec, part A2). Another held mail keeps its header facts only.
 /// - It prints counts only: never a field of a mail.
 public struct DecideExport {
     public var days: Int
@@ -25,6 +26,8 @@ public struct DecideExport {
         public var mails = 0
         public var withText = 0
         public var failed = 0
+        /// The export stopped at `maxMails` before the end of the days.
+        public var capped = false
     }
 
     /// The owner of the items: the setting, or the Mail accounts (as `Engine.ownerAddresses` and `ownerNames`).
@@ -58,16 +61,18 @@ public struct DecideExport {
         var lines: [String] = []
         var pos = 0
         var done = false
-        while !done, r.mails < maxMails {
+        while !done {
+            if r.mails >= maxMails { r.capped = true; break }
             let ids = try source.ids(from: pos, count: batch)
             if ids.isEmpty { break }
             pos += ids.count
             for id in ids {
-                guard r.mails < maxMails else { done = true; break }
+                guard r.mails < maxMails else { r.capped = true; done = true; break }
                 guard var m = try? source.envelope(id: id) else { r.failed += 1; continue }
                 if m.date < since { done = true; break }
                 let own = Self.ownerAddress(m, ownerAddresses)
-                if BulkFilter.reason(m, owner: Set(ownerAddresses)) == nil {
+                let reason = BulkFilter.reason(m, owner: Set(ownerAddresses))
+                if reason == nil || reason == "replied" {
                     if let t = try? source.text(id: id) {
                         m.text = String(t.prefix(MailMessage.maxText))
                         r.withText += 1
@@ -98,6 +103,7 @@ public struct DecideExport {
         try h.close()
         try fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
         out("Export: \(r.mails) mails in \(days) days, \(r.withText) with text, \(r.failed) failed reads")
+        if r.capped { out("The export stopped at the cap of \(maxMails) mails: the counts cover fewer than \(days) days.") }
         return r
     }
 }
